@@ -46,11 +46,11 @@ TODO: compilare l'usage guide
 
 ## Acknowledgments
 
-TODO: riempire con i ringraziamenti
+- Thanks to **Shobhit Narayanan** for creating [GnomeCodexBar](https://github.com/shenron0101/GnomeCodexBar).
 
 
 
 ## License
 
-TODO: rimpere con le informazioni della lincenza
-
+- This program is licensed under the terms in [`LICENSE`](./LICENSE).
+- This project includes modified files from **GnomeCodexBar**; those files are covered by the license provided in `LICENSE_GnomeCodexBar`, as required by the original license terms.
