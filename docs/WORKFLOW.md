@@ -1,0 +1,182 @@
+## Execution Units Index
+
+- `id: PROC:main`
+  - `type: Process`
+  - `parent_process: null`
+  - `role: usage-tui executable process (CLI/TUI), including direct shell invocation and GNOME-triggered invocations`
+  - `entrypoints: usage_tui.cli.main(...) [src/aibar/usage_tui/cli.py:67], run_tui(...) [src/aibar/usage_tui/tui.py:512]`
+  - `defining_files: src/aibar/usage_tui/cli.py, src/aibar/usage_tui/tui.py, src/aibar/usage_tui/config.py, src/aibar/usage_tui/cache.py, src/aibar/usage_tui/claude_cli_auth.py, src/aibar/usage_tui/providers/*.py`
+  - `thread_model: no explicit threads detected in repository source under src/`
+
+- `id: PROC:gnome-shell`
+  - `type: Process`
+  - `parent_process: null`
+  - `role: GNOME Shell extension host executing usage monitor panel logic`
+  - `entrypoints: UsageTuiExtension.enable(...) [src/aibar/extension/extension.js:770], UsageTuiExtension.disable(...) [src/aibar/extension/extension.js:776]`
+  - `defining_files: src/aibar/extension/extension.js, src/aibar/extension/metadata.json, src/aibar/extension/stylesheet.css`
+  - `thread_model: no explicit threads detected in repository source under src/`
+
+## Execution Units
+
+### PROC:main
+- `Entrypoints`
+  - `main(...)`: Click command group dispatcher [`src/aibar/usage_tui/cli.py:67`]
+  - `run_tui(...)`: Textual app runner [`src/aibar/usage_tui/tui.py:512`]
+- `Lifecycle/Trigger`
+  - Starts when `usage-tui` binary is executed by a shell or by `Gio.SubprocessLauncher.spawnv(...)` from `PROC:gnome-shell`.
+  - Executes one command path (`show|doctor|tui|env|setup|login`) per invocation, then exits; `tui` command blocks in Textual event loop until user quit.
+- `Internal Call-Trace Tree`
+  - `main(...)`: command router [`src/aibar/usage_tui/cli.py:67`]
+    - `show(provider, window, output_json)`: fetch/report usage metrics [`src/aibar/usage_tui/cli.py:91`]
+      - `parse_window(window)`: map CLI window string to enum [`src/aibar/usage_tui/cli.py:32`]
+      - `parse_provider(provider)`: map provider selector [`src/aibar/usage_tui/cli.py:44`]
+      - `get_providers()`: instantiate provider objects [`src/aibar/usage_tui/cli.py:21`]
+        - `ClaudeOAuthProvider.__init__(...)`: load Claude token [`src/aibar/usage_tui/providers/claude_oauth.py:37`]
+          - `extract_claude_cli_token()`: Claude CLI credential extraction [`src/aibar/usage_tui/claude_cli_auth.py:106`]
+            - `ClaudeCLIAuth.get_access_token(...)`: read access token [`src/aibar/usage_tui/claude_cli_auth.py:49`]
+              - `ClaudeCLIAuth.get_credentials(...)`: parse credential JSON [`src/aibar/usage_tui/claude_cli_auth.py:33`]
+        - `OpenAIUsageProvider.__init__(...)`: load OpenAI token [`src/aibar/usage_tui/providers/openai_usage.py:37`]
+          - `Config.get_token(...)`: credential resolution [`src/aibar/usage_tui/config.py`]
+            - `load_env_file()`: parse env file kv pairs [`src/aibar/usage_tui/config.py:14`]
+        - `OpenRouterUsageProvider.__init__(...)`: load OpenRouter key [`src/aibar/usage_tui/providers/openrouter.py:31`]
+          - `Config.get_token(...)` -> `load_env_file()` [`src/aibar/usage_tui/config.py:14`]
+        - `CopilotProvider.__init__(...)`: load GitHub token [`src/aibar/usage_tui/providers/copilot.py:192`]
+          - `CopilotCredentialStore.load_token(...)`: resolve token from env/file stores [`src/aibar/usage_tui/providers/copilot.py:127`]
+        - `CodexProvider.__init__(...)`: load Codex credentials [`src/aibar/usage_tui/providers/codex.py:230`]
+          - `CodexCredentialStore.load(...)`: parse auth store [`src/aibar/usage_tui/providers/codex.py:89`]
+      - `_fetch_result(provider, window)`: execute provider fetch via asyncio [`src/aibar/usage_tui/cli.py:55`]
+        - `ClaudeOAuthProvider.fetch(...)`: query Claude OAuth usage [`src/aibar/usage_tui/providers/claude_oauth.py:61`]
+          - `ClaudeOAuthProvider.is_configured(...)` [`src/aibar/usage_tui/providers/claude_oauth.py:47`]
+          - `ClaudeOAuthProvider._parse_response(...)`: normalize utilization/reset metrics [`src/aibar/usage_tui/providers/claude_oauth.py:135`]
+        - `OpenAIUsageProvider.fetch(...)`: query OpenAI org usage+costs [`src/aibar/usage_tui/providers/openai_usage.py:71`]
+          - `OpenAIUsageProvider.is_configured(...)` [`src/aibar/usage_tui/providers/openai_usage.py:50`]
+          - `OpenAIUsageProvider._get_time_range(...)`: derive unix range [`src/aibar/usage_tui/providers/openai_usage.py:64`]
+          - `OpenAIUsageProvider._fetch_usage(...)` -> `OpenAIUsageProvider._check_response(...)` [`src/aibar/usage_tui/providers/openai_usage.py:101`, `:141`]
+          - `OpenAIUsageProvider._fetch_costs(...)` -> `OpenAIUsageProvider._check_response(...)` [`src/aibar/usage_tui/providers/openai_usage.py:121`, `:141`]
+          - `OpenAIUsageProvider._build_result(...)`: aggregate tokens/requests/cost [`src/aibar/usage_tui/providers/openai_usage.py:152`]
+        - `OpenRouterUsageProvider.fetch(...)`: query key usage/limits [`src/aibar/usage_tui/providers/openrouter.py:57`]
+          - `OpenRouterUsageProvider.is_configured(...)` [`src/aibar/usage_tui/providers/openrouter.py:44`]
+          - `OpenRouterUsageProvider._parse_response(...)`: normalize usage/credits [`src/aibar/usage_tui/providers/openrouter.py:112`]
+            - `OpenRouterUsageProvider._get_usage(...)`: window-specific metric select [`src/aibar/usage_tui/providers/openrouter.py:136`]
+              - `OpenRouterUsageProvider._to_float(...)`: numeric conversion [`src/aibar/usage_tui/providers/openrouter.py:152`]
+        - `CopilotProvider.fetch(...)`: query Copilot internal quota API [`src/aibar/usage_tui/providers/copilot.py:219`]
+          - `CopilotProvider.is_configured(...)` [`src/aibar/usage_tui/providers/copilot.py:202`]
+          - `CopilotProvider._parse_response(...)`: normalize quota snapshots [`src/aibar/usage_tui/providers/copilot.py:278`]
+            - `_get_snapshot(...)`: nested extractor [`src/aibar/usage_tui/providers/copilot.py:297`]
+            - `_extract_quota_data(...)`: nested normalization helper [`src/aibar/usage_tui/providers/copilot.py:300`]
+        - `CodexProvider.fetch(...)`: query Codex usage endpoint [`src/aibar/usage_tui/providers/codex.py:260`]
+          - `CodexProvider.is_configured(...)` [`src/aibar/usage_tui/providers/codex.py:241`]
+          - `CodexCredentials.needs_refresh(...)`: refresh threshold check [`src/aibar/usage_tui/providers/codex.py:43`]
+          - `CodexTokenRefresher.refresh(...)`: refresh token exchange [`src/aibar/usage_tui/providers/codex.py:155`]
+            - `CodexCredentialStore.save(...)`: persist refreshed credentials [`src/aibar/usage_tui/providers/codex.py:125`]
+          - `CodexProvider._parse_response(...)`: normalize window utilization [`src/aibar/usage_tui/providers/codex.py:326`]
+      - `_print_result(name, result, label)`: text-mode renderer [`src/aibar/usage_tui/cli.py:140`]
+        - `_progress_bar(percent, width)`: text progress bar [`src/aibar/usage_tui/cli.py:187`]
+    - `doctor()`: provider config+connectivity checks [`src/aibar/usage_tui/cli.py:195`]
+      - `get_providers()` [`src/aibar/usage_tui/cli.py:21`]
+      - `Config.get_provider_status(...)`: status object [`src/aibar/usage_tui/config.py`]
+        - `Config.is_provider_configured(...)`: instantiate provider and call `is_configured` [`src/aibar/usage_tui/config.py`]
+      - `_fetch_result(provider, WindowPeriod.HOUR_5)` [`src/aibar/usage_tui/cli.py:55`]
+    - `tui()`: launch Textual UI [`src/aibar/usage_tui/cli.py:243`]
+      - `run_tui()`: create and run app [`src/aibar/usage_tui/tui.py:512`]
+        - `UsageTUI.__init__(...)`: provider registry + cache init [`src/aibar/usage_tui/tui.py:365`]
+          - `ResultCache.__init__(...)`: memory/disk cache setup [`src/aibar/usage_tui/cache.py:46`]
+        - `UsageTUI.on_mount(...)`: initial refresh trigger [`src/aibar/usage_tui/tui.py:400`]
+          - `UsageTUI.action_refresh(...)`: fetch flow [`src/aibar/usage_tui/tui.py:420`]
+            - `UsageTUI._get_card(...)` [`src/aibar/usage_tui/tui.py:478`]
+            - `ResultCache.get(provider, window)`: cached read [`src/aibar/usage_tui/cache.py:76`]
+            - provider `fetch(...)` path (same provider call chain as `show(...)`)
+            - `ResultCache.set(result)`: cache write [`src/aibar/usage_tui/cache.py:93`]
+              - `ResultCache._save_to_disk(...)`: persist successful result [`src/aibar/usage_tui/cache.py:145`]
+                - `ResultCache._sanitize_raw(...)`: redact sensitive keys [`src/aibar/usage_tui/cache.py:188`]
+            - `UsageTUI._update_json_view(...)`: JSON tab update [`src/aibar/usage_tui/tui.py:502`]
+        - `UsageTUI.action_window_5h(...)` / `UsageTUI.action_window_7d(...)`: switch window + invalidate cache [`src/aibar/usage_tui/tui.py:455`, `:462`]
+          - `ResultCache.invalidate(...)` [`src/aibar/usage_tui/cache.py:121`]
+        - `UsageTUI.action_toggle_json(...)`: tab switch [`src/aibar/usage_tui/tui.py:469`]
+    - `env()`: print env var help [`src/aibar/usage_tui/cli.py:251`]
+      - `Config.get_env_var_help(...)`: provider help text [`src/aibar/usage_tui/config.py`]
+        - `Config.is_provider_configured(...)` [`src/aibar/usage_tui/config.py`]
+    - `setup()`: interactive key setup [`src/aibar/usage_tui/cli.py:257`]
+      - `write_env_file(updates)`: persist provided keys [`src/aibar/usage_tui/config.py:29`]
+    - `login(provider)`: auth flow router [`src/aibar/usage_tui/cli.py:351`]
+      - `_login_claude()`: Claude CLI token validation flow [`src/aibar/usage_tui/cli.py:368`]
+        - `ClaudeCLIAuth.is_available(...)` [`src/aibar/usage_tui/claude_cli_auth.py:29`]
+        - `ClaudeCLIAuth.get_token_info(...)` [`src/aibar/usage_tui/claude_cli_auth.py:68`]
+          - `ClaudeCLIAuth.is_token_expired(...)` [`src/aibar/usage_tui/claude_cli_auth.py:54`]
+        - `ClaudeCLIAuth.get_access_token(...)` [`src/aibar/usage_tui/claude_cli_auth.py:49`]
+      - `_login_copilot()`: Copilot device-flow auth [`src/aibar/usage_tui/cli.py:413`]
+        - `CopilotProvider.login(...)` [`src/aibar/usage_tui/providers/copilot.py:377`]
+          - `CopilotDeviceFlow.request_device_code(...)` [`src/aibar/usage_tui/providers/copilot.py:37`]
+          - `CopilotDeviceFlow.poll_for_token(...)` [`src/aibar/usage_tui/providers/copilot.py:62`]
+          - `CopilotCredentialStore.save_token(...)` [`src/aibar/usage_tui/providers/copilot.py:162`]
+- `External Boundaries`
+  - `click` CLI parsing/dispatch.
+  - `textual` event loop/rendering.
+  - `httpx` network I/O to external APIs (Anthropic/OpenAI/OpenRouter/GitHub/Auth servers/ChatGPT backend).
+  - local filesystem credential/cache reads+writes under user home (`~/.claude`, `~/.codex`, `~/.config/usage-tui`, `~/.cache/usage-tui`).
+
+### PROC:gnome-shell
+- `Entrypoints`
+  - `UsageTuiExtension.enable(...)`: extension activation [`src/aibar/extension/extension.js:770`]
+  - `UsageTuiExtension.disable(...)`: extension deactivation [`src/aibar/extension/extension.js:776`]
+- `Lifecycle/Trigger`
+  - Starts with GNOME Shell session; extension methods invoked by GNOME extension manager.
+  - On enable: panel indicator initialized, immediate refresh run, periodic refresh timer scheduled.
+  - On disable: indicator destroyed and timeout removed.
+- `Internal Call-Trace Tree`
+  - `UsageTuiExtension.enable(...)`: construct and register indicator [`src/aibar/extension/extension.js:770`]
+    - `UsageTuiIndicator._init()`: initialize state and bootstrap UI/runtime [`src/aibar/extension/extension.js:95`]
+      - `_buildPanelButton()`: panel icon/label widgets [`src/aibar/extension/extension.js:112`]
+      - `_buildPopupMenu()`: popup layout, action items, and handlers [`src/aibar/extension/extension.js:133`]
+        - action handler -> `_refreshData()` [`src/aibar/extension/extension.js:633`]
+        - action handler -> `_openTerminalWithCommand(command)` [`src/aibar/extension/extension.js:744`]
+      - `_refreshData()`: execute `usage-tui show --json` subprocess [`src/aibar/extension/extension.js:633`]
+        - `_loadEnvFromFile()`: read env file values [`src/aibar/extension/extension.js:30`]
+        - `_getUsageTuiPath()`: resolve binary path [`src/aibar/extension/extension.js:18`]
+        - async callback path:
+          - `_parseOutput(output)`: JSON decode and state update [`src/aibar/extension/extension.js:666`]
+          - `_updateUI()`: recalc panel/popup from parsed provider data [`src/aibar/extension/extension.js:680`]
+            - `_createTab(providerName)`: tab widget creation [`src/aibar/extension/extension.js:205`]
+            - `_updateProviderCard(providerName, data)`: create/update card [`src/aibar/extension/extension.js:248`]
+              - `_createProviderCard(providerName)`: card widget graph [`src/aibar/extension/extension.js:263`]
+              - `_populateProviderCard(card, providerName, data)`: metric rendering [`src/aibar/extension/extension.js:406`]
+                - `_getProgressClass(pct)`: threshold-to-style mapping [`src/aibar/extension/extension.js:84`]
+            - `_switchToProvider(providerName)`: active tab/card switch [`src/aibar/extension/extension.js:224`]
+          - `_handleError(message)`: error-state update [`src/aibar/extension/extension.js:738`]
+      - `_startAutoRefresh()`: periodic refresh timer setup [`src/aibar/extension/extension.js:619`]
+        - timer callback -> `_refreshData()` [`src/aibar/extension/extension.js:633`]
+  - `UsageTuiExtension.disable(...)`: teardown indicator [`src/aibar/extension/extension.js:776`]
+    - `UsageTuiIndicator.destroy()`: remove timer and call parent destroy [`src/aibar/extension/extension.js:755`]
+- `External Boundaries`
+  - GNOME Shell APIs (`Main.panel`, `PanelMenu`, `PopupMenu`, `St`, `Gio`, `GLib`).
+  - Subprocess execution via `Gio.SubprocessLauncher` and `Gio.Subprocess`.
+  - Terminal emulator process spawn (`gnome-terminal` command path).
+
+## Communication Edges
+
+- `id: EDGE-001`
+  - `source: PROC:gnome-shell`
+  - `destination: PROC:main`
+  - `direction: unidirectional request/response (process spawn + stdio return)`
+  - `mechanism: Gio.SubprocessLauncher.spawnv([...,'show','--json']) + communicate_utf8_async`
+  - `endpoint_or_channel: child-process argv + STDOUT JSON payload`
+  - `payload_data_shape: { "<provider_name>": ProviderResult.model_dump(mode="json"), ... }`
+  - `evidence: src/aibar/extension/extension.js:637-653, src/aibar/usage_tui/cli.py:135-137, src/aibar/usage_tui/providers/base.py:57-66`
+
+- `id: EDGE-002`
+  - `source: PROC:gnome-shell`
+  - `destination: PROC:main`
+  - `direction: unidirectional launch trigger (indirect via external terminal process)`
+  - `mechanism: Gio.Subprocess.new(['gnome-terminal','--','bash','-c','usage-tui tui; ...'])`
+  - `endpoint_or_channel: command string passed to shell in terminal subprocess`
+  - `payload_data_shape: UTF-8 shell command text; no structured runtime payload returned to source unit`
+  - `evidence: src/aibar/extension/extension.js:744-748, src/aibar/usage_tui/cli.py:243-247, src/aibar/usage_tui/tui.py:512-515`
+
+- `id: EDGE-003`
+  - `source: PROC:gnome-shell`
+  - `destination: PROC:main`
+  - `direction: unidirectional environment injection before spawn`
+  - `mechanism: env-file parse + launcher.setenv(key,value,true) prior to child launch`
+  - `endpoint_or_channel: inherited process environment variables`
+  - `payload_data_shape: key/value map parsed from ~/.config/usage-tui/env (string->string)`
+  - `evidence: src/aibar/extension/extension.js:30-82, src/aibar/extension/extension.js:641-645`
