@@ -1,0 +1,11 @@
+# Runtime dependencies for src/aibar/aibar.
+click
+httpx
+pydantic
+textual
+
+# Build/test tooling used by repository scripts.
+build
+setuptools
+wheel
+pytest
