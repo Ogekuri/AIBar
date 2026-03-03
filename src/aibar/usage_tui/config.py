@@ -1,4 +1,8 @@
-"""Configuration management for usage-tui."""
+"""
+@file
+@brief Configuration and credential resolution for usage_tui.
+@details Provides environment-file parsing, token precedence resolution, and provider configuration status reporting.
+"""
 
 import os
 from pathlib import Path

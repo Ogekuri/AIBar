@@ -25,6 +25,7 @@
 - `Lifecycle/Trigger`
   - Starts when `usage-tui` binary is executed by a shell or by `Gio.SubprocessLauncher.spawnv(...)` from `PROC:gnome-shell`.
   - Executes one command path (`show|doctor|tui|env|setup|login`) per invocation, then exits; `tui` command blocks in Textual event loop until user quit.
+  - Source-file documentation updates under `src/aibar/usage_tui/**` do not alter execution units or internal call ordering.
 - `Internal Call-Trace Tree`
   - `main(...)`: command router [`src/aibar/usage_tui/cli.py:67`]
     - `show(provider, window, output_json)`: fetch/report usage metrics [`src/aibar/usage_tui/cli.py:91`]
@@ -123,6 +124,7 @@
   - Starts with GNOME Shell session; extension methods invoked by GNOME extension manager.
   - On enable: panel indicator initialized, immediate refresh run, periodic refresh timer scheduled.
   - On disable: indicator destroyed and timeout removed.
+  - Source-file documentation updates under `src/aibar/extension/**` do not alter execution units or internal call ordering.
 - `Internal Call-Trace Tree`
   - `UsageTuiExtension.enable(...)`: construct and register indicator [`src/aibar/extension/extension.js:770`]
     - `UsageTuiIndicator._init()`: initialize state and bootstrap UI/runtime [`src/aibar/extension/extension.js:95`]

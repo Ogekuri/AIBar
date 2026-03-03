@@ -1,3 +1,8 @@
+/**
+ * @file extension.js
+ * @brief GNOME Shell panel extension for usage-tui metrics.
+ * @details Collects usage JSON from the usage-tui CLI and renders provider-specific quota/cost cards in the GNOME panel popup.
+ */
 import GLib from 'gi://GLib';
 import St from 'gi://St';
 import Gio from 'gi://Gio';
@@ -12,8 +17,9 @@ const REFRESH_INTERVAL_SECONDS = 300;
 const ENV_FILE_PATH = GLib.get_home_dir() + '/.config/usage-tui/env';
 
 /**
- * Resolve the usage-tui binary path.
- * Checks PATH first, then USAGE_TUI_PATH from the env file.
+ * @brief Resolve usage-tui executable path.
+ * @details Prefers PATH discovery and falls back to USAGE_TUI_PATH from the env file.
+ * @returns {string} Resolved executable path or fallback command name.
  */
 function _getUsageTuiPath() {
     let found = GLib.find_program_in_path('usage-tui');
@@ -27,6 +33,11 @@ function _getUsageTuiPath() {
     return 'usage-tui';
 }
 
+/**
+ * @brief Load key-value environment variables from usage-tui env file.
+ * @details Parses export syntax, quoted values, and inline comments.
+ * @returns {Object<string,string>} Parsed environment map.
+ */
 function _loadEnvFromFile() {
     let env = {};
 
@@ -81,6 +92,11 @@ function _loadEnvFromFile() {
     return env;
 }
 
+/**
+ * @brief Map percentage usage to CSS progress severity class.
+ * @param {number} pct Usage percentage.
+ * @returns {string} CSS class suffix for progress state.
+ */
 function _getProgressClass(pct) {
     if (pct < 50)
         return 'usage-tui-progress-ok';
@@ -90,6 +106,7 @@ function _getProgressClass(pct) {
 }
 
 const UsageTuiIndicator = GObject.registerClass(
+/** @brief Panel indicator widget that manages popup rendering and refresh lifecycle. */
 class UsageTuiIndicator extends PanelMenu.Button {
 
     _init() {
@@ -762,6 +779,7 @@ class UsageTuiIndicator extends PanelMenu.Button {
     }
 });
 
+/** @brief GNOME extension lifecycle adapter for UsageTuiIndicator registration. */
 export default class UsageTuiExtension {
     constructor() {
         this._indicator = null;

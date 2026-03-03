@@ -1,7 +1,7 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.1.0"
+version: "0.2.0"
 date: "2026-03-03"
 author: "req-create"
 scope:
@@ -78,13 +78,15 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **PRJ-002**: MUST aggregate provider metrics through a normalized provider contract for `claude`, `openai`, `openrouter`, `copilot`, and `codex`.
 - **PRJ-003**: MUST provide an interactive Textual TUI with an Overview tab and a Raw JSON tab.
 - **PRJ-004**: MUST provide a GNOME Shell panel extension that executes `usage-tui show --json` and renders provider-specific cards.
+- **PRJ-005**: MUST maintain a machine-readable symbol inventory for repository code documentation under `docs/REFERENCES.md`.
 
 ### 2.2 Project Constraints
 - **CTN-001**: MUST resolve provider credentials with precedence: environment variable, then `~/.config/usage-tui/env`, then provider-specific local credential stores.
 - **CTN-002**: MUST represent provider fetch output with `ProviderResult` containing `provider`, `window`, `metrics`, `updated_at`, `raw`, and optional `error`.
 - **CTN-003**: MUST perform external HTTP API calls with `httpx.AsyncClient(timeout=30.0)` for provider integrations.
 - **CTN-004**: MUST cache successful provider results with per-provider TTL and disk persistence under `~/.cache/usage-tui`.
-- **CTN-005**: MAY depend on unofficial/internal endpoints for Claude OAuth usage, Copilot internal usage, and Codex backend usage as currently implemented.
+- **CTN-005**: MAY depend on unofficial/internal endpoints when official usage APIs are unavailable for Claude, Copilot, or Codex integrations.
+- **CTN-006**: MUST keep `docs/REFERENCES.md` synchronized with symbols defined under `src/` and `.github/workflows/`.
 
 ## 3. Requirements
 
@@ -116,6 +118,7 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **REQ-017**: MUST set GNOME panel label to total cost when cost metrics exist, otherwise configured-provider count when quota metrics exist, otherwise `N/A`.
 - **REQ-018**: MUST set GNOME panel label to `Err` and truncate popup error text to 40 characters when command execution or JSON parsing fails.
 - **REQ-019**: SHOULD order extension provider tabs/cards by `claude`, `openrouter`, `copilot`, `codex`, with providers not listed in ordering array appended alphabetically.
+- **REQ-020**: MUST include each discovered source symbol in `docs/REFERENCES.md` with file path, symbol kind, and line-range evidence.
 
 ## 4. Test Requirements
 
@@ -126,6 +129,7 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 - **TST-003**: MUST verify cache persistence writes only successful results and redacts sensitive raw keys before disk serialization.
 - **TST-004**: MUST verify GNOME extension error path sets panel text `Err` and caps displayed error string length to 40 characters.
 - **TST-005**: MUST verify Copilot provider always returns `window=30d` regardless of requested window argument.
+- **TST-006**: MUST verify `req --here --references` reproduces `docs/REFERENCES.md` without missing symbol entries for tracked `src/` files.
 
 ## 5. Evidence
 
@@ -135,11 +139,13 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | PRJ-002 | `src/aibar/usage_tui/cli.py` + `get_providers` + returns Claude/OpenAI/OpenRouter/Copilot/Codex provider instances keyed by `ProviderName`. |
 | PRJ-003 | `src/aibar/usage_tui/tui.py` + `UsageTUI.compose` + defines `TabPane("Overview")` and `TabPane("Raw JSON")`. |
 | PRJ-004 | `src/aibar/extension/extension.js` + `_refreshData/_updateProviderCard` + spawns `[_getUsageTuiPath(),'show','--json']` and renders provider cards. |
+| PRJ-005 | `docs/REFERENCES.md` + repository-wide symbol sections + machine-readable file/symbol index entries. |
 | CTN-001 | `src/aibar/usage_tui/config.py` + `Config.get_token` + env var -> env file -> provider-specific stores (`ClaudeCLIAuth`, `CodexCredentialStore`, `CopilotCredentialStore`). |
 | CTN-002 | `src/aibar/usage_tui/providers/base.py` + `ProviderResult` model + fields `provider/window/metrics/updated_at/raw/error`. |
 | CTN-003 | `src/aibar/usage_tui/providers/*.py` + `fetch` methods + `httpx.AsyncClient(timeout=30.0)` in Claude/OpenAI/OpenRouter/Copilot/Codex providers. |
 | CTN-004 | `src/aibar/usage_tui/cache.py` + `ResultCache` + provider TTL map, memory cache, disk path `~/.cache/usage-tui`, `_save_to_disk` on successful results. |
 | CTN-005 | `src/aibar/usage_tui/config.py` + `PROVIDER_INFO` notes + entries describing unofficial/internal usage for Claude, Copilot, and Codex. |
+| CTN-006 | `docs/REFERENCES.md` + full symbol index grouped by source file, regenerated from repository code. |
 | DES-001 | `src/aibar/usage_tui/providers/base.py` + `class BaseProvider(ABC)` + abstract methods `fetch`, `is_configured`, `get_config_help`. |
 | DES-002 | `src/aibar/usage_tui/providers/base.py` + `WindowPeriod/ProviderName` + enum literals `5h/7d/30d` and provider names. |
 | DES-003 | `src/aibar/usage_tui/cli.py` + `parse_window/parse_provider` + raises `click.BadParameter` for invalid inputs. |
@@ -165,8 +171,10 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | REQ-017 | `src/aibar/extension/extension.js` + `_updateUI` + panel label set to `$totalCost`, else `${configuredProviders} active`, else `N/A`. |
 | REQ-018 | `src/aibar/extension/extension.js` + `_handleError` + `this._panelLabel.set_text('Err')` and `message.substring(0, 40)`. |
 | REQ-019 | `src/aibar/extension/extension.js` + `_providerOrder` and `_updateUI` sorting + unknown providers rank `999` then lexical order. |
+| REQ-020 | `docs/REFERENCES.md` + per-symbol entries containing symbol identifier, file path, and line-range spans. |
 | TST-001 | `src/aibar/usage_tui/cli.py` + `parse_window/parse_provider` provide direct validation points for invalid inputs. |
 | TST-002 | `src/aibar/usage_tui/config.py` + `get_token` implements explicit precedence chain requiring regression coverage. |
 | TST-003 | `src/aibar/usage_tui/cache.py` + `_save_to_disk/_sanitize_raw` define redaction and success-only disk persistence behavior. |
 | TST-004 | `src/aibar/extension/extension.js` + `_handleError` defines deterministic error UI behavior and truncation boundary. |
 | TST-005 | `src/aibar/usage_tui/providers/copilot.py` + `fetch` hard-codes `effective_window` to `WindowPeriod.DAY_30`. |
+| TST-006 | `docs/REFERENCES.md` + generated symbol coverage for tracked `src/` files validates documentation inventory completeness. |

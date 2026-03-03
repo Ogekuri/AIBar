@@ -1,4 +1,8 @@
-"""Caching layer for provider results."""
+"""
+@file
+@brief Provider result caching primitives.
+@details Implements in-memory and disk cache entries, TTL invalidation, and raw-payload sanitization for provider metrics.
+"""
 
 import json
 import os

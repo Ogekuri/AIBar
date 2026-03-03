@@ -1,4 +1,8 @@
-"""OpenRouter usage and credit provider."""
+"""
+@file
+@brief OpenRouter key usage and credit provider.
+@details Fetches key usage snapshots and quota limits, then transforms provider payloads into normalized cost and quota metrics.
+"""
 
 import httpx
 

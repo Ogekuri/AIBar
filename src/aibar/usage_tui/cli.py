@@ -1,4 +1,8 @@
-"""CLI entry point for usage-tui."""
+"""
+@file
+@brief Command-line interface for usage_tui.
+@details Defines command parsing, provider dispatch, formatted output, setup helpers, login flows, and TUI launch hooks.
+"""
 
 import asyncio
 import json
@@ -422,11 +426,11 @@ def _login_copilot() -> None:
     provider = CopilotProvider()
 
     try:
-        token = asyncio.run(provider.login())
+        asyncio.run(provider.login())
         click.echo()
         click.echo(click.style(" Login successful!", fg="green", bold=True))
         click.echo()
-        click.echo(f"  Token saved to: ~/.config/usage-tui/copilot.json")
+        click.echo("  Token saved to: ~/.config/usage-tui/copilot.json")
         click.echo()
         click.echo("You can now run: usage-tui show --provider copilot")
     except Exception as e:

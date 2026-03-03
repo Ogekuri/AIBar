@@ -1,5 +1,7 @@
 #!/bin/bash
-# Development script for usage-tui GNOME Extension
+# @file dev.sh
+# @brief Development helper commands for usage-tui GNOME extension.
+# @details Wraps nested-shell start, enable/disable/reload, and log tail commands for local extension workflows.
 
 EXT_UUID="usage-tui@gnome.codexbar"
 

@@ -1,4 +1,10 @@
-"""Textual TUI for usage metrics."""
+"""
+@file
+@brief Textual terminal UI for usage metrics.
+@details Implements provider cards, refresh controls, window switching, and raw JSON visualization over normalized provider results.
+"""
+
+# pyright: reportMissingImports=false
 
 import json
 from datetime import datetime, timezone
@@ -10,12 +16,10 @@ from textual.containers import Container, Horizontal, VerticalGroup, VerticalScr
 from textual.reactive import reactive
 from textual.widgets import (
     Button,
-    DataTable,
     Footer,
     Header,
     Label,
     ProgressBar,
-    Rule,
     Static,
     TabbedContent,
     TabPane,

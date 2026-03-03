@@ -1,4 +1,8 @@
-"""Extract and use authentication from Claude CLI installation."""
+"""
+@file
+@brief Claude CLI credential extraction helpers.
+@details Reads Claude CLI OAuth credential stores and exposes token/status accessors for provider authentication.
+"""
 
 import json
 from datetime import datetime, timezone

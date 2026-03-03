@@ -1,4 +1,8 @@
-"""GitHub Copilot provider for usage metrics."""
+"""
+@file
+@brief GitHub Copilot usage provider and device-flow authentication.
+@details Handles device-code authorization, token storage resolution, Copilot quota retrieval, and normalization to provider result schema.
+"""
 
 import json
 import os
@@ -392,10 +396,10 @@ Note: Token needs 'read:user' scope."""
         device_code = device_response["device_code"]
 
         # Display instructions to user
-        print(f"\nTo authorize GitHub Copilot access:")
+        print("\nTo authorize GitHub Copilot access:")
         print(f"  1. Open: {verification_uri}")
         print(f"  2. Enter code: {user_code}")
-        print(f"\nWaiting for authorization...")
+        print("\nWaiting for authorization...")
 
         # Poll for token
         token = await flow.poll_for_token(device_code, interval)

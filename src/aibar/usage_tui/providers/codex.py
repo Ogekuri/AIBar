@@ -1,11 +1,13 @@
-"""OpenAI Codex provider for usage metrics."""
+"""
+@file
+@brief OpenAI Codex usage provider and credential helpers.
+@details Resolves Codex credentials, refreshes OAuth tokens when required, queries usage endpoints, and normalizes quota metrics.
+"""
 
 import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
-
 import httpx
 
 from usage_tui.providers.base import (

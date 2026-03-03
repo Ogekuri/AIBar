@@ -1,4 +1,8 @@
-"""OpenAI usage and cost provider."""
+"""
+@file
+@brief OpenAI organization usage provider.
+@details Retrieves organization completion usage and cost buckets, aggregates counters, and maps response data to normalized provider metrics.
+"""
 
 from datetime import datetime, timedelta, timezone
 

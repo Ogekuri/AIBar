@@ -1,4 +1,8 @@
-"""Provider implementations for usage metrics."""
+"""
+@file
+@brief Provider implementation exports.
+@details Re-exports provider contracts and concrete provider classes for centralized CLI/TUI provider registration.
+"""
 
 from usage_tui.providers.base import BaseProvider, UsageMetrics, ProviderResult
 from usage_tui.providers.claude_oauth import ClaudeOAuthProvider

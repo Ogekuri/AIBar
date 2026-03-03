@@ -1,4 +1,8 @@
-"""Base provider interface and normalized output contract."""
+"""
+@file
+@brief Base provider abstractions and normalized metric models.
+@details Defines provider/window enums, normalized usage/result payloads, provider exception hierarchy, and the abstract provider interface.
+"""
 
 from abc import ABC, abstractmethod
 from datetime import datetime

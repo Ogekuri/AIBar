@@ -1,4 +1,8 @@
-"""Claude OAuth provider for Claude Code subscription quota."""
+"""
+@file
+@brief Claude OAuth usage provider.
+@details Fetches Claude subscription utilization through OAuth credentials and normalizes provider quota state into the shared result contract.
+"""
 
 import os
 from datetime import datetime
