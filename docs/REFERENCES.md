@@ -3,113 +3,36 @@
 .
 └── src
     └── aibar
-        ├── extension
-        │   ├── dev.sh
-        │   └── extension.js
-        └── usage_tui
-            ├── __init__.py
-            ├── cache.py
-            ├── claude_cli_auth.py
-            ├── cli.py
-            ├── config.py
-            ├── providers
-            │   ├── __init__.py
-            │   ├── base.py
-            │   ├── claude_oauth.py
-            │   ├── codex.py
-            │   ├── copilot.py
-            │   ├── openai_usage.py
-            │   └── openrouter.py
-            └── tui.py
+        ├── aibar
+        │   ├── __init__.py
+        │   ├── cache.py
+        │   ├── claude_cli_auth.py
+        │   ├── cli.py
+        │   ├── config.py
+        │   ├── providers
+        │   │   ├── __init__.py
+        │   │   ├── base.py
+        │   │   ├── claude_oauth.py
+        │   │   ├── codex.py
+        │   │   ├── copilot.py
+        │   │   ├── openai_usage.py
+        │   │   └── openrouter.py
+        │   └── ui.py
+        └── extension
+            ├── dev.sh
+            └── extension.js
 ```
-
-# dev.sh | Shell | 34L | 1 symbols | 0 imports | 4 comments
-> Path: `src/aibar/extension/dev.sh`
-
-## Definitions
-
-- var `EXT_UUID="usage-tui@gnome.codexbar"` (L6)
-- @brief Development helper commands for usage-tui GNOME extension.
-- @details Wraps nested-shell start, enable/disable/reload, and log tail commands for local extension workflows.
-## Symbol Index
-|Symbol|Kind|Vis|Lines|Sig|
-|---|---|---|---|---|
-|`EXT_UUID`|var||6||
-
-
----
-
-# extension.js | JavaScript | 802L | 9 symbols | 8 imports | 6 comments
-> Path: `src/aibar/extension/extension.js`
-- @brief GNOME Shell panel extension for usage-tui metrics.
-- @details Collects usage JSON from the usage-tui CLI and renders provider-specific quota/cost cards in the GNOME panel popup.
-
-## Imports
-```
-import GLib from 'gi://GLib';
-import St from 'gi://St';
-import Gio from 'gi://Gio';
-import Clutter from 'gi://Clutter';
-import GObject from 'gi://GObject';
-import * as Main from 'resource:///org/gnome/shell/ui/main.js';
-import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
-import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
-```
-
-## Definitions
-
-- const `const REFRESH_INTERVAL_SECONDS = 300;` (L16)
-- const `const ENV_FILE_PATH = GLib.get_home_dir() + '/.config/usage-tui/env';` (L17)
-### fn `function _getUsageTuiPath()` (L24-34)
-- @brief Resolve usage-tui executable path.
-- @details Prefers PATH discovery and falls back to USAGE_TUI_PATH from the env file.
-- @return s {string} Resolved executable path or fallback command name.
-
-### fn `function _loadEnvFromFile()` (L41-93)
-- @brief Load key-value environment variables from usage-tui env file.
-- @details Parses export syntax, quoted values, and inline comments.
-- @return s {Object<string,string>} Parsed environment map.
-
-### fn `function _getProgressClass(pct)` (L100-106)
-- @brief Map percentage usage to CSS progress severity class.
-- @param {number} pct Usage percentage.
-- @return s {string} CSS class suffix for progress state.
-
-### class `class UsageTuiIndicator extends PanelMenu.Button` : PanelMenu.Button (L110-409)
-- @brief Panel indicator widget that manages popup rendering and refresh lifecycle. */
-- fn `const createWindowBar = (labelText) =>` (L319-365)
-
-### fn `const updateWindowBar = (bar, pct, resetTime, useDays) =>` (L459-500)
-
-### class `export default class UsageTuiExtension` (L783-802)
-- @brief GNOME extension lifecycle adapter for UsageTuiIndicator registration. */
-
-## Symbol Index
-|Symbol|Kind|Vis|Lines|Sig|
-|---|---|---|---|---|
-|`REFRESH_INTERVAL_SECONDS`|const||16||
-|`ENV_FILE_PATH`|const||17||
-|`_getUsageTuiPath`|fn||24-34|function _getUsageTuiPath()|
-|`_loadEnvFromFile`|fn||41-93|function _loadEnvFromFile()|
-|`_getProgressClass`|fn||100-106|function _getProgressClass(pct)|
-|`UsageTuiIndicator`|class||110-409|class UsageTuiIndicator extends PanelMenu.Button|
-|`UsageTuiIndicator.createWindowBar`|fn||319-365|const createWindowBar = (labelText) =>|
-|`updateWindowBar`|fn||459-500|const updateWindowBar = (bar, pct, resetTime, useDays) =>|
-|`UsageTuiExtension`|class||783-802|export default class UsageTuiExtension|
-
-
----
 
 # __init__.py | Python | 7L | 0 symbols | 0 imports | 1 comments
-> Path: `src/aibar/usage_tui/__init__.py`
-- @brief Package metadata for usage_tui.
+> Path: `src/aibar/aibar/__init__.py`
+- @brief Package metadata for aibar.
 - @details Exposes the package version for the multi-provider usage monitoring application.
 
 
 ---
 
 # cache.py | Python | 206L | 18 symbols | 7 imports | 23 comments
-> Path: `src/aibar/usage_tui/cache.py`
+> Path: `src/aibar/aibar/cache.py`
 - @brief Provider result caching primitives.
 - @details Implements in-memory and disk cache entries, TTL invalidation, and raw-payload sanitization for provider metrics.
 
@@ -121,7 +44,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from pydantic import BaseModel
-from usage_tui.providers.base import ProviderName, ProviderResult, WindowPeriod
+from aibar.providers.base import ProviderName, ProviderResult, WindowPeriod
 ```
 
 ## Definitions
@@ -172,7 +95,7 @@ from usage_tui.providers.base import ProviderName, ProviderResult, WindowPeriod
 ---
 
 # claude_cli_auth.py | Python | 118L | 9 symbols | 4 imports | 11 comments
-> Path: `src/aibar/usage_tui/claude_cli_auth.py`
+> Path: `src/aibar/aibar/claude_cli_auth.py`
 - @brief Claude CLI credential extraction helpers.
 - @details Reads Claude CLI OAuth credential stores and exposes token/status accessors for provider authentication.
 
@@ -214,9 +137,9 @@ from typing import Any
 ---
 
 # cli.py | Python | 442L | 15 symbols | 13 imports | 33 comments
-> Path: `src/aibar/usage_tui/cli.py`
-- @brief Command-line interface for usage_tui.
-- @details Defines command parsing, provider dispatch, formatted output, setup helpers, login flows, and TUI launch hooks.
+> Path: `src/aibar/aibar/cli.py`
+- @brief Command-line interface for aibar.
+- @details Defines command parsing, provider dispatch, formatted output, setup helpers, login flows, and UI launch hooks.
 
 ## Imports
 ```
@@ -225,14 +148,14 @@ import json
 import sys
 import click
 from click.core import ParameterSource
-from usage_tui.config import config
-from usage_tui.providers import (
-from usage_tui.providers.base import BaseProvider, ProviderError, ProviderName, WindowPeriod
+from aibar.config import config
+from aibar.providers import (
+from aibar.providers.base import BaseProvider, ProviderError, ProviderName, WindowPeriod
 from datetime import datetime, timezone
-from usage_tui.tui import run_tui
-from usage_tui.config import ENV_FILE_PATH, write_env_file
-from usage_tui.claude_cli_auth import ClaudeCLIAuth
-from usage_tui.providers.copilot import CopilotProvider
+from aibar.ui import run_ui
+from aibar.config import ENV_FILE_PATH, write_env_file
+from aibar.claude_cli_auth import ClaudeCLIAuth
+from aibar.providers.copilot import CopilotProvider
 ```
 
 ## Definitions
@@ -255,7 +178,7 @@ from usage_tui.providers.copilot import CopilotProvider
 
 ### fn `def doctor() -> None` `@main.command()` (L199-245)
 
-### fn `def tui() -> None` `@main.command()` (L247-253)
+### fn `def ui() -> None` `@main.command()` (L247-253)
 
 ### fn `def env() -> None` `@main.command()` (L255-259)
 
@@ -279,7 +202,7 @@ from usage_tui.providers.copilot import CopilotProvider
 |`_print_result`|fn|priv|144-190|def _print_result(name: ProviderName, result, label: str ...|
 |`_progress_bar`|fn|priv|191-197|def _progress_bar(percent: float, width: int = 20) -> str|
 |`doctor`|fn|pub|199-245|def doctor() -> None|
-|`tui`|fn|pub|247-253|def tui() -> None|
+|`ui`|fn|pub|247-253|def ui() -> None|
 |`env`|fn|pub|255-259|def env() -> None|
 |`setup`|fn|pub|261-347|def setup() -> None|
 |`login`|fn|pub|355-371|def login(provider: str) -> None|
@@ -290,8 +213,8 @@ from usage_tui.providers.copilot import CopilotProvider
 ---
 
 # config.py | Python | 233L | 12 symbols | 8 imports | 19 comments
-> Path: `src/aibar/usage_tui/config.py`
-- @brief Configuration and credential resolution for usage_tui.
+> Path: `src/aibar/aibar/config.py`
+- @brief Configuration and credential resolution for aibar.
 - @details Provides environment-file parsing, token precedence resolution, and provider configuration status reporting.
 
 ## Imports
@@ -299,16 +222,16 @@ from usage_tui.providers.copilot import CopilotProvider
 import os
 from pathlib import Path
 from typing import Any
-from usage_tui.claude_cli_auth import extract_claude_cli_token
-from usage_tui.providers.base import ProviderName
-from usage_tui.providers.codex import CodexCredentialStore
-from usage_tui.providers.copilot import CopilotCredentialStore
-from usage_tui.providers import (
+from aibar.claude_cli_auth import extract_claude_cli_token
+from aibar.providers.base import ProviderName
+from aibar.providers.codex import CodexCredentialStore
+from aibar.providers.copilot import CopilotCredentialStore
+from aibar.providers import (
 ```
 
 ## Definitions
 
-- var `ENV_FILE_PATH = Path.home() / ".config" / "usage-tui" / "env"` (L15)
+- var `ENV_FILE_PATH = Path.home() / ".config" / "aibar" / "env"` (L15)
 ### fn `def load_env_file() -> dict[str, str]` (L18-32)
 
 ### fn `def write_env_file(updates: dict[str, str]) -> None` (L33-67)
@@ -343,25 +266,25 @@ from usage_tui.providers import (
 ---
 
 # __init__.py | Python | 23L | 0 symbols | 6 imports | 1 comments
-> Path: `src/aibar/usage_tui/providers/__init__.py`
+> Path: `src/aibar/aibar/providers/__init__.py`
 - @brief Provider implementation exports.
-- @details Re-exports provider contracts and concrete provider classes for centralized CLI/TUI provider registration.
+- @details Re-exports provider contracts and concrete provider classes for centralized CLI/UI provider registration.
 
 ## Imports
 ```
-from usage_tui.providers.base import BaseProvider, UsageMetrics, ProviderResult
-from usage_tui.providers.claude_oauth import ClaudeOAuthProvider
-from usage_tui.providers.openai_usage import OpenAIUsageProvider
-from usage_tui.providers.openrouter import OpenRouterUsageProvider
-from usage_tui.providers.copilot import CopilotProvider
-from usage_tui.providers.codex import CodexProvider
+from aibar.providers.base import BaseProvider, UsageMetrics, ProviderResult
+from aibar.providers.claude_oauth import ClaudeOAuthProvider
+from aibar.providers.openai_usage import OpenAIUsageProvider
+from aibar.providers.openrouter import OpenRouterUsageProvider
+from aibar.providers.copilot import CopilotProvider
+from aibar.providers.codex import CodexProvider
 ```
 
 
 ---
 
 # base.py | Python | 147L | 23 symbols | 5 imports | 16 comments
-> Path: `src/aibar/usage_tui/providers/base.py`
+> Path: `src/aibar/aibar/providers/base.py`
 - @brief Base provider abstractions and normalized metric models.
 - @details Defines provider/window enums, normalized usage/result payloads, provider exception hierarchy, and the abstract provider interface.
 
@@ -438,7 +361,7 @@ from pydantic import BaseModel, Field
 ---
 
 # claude_oauth.py | Python | 190L | 8 symbols | 5 imports | 13 comments
-> Path: `src/aibar/usage_tui/providers/claude_oauth.py`
+> Path: `src/aibar/aibar/providers/claude_oauth.py`
 - @brief Claude OAuth usage provider.
 - @details Fetches Claude subscription utilization through OAuth credentials and normalizes provider quota state into the shared result contract.
 
@@ -447,8 +370,8 @@ from pydantic import BaseModel, Field
 import os
 from datetime import datetime
 import httpx
-from usage_tui.claude_cli_auth import extract_claude_cli_token
-from usage_tui.providers.base import (
+from aibar.claude_cli_auth import extract_claude_cli_token
+from aibar.providers.base import (
 ```
 
 ## Definitions
@@ -480,7 +403,7 @@ from usage_tui.providers.base import (
 ---
 
 # codex.py | Python | 398L | 21 symbols | 6 imports | 31 comments
-> Path: `src/aibar/usage_tui/providers/codex.py`
+> Path: `src/aibar/aibar/providers/codex.py`
 - @brief OpenAI Codex usage provider and credential helpers.
 - @details Resolves Codex credentials, refreshes OAuth tokens when required, queries usage endpoints, and normalizes quota metrics.
 
@@ -491,7 +414,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 import httpx
-from usage_tui.providers.base import (
+from aibar.providers.base import (
 ```
 
 ## Definitions
@@ -552,7 +475,7 @@ from usage_tui.providers.base import (
 ---
 
 # copilot.py | Python | 412L | 27 symbols | 8 imports | 30 comments
-> Path: `src/aibar/usage_tui/providers/copilot.py`
+> Path: `src/aibar/aibar/providers/copilot.py`
 - @brief GitHub Copilot usage provider and device-flow authentication.
 - @details Handles device-code authorization, token storage resolution, Copilot quota retrieval, and normalization to provider result schema.
 
@@ -564,7 +487,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 import httpx
-from usage_tui.providers.base import (
+from aibar.providers.base import (
 import asyncio
 ```
 
@@ -579,7 +502,7 @@ import asyncio
 - fn `async def poll_for_token(self, device_code: str, interval: int = 5) -> str` (L66-118)
 
 ### class `class CopilotCredentialStore` (L119-175)
-- var `CONFIG_DIR = Path.home() / ".config" / "usage-tui"` (L127)
+- var `CONFIG_DIR = Path.home() / ".config" / "aibar"` (L127)
 - var `CREDS_FILE = CONFIG_DIR / "copilot.json"` (L128)
 - var `CODEXBAR_CONFIG = Path.home() / ".codexbar" / "config.json"` (L129)
 - fn `def load_token(self) -> str | None` (L131-165)
@@ -640,7 +563,7 @@ import asyncio
 ---
 
 # openai_usage.py | Python | 195L | 12 symbols | 4 imports | 17 comments
-> Path: `src/aibar/usage_tui/providers/openai_usage.py`
+> Path: `src/aibar/aibar/providers/openai_usage.py`
 - @brief OpenAI organization usage provider.
 - @details Retrieves organization completion usage and cost buckets, aggregates counters, and maps response data to normalized provider metrics.
 
@@ -648,8 +571,8 @@ import asyncio
 ```
 from datetime import datetime, timedelta, timezone
 import httpx
-from usage_tui.providers.base import (
-from usage_tui.config import config
+from aibar.providers.base import (
+from aibar.config import config
 ```
 
 ## Definitions
@@ -693,15 +616,15 @@ from usage_tui.config import config
 ---
 
 # openrouter.py | Python | 163L | 11 symbols | 3 imports | 11 comments
-> Path: `src/aibar/usage_tui/providers/openrouter.py`
+> Path: `src/aibar/aibar/providers/openrouter.py`
 - @brief OpenRouter key usage and credit provider.
 - @details Fetches key usage snapshots and quota limits, then transforms provider payloads into normalized cost and quota metrics.
 
 ## Imports
 ```
 import httpx
-from usage_tui.providers.base import (
-from usage_tui.config import config
+from aibar.providers.base import (
+from aibar.config import config
 ```
 
 ## Definitions
@@ -741,8 +664,8 @@ from usage_tui.config import config
 
 ---
 
-# tui.py | Python | 523L | 27 symbols | 12 imports | 35 comments
-> Path: `src/aibar/usage_tui/tui.py`
+# ui.py | Python | 523L | 27 symbols | 12 imports | 35 comments
+> Path: `src/aibar/aibar/ui.py`
 - @brief Textual terminal UI for usage metrics.
 - @details Implements provider cards, refresh controls, window switching, and raw JSON visualization over normalized provider results.
 
@@ -756,10 +679,10 @@ from textual.binding import Binding
 from textual.containers import Container, Horizontal, VerticalGroup, VerticalScroll
 from textual.reactive import reactive
 from textual.widgets import (
-from usage_tui.cache import ResultCache
-from usage_tui.config import config
-from usage_tui.providers import (
-from usage_tui.providers.base import (
+from aibar.cache import ResultCache
+from aibar.config import config
+from aibar.providers import (
+from aibar.providers.base import (
 ```
 
 ## Definitions
@@ -778,9 +701,9 @@ from usage_tui.providers.base import (
 - fn `def compose(self) -> ComposeResult` (L283-288)
 - fn `def watch_data(self, data: dict | None) -> None` (L289-298)
 
-### class `class UsageTUI(App)` : App (L299-498)
+### class `class AIBarUI(App)` : App (L299-498)
 - var `BINDINGS = [` (L356)
-- var `TITLE = "Usage Metrics TUI"` (L364)
+- var `TITLE = "Usage Metrics UI"` (L364)
 - fn `def __init__(self) -> None` `priv` (L369-380)
 - fn `def compose(self) -> ComposeResult` (L381-403)
 - fn `async def on_mount(self) -> None` (L404-408)
@@ -797,7 +720,7 @@ from usage_tui.providers.base import (
 
 ### fn `def _update_json_view(self) -> None` `priv` (L506-515)
 
-### fn `def run_tui() -> None` (L516-521)
+### fn `def run_ui() -> None` (L516-521)
 
 ## Symbol Index
 |Symbol|Kind|Vis|Lines|Sig|
@@ -812,21 +735,98 @@ from usage_tui.providers.base import (
 |`RawJsonView`|class|pub|264-298|class RawJsonView(Static)|
 |`RawJsonView.compose`|fn|pub|283-288|def compose(self) -> ComposeResult|
 |`RawJsonView.watch_data`|fn|pub|289-298|def watch_data(self, data: dict | None) -> None|
-|`UsageTUI`|class|pub|299-498|class UsageTUI(App)|
-|`UsageTUI.BINDINGS`|var|pub|356||
-|`UsageTUI.TITLE`|var|pub|364||
-|`UsageTUI.__init__`|fn|priv|369-380|def __init__(self) -> None|
-|`UsageTUI.compose`|fn|pub|381-403|def compose(self) -> ComposeResult|
-|`UsageTUI.on_mount`|fn|pub|404-408|async def on_mount(self) -> None|
-|`UsageTUI.on_refresh_pressed`|fn|pub|410-413|async def on_refresh_pressed(self) -> None|
-|`UsageTUI.on_5h_pressed`|fn|pub|415-418|async def on_5h_pressed(self) -> None|
-|`UsageTUI.on_7d_pressed`|fn|pub|420-423|async def on_7d_pressed(self) -> None|
-|`UsageTUI.action_refresh`|fn|pub|424-458|async def action_refresh(self) -> None|
-|`UsageTUI.action_window_5h`|fn|pub|459-465|async def action_window_5h(self) -> None|
-|`UsageTUI.action_window_7d`|fn|pub|466-472|async def action_window_7d(self) -> None|
-|`UsageTUI.action_toggle_json`|fn|pub|473-481|async def action_toggle_json(self) -> None|
-|`UsageTUI._get_card`|fn|priv|482-489|def _get_card(self, provider: ProviderName) -> ProviderCa...|
+|`AIBarUI`|class|pub|299-498|class AIBarUI(App)|
+|`AIBarUI.BINDINGS`|var|pub|356||
+|`AIBarUI.TITLE`|var|pub|364||
+|`AIBarUI.__init__`|fn|priv|369-380|def __init__(self) -> None|
+|`AIBarUI.compose`|fn|pub|381-403|def compose(self) -> ComposeResult|
+|`AIBarUI.on_mount`|fn|pub|404-408|async def on_mount(self) -> None|
+|`AIBarUI.on_refresh_pressed`|fn|pub|410-413|async def on_refresh_pressed(self) -> None|
+|`AIBarUI.on_5h_pressed`|fn|pub|415-418|async def on_5h_pressed(self) -> None|
+|`AIBarUI.on_7d_pressed`|fn|pub|420-423|async def on_7d_pressed(self) -> None|
+|`AIBarUI.action_refresh`|fn|pub|424-458|async def action_refresh(self) -> None|
+|`AIBarUI.action_window_5h`|fn|pub|459-465|async def action_window_5h(self) -> None|
+|`AIBarUI.action_window_7d`|fn|pub|466-472|async def action_window_7d(self) -> None|
+|`AIBarUI.action_toggle_json`|fn|pub|473-481|async def action_toggle_json(self) -> None|
+|`AIBarUI._get_card`|fn|priv|482-489|def _get_card(self, provider: ProviderName) -> ProviderCa...|
 |`_update_window_buttons`|fn|priv|490-505|def _update_window_buttons(self) -> None|
 |`_update_json_view`|fn|priv|506-515|def _update_json_view(self) -> None|
-|`run_tui`|fn|pub|516-521|def run_tui() -> None|
+|`run_ui`|fn|pub|516-521|def run_ui() -> None|
+
+
+---
+
+# dev.sh | Shell | 34L | 1 symbols | 0 imports | 4 comments
+> Path: `src/aibar/extension/dev.sh`
+
+## Definitions
+
+- var `EXT_UUID="aibar@aibar.panel"` (L6)
+- @brief Development helper commands for aibar GNOME extension.
+- @details Wraps nested-shell start, enable/disable/reload, and log tail commands for local extension workflows.
+## Symbol Index
+|Symbol|Kind|Vis|Lines|Sig|
+|---|---|---|---|---|
+|`EXT_UUID`|var||6||
+
+
+---
+
+# extension.js | JavaScript | 802L | 9 symbols | 8 imports | 6 comments
+> Path: `src/aibar/extension/extension.js`
+- @brief GNOME Shell panel extension for aibar metrics.
+- @details Collects usage JSON from the aibar CLI and renders provider-specific quota/cost cards in the GNOME panel popup.
+
+## Imports
+```
+import GLib from 'gi://GLib';
+import St from 'gi://St';
+import Gio from 'gi://Gio';
+import Clutter from 'gi://Clutter';
+import GObject from 'gi://GObject';
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
+import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
+```
+
+## Definitions
+
+- const `const REFRESH_INTERVAL_SECONDS = 300;` (L16)
+- const `const ENV_FILE_PATH = GLib.get_home_dir() + '/.config/aibar/env';` (L17)
+### fn `function _getAiBarPath()` (L24-34)
+- @brief Resolve aibar executable path.
+- @details Prefers PATH discovery and falls back to AIBAR_PATH from the env file.
+- @return s {string} Resolved executable path or fallback command name.
+
+### fn `function _loadEnvFromFile()` (L41-93)
+- @brief Load key-value environment variables from aibar env file.
+- @details Parses export syntax, quoted values, and inline comments.
+- @return s {Object<string,string>} Parsed environment map.
+
+### fn `function _getProgressClass(pct)` (L100-106)
+- @brief Map percentage usage to CSS progress severity class.
+- @param {number} pct Usage percentage.
+- @return s {string} CSS class suffix for progress state.
+
+### class `class AIBarIndicator extends PanelMenu.Button` : PanelMenu.Button (L110-409)
+- @brief Panel indicator widget that manages popup rendering and refresh lifecycle. */
+- fn `const createWindowBar = (labelText) =>` (L319-365)
+
+### fn `const updateWindowBar = (bar, pct, resetTime, useDays) =>` (L459-500)
+
+### class `export default class AIBarExtension` (L783-802)
+- @brief GNOME extension lifecycle adapter for AIBarIndicator registration. */
+
+## Symbol Index
+|Symbol|Kind|Vis|Lines|Sig|
+|---|---|---|---|---|
+|`REFRESH_INTERVAL_SECONDS`|const||16||
+|`ENV_FILE_PATH`|const||17||
+|`_getAiBarPath`|fn||24-34|function _getAiBarPath()|
+|`_loadEnvFromFile`|fn||41-93|function _loadEnvFromFile()|
+|`_getProgressClass`|fn||100-106|function _getProgressClass(pct)|
+|`AIBarIndicator`|class||110-409|class AIBarIndicator extends PanelMenu.Button|
+|`AIBarIndicator.createWindowBar`|fn||319-365|const createWindowBar = (labelText) =>|
+|`updateWindowBar`|fn||459-500|const updateWindowBar = (bar, pct, resetTime, useDays) =>|
+|`AIBarExtension`|class||783-802|export default class AIBarExtension|
 

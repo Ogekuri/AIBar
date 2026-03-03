@@ -1,6 +1,6 @@
 """
 @file
-@brief Package metadata for usage_tui.
+@brief Package metadata for aibar.
 @details Exposes the package version for the multi-provider usage monitoring application.
 """
 

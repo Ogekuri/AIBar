@@ -12,15 +12,15 @@
 #
 # Environment:
 #   XDG_CONFIG_HOME - Config directory (default: ~/.config)
-#   USAGE_TUI_CLAUDE_REFRESH_INTERVAL_SECONDS - Interval in seconds (default: 1800)
+#   AIBAR_CLAUDE_REFRESH_INTERVAL_SECONDS - Interval in seconds (default: 1800)
 
 set -euo pipefail
 
 # Configuration
-CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/usage-tui"
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/aibar"
 PID_FILE="$CONFIG_DIR/claude_token_refresh.pid"
 LOG_FILE="$CONFIG_DIR/claude_token_refresh.log"
-INTERVAL="${USAGE_TUI_CLAUDE_REFRESH_INTERVAL_SECONDS:-1800}"
+INTERVAL="${AIBAR_CLAUDE_REFRESH_INTERVAL_SECONDS:-1800}"
 
 # Ensure config directory exists
 mkdir -p "$CONFIG_DIR"
@@ -41,11 +41,11 @@ do_refresh() {
         log "Warning: claude command not found"
     fi
     
-    if command -v usage-tui >/dev/null 2>&1; then
-        log "Running: usage-tui login --provider claude"
-        usage-tui login --provider claude >>"$LOG_FILE" 2>&1 || log "Warning: usage-tui login failed"
+    if command -v aibar >/dev/null 2>&1; then
+        log "Running: aibar login --provider claude"
+        aibar login --provider claude >>"$LOG_FILE" 2>&1 || log "Warning: aibar login failed"
     else
-        log "Warning: usage-tui command not found"
+        log "Warning: aibar command not found"
     fi
     
     log "Token refresh cycle complete"
@@ -136,7 +136,7 @@ Commands:
 
 Environment Variables:
   XDG_CONFIG_HOME                           Config directory (default: ~/.config)
-  USAGE_TUI_CLAUDE_REFRESH_INTERVAL_SECONDS Interval in seconds (default: 1800)
+  AIBAR_CLAUDE_REFRESH_INTERVAL_SECONDS Interval in seconds (default: 1800)
 EOF
 }
 

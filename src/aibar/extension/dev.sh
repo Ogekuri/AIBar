@@ -1,9 +1,9 @@
 #!/bin/bash
 # @file dev.sh
-# @brief Development helper commands for usage-tui GNOME extension.
+# @brief Development helper commands for aibar GNOME extension.
 # @details Wraps nested-shell start, enable/disable/reload, and log tail commands for local extension workflows.
 
-EXT_UUID="usage-tui@gnome.codexbar"
+EXT_UUID="aibar@aibar.panel"
 
 case "$1" in
     start)
@@ -25,7 +25,7 @@ case "$1" in
         echo "Extension reloaded"
         ;;
     logs)
-        journalctl -f -o cat /usr/bin/gnome-shell | grep -i "usage-tui"
+        journalctl -f -o cat /usr/bin/gnome-shell | grep -i "aibar"
         ;;
     *)
         echo "Usage: $0 {start|enable|disable|reload|logs}"

@@ -1,7 +1,7 @@
 """
 @file
-@brief Command-line interface for usage_tui.
-@details Defines command parsing, provider dispatch, formatted output, setup helpers, login flows, and TUI launch hooks.
+@brief Command-line interface for aibar.
+@details Defines command parsing, provider dispatch, formatted output, setup helpers, login flows, and UI launch hooks.
 """
 
 import asyncio
@@ -11,15 +11,15 @@ import sys
 import click
 from click.core import ParameterSource
 
-from usage_tui.config import config
-from usage_tui.providers import (
+from aibar.config import config
+from aibar.providers import (
     ClaudeOAuthProvider,
     OpenAIUsageProvider,
     OpenRouterUsageProvider,
     CopilotProvider,
     CodexProvider,
 )
-from usage_tui.providers.base import BaseProvider, ProviderError, ProviderName, WindowPeriod
+from aibar.providers.base import BaseProvider, ProviderError, ProviderName, WindowPeriod
 
 
 def get_providers() -> dict[ProviderName, BaseProvider]:
@@ -69,7 +69,7 @@ def _fetch_result(provider: BaseProvider, window: WindowPeriod):
 @click.group()
 @click.version_option()
 def main() -> None:
-    """Usage metrics TUI for Claude, OpenAI, OpenRouter, Copilot, and Codex."""
+    """Usage metrics UI for Claude, OpenAI, OpenRouter, Copilot, and Codex."""
     pass
 
 
@@ -198,7 +198,7 @@ def _progress_bar(percent: float, width: int = 20) -> str:
 @main.command()
 def doctor() -> None:
     """Check provider configuration and connectivity."""
-    click.echo("Usage TUI Doctor")
+    click.echo("Usage UI Doctor")
     click.echo("=" * 40)
     click.echo()
 
@@ -244,11 +244,11 @@ def doctor() -> None:
 
 
 @main.command()
-def tui() -> None:
-    """Launch the interactive TUI."""
-    from usage_tui.tui import run_tui
+def ui() -> None:
+    """Launch the interactive UI."""
+    from aibar.ui import run_ui
 
-    run_tui()
+    run_ui()
 
 
 @main.command()
@@ -260,10 +260,10 @@ def env() -> None:
 @main.command()
 def setup() -> None:
     """Interactive setup wizard for API keys."""
-    from usage_tui.config import ENV_FILE_PATH, write_env_file
+    from aibar.config import ENV_FILE_PATH, write_env_file
 
     click.echo()
-    click.echo("Usage TUI Setup")
+    click.echo("Usage UI Setup")
     click.echo("=" * 40)
     click.echo()
     click.echo(f"Keys will be saved to: {ENV_FILE_PATH}")
@@ -298,7 +298,7 @@ def setup() -> None:
     # GitHub token (optional)
     click.echo(click.style("GitHub Copilot", bold=True))
     click.echo("  Optional: provide a GitHub token, or use device flow login later.")
-    click.echo("  Recommended: run 'usage-tui login --provider copilot' instead.")
+    click.echo("  Recommended: run 'aibar login --provider copilot' instead.")
     github_token = click.prompt("  GITHUB_TOKEN", default="", show_default=False).strip()
     if github_token:
         updates["GITHUB_TOKEN"] = github_token
@@ -339,10 +339,10 @@ def setup() -> None:
 
     click.echo()
     click.echo("Next steps:")
-    click.echo("  usage-tui show --json")
-    click.echo("  usage-tui show")
-    click.echo("  usage-tui doctor")
-    click.echo("  usage-tui tui")
+    click.echo("  aibar show --json")
+    click.echo("  aibar show")
+    click.echo("  aibar doctor")
+    click.echo("  aibar ui")
 
 
 @main.command()
@@ -371,7 +371,7 @@ def login(provider: str) -> None:
 
 def _login_claude() -> None:
     """Login for Claude provider."""
-    from usage_tui.claude_cli_auth import ClaudeCLIAuth
+    from aibar.claude_cli_auth import ClaudeCLIAuth
 
     auth = ClaudeCLIAuth()
 
@@ -381,7 +381,7 @@ def _login_claude() -> None:
         click.echo("To set up Claude CLI:")
         click.echo("  1. Install: npm install -g @anthropics/claude")
         click.echo("  2. Authenticate: claude setup-token")
-        click.echo("  3. Then run 'usage-tui login' again")
+        click.echo("  3. Then run 'aibar login' again")
         sys.exit(1)
 
     info = auth.get_token_info()
@@ -407,7 +407,7 @@ def _login_claude() -> None:
             click.echo(f"  Scopes:     {', '.join(scopes)}")
         click.echo()
         click.echo("Token auto-loaded from ~/.claude/.credentials.json")
-        click.echo("You can now run: usage-tui show --provider claude")
+        click.echo("You can now run: aibar show --provider claude")
         click.echo("=" * 60)
     else:
         click.echo(click.style("\n Could not extract token", fg="red"))
@@ -416,7 +416,7 @@ def _login_claude() -> None:
 
 def _login_copilot() -> None:
     """Login for GitHub Copilot provider via device flow."""
-    from usage_tui.providers.copilot import CopilotProvider
+    from aibar.providers.copilot import CopilotProvider
 
     click.echo()
     click.echo("GitHub Copilot Login")
@@ -430,9 +430,9 @@ def _login_copilot() -> None:
         click.echo()
         click.echo(click.style(" Login successful!", fg="green", bold=True))
         click.echo()
-        click.echo("  Token saved to: ~/.config/usage-tui/copilot.json")
+        click.echo("  Token saved to: ~/.config/aibar/copilot.json")
         click.echo()
-        click.echo("You can now run: usage-tui show --provider copilot")
+        click.echo("You can now run: aibar show --provider copilot")
     except Exception as e:
         click.echo(click.style(f"\n Login failed: {e}", fg="red"))
         sys.exit(1)

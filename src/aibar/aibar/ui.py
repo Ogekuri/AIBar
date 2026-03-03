@@ -25,16 +25,16 @@ from textual.widgets import (
     TabPane,
 )
 
-from usage_tui.cache import ResultCache
-from usage_tui.config import config
-from usage_tui.providers import (
+from aibar.cache import ResultCache
+from aibar.config import config
+from aibar.providers import (
     ClaudeOAuthProvider,
     CodexProvider,
     CopilotProvider,
     OpenAIUsageProvider,
     OpenRouterUsageProvider,
 )
-from usage_tui.providers.base import (
+from aibar.providers.base import (
     BaseProvider,
     ProviderName,
     ProviderResult,
@@ -296,8 +296,8 @@ class RawJsonView(Static):
             display.update(formatted)
 
 
-class UsageTUI(App):
-    """Main TUI application for usage metrics."""
+class AIBarUI(App):
+    """Main UI application for usage metrics."""
 
     CSS = """
     Screen {
@@ -361,7 +361,7 @@ class UsageTUI(App):
         Binding("j", "toggle_json", "Toggle JSON"),
     ]
 
-    TITLE = "Usage Metrics TUI"
+    TITLE = "Usage Metrics UI"
 
     window: reactive[WindowPeriod] = reactive(WindowPeriod.DAY_7)
     show_json: reactive[bool] = reactive(False)
@@ -513,11 +513,11 @@ class UsageTUI(App):
         json_view.data = data
 
 
-def run_tui() -> None:
-    """Run the TUI application."""
-    app = UsageTUI()
+def run_ui() -> None:
+    """Run the UI application."""
+    app = AIBarUI()
     app.run()
 
 
 if __name__ == "__main__":
-    run_tui()
+    run_ui()

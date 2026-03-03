@@ -1,6 +1,6 @@
 """
 @file
-@brief Configuration and credential resolution for usage_tui.
+@brief Configuration and credential resolution for aibar.
 @details Provides environment-file parsing, token precedence resolution, and provider configuration status reporting.
 """
 
@@ -8,11 +8,11 @@ import os
 from pathlib import Path
 from typing import Any
 
-from usage_tui.claude_cli_auth import extract_claude_cli_token
-from usage_tui.providers.base import ProviderName
+from aibar.claude_cli_auth import extract_claude_cli_token
+from aibar.providers.base import ProviderName
 
 # Env file location
-ENV_FILE_PATH = Path.home() / ".config" / "usage-tui" / "env"
+ENV_FILE_PATH = Path.home() / ".config" / "aibar" / "env"
 
 
 def load_env_file() -> dict[str, str]:
@@ -139,14 +139,14 @@ class Config:
             return extract_claude_cli_token()
 
         if provider == ProviderName.CODEX:
-            from usage_tui.providers.codex import CodexCredentialStore
+            from aibar.providers.codex import CodexCredentialStore
 
             store = CodexCredentialStore()
             creds = store.load()
             return creds.access_token if creds else None
 
         if provider == ProviderName.COPILOT:
-            from usage_tui.providers.copilot import CopilotCredentialStore
+            from aibar.providers.copilot import CopilotCredentialStore
 
             store = CopilotCredentialStore()
             return store.load_token()
@@ -160,7 +160,7 @@ class Config:
         Delegates to provider's is_configured() method for accurate detection.
         """
         # Import providers lazily to avoid circular imports
-        from usage_tui.providers import (
+        from aibar.providers import (
             ClaudeOAuthProvider,
             OpenAIUsageProvider,
             OpenRouterUsageProvider,

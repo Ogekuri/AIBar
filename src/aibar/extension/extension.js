@@ -1,7 +1,7 @@
 /**
  * @file extension.js
- * @brief GNOME Shell panel extension for usage-tui metrics.
- * @details Collects usage JSON from the usage-tui CLI and renders provider-specific quota/cost cards in the GNOME panel popup.
+ * @brief GNOME Shell panel extension for aibar metrics.
+ * @details Collects usage JSON from the aibar CLI and renders provider-specific quota/cost cards in the GNOME panel popup.
  */
 import GLib from 'gi://GLib';
 import St from 'gi://St';
@@ -14,27 +14,27 @@ import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
 const REFRESH_INTERVAL_SECONDS = 300;
-const ENV_FILE_PATH = GLib.get_home_dir() + '/.config/usage-tui/env';
+const ENV_FILE_PATH = GLib.get_home_dir() + '/.config/aibar/env';
 
 /**
- * @brief Resolve usage-tui executable path.
- * @details Prefers PATH discovery and falls back to USAGE_TUI_PATH from the env file.
+ * @brief Resolve aibar executable path.
+ * @details Prefers PATH discovery and falls back to AIBAR_PATH from the env file.
  * @returns {string} Resolved executable path or fallback command name.
  */
-function _getUsageTuiPath() {
-    let found = GLib.find_program_in_path('usage-tui');
+function _getAiBarPath() {
+    let found = GLib.find_program_in_path('aibar');
     if (found)
         return found;
 
     let env = _loadEnvFromFile();
-    if (env.USAGE_TUI_PATH)
-        return env.USAGE_TUI_PATH;
+    if (env.AIBAR_PATH)
+        return env.AIBAR_PATH;
 
-    return 'usage-tui';
+    return 'aibar';
 }
 
 /**
- * @brief Load key-value environment variables from usage-tui env file.
+ * @brief Load key-value environment variables from aibar env file.
  * @details Parses export syntax, quoted values, and inline comments.
  * @returns {Object<string,string>} Parsed environment map.
  */
@@ -99,18 +99,18 @@ function _loadEnvFromFile() {
  */
 function _getProgressClass(pct) {
     if (pct < 50)
-        return 'usage-tui-progress-ok';
+        return 'aibar-progress-ok';
     if (pct < 80)
-        return 'usage-tui-progress-warning';
-    return 'usage-tui-progress-danger';
+        return 'aibar-progress-warning';
+    return 'aibar-progress-danger';
 }
 
-const UsageTuiIndicator = GObject.registerClass(
+const AIBarIndicator = GObject.registerClass(
 /** @brief Panel indicator widget that manages popup rendering and refresh lifecycle. */
-class UsageTuiIndicator extends PanelMenu.Button {
+class AIBarIndicator extends PanelMenu.Button {
 
     _init() {
-        super._init(0.0, 'usage-tui Monitor', false);
+        super._init(0.0, 'aibar Monitor', false);
 
         this._timeout = null;
         this._usageData = {};
@@ -139,7 +139,7 @@ class UsageTuiIndicator extends PanelMenu.Button {
         this._panelLabel = new St.Label({
             text: '...',
             y_align: Clutter.ActorAlign.CENTER,
-            style_class: 'usage-tui-panel-label',
+            style_class: 'aibar-panel-label',
         });
 
         this._panelBox.add_child(this._icon);
@@ -150,7 +150,7 @@ class UsageTuiIndicator extends PanelMenu.Button {
     _buildPopupMenu() {
         let headerBox = new St.BoxLayout({
             vertical: false,
-            style_class: 'usage-tui-header',
+            style_class: 'aibar-header',
         });
 
         let headerIcon = new St.Icon({
@@ -159,8 +159,8 @@ class UsageTuiIndicator extends PanelMenu.Button {
         });
 
         let headerLabel = new St.Label({
-            text: 'usage-tui',
-            style_class: 'usage-tui-header-label',
+            text: 'aibar',
+            style_class: 'aibar-header-label',
             y_align: Clutter.ActorAlign.CENTER,
         });
 
@@ -173,7 +173,7 @@ class UsageTuiIndicator extends PanelMenu.Button {
 
         this._tabBar = new St.BoxLayout({
             vertical: false,
-            style_class: 'usage-tui-tab-bar',
+            style_class: 'aibar-tab-bar',
         });
 
         let tabBarItem = new PopupMenu.PopupBaseMenuItem({reactive: false});
@@ -181,13 +181,13 @@ class UsageTuiIndicator extends PanelMenu.Button {
         this.menu.addMenuItem(tabBarItem);
 
         let separator1 = new PopupMenu.PopupSeparatorMenuItem();
-        separator1.style_class = 'usage-tui-separator';
+        separator1.style_class = 'aibar-separator';
         this.menu.addMenuItem(separator1);
 
         this._providersContainer = new St.BoxLayout({
             vertical: true,
             x_expand: true,
-            style_class: 'usage-tui-providers',
+            style_class: 'aibar-providers',
         });
 
         let providersItem = new PopupMenu.PopupBaseMenuItem({reactive: false});
@@ -195,7 +195,7 @@ class UsageTuiIndicator extends PanelMenu.Button {
         this.menu.addMenuItem(providersItem);
 
         let separator2 = new PopupMenu.PopupSeparatorMenuItem();
-        separator2.style_class = 'usage-tui-separator';
+        separator2.style_class = 'aibar-separator';
         this.menu.addMenuItem(separator2);
 
         let refreshItem = new PopupMenu.PopupMenuItem('Refresh Now');
@@ -204,30 +204,30 @@ class UsageTuiIndicator extends PanelMenu.Button {
         });
         this.menu.addMenuItem(refreshItem);
 
-        let openTuiItem = new PopupMenu.PopupMenuItem('Open usage-tui TUI');
-        openTuiItem.connect('activate', () => {
-            this._openTerminalWithCommand(`${_getUsageTuiPath()} tui`);
+        let openUiItem = new PopupMenu.PopupMenuItem('Open aibar UI');
+        openUiItem.connect('activate', () => {
+            this._openTerminalWithCommand(`${_getAiBarPath()} ui`);
         });
-        this.menu.addMenuItem(openTuiItem);
+        this.menu.addMenuItem(openUiItem);
 
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
         this._lastUpdatedItem = new PopupMenu.PopupMenuItem('Last updated: Never', {
             reactive: false,
         });
-        this._lastUpdatedItem.label.style_class = 'usage-tui-last-updated';
+        this._lastUpdatedItem.label.style_class = 'aibar-last-updated';
         this.menu.addMenuItem(this._lastUpdatedItem);
     }
 
     _createTab(providerName) {
         let tab = new St.Button({
-            style_class: 'usage-tui-tab',
+            style_class: 'aibar-tab',
             can_focus: true,
         });
 
         let tabLabel = new St.Label({
             text: providerName.toUpperCase(),
-            style_class: `usage-tui-tab-label usage-tui-tab-label-${providerName}`,
+            style_class: `aibar-tab-label aibar-tab-label-${providerName}`,
         });
 
         tab.set_child(tabLabel);
@@ -246,9 +246,9 @@ class UsageTuiIndicator extends PanelMenu.Button {
 
         for (let [name, tabData] of Object.entries(this._providerTabs)) {
             if (name === providerName)
-                tabData.button.style_class = `usage-tui-tab-active usage-tui-tab-active-${name}`;
+                tabData.button.style_class = `aibar-tab-active aibar-tab-active-${name}`;
             else
-                tabData.button.style_class = 'usage-tui-tab';
+                tabData.button.style_class = 'aibar-tab';
         }
 
         for (let [name, card] of Object.entries(this._providerRows)) {
@@ -281,7 +281,7 @@ class UsageTuiIndicator extends PanelMenu.Button {
         let container = new St.BoxLayout({
             vertical: true,
             x_expand: true,
-            style_class: `usage-tui-card usage-tui-provider-${providerName}`,
+            style_class: `aibar-card aibar-provider-${providerName}`,
         });
 
         let header = new St.Label({
@@ -293,16 +293,16 @@ class UsageTuiIndicator extends PanelMenu.Button {
         let progressContainer = new St.BoxLayout({
             vertical: false,
             x_expand: true,
-            style_class: 'usage-tui-progress-row',
+            style_class: 'aibar-progress-row',
         });
 
         let progressBg = new St.BoxLayout({
-            style_class: 'usage-tui-progress-bg',
+            style_class: 'aibar-progress-bg',
             x_expand: true,
         });
 
         let progressFill = new St.Widget({
-            style_class: 'usage-tui-progress-fill',
+            style_class: 'aibar-progress-fill',
         });
 
         progressBg.add_child(progressFill);
@@ -310,7 +310,7 @@ class UsageTuiIndicator extends PanelMenu.Button {
 
         let progressLabel = new St.Label({
             text: '',
-            style_class: 'usage-tui-progress-label',
+            style_class: 'aibar-progress-label',
         });
         progressContainer.add_child(progressLabel);
 
@@ -320,37 +320,37 @@ class UsageTuiIndicator extends PanelMenu.Button {
             let barContainer = new St.BoxLayout({
                 vertical: true,
                 x_expand: true,
-                style_class: 'usage-tui-window-bar',
+                style_class: 'aibar-window-bar',
             });
 
             let row = new St.BoxLayout({
                 vertical: false,
                 x_expand: true,
-                style_class: 'usage-tui-window-row',
+                style_class: 'aibar-window-row',
             });
 
             let label = new St.Label({
                 text: labelText,
-                style_class: 'usage-tui-window-label',
+                style_class: 'aibar-window-label',
             });
 
             let barBg = new St.BoxLayout({
-                style_class: 'usage-tui-progress-bg',
+                style_class: 'aibar-progress-bg',
                 x_expand: true,
             });
 
             let barFill = new St.Widget({
-                style_class: 'usage-tui-progress-fill',
+                style_class: 'aibar-progress-fill',
             });
 
             let pctLabel = new St.Label({
                 text: '',
-                style_class: 'usage-tui-window-pct',
+                style_class: 'aibar-window-pct',
             });
 
             let resetLabel = new St.Label({
                 text: '',
-                style_class: 'usage-tui-reset-label',
+                style_class: 'aibar-reset-label',
             });
 
             barBg.add_child(barFill);
@@ -367,7 +367,7 @@ class UsageTuiIndicator extends PanelMenu.Button {
         let windowBars = new St.BoxLayout({
             vertical: true,
             x_expand: true,
-            style_class: 'usage-tui-window-bars',
+            style_class: 'aibar-window-bars',
         });
 
         let fiveHourBar = createWindowBar('5h');
@@ -381,15 +381,15 @@ class UsageTuiIndicator extends PanelMenu.Button {
 
         let statsGrid = new St.BoxLayout({
             vertical: true,
-            style_class: 'usage-tui-stats',
+            style_class: 'aibar-stats',
         });
 
-        let costLabel = new St.Label({style_class: 'usage-tui-cost'});
-        let byokLabel = new St.Label({style_class: 'usage-tui-stat'});
-        let requestsLabel = new St.Label({style_class: 'usage-tui-stat'});
-        let tokensLabel = new St.Label({style_class: 'usage-tui-stat'});
-        let resetsLabel = new St.Label({style_class: 'usage-tui-stat-reset'});
-        let errorLabel = new St.Label({style_class: 'usage-tui-error'});
+        let costLabel = new St.Label({style_class: 'aibar-cost'});
+        let byokLabel = new St.Label({style_class: 'aibar-stat'});
+        let requestsLabel = new St.Label({style_class: 'aibar-stat'});
+        let tokensLabel = new St.Label({style_class: 'aibar-stat'});
+        let resetsLabel = new St.Label({style_class: 'aibar-stat-reset'});
+        let errorLabel = new St.Label({style_class: 'aibar-error'});
 
         statsGrid.add_child(costLabel);
         statsGrid.add_child(byokLabel);
@@ -432,7 +432,7 @@ class UsageTuiIndicator extends PanelMenu.Button {
             card.requestsLabel.text = '';
             card.tokensLabel.text = '';
             card.resetsLabel.text = '';
-            card.progressFill.style_class = 'usage-tui-progress-fill usage-tui-progress-danger';
+            card.progressFill.style_class = 'aibar-progress-fill aibar-progress-danger';
             card.progressFill.set_width(0);
             card.progressLabel.text = '';
             card.windowBars.hide();
@@ -458,7 +458,7 @@ class UsageTuiIndicator extends PanelMenu.Button {
 
         const updateWindowBar = (bar, pct, resetTime, useDays) => {
             bar.pctLabel.text = `${pct.toFixed(1)}%`;
-            bar.barFill.style_class = `usage-tui-progress-fill ${_getProgressClass(pct)}`;
+            bar.barFill.style_class = `aibar-progress-fill ${_getProgressClass(pct)}`;
 
             GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
                 let barBgWidth = bar.barBg.get_width();
@@ -553,7 +553,7 @@ class UsageTuiIndicator extends PanelMenu.Button {
                 let pct = usagePercent;
                 card._barData.progress = {pct};
                 card.progressLabel.text = `${pct.toFixed(1)}%`;
-                card.progressFill.style_class = `usage-tui-progress-fill ${_getProgressClass(pct)}`;
+                card.progressFill.style_class = `aibar-progress-fill ${_getProgressClass(pct)}`;
 
                 GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
                     let barBgWidth = card.progressBg ? card.progressBg.get_width() : 0;
@@ -565,7 +565,7 @@ class UsageTuiIndicator extends PanelMenu.Button {
                 });
             } else {
                 card._barData.progress = null;
-                card.progressFill.style_class = 'usage-tui-progress-fill usage-tui-progress-none';
+                card.progressFill.style_class = 'aibar-progress-fill aibar-progress-none';
                 card.progressFill.set_width(0);
                 card.progressLabel.text = '';
             }
@@ -659,7 +659,7 @@ class UsageTuiIndicator extends PanelMenu.Button {
             for (let [key, value] of Object.entries(envFromFile))
                 launcher.setenv(key, value, true);
 
-            let proc = launcher.spawnv([_getUsageTuiPath(), 'show', '--json']);
+            let proc = launcher.spawnv([_getAiBarPath(), 'show', '--json']);
 
             proc.communicate_utf8_async(null, null, (proc, result) => {
                 try {
@@ -681,15 +681,15 @@ class UsageTuiIndicator extends PanelMenu.Button {
     }
 
     _parseOutput(output) {
-        console.debug('usage-tui: Parsing output');
+        console.debug('aibar: Parsing output');
 
         try {
             let json = JSON.parse(output);
             this._usageData = json;
             this._lastUpdated = new Date();
-            console.debug(`usage-tui: Parsed ${Object.keys(json).length} providers`);
+            console.debug(`aibar: Parsed ${Object.keys(json).length} providers`);
         } catch (e) {
-            console.debug(`usage-tui: JSON parse error: ${e.message}`);
+            console.debug(`aibar: JSON parse error: ${e.message}`);
             this._handleError(`Parse error: ${e.message}`);
         }
     }
@@ -753,7 +753,7 @@ class UsageTuiIndicator extends PanelMenu.Button {
     }
 
     _handleError(message) {
-        console.debug(`usage-tui Error: ${message}`);
+        console.debug(`aibar Error: ${message}`);
         this._panelLabel.set_text('Err');
         this._lastUpdatedItem.label.set_text(`Error: ${message.substring(0, 40)}`);
     }
@@ -765,7 +765,7 @@ class UsageTuiIndicator extends PanelMenu.Button {
                 Gio.SubprocessFlags.NONE
             );
         } catch (e) {
-            console.debug(`usage-tui: Failed to open terminal: ${e.message}`);
+            console.debug(`aibar: Failed to open terminal: ${e.message}`);
         }
     }
 
@@ -779,20 +779,20 @@ class UsageTuiIndicator extends PanelMenu.Button {
     }
 });
 
-/** @brief GNOME extension lifecycle adapter for UsageTuiIndicator registration. */
-export default class UsageTuiExtension {
+/** @brief GNOME extension lifecycle adapter for AIBarIndicator registration. */
+export default class AIBarExtension {
     constructor() {
         this._indicator = null;
     }
 
     enable() {
-        console.debug('usage-tui: Enabling extension');
-        this._indicator = new UsageTuiIndicator();
-        Main.panel.addToStatusArea('usage-tui', this._indicator, 0, 'right');
+        console.debug('aibar: Enabling extension');
+        this._indicator = new AIBarIndicator();
+        Main.panel.addToStatusArea('aibar', this._indicator, 0, 'right');
     }
 
     disable() {
-        console.debug('usage-tui: Disabling extension');
+        console.debug('aibar: Disabling extension');
 
         if (this._indicator) {
             this._indicator.destroy();

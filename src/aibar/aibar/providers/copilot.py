@@ -12,7 +12,7 @@ from typing import Any
 
 import httpx
 
-from usage_tui.providers.base import (
+from aibar.providers.base import (
     AuthenticationError,
     BaseProvider,
     ProviderError,
@@ -120,11 +120,11 @@ class CopilotCredentialStore:
     """
     Store and retrieve Copilot credentials.
 
-    Stores tokens in ~/.config/usage-tui/copilot.json
+    Stores tokens in ~/.config/aibar/copilot.json
     Also checks ~/.codexbar/config.json for existing tokens.
     """
 
-    CONFIG_DIR = Path.home() / ".config" / "usage-tui"
+    CONFIG_DIR = Path.home() / ".config" / "aibar"
     CREDS_FILE = CONFIG_DIR / "copilot.json"
     CODEXBAR_CONFIG = Path.home() / ".codexbar" / "config.json"
 
@@ -211,7 +211,7 @@ class CopilotProvider(BaseProvider):
         """Get configuration instructions."""
         return """GitHub Copilot Provider Configuration:
 
-1. Run: usage-tui login --provider copilot
+1. Run: aibar login --provider copilot
 2. Follow the browser authorization flow
 3. Token will be saved automatically
 
@@ -231,7 +231,7 @@ Note: Token needs 'read:user' scope."""
         if not self.is_configured():
             return self._make_error_result(
                 window=effective_window,
-                error="Not configured. Run 'usage-tui login --provider copilot'",
+                error="Not configured. Run 'aibar login --provider copilot'",
             )
 
         try:
@@ -251,7 +251,7 @@ Note: Token needs 'read:user' scope."""
                 if response.status_code in (401, 403):
                     raise AuthenticationError(
                         "GitHub token invalid or lacks Copilot access. "
-                        "Run 'usage-tui login --provider copilot'"
+                        "Run 'aibar login --provider copilot'"
                     )
 
                 if response.status_code == 404:

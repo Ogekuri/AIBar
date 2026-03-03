@@ -1,227 +1,227 @@
 /* Panel */
-.usage-tui-panel-label {
+.aibar-panel-label {
     margin-left: 5px;
 }
 
 /* Header */
-.usage-tui-header {
+.aibar-header {
     padding: 4px 8px;
     spacing: 6px;
 }
 
-.usage-tui-header-label {
+.aibar-header-label {
     font-weight: bold;
     font-size: 1.1em;
 }
 
 /* Tab bar */
-.usage-tui-tab-bar {
+.aibar-tab-bar {
     padding: 4px 10px 0px 8px;
     spacing: 0px;
 }
 
-.usage-tui-tab {
+.aibar-tab {
     padding: 5px 10px;
     border-radius: 4px 4px 0 0;
     background-color: rgba(255, 255, 255, 0.05);
     margin-right: 2px;
 }
 
-.usage-tui-tab-active {
+.aibar-tab-active {
     padding: 5px 10px;
     border-radius: 4px 4px 0 0;
     background-color: rgba(255, 255, 255, 0.12);
     margin-right: 2px;
 }
 
-.usage-tui-tab-active-claude {
+.aibar-tab-active-claude {
     border-bottom: 2px solid #D4A574;
 }
 
-.usage-tui-tab-active-openai {
+.aibar-tab-active-openai {
     border-bottom: 2px solid #74AA9C;
 }
 
-.usage-tui-tab-active-openrouter {
+.aibar-tab-active-openrouter {
     border-bottom: 2px solid #FF6B35;
 }
 
-.usage-tui-tab-active-copilot {
+.aibar-tab-active-copilot {
     border-bottom: 2px solid #6E40C9;
 }
 
-.usage-tui-tab-active-codex {
+.aibar-tab-active-codex {
     border-bottom: 2px solid #FF6B35;
 }
 
 /* Tab label (base + per-provider color) */
-.usage-tui-tab-label {
+.aibar-tab-label {
     font-size: 0.8em;
     font-weight: bold;
     color: #888;
 }
 
-.usage-tui-tab-label-claude {
+.aibar-tab-label-claude {
     color: #D4A574;
 }
 
-.usage-tui-tab-label-openai {
+.aibar-tab-label-openai {
     color: #74AA9C;
 }
 
-.usage-tui-tab-label-openrouter {
+.aibar-tab-label-openrouter {
     color: #FF6B35;
 }
 
-.usage-tui-tab-label-copilot {
+.aibar-tab-label-copilot {
     color: #6E40C9;
 }
 
-.usage-tui-tab-label-codex {
+.aibar-tab-label-codex {
     color: #FF6B35;
 }
 
 /* Separator */
-.usage-tui-separator {
+.aibar-separator {
     margin: 0px;
 }
 
 /* Providers container */
-.usage-tui-providers {
+.aibar-providers {
     padding: 2px 12px;
     spacing: 8px;
     min-width: 260px;
 }
 
 /* Provider card */
-.usage-tui-card {
+.aibar-card {
     background-color: rgba(255, 255, 255, 0.03);
     border-radius: 6px;
     padding: 8px 5px 5px 5px;
 }
 
-.usage-tui-provider-claude {
+.aibar-provider-claude {
     border-left: 3px solid #D4A574;
 }
 
-.usage-tui-provider-openai {
+.aibar-provider-openai {
     border-left: 3px solid #74AA9C;
 }
 
-.usage-tui-provider-openrouter {
+.aibar-provider-openrouter {
     border-left: 3px solid #FF6B35;
 }
 
-.usage-tui-provider-copilot {
+.aibar-provider-copilot {
     border-left: 3px solid #6E40C9;
 }
 
-.usage-tui-provider-codex {
+.aibar-provider-codex {
     border-left: 3px solid #FF6B35;
 }
 
 /* Progress bars */
-.usage-tui-progress-row {
+.aibar-progress-row {
     spacing: 8px;
     margin-bottom: 4px;
 }
 
-.usage-tui-progress-bg {
+.aibar-progress-bg {
     background-color: #3a3a3a;
     border-radius: 3px;
     height: 6px;
 }
 
-.usage-tui-progress-fill {
+.aibar-progress-fill {
     border-radius: 3px;
     height: 6px;
 }
 
-.usage-tui-progress-ok {
+.aibar-progress-ok {
     background-color: #4CAF50;
 }
 
-.usage-tui-progress-warning {
+.aibar-progress-warning {
     background-color: #ff9800;
 }
 
-.usage-tui-progress-danger {
+.aibar-progress-danger {
     background-color: #f44336;
 }
 
-.usage-tui-progress-none {
+.aibar-progress-none {
     background-color: #555;
 }
 
-.usage-tui-progress-label {
+.aibar-progress-label {
     font-size: 0.9em;
     color: #aaa;
     min-width: 42px;
 }
 
 /* Window bars (5h / 7d) */
-.usage-tui-window-bars {
+.aibar-window-bars {
     spacing: 2px;
 }
 
-.usage-tui-window-bar {
+.aibar-window-bar {
     spacing: 2px;
     margin-bottom: 4px;
 }
 
-.usage-tui-window-row {
+.aibar-window-row {
     spacing: 6px;
 }
 
-.usage-tui-window-label {
+.aibar-window-label {
     font-size: 0.85em;
     color: #999;
     min-width: 20px;
     font-weight: bold;
 }
 
-.usage-tui-window-pct {
+.aibar-window-pct {
     font-size: 0.9em;
     color: #aaa;
     min-width: 42px;
 }
 
-.usage-tui-reset-label {
+.aibar-reset-label {
     font-size: 0.8em;
     color: #888;
     margin-left: 26px;
 }
 
 /* Stats */
-.usage-tui-stats {
+.aibar-stats {
     spacing: 2px;
     margin-top: 4px;
 }
 
-.usage-tui-cost {
+.aibar-cost {
     font-size: 0.95em;
     color: #ddd;
 }
 
-.usage-tui-stat {
+.aibar-stat {
     font-size: 0.85em;
     color: #aaa;
 }
 
-.usage-tui-stat-reset {
+.aibar-stat-reset {
     font-size: 0.85em;
     color: #888;
     margin-top: 2px;
 }
 
-.usage-tui-error {
+.aibar-error {
     font-size: 0.85em;
     color: #f44336;
     margin-top: 2px;
 }
 
 /* Footer */
-.usage-tui-last-updated {
+.aibar-last-updated {
     font-size: 0.85em;
     color: #666;
 }

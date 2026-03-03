@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 import httpx
 
-from usage_tui.providers.base import (
+from aibar.providers.base import (
     AuthenticationError,
     BaseProvider,
     ProviderError,
@@ -289,7 +289,7 @@ Note: Token is refreshed automatically when needed."""
                 headers = {
                     "Authorization": f"Bearer {self._credentials.access_token}",
                     "Accept": "application/json",
-                    "User-Agent": "usage-tui",
+                    "User-Agent": "aibar",
                 }
 
                 # Add account ID if available

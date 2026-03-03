@@ -6,7 +6,7 @@
 
 import httpx
 
-from usage_tui.providers.base import (
+from aibar.providers.base import (
     AuthenticationError,
     BaseProvider,
     ProviderError,
@@ -42,7 +42,7 @@ class OpenRouterUsageProvider(BaseProvider):
         if api_key:
             self._api_key = api_key
         else:
-            from usage_tui.config import config
+            from aibar.config import config
             self._api_key = config.get_token(ProviderName.OPENROUTER)
 
     def is_configured(self) -> bool:
@@ -73,7 +73,7 @@ class OpenRouterUsageProvider(BaseProvider):
                     headers={
                         "Authorization": f"Bearer {self._api_key}",
                         "Accept": "application/json",
-                        "User-Agent": "usage-tui",
+                        "User-Agent": "aibar",
                     },
                 )
 

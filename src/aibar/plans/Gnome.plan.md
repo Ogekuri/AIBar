@@ -1,6 +1,6 @@
-# Complete Guide: Building a usage-tui GNOME Extension
+# Complete Guide: Building a aibar GNOME Extension
 
-This guide walks you through creating a GNOME Shell extension that displays usage metrics from `usage-tui` in the top panel with a popup UI. It covers everything from understanding our existing codebase to debugging and installation.
+This guide walks you through creating a GNOME Shell extension that displays usage metrics from `aibar` in the top panel with a popup UI. It covers everything from understanding our existing codebase to debugging and installation.
 
 ---
 
@@ -11,7 +11,7 @@ This guide walks you through creating a GNOME Shell extension that displays usag
 3. [Development Environment Setup](#3-development-environment-setup)
 4. [Extension File Structure](#4-extension-file-structure)
 5. [Complete Extension Code](#5-complete-extension-code)
-6. [Parsing usage-tui Output](#6-parsing-usage-tui-output)
+6. [Parsing aibar Output](#6-parsing-aibar-output)
 7. [Installation](#7-installation)
 8. [Development Workflow on Wayland](#8-development-workflow-on-wayland)
 9. [Debugging](#9-debugging)
@@ -24,19 +24,19 @@ This guide walks you through creating a GNOME Shell extension that displays usag
 
 ### 1.1 Project Overview
 
-This is a Python CLI/TUI tool for monitoring AI service usage across multiple providers:
+This is a Python CLI/UI tool for monitoring AI service usage across multiple providers:
 
 | Provider | Description | Configuration |
 |----------|-------------|---------------|
 | **claude** | Anthropic Claude API | Via `claude setup-token` or env var |
 | **openai** | OpenAI API | `OPENAI_API_KEY` environment variable |
 | **openrouter** | OpenRouter API | `OPENROUTER_API_KEY` environment variable |
-| **copilot** | GitHub Copilot | OAuth via `usage-tui login --provider copilot` |
+| **copilot** | GitHub Copilot | OAuth via `aibar login --provider copilot` |
 | **codex** | OpenAI Codex CLI | Uses Codex CLI configuration |
 
 ### 1.2 Key Output Formats
 
-**Text Output (`usage-tui show`):**
+**Text Output (`aibar show`):**
 ```
 CLAUDE
 ----------------------------------------
@@ -53,7 +53,7 @@ Requests: 2,345
 Tokens:   89,012 (34,567 in / 54,445 out)
 ```
 
-**JSON Output (`usage-tui show --json`):**
+**JSON Output (`aibar show --json`):**
 ```json
 {
   "claude": {
@@ -134,40 +134,40 @@ sudo apt install gnome-shell gnome-shell-extensions gnome-tweaks gjs
 sudo pacman -S gnome-shell gnome-extensions gnome-tweaks gjs
 ```
 
-### 3.2 Verify usage-tui Installation
+### 3.2 Verify aibar Installation
 
 ```bash
-# Ensure usage-tui is installed
-usage-tui show
+# Ensure aibar is installed
+aibar show
 
 # Test JSON output
-usage-tui show --json
+aibar show --json
 
 # Test with specific provider
-usage-tui show --provider claude
-usage-tui show --provider openai --window 30d
+aibar show --provider claude
+aibar show --provider openai --window 30d
 ```
 
 ### 3.3 Create the Extension Directory
 
 ```bash
 # Create extension directory
-mkdir -p ~/.local/share/gnome-shell/extensions/usage-tui@gnome.codexbar
+mkdir -p ~/.local/share/gnome-shell/extensions/aibar@aibar.panel
 
 # Navigate to it
-cd ~/.local/share/gnome-shell/extensions/usage-tui@gnome.codexbar
+cd ~/.local/share/gnome-shell/extensions/aibar@aibar.panel
 ```
 
 ### 3.4 Set Up a Development Symlink (Recommended)
 
 ```bash
 # Create a development directory in our repo
-mkdir -p /home/omegashenr01n/Desktop/Projects/GnomeCodexBar/extension
+mkdir -p /home/omegashenr01n/Desktop/Projects/AIBar/extension
 
 # Remove the original and create symlink
-rm -rf ~/.local/share/gnome-shell/extensions/usage-tui@gnome.codexbar
-ln -s /home/omegashenr01n/Desktop/Projects/GnomeCodexBar/extension \
-    ~/.local/share/gnome-shell/extensions/usage-tui@gnome.codexbar
+rm -rf ~/.local/share/gnome-shell/extensions/aibar@aibar.panel
+ln -s /home/omegashenr01n/Desktop/Projects/AIBar/extension \
+    ~/.local/share/gnome-shell/extensions/aibar@aibar.panel
 ```
 
 ---
@@ -195,14 +195,14 @@ extension/
 
 ```json
 {
-  "uuid": "usage-tui@gnome.codexbar",
-  "name": "usage-tui Monitor",
+  "uuid": "aibar@aibar.panel",
+  "name": "aibar Monitor",
   "description": "Display AI service usage metrics (Claude, OpenAI, OpenRouter, Copilot, Codex) in the top panel",
   "version": 1,
   "shell-version": ["45", "46", "47", "48"],
-  "url": "https://github.com/shobhitpachauri/usage-tui",
-  "settings-schema": "org.gnome.shell.extensions.usage-tui",
-  "gettext-domain": "usage-tui"
+  "url": "https://github.com/shobhitpachauri/aibar",
+  "settings-schema": "org.gnome.shell.extensions.aibar",
+  "gettext-domain": "aibar"
 }
 ```
 
@@ -210,12 +210,12 @@ extension/
 
 ```javascript
 /**
- * usage-tui GNOME Extension
+ * aibar GNOME Extension
  * 
- * Displays AI service usage metrics from usage-tui in the GNOME Shell top panel
+ * Displays AI service usage metrics from aibar in the GNOME Shell top panel
  * with a dropdown popup showing detailed statistics for all providers.
  * 
- * @author Based on usage-tui project
+ * @author Based on aibar project
  * @version 1.0
  */
 
@@ -231,7 +231,7 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
 // Configuration
 const REFRESH_INTERVAL_SECONDS = 300; // 5 minutes
-const COMMAND = 'usage-tui show --json';
+const COMMAND = 'aibar show --json';
 
 // Provider colors for UI
 const PROVIDER_COLORS = {
@@ -245,11 +245,11 @@ const PROVIDER_COLORS = {
 /**
  * Main indicator class that appears in the panel
  */
-const UsageTuiIndicator = GObject.registerClass(
-class UsageTuiIndicator extends PanelMenu.Button {
+const AIBarIndicator = GObject.registerClass(
+class AIBarIndicator extends PanelMenu.Button {
     
     _init() {
-        super._init(0.0, 'usage-tui Monitor', false);
+        super._init(0.0, 'aibar Monitor', false);
         
         this._timeout = null;
         this._usageData = {};
@@ -311,7 +311,7 @@ class UsageTuiIndicator extends PanelMenu.Button {
         });
         
         let headerLabel = new St.Label({
-            text: 'usage-tui',
+            text: 'aibar',
             style: 'font-weight: bold; font-size: 1.3em;',
             y_align: Clutter.ActorAlign.CENTER,
         });
@@ -346,12 +346,12 @@ class UsageTuiIndicator extends PanelMenu.Button {
         });
         this.menu.addMenuItem(refreshItem);
         
-        // Open TUI button
-        let openTuiItem = new PopupMenu.PopupMenuItem('📊  Open usage-tui TUI');
-        openTuiItem.connect('activate', () => {
-            this._openTerminalWithCommand('usage-tui tui');
+        // Open UI button
+        let openUiItem = new PopupMenu.PopupMenuItem('📊  Open aibar UI');
+        openUiItem.connect('activate', () => {
+            this._openTerminalWithCommand('aibar ui');
         });
-        this.menu.addMenuItem(openTuiItem);
+        this.menu.addMenuItem(openUiItem);
         
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
         
@@ -564,7 +564,7 @@ class UsageTuiIndicator extends PanelMenu.Button {
     }
     
     /**
-     * Fetch data from usage-tui command
+     * Fetch data from aibar command
      */
     _refreshData() {
         this._panelLabel.set_text('...');
@@ -595,18 +595,18 @@ class UsageTuiIndicator extends PanelMenu.Button {
     }
     
     /**
-     * Parse the JSON output from usage-tui show --json
+     * Parse the JSON output from aibar show --json
      */
     _parseOutput(output) {
-        log(`usage-tui: Parsing output`);
+        log(`aibar: Parsing output`);
         
         try {
             let json = JSON.parse(output);
             this._usageData = json;
             this._lastUpdated = new Date();
-            log(`usage-tui: Parsed ${Object.keys(json).length} providers`);
+            log(`aibar: Parsed ${Object.keys(json).length} providers`);
         } catch (e) {
-            log(`usage-tui: JSON parse error: ${e.message}`);
+            log(`aibar: JSON parse error: ${e.message}`);
             this._handleError(`Parse error: ${e.message}`);
         }
     }
@@ -649,7 +649,7 @@ class UsageTuiIndicator extends PanelMenu.Button {
      * Handle errors gracefully
      */
     _handleError(message) {
-        log(`usage-tui Error: ${message}`);
+        log(`aibar Error: ${message}`);
         this._panelLabel.set_text('Err');
         this._lastUpdatedItem.label.set_text(`Error: ${message.substring(0, 40)}`);
     }
@@ -664,7 +664,7 @@ class UsageTuiIndicator extends PanelMenu.Button {
                 Gio.SubprocessFlags.NONE
             );
         } catch (e) {
-            log(`usage-tui: Failed to open terminal: ${e.message}`);
+            log(`aibar: Failed to open terminal: ${e.message}`);
         }
     }
     
@@ -684,19 +684,19 @@ class UsageTuiIndicator extends PanelMenu.Button {
 /**
  * Extension entry point class
  */
-export default class UsageTuiExtension {
+export default class AIBarExtension {
     constructor() {
         this._indicator = null;
     }
     
     enable() {
-        log('usage-tui: Enabling extension');
-        this._indicator = new UsageTuiIndicator();
-        Main.panel.addToStatusArea('usage-tui', this._indicator, 0, 'right');
+        log('aibar: Enabling extension');
+        this._indicator = new AIBarIndicator();
+        Main.panel.addToStatusArea('aibar', this._indicator, 0, 'right');
     }
     
     disable() {
-        log('usage-tui: Disabling extension');
+        log('aibar: Disabling extension');
         
         if (this._indicator) {
             this._indicator.destroy();
@@ -709,66 +709,66 @@ export default class UsageTuiExtension {
 ### 5.3 stylesheet.css
 
 ```css
-/* Custom styles for the usage-tui extension */
+/* Custom styles for the aibar extension */
 
 /* Panel button styling */
-.usage-tui-panel-button {
+.aibar-panel-button {
     padding: 0 8px;
 }
 
 /* Provider card styling */
-.usage-tui-provider-card {
+.aibar-provider-card {
     background-color: rgba(255, 255, 255, 0.05);
     border-radius: 8px;
     padding: 10px;
 }
 
-.usage-tui-provider-claude {
+.aibar-provider-claude {
     border-left: 3px solid #D4A574;
 }
 
-.usage-tui-provider-openai {
+.aibar-provider-openai {
     border-left: 3px solid #74AA9C;
 }
 
-.usage-tui-provider-openrouter {
+.aibar-provider-openrouter {
     border-left: 3px solid #FF6B35;
 }
 
-.usage-tui-provider-copilot {
+.aibar-provider-copilot {
     border-left: 3px solid #6E40C9;
 }
 
-.usage-tui-provider-codex {
+.aibar-provider-codex {
     border-left: 3px solid #FF6B35;
 }
 
 /* Progress bar colors */
-.usage-tui-progress-ok {
+.aibar-progress-ok {
     background-color: #4CAF50;
 }
 
-.usage-tui-progress-warning {
+.aibar-progress-warning {
     background-color: #ff9800;
 }
 
-.usage-tui-progress-danger {
+.aibar-progress-danger {
     background-color: #f44336;
 }
 
 /* Stats styling */
-.usage-tui-stat-label {
+.aibar-stat-label {
     font-size: 0.85em;
     color: #cccccc;
 }
 
-.usage-tui-stat-value {
+.aibar-stat-value {
     font-weight: bold;
     font-family: monospace;
 }
 
 /* Error styling */
-.usage-tui-error {
+.aibar-error {
     color: #f44336;
     font-size: 0.8em;
 }
@@ -776,7 +776,7 @@ export default class UsageTuiExtension {
 
 ---
 
-## 6. Parsing usage-tui Output
+## 6. Parsing aibar Output
 
 ### 6.1 JSON Schema
 
@@ -822,7 +822,7 @@ When a provider has an error:
 
 ```bash
 # Navigate to extension directory
-cd /home/omegashenr01n/Desktop/Projects/GnomeCodexBar/extension
+cd /home/omegashenr01n/Desktop/Projects/AIBar/extension
 
 # Create files (copy from above)
 nano metadata.json
@@ -840,14 +840,14 @@ chmod 644 metadata.json extension.js stylesheet.css
 gnome-extensions list
 
 # Check extension info
-gnome-extensions info usage-tui@gnome.codexbar
+gnome-extensions info aibar@aibar.panel
 ```
 
 ### 7.3 Enable the Extension
 
 ```bash
 # Enable via command line
-gnome-extensions enable usage-tui@gnome.codexbar
+gnome-extensions enable aibar@aibar.panel
 
 # Or use the Extensions app
 gnome-extensions-app
@@ -875,11 +875,11 @@ This opens a sandboxed GNOME Shell in a window that:
 
 ### 8.2 Development Script
 
-Save as `/home/omegashenr01n/Desktop/Projects/GnomeCodexBar/extension/dev.sh`:
+Save as `/home/omegashenr01n/Desktop/Projects/AIBar/extension/dev.sh`:
 
 ```bash
 #!/bin/bash
-EXT_UUID="usage-tui@gnome.codexbar"
+EXT_UUID="aibar@aibar.panel"
 
  case "$1" in
     start)
@@ -901,7 +901,7 @@ EXT_UUID="usage-tui@gnome.codexbar"
         echo "Extension reloaded"
         ;;
     logs)
-        journalctl -f -o cat /usr/bin/gnome-shell | grep -i "usage-tui"
+        journalctl -f -o cat /usr/bin/gnome-shell | grep -i "aibar"
         ;;
     *)
         echo "Usage: $0 {start|enable|disable|reload|logs}"
@@ -927,7 +927,7 @@ chmod +x dev.sh
 journalctl -f -o cat /usr/bin/gnome-shell
 
 # Filter for your extension
-journalctl -f -o cat /usr/bin/gnome-shell | grep -i "usage-tui"
+journalctl -f -o cat /usr/bin/gnome-shell | grep -i "aibar"
 ```
 
 ### 9.2 Using Looking Glass
@@ -937,7 +937,7 @@ Press `Alt+F2`, type `lg`, press Enter.
 ```javascript
 // In the Evaluator tab:
 // Get extension object
-const ext = Main.extensionManager.lookup('usage-tui@gnome.codexbar');
+const ext = Main.extensionManager.lookup('aibar@aibar.panel');
 
 // Check extension state
 ext.state  // Should be 1 (ENABLED)
@@ -958,7 +958,7 @@ Add notifications when approaching limits:
 import * as MessageTray from 'resource:///org/gnome/shell/ui/messageTray.js';
 
 _sendNotification(title, body) {
-    let source = new MessageTray.Source('usage-tui', 'dialog-warning-symbolic');
+    let source = new MessageTray.Source('aibar', 'dialog-warning-symbolic');
     Main.messageTray.add(source);
     let notification = new MessageTray.Notification(source, title, body);
     source.showNotification(notification);
@@ -972,8 +972,8 @@ Add settings to show only specific providers:
 ```javascript
 // In _refreshData()
 const COMMAND = this._settings.get_boolean('show-all-providers') 
-    ? 'usage-tui show --json'
-    : 'usage-tui show --provider claude --json';
+    ? 'aibar show --json'
+    : 'aibar show --provider claude --json';
 ```
 
 ### 10.3 Click Actions
@@ -982,7 +982,7 @@ Make provider cards clickable:
 
 ```javascript
 providerCard.connect('button-press-event', () => {
-    this._openTerminalWithCommand(`usage-tui show --provider ${providerName}`);
+    this._openTerminalWithCommand(`aibar show --provider ${providerName}`);
 });
 ```
 
@@ -995,9 +995,9 @@ providerCard.connect('button-press-event', () => {
 1. **Check UUID matches directory name:**
    ```bash
    ls ~/.local/share/gnome-shell/extensions/
-   # Should show: usage-tui@gnome.codexbar
+   # Should show: aibar@aibar.panel
    
-   grep uuid ~/.local/share/gnome-shell/extensions/usage-tui@gnome.codexbar/metadata.json
+   grep uuid ~/.local/share/gnome-shell/extensions/aibar@aibar.panel/metadata.json
    ```
 
 2. **Verify GNOME Shell version compatibility:**
@@ -1008,30 +1008,30 @@ providerCard.connect('button-press-event', () => {
 
 3. **Check for syntax errors:**
    ```bash
-   gjs -c "import '~/.local/share/gnome-shell/extensions/usage-tui@gnome.codexbar/extension.js'"
+   gjs -c "import '~/.local/share/gnome-shell/extensions/aibar@aibar.panel/extension.js'"
    ```
 
-### usage-tui Not Found
+### aibar Not Found
 
-If `usage-tui` isn't in PATH when running from the extension:
+If `aibar` isn't in PATH when running from the extension:
 
 ```javascript
 // Use full path in extension.js
-const COMMAND = '/home/omegashenr01n/.local/bin/usage-tui show --json';
+const COMMAND = '/home/omegashenr01n/.local/bin/aibar show --json';
 
 // Or
-const COMMAND = '/usr/local/bin/usage-tui show --json';
+const COMMAND = '/usr/local/bin/aibar show --json';
 ```
 
 Find the path:
 ```bash
-which usage-tui
+which aibar
 ```
 
 ### Permission Errors
 
 ```bash
-chmod 644 ~/.local/share/gnome-shell/extensions/usage-tui@gnome.codexbar/*
+chmod 644 ~/.local/share/gnome-shell/extensions/aibar@aibar.panel/*
 ```
 
 ---
@@ -1041,13 +1041,13 @@ chmod 644 ~/.local/share/gnome-shell/extensions/usage-tui@gnome.codexbar/*
 ```bash
 # Extension management
 gnome-extensions list
-gnome-extensions enable usage-tui@gnome.codexbar
-gnome-extensions disable usage-tui@gnome.codexbar
-gnome-extensions info usage-tui@gnome.codexbar
+gnome-extensions enable aibar@aibar.panel
+gnome-extensions disable aibar@aibar.panel
+gnome-extensions info aibar@aibar.panel
 
 # Development
 dbus-run-session -- gnome-shell --nested --wayland
-journalctl -f -o cat /usr/bin/gnome-shell | grep -i "usage-tui"
+journalctl -f -o cat /usr/bin/gnome-shell | grep -i "aibar"
 
 # Debugging
 Alt+F2 → lg  # Open Looking Glass

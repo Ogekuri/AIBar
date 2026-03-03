@@ -12,7 +12,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from usage_tui.providers.base import ProviderName, ProviderResult, WindowPeriod
+from aibar.providers.base import ProviderName, ProviderResult, WindowPeriod
 
 
 class CacheEntry(BaseModel):
@@ -53,7 +53,7 @@ class ResultCache:
 
         Args:
             cache_dir: Directory for disk persistence.
-                      Defaults to ~/.cache/usage-tui/
+                      Defaults to ~/.cache/aibar/
         """
         self._memory_cache: dict[str, CacheEntry] = {}
         self._cache_dir = cache_dir or self._default_cache_dir()
@@ -63,7 +63,7 @@ class ResultCache:
         """Get default cache directory following XDG spec."""
         xdg_cache = os.environ.get("XDG_CACHE_HOME")
         base = Path(xdg_cache) if xdg_cache else Path.home() / ".cache"
-        return base / "usage-tui"
+        return base / "aibar"
 
     def _ensure_cache_dir(self) -> None:
         """Create cache directory if it doesn't exist."""
