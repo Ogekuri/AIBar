@@ -1,4 +1,4 @@
-# useReq/req (0.8.0)
+# AIBar/aibar (0.0.0)
 
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.11+">
@@ -9,9 +9,8 @@
 </p>
 
 <p align="center">
-<strong>The <u>req</u> script provides CLI prompts for requirements-driven software development.</strong><br>
-The defined prompts are exposed as <b>/req-<name></b> commands within various CLIs and Agents.<br>
-This allows them to be run both as a Python package (installed as <b>req</b>, <b>usereq</b>, or <b>use-req</b>) and directly using <b>uvx</b>.
+<strong>Monitor AI usage and quota in one CLI/TUI.</strong><br>
+AIBar aggregates usage metrics for Claude, OpenAI, OpenRouter, GitHub Copilot, and Codex, with both terminal output and a GNOME panel extension.
 </p>
 
 <p align="center">
@@ -30,17 +29,57 @@ This allows them to be run both as a Python package (installed as <b>req</b>, <b
 
 
 ## Feature Highlights
-- TODO: compilare con la lista delle funzionalità
+- Unified `show` command for multiple providers (`claude`, `openai`, `openrouter`, `copilot`, `codex`).
+- Human-readable output and JSON output (`--json`) for scripting/integration.
+- Interactive Textual UI (`ui`) with refresh controls and 5h/7d window switching.
+- Provider diagnostics (`doctor`) and interactive setup (`setup`) for credentials.
+- Local cache of successful results under `~/.cache/aibar` to reduce repeated API calls.
+- GNOME Shell extension support via `aibar show --json`.
 
 
 ## Quick Start
 
-TODO: compilare lq quick start guide
+```bash
+# 1) From the repository root, run the launcher (creates .venv on first run)
+./aibar.sh --help
+
+# 2) Configure credentials interactively
+./aibar.sh setup
+
+# 3) Verify provider configuration and connectivity
+./aibar.sh doctor
+
+# 4) Show usage
+./aibar.sh show
+./aibar.sh show --json
+```
 
 
 ## Usage
 
-TODO: compilare l'usage guide
+```bash
+# Show all configured providers (default window: 7d)
+./aibar.sh show
+
+# Show one provider and select window
+./aibar.sh show --provider claude --window 5h
+
+# JSON output
+./aibar.sh show --json
+
+# Print required environment variables
+./aibar.sh env
+
+# Interactive setup wizard
+./aibar.sh setup
+
+# Provider login helpers
+./aibar.sh login --provider claude
+./aibar.sh login --provider copilot
+
+# Launch terminal UI
+./aibar.sh ui
+```
 
 
 
