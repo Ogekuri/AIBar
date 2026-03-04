@@ -54,9 +54,9 @@ def test_popup_labels_use_aibar_brand_casing() -> None:
     assert "PopupMenu.PopupMenuItem('Open aibar UI')" not in source
 
 
-def test_panel_percentage_labels_use_fixed_order_and_provider_styles() -> None:
+def test_panel_percentage_labels_use_fixed_order_provider_styles_and_primary_bold() -> None:
     """
-    @brief Verify panel percentage labels use Claude/Copilot/Codex order and provider styles.
+    @brief Verify panel percentage label order, provider styles, and primary bold classes.
     """
     source = EXTENSION_PATH.read_text(encoding="utf-8")
     assert "this._panelBox.add_child(this._icon);" in source
@@ -64,13 +64,17 @@ def test_panel_percentage_labels_use_fixed_order_and_provider_styles() -> None:
     assert "this._panelBox.add_child(this._panelLabel);" in source
 
     claude_idx = source.index("this._panelPercentages.add_child(this._panelClaudePctLabel);")
+    claude_7d_idx = source.index("this._panelPercentages.add_child(this._panelClaude7dPctLabel);")
     copilot_idx = source.index("this._panelPercentages.add_child(this._panelCopilotPctLabel);")
-    codex_idx = source.index("this._panelPercentages.add_child(this._panelCodexPctLabel);")
-    assert claude_idx < copilot_idx < codex_idx
+    codex_5h_idx = source.index("this._panelPercentages.add_child(this._panelCodexPctLabel);")
+    codex_7d_idx = source.index("this._panelPercentages.add_child(this._panelCodex7dPctLabel);")
+    assert claude_idx < claude_7d_idx < copilot_idx < codex_5h_idx < codex_7d_idx
 
-    assert "style_class: 'aibar-panel-pct aibar-tab-label-claude'" in source
-    assert "style_class: 'aibar-panel-pct aibar-tab-label-copilot'" in source
-    assert "style_class: 'aibar-panel-pct aibar-tab-label-codex'" in source
+    assert "style_class: 'aibar-panel-pct aibar-panel-pct-primary aibar-tab-label-claude'" in source
+    assert "style_class: 'aibar-panel-pct aibar-panel-pct-secondary aibar-tab-label-claude'" in source
+    assert "style_class: 'aibar-panel-pct aibar-panel-pct-primary aibar-tab-label-copilot'" in source
+    assert "style_class: 'aibar-panel-pct aibar-panel-pct-primary aibar-tab-label-codex'" in source
+    assert "style_class: 'aibar-panel-pct aibar-panel-pct-secondary aibar-tab-label-codex'" in source
 
 
 def test_panel_percentage_labels_hide_when_metrics_are_unavailable() -> None:
@@ -81,5 +85,7 @@ def test_panel_percentage_labels_hide_when_metrics_are_unavailable() -> None:
     assert "label.set_text('');" in source
     assert "label.hide();" in source
     assert "this._panelClaudePctLabel.hide();" in source
+    assert "this._panelClaude7dPctLabel.hide();" in source
     assert "this._panelCopilotPctLabel.hide();" in source
     assert "this._panelCodexPctLabel.hide();" in source
+    assert "this._panelCodex7dPctLabel.hide();" in source

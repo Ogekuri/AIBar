@@ -160,28 +160,44 @@ class AIBarIndicator extends PanelMenu.Button {
         this._panelClaudePctLabel = new St.Label({
             text: '',
             y_align: Clutter.ActorAlign.CENTER,
-            style_class: 'aibar-panel-pct aibar-tab-label-claude',
+            style_class: 'aibar-panel-pct aibar-panel-pct-primary aibar-tab-label-claude',
+        });
+
+        this._panelClaude7dPctLabel = new St.Label({
+            text: '',
+            y_align: Clutter.ActorAlign.CENTER,
+            style_class: 'aibar-panel-pct aibar-panel-pct-secondary aibar-tab-label-claude',
         });
 
         this._panelCopilotPctLabel = new St.Label({
             text: '',
             y_align: Clutter.ActorAlign.CENTER,
-            style_class: 'aibar-panel-pct aibar-tab-label-copilot',
+            style_class: 'aibar-panel-pct aibar-panel-pct-primary aibar-tab-label-copilot',
         });
 
         this._panelCodexPctLabel = new St.Label({
             text: '',
             y_align: Clutter.ActorAlign.CENTER,
-            style_class: 'aibar-panel-pct aibar-tab-label-codex',
+            style_class: 'aibar-panel-pct aibar-panel-pct-primary aibar-tab-label-codex',
+        });
+
+        this._panelCodex7dPctLabel = new St.Label({
+            text: '',
+            y_align: Clutter.ActorAlign.CENTER,
+            style_class: 'aibar-panel-pct aibar-panel-pct-secondary aibar-tab-label-codex',
         });
 
         this._panelClaudePctLabel.hide();
+        this._panelClaude7dPctLabel.hide();
         this._panelCopilotPctLabel.hide();
         this._panelCodexPctLabel.hide();
+        this._panelCodex7dPctLabel.hide();
 
         this._panelPercentages.add_child(this._panelClaudePctLabel);
+        this._panelPercentages.add_child(this._panelClaude7dPctLabel);
         this._panelPercentages.add_child(this._panelCopilotPctLabel);
         this._panelPercentages.add_child(this._panelCodexPctLabel);
+        this._panelPercentages.add_child(this._panelCodex7dPctLabel);
 
         this._panelBox.add_child(this._icon);
         this._panelBox.add_child(this._panelPercentages);
@@ -813,58 +829,97 @@ class AIBarIndicator extends PanelMenu.Button {
         let hasCostData = false;
         let configuredProviders = 0;
         const usageLabels = {
-            claude: this._panelClaudePctLabel,
+            claude5h: this._panelClaudePctLabel,
+            claude7d: this._panelClaude7dPctLabel,
             copilot: this._panelCopilotPctLabel,
-            codex: this._panelCodexPctLabel,
+            codex5h: this._panelCodexPctLabel,
+            codex7d: this._panelCodex7dPctLabel,
         };
 
-        const getPanelUsagePercent = (providerName, data) => {
-            if (!data)
+        const toPercent = (value) => {
+            if (value === null || value === undefined)
                 return null;
+            const numeric = Number(value);
+            return Number.isFinite(numeric) ? numeric : null;
+        };
+
+        const getPanelUsageValues = (providerName, data) => {
+            if (!data) {
+                return {primary: null, secondary: null};
+            }
 
             const metrics = data.metrics || {};
             const raw = data.raw || {};
 
             if (providerName === 'copilot') {
                 if (metrics.usage_percent !== null && metrics.usage_percent !== undefined)
-                    return Number(metrics.usage_percent);
+                    return {primary: toPercent(metrics.usage_percent), secondary: null};
                 if (
                     metrics.limit !== null && metrics.limit !== undefined &&
                     metrics.remaining !== null && metrics.remaining !== undefined &&
                     Number(metrics.limit) !== 0
                 ) {
-                    return ((Number(metrics.limit) - Number(metrics.remaining)) / Number(metrics.limit)) * 100;
+                    return {
+                        primary: toPercent(
+                            ((Number(metrics.limit) - Number(metrics.remaining)) / Number(metrics.limit)) * 100
+                        ),
+                        secondary: null,
+                    };
                 }
-                return null;
+                return {primary: null, secondary: null};
             }
 
+            let fiveHourPct = null;
             if (raw.five_hour && raw.five_hour.utilization !== null && raw.five_hour.utilization !== undefined)
-                return Number(raw.five_hour.utilization);
-
-            if (raw.rate_limit && raw.rate_limit.primary_window &&
+                fiveHourPct = toPercent(raw.five_hour.utilization);
+            else if (
+                raw.rate_limit && raw.rate_limit.primary_window &&
                 raw.rate_limit.primary_window.used_percent !== null &&
-                raw.rate_limit.primary_window.used_percent !== undefined) {
-                return Number(raw.rate_limit.primary_window.used_percent);
-            }
-
-            if (
+                raw.rate_limit.primary_window.used_percent !== undefined
+            ) {
+                fiveHourPct = toPercent(raw.rate_limit.primary_window.used_percent);
+            } else if (
                 metrics.limit !== null && metrics.limit !== undefined &&
                 metrics.remaining !== null && metrics.remaining !== undefined &&
                 Number(metrics.limit) !== 0
             ) {
-                return ((Number(metrics.limit) - Number(metrics.remaining)) / Number(metrics.limit)) * 100;
+                fiveHourPct = toPercent(
+                    ((Number(metrics.limit) - Number(metrics.remaining)) / Number(metrics.limit)) * 100
+                );
             }
 
-            return null;
+            let sevenDayPct = null;
+            if (raw.seven_day && raw.seven_day.utilization !== null && raw.seven_day.utilization !== undefined)
+                sevenDayPct = toPercent(raw.seven_day.utilization);
+            else if (
+                raw.rate_limit && raw.rate_limit.secondary_window &&
+                raw.rate_limit.secondary_window.used_percent !== null &&
+                raw.rate_limit.secondary_window.used_percent !== undefined
+            ) {
+                sevenDayPct = toPercent(raw.rate_limit.secondary_window.used_percent);
+            }
+
+            return {primary: fiveHourPct, secondary: sevenDayPct};
         };
 
-        for (let providerName of ['claude', 'copilot', 'codex']) {
-            const pct = getPanelUsagePercent(providerName, this._usageData[providerName]);
-            const label = usageLabels[providerName];
+        const claudeUsage = getPanelUsageValues('claude', this._usageData.claude);
+        const copilotUsage = getPanelUsageValues('copilot', this._usageData.copilot);
+        const codexUsage = getPanelUsageValues('codex', this._usageData.codex);
+
+        const panelValues = {
+            claude5h: claudeUsage.primary,
+            claude7d: claudeUsage.secondary,
+            copilot: copilotUsage.primary,
+            codex5h: codexUsage.primary,
+            codex7d: codexUsage.secondary,
+        };
+
+        for (let [labelKey, value] of Object.entries(panelValues)) {
+            const label = usageLabels[labelKey];
             if (!label)
                 continue;
-            if (pct !== null && Number.isFinite(pct)) {
-                label.set_text(`${pct.toFixed(1)}%`);
+            if (value !== null) {
+                label.set_text(`${value.toFixed(1)}%`);
                 label.show();
             } else {
                 label.set_text('');
@@ -934,11 +989,15 @@ class AIBarIndicator extends PanelMenu.Button {
     _handleError(message) {
         console.debug(`aibar Error: ${message}`);
         this._panelClaudePctLabel.set_text('');
+        this._panelClaude7dPctLabel.set_text('');
         this._panelCopilotPctLabel.set_text('');
         this._panelCodexPctLabel.set_text('');
+        this._panelCodex7dPctLabel.set_text('');
         this._panelClaudePctLabel.hide();
+        this._panelClaude7dPctLabel.hide();
         this._panelCopilotPctLabel.hide();
         this._panelCodexPctLabel.hide();
+        this._panelCodex7dPctLabel.hide();
         this._panelLabel.set_text('Err');
         this._lastUpdatedItem.label.set_text(`Error: ${message.substring(0, 40)}`);
     }

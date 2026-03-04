@@ -158,7 +158,7 @@
 - `Internal Call-Trace Tree`
   - `AIBarExtension.enable(...)`: extension enable adapter [`src/aibar/extension/aibar@aibar.panel/extension.js`]
     - `AIBarIndicator._init(...)`: indicator runtime bootstrap [`src/aibar/extension/aibar@aibar.panel/extension.js`]
-      - `AIBarIndicator._buildPanelButton(...)`: panel icon/percentage/summary-label setup [`src/aibar/extension/aibar@aibar.panel/extension.js`]
+      - `AIBarIndicator._buildPanelButton(...)`: panel icon/percentage/summary-label setup with five ordered percentage labels (Claude 5h, Claude 7d, Copilot, Codex 5h, Codex 7d) and primary/secondary style classes [`src/aibar/extension/aibar@aibar.panel/extension.js`]
       - `AIBarIndicator._buildPopupMenu(...)`: popup structure and actions setup [`src/aibar/extension/aibar@aibar.panel/extension.js`]
         - `AIBarIndicator._refreshData(...)`: refresh action handler [`src/aibar/extension/aibar@aibar.panel/extension.js`]
         - `AIBarIndicator._openTerminalWithCommand(...)`: UI-launch action handler [`src/aibar/extension/aibar@aibar.panel/extension.js`]
@@ -167,7 +167,7 @@
         - `_getAiBarPath(...)`: executable path resolution [`src/aibar/extension/aibar@aibar.panel/extension.js`]
         - callback chain
           - `AIBarIndicator._parseOutput(...)`: JSON decode + state update [`src/aibar/extension/aibar@aibar.panel/extension.js`]
-          - `AIBarIndicator._updateUI(...)`: provider tab/card rendering update plus ordered panel percentage-label projection (`claude`, `copilot`, `codex`) [`src/aibar/extension/aibar@aibar.panel/extension.js`]
+          - `AIBarIndicator._updateUI(...)`: provider tab/card rendering update plus ordered panel percentage-label projection (`claude5h`, `claude7d`, `copilot`, `codex5h`, `codex7d`) with hidden-label fallback for missing metrics [`src/aibar/extension/aibar@aibar.panel/extension.js`]
             - `AIBarIndicator._createTab(...)`: provider tab creation [`src/aibar/extension/aibar@aibar.panel/extension.js`]
             - `AIBarIndicator._updateProviderCard(...)`: card lifecycle update [`src/aibar/extension/aibar@aibar.panel/extension.js`]
               - `AIBarIndicator._createProviderCard(...)`: card widget graph creation [`src/aibar/extension/aibar@aibar.panel/extension.js`]

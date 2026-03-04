@@ -10,7 +10,14 @@
 
 .aibar-panel-pct {
     font-size: 0.85em;
+}
+
+.aibar-panel-pct-primary {
     font-weight: bold;
+}
+
+.aibar-panel-pct-secondary {
+    font-weight: normal;
 }
 
 /* Header */
