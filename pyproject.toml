@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "aibar"
+version = "0.1.0"
+description = "CLI/TUI usage monitor for Claude, OpenAI, OpenRouter, GitHub Copilot, and Codex."
+readme = "README.md"
+license = "GPL-3.0-only"
+requires-python = ">= 3.11"
+dependencies = [
+    "click",
+    "httpx",
+    "pydantic",
+    "textual",
+]
+
+[project.scripts]
+aibar = "aibar.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/aibar/aibar"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/aibar/aibar/**",
+    "pyproject.toml",
+    "README.md",
+    "LICENSE",
+]

@@ -5,7 +5,7 @@
   - `parent_process: null`
   - `role: aibar CLI and Textual UI runtime process`
   - `entrypoint_symbols: main(...), run_ui(...)`
-  - `defining_files: src/aibar/aibar/cli.py, src/aibar/aibar/ui.py`
+  - `defining_files: src/aibar/aibar/cli.py, src/aibar/aibar/ui.py, src/aibar/aibar/__main__.py`
   - `thread_model: no explicit threads detected`
 
 - `id: PROC:gnome-shell`
@@ -140,6 +140,8 @@
     - `AIBarUI.__init__(...)`: provider registry + cache initialization [`src/aibar/aibar/ui.py`]
     - `AIBarUI.on_mount(...)`: first-refresh trigger [`src/aibar/aibar/ui.py`]
     - `AIBarUI.action_refresh(...)`: refresh loop over configured providers [`src/aibar/aibar/ui.py`]
+  - `__main__` module: `python -m aibar` entrypoint, delegates to `main(...)` [`src/aibar/aibar/__main__.py`]
+    - `main(...)`: CLI command router [`src/aibar/aibar/cli.py`]
 - `External Boundaries`
   - Click command parsing and dispatch.
   - Textual event loop, rendering, and widget runtime.

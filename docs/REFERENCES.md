@@ -5,6 +5,7 @@
     └── aibar
         ├── aibar
         │   ├── __init__.py
+        │   ├── __main__.py
         │   ├── cache.py
         │   ├── claude_cli_auth.py
         │   ├── cli.py
@@ -28,6 +29,20 @@
 > Path: `src/aibar/aibar/__init__.py`
 - @brief Package metadata for aibar.
 - @details Exposes the package version for the multi-provider usage monitoring application.
+
+
+---
+
+# __main__.py | Python | 11L | 0 symbols | 1 imports | 1 comments
+> Path: `src/aibar/aibar/__main__.py`
+- @brief Module execution entry point for aibar.
+- @details Delegates to aibar.cli:main to enable `python -m aibar` invocation.
+- @satisfies REQ-024
+
+## Imports
+```
+from aibar.cli import main
+```
 
 
 ---

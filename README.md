@@ -15,6 +15,7 @@ AIBar aggregates usage metrics for Claude, OpenAI, OpenRouter, GitHub Copilot, a
 
 <p align="center">
   <a href="#quick-start">Quick Start</a> |
+  <a href="#installation-uv">Installation (uv)</a> |
   <a href="#feature-highlights">Feature Highlights</a> |
   <a href="#usage">Usage</a> |
   <a href="#acknowledgments">Acknowledgments</a>
@@ -52,6 +53,41 @@ AIBar aggregates usage metrics for Claude, OpenAI, OpenRouter, GitHub Copilot, a
 # 4) Show usage
 ./aibar show
 ./aibar show --json
+```
+
+
+## Installation (uv)
+
+[uv](https://docs.astral.sh/uv/) is the recommended tool for installing and running AIBar.
+
+### Install from Git
+
+```bash
+uv pip install "aibar @ git+https://github.com/Ogekuri/AIBar.git"
+```
+
+After installation the `aibar` command is available system-wide (or in the active virtual environment):
+
+```bash
+aibar --help
+aibar show
+aibar doctor
+```
+
+### Live Execution (no install)
+
+Run AIBar directly from the repository without a local clone using `uvx`:
+
+```bash
+uvx --from "git+https://github.com/Ogekuri/AIBar.git" aibar --help
+uvx --from "git+https://github.com/Ogekuri/AIBar.git" aibar show --json
+uvx --from "git+https://github.com/Ogekuri/AIBar.git" aibar doctor
+```
+
+### Uninstall
+
+```bash
+uv pip uninstall aibar
 ```
 
 
