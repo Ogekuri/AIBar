@@ -27,6 +27,7 @@
 !pyproject.toml
 !requirements.txt
 !.g.conf
+!aibar
 !/**/*.sh
 !src/
 !src/**/*

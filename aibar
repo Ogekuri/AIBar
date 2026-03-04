@@ -40,23 +40,6 @@ else
   source ${VENVDIR}/bin/activate
 fi
 
-# Run tests in 1 phase by default.
-# Optional post-link validation can be enabled with RUN_POST_LINK_PHASE=1.
-if [ "$#" -eq 0 ]; then
-  set -- tests
-fi
-
-PYTHONPATH="${SCRIPT_PATH}/src:${PYTHONPATH}" \
-    ${VENVDIR}/bin/python3 -m 'pytest' "$@"
-
-rc=$?
-if [ $rc -ne 0 ]; then
-  exit $rc
-fi
-
-if [ "${RUN_POST_LINK_PHASE:-0}" = "1" ]; then
-  echo "[tests.sh] Main test suite OK. Running post-link tests..."
-  PYTHONPATH="${SCRIPT_PATH}/src:${PYTHONPATH}" \
-    RUN_POST_LINK_TESTS=1 \
-    ${VENVDIR}/bin/python3 -m 'pytest' "$@"
-fi
+# Execute the application from src/aibar/aibar:
+PYTHONPATH="${SCRIPT_PATH}/src/aibar:${PYTHONPATH}" \
+    exec ${VENVDIR}/bin/python3 -m aibar.cli "$@"
