@@ -141,7 +141,7 @@
             - `_createTab(providerName)`: tab widget creation [`src/aibar/extension/aibar@aibar.panel/extension.js:205`]
             - `_updateProviderCard(providerName, data)`: create/update card [`src/aibar/extension/aibar@aibar.panel/extension.js:248`]
               - `_createProviderCard(providerName)`: card widget graph [`src/aibar/extension/aibar@aibar.panel/extension.js:263`]
-              - `_populateProviderCard(card, providerName, data)`: metric rendering [`src/aibar/extension/aibar@aibar.panel/extension.js:406`]
+              - `_populateProviderCard(card, providerName, data)`: metric rendering and quota-label text composition [`src/aibar/extension/aibar@aibar.panel/extension.js:406`]
                 - `_getProgressClass(pct)`: threshold-to-style mapping [`src/aibar/extension/aibar@aibar.panel/extension.js:84`]
             - `_switchToProvider(providerName)`: active tab/card switch [`src/aibar/extension/aibar@aibar.panel/extension.js:224`]
           - `_handleError(message)`: error-state update [`src/aibar/extension/aibar@aibar.panel/extension.js:738`]

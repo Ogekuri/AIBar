@@ -579,7 +579,7 @@ class AIBarIndicator extends PanelMenu.Button {
             else
                 card.costLabel.text = `$${metrics.cost.toFixed(4)}`;
         } else if (metrics.remaining !== null && metrics.limit !== null) {
-            card.costLabel.text = `${metrics.remaining.toFixed(1)} / ${metrics.limit.toFixed(1)} credits`;
+            card.costLabel.text = `${metrics.remaining.toFixed(1)} / ${metrics.limit.toFixed(1)} remaining credits`;
         } else {
             card.costLabel.text = '';
         }
