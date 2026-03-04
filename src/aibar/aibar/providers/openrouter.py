@@ -19,13 +19,8 @@ from aibar.providers.base import (
 
 class OpenRouterUsageProvider(BaseProvider):
     """
-    Provider for OpenRouter API key usage and limits.
-
-    Environment Variables:
-        OPENROUTER_API_KEY: OpenRouter API key
-
-    Official API endpoint:
-        - GET /api/v1/key
+    @brief Define open router usage provider component.
+    @details Encapsulates open router usage provider state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
     """
 
     name = ProviderName.OPENROUTER
@@ -34,10 +29,10 @@ class OpenRouterUsageProvider(BaseProvider):
 
     def __init__(self, api_key: str | None = None) -> None:
         """
-        Initialize the OpenRouter usage provider.
-
-        Args:
-            api_key: API key. If not provided, reads from config (env var or env file).
+        @brief Execute init.
+        @details Applies init logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param api_key {str | None} Input parameter `api_key`.
+        @return {None} Function return value.
         """
         if api_key:
             self._api_key = api_key
@@ -46,11 +41,19 @@ class OpenRouterUsageProvider(BaseProvider):
             self._api_key = config.get_token(ProviderName.OPENROUTER)
 
     def is_configured(self) -> bool:
-        """Check if API key is available."""
+        """
+        @brief Execute is configured.
+        @details Applies is configured logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {bool} Function return value.
+        """
         return bool(self._api_key)
 
     def get_config_help(self) -> str:
-        """Get configuration instructions."""
+        """
+        @brief Execute get config help.
+        @details Applies get config help logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {str} Function return value.
+        """
         return f"""OpenRouter Usage Provider Configuration:
 
 1. Create an API key in OpenRouter
@@ -59,7 +62,13 @@ class OpenRouterUsageProvider(BaseProvider):
 """
 
     async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult:
-        """Fetch OpenRouter usage and credit data."""
+        """
+        @brief Execute fetch.
+        @details Applies fetch logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param window {WindowPeriod} Input parameter `window`.
+        @return {ProviderResult} Function return value.
+        @throws {Exception} Propagates explicit raised error states from internal validation or provider operations.
+        """
         if not self.is_configured():
             return self._make_error_result(
                 window=window,
@@ -114,7 +123,13 @@ class OpenRouterUsageProvider(BaseProvider):
             raise ProviderError(f"Unexpected error: {e}") from e
 
     def _parse_response(self, data: dict, window: WindowPeriod) -> ProviderResult:
-        """Parse the OpenRouter key response into normalized metrics."""
+        """
+        @brief Execute parse response.
+        @details Applies parse response logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param data {dict} Input parameter `data`.
+        @param window {WindowPeriod} Input parameter `window`.
+        @return {ProviderResult} Function return value.
+        """
         payload = data.get("data", {})
 
         usage = self._get_usage(payload, window)
@@ -138,7 +153,13 @@ class OpenRouterUsageProvider(BaseProvider):
         )
 
     def _get_usage(self, payload: dict, window: WindowPeriod) -> float:
-        """Get usage in credits for the requested window."""
+        """
+        @brief Execute get usage.
+        @details Applies get usage logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param payload {dict} Input parameter `payload`.
+        @param window {WindowPeriod} Input parameter `window`.
+        @return {float} Function return value.
+        """
         if window == WindowPeriod.DAY_30:
             return self._to_float(payload.get("usage_monthly"))
         if window == WindowPeriod.HOUR_5:
@@ -146,7 +167,13 @@ class OpenRouterUsageProvider(BaseProvider):
         return self._to_float(payload.get("usage_weekly"))
 
     def _get_byok_usage(self, payload: dict, window: WindowPeriod) -> float:
-        """Get BYOK usage in credits for the requested window."""
+        """
+        @brief Execute get byok usage.
+        @details Applies get byok usage logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param payload {dict} Input parameter `payload`.
+        @param window {WindowPeriod} Input parameter `window`.
+        @return {float} Function return value.
+        """
         if window == WindowPeriod.DAY_30:
             return self._to_float(payload.get("byok_usage_monthly"))
         if window == WindowPeriod.HOUR_5:
@@ -154,7 +181,12 @@ class OpenRouterUsageProvider(BaseProvider):
         return self._to_float(payload.get("byok_usage_weekly"))
 
     def _to_float(self, value: float | int | None) -> float:
-        """Convert optional numeric values to float."""
+        """
+        @brief Execute to float.
+        @details Applies to float logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param value {float | int | None} Input parameter `value`.
+        @return {float} Function return value.
+        """
         if value is None:
             return 0.0
         try:

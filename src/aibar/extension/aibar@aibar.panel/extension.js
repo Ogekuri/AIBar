@@ -109,6 +109,11 @@ const AIBarIndicator = GObject.registerClass(
 /** @brief Panel indicator widget that manages popup rendering and refresh lifecycle. */
 class AIBarIndicator extends PanelMenu.Button {
 
+    /**
+     * @brief Execute init.
+     * @details Applies init logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
+     * @returns {any} Function return value.
+     */
     _init() {
         super._init(0.0, 'IABar Monitor', false);
 
@@ -126,6 +131,11 @@ class AIBarIndicator extends PanelMenu.Button {
         this._startAutoRefresh();
     }
 
+    /**
+     * @brief Execute build panel button.
+     * @details Applies build panel button logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
+     * @returns {any} Function return value.
+     */
     _buildPanelButton() {
         this._panelBox = new St.BoxLayout({
             style_class: 'panel-status-menu-box',
@@ -147,6 +157,11 @@ class AIBarIndicator extends PanelMenu.Button {
         this.add_child(this._panelBox);
     }
 
+    /**
+     * @brief Execute build popup menu.
+     * @details Applies build popup menu logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
+     * @returns {any} Function return value.
+     */
     _buildPopupMenu() {
         let headerBox = new St.BoxLayout({
             vertical: false,
@@ -219,6 +234,12 @@ class AIBarIndicator extends PanelMenu.Button {
         this.menu.addMenuItem(this._lastUpdatedItem);
     }
 
+    /**
+     * @brief Execute create tab.
+     * @details Applies create tab logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
+     * @param {any} providerName Input parameter `providerName`.
+     * @returns {any} Function return value.
+     */
     _createTab(providerName) {
         let tab = new St.Button({
             style_class: 'aibar-tab',
@@ -238,6 +259,12 @@ class AIBarIndicator extends PanelMenu.Button {
         return {button: tab, label: tabLabel};
     }
 
+    /**
+     * @brief Execute switch to provider.
+     * @details Applies switch to provider logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
+     * @param {any} providerName Input parameter `providerName`.
+     * @returns {any} Function return value.
+     */
     _switchToProvider(providerName) {
         if (this._activeProvider === providerName)
             return;
@@ -262,6 +289,13 @@ class AIBarIndicator extends PanelMenu.Button {
         }
     }
 
+    /**
+     * @brief Execute update provider card.
+     * @details Applies update provider card logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
+     * @param {any} providerName Input parameter `providerName`.
+     * @param {any} data Input parameter `data`.
+     * @returns {any} Function return value.
+     */
     _updateProviderCard(providerName, data) {
         let card = this._providerRows[providerName];
 
@@ -277,6 +311,12 @@ class AIBarIndicator extends PanelMenu.Button {
         this._populateProviderCard(card, providerName, data);
     }
 
+    /**
+     * @brief Execute create provider card.
+     * @details Applies create provider card logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
+     * @param {any} providerName Input parameter `providerName`.
+     * @returns {any} Function return value.
+     */
     _createProviderCard(providerName) {
         let container = new St.BoxLayout({
             vertical: true,
@@ -420,6 +460,14 @@ class AIBarIndicator extends PanelMenu.Button {
         };
     }
 
+    /**
+     * @brief Execute populate provider card.
+     * @details Applies populate provider card logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
+     * @param {any} card Input parameter `card`.
+     * @param {any} providerName Input parameter `providerName`.
+     * @param {any} data Input parameter `data`.
+     * @returns {any} Function return value.
+     */
     _populateProviderCard(card, providerName, data) {
         const metrics = data.metrics || {};
         const isError = data.error !== null && data.error !== undefined;
@@ -643,6 +691,11 @@ class AIBarIndicator extends PanelMenu.Button {
         }
     }
 
+    /**
+     * @brief Execute start auto refresh.
+     * @details Applies start auto refresh logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
+     * @returns {any} Function return value.
+     */
     _startAutoRefresh() {
         if (this._timeout)
             GLib.source_remove(this._timeout);
@@ -657,6 +710,11 @@ class AIBarIndicator extends PanelMenu.Button {
         );
     }
 
+    /**
+     * @brief Execute refresh data.
+     * @details Applies refresh data logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
+     * @returns {any} Function return value.
+     */
     _refreshData() {
         this._panelLabel.set_text('...');
 
@@ -690,6 +748,12 @@ class AIBarIndicator extends PanelMenu.Button {
         }
     }
 
+    /**
+     * @brief Execute parse output.
+     * @details Applies parse output logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
+     * @param {any} output Input parameter `output`.
+     * @returns {any} Function return value.
+     */
     _parseOutput(output) {
         console.debug('aibar: Parsing output');
 
@@ -704,6 +768,11 @@ class AIBarIndicator extends PanelMenu.Button {
         }
     }
 
+    /**
+     * @brief Execute update u i.
+     * @details Applies update u i logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
+     * @returns {any} Function return value.
+     */
     _updateUI() {
         let totalCost = 0;
         let hasCostData = false;
@@ -762,12 +831,24 @@ class AIBarIndicator extends PanelMenu.Button {
         }
     }
 
+    /**
+     * @brief Execute handle error.
+     * @details Applies handle error logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
+     * @param {any} message Input parameter `message`.
+     * @returns {any} Function return value.
+     */
     _handleError(message) {
         console.debug(`aibar Error: ${message}`);
         this._panelLabel.set_text('Err');
         this._lastUpdatedItem.label.set_text(`Error: ${message.substring(0, 40)}`);
     }
 
+    /**
+     * @brief Execute open terminal with command.
+     * @details Applies open terminal with command logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
+     * @param {any} command Input parameter `command`.
+     * @returns {any} Function return value.
+     */
     _openTerminalWithCommand(command) {
         try {
             Gio.Subprocess.new(
@@ -779,6 +860,11 @@ class AIBarIndicator extends PanelMenu.Button {
         }
     }
 
+    /**
+     * @brief Execute destroy.
+     * @details Applies destroy logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
+     * @returns {any} Function return value.
+     */
     destroy() {
         if (this._timeout) {
             GLib.source_remove(this._timeout);
@@ -791,16 +877,31 @@ class AIBarIndicator extends PanelMenu.Button {
 
 /** @brief GNOME extension lifecycle adapter for AIBarIndicator registration. */
 export default class AIBarExtension {
+    /**
+     * @brief Execute constructor.
+     * @details Applies constructor logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
+     * @returns {any} Function return value.
+     */
     constructor() {
         this._indicator = null;
     }
 
+    /**
+     * @brief Execute enable.
+     * @details Applies enable logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
+     * @returns {any} Function return value.
+     */
     enable() {
         console.debug('aibar: Enabling extension');
         this._indicator = new AIBarIndicator();
         Main.panel.addToStatusArea('aibar', this._indicator, 0, 'right');
     }
 
+    /**
+     * @brief Execute disable.
+     * @details Applies disable logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
+     * @returns {any} Function return value.
+     */
     disable() {
         console.debug('aibar: Disabling extension');
 

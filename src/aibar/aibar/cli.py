@@ -23,7 +23,11 @@ from aibar.providers.base import BaseProvider, ProviderError, ProviderName, Wind
 
 
 def get_providers() -> dict[ProviderName, BaseProvider]:
-    """Get all available providers."""
+    """
+    @brief Execute get providers.
+    @details Applies get providers logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+    @return {dict[ProviderName, BaseProvider]} Function return value.
+    """
     return {
         ProviderName.CLAUDE: ClaudeOAuthProvider(),
         ProviderName.OPENAI: OpenAIUsageProvider(),
@@ -34,7 +38,13 @@ def get_providers() -> dict[ProviderName, BaseProvider]:
 
 
 def parse_window(window: str) -> WindowPeriod:
-    """Parse window string to WindowPeriod enum."""
+    """
+    @brief Execute parse window.
+    @details Applies parse window logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+    @param window {str} Input parameter `window`.
+    @return {WindowPeriod} Function return value.
+    @throws {Exception} Propagates explicit raised error states from internal validation or provider operations.
+    """
     mapping = {
         "5h": WindowPeriod.HOUR_5,
         "7d": WindowPeriod.DAY_7,
@@ -46,7 +56,13 @@ def parse_window(window: str) -> WindowPeriod:
 
 
 def parse_provider(provider: str) -> ProviderName | None:
-    """Parse provider string. Returns None for 'all'."""
+    """
+    @brief Execute parse provider.
+    @details Applies parse provider logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+    @param provider {str} Input parameter `provider`.
+    @return {ProviderName | None} Function return value.
+    @throws {Exception} Propagates explicit raised error states from internal validation or provider operations.
+    """
     if provider == "all":
         return None
     try:
@@ -57,7 +73,13 @@ def parse_provider(provider: str) -> ProviderName | None:
 
 
 def _fetch_result(provider: BaseProvider, window: WindowPeriod):
-    """Fetch provider metrics, converting errors into results."""
+    """
+    @brief Execute fetch result.
+    @details Applies fetch result logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+    @param provider {BaseProvider} Input parameter `provider`.
+    @param window {WindowPeriod} Input parameter `window`.
+    @return {None} Function return value.
+    """
     try:
         return asyncio.run(provider.fetch(window))
     except ProviderError as exc:
@@ -69,7 +91,11 @@ def _fetch_result(provider: BaseProvider, window: WindowPeriod):
 @click.group()
 @click.version_option()
 def main() -> None:
-    """Usage metrics UI for Claude, OpenAI, OpenRouter, Copilot, and Codex."""
+    """
+    @brief Execute main.
+    @details Applies main logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+    @return {None} Function return value.
+    """
     pass
 
 
@@ -93,7 +119,14 @@ def main() -> None:
     help="Output raw JSON instead of formatted text",
 )
 def show(provider: str, window: str, output_json: bool) -> None:
-    """Show usage metrics for providers."""
+    """
+    @brief Execute show.
+    @details Applies show logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+    @param provider {str} Input parameter `provider`.
+    @param window {str} Input parameter `window`.
+    @param output_json {bool} Input parameter `output_json`.
+    @return {None} Function return value.
+    """
     window_period = parse_window(window)
     provider_filter = parse_provider(provider)
 
@@ -142,7 +175,14 @@ def show(provider: str, window: str, output_json: bool) -> None:
 
 
 def _print_result(name: ProviderName, result, label: str | None = None) -> None:
-    """Print a formatted result."""
+    """
+    @brief Execute print result.
+    @details Applies print result logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+    @param name {ProviderName} Input parameter `name`.
+    @param result {None} Input parameter `result`.
+    @param label {str | None} Input parameter `label`.
+    @return {None} Function return value.
+    """
     title = name.value.upper()
     if label:
         title = f"{title} ({label})"
@@ -195,9 +235,10 @@ def _print_result(name: ProviderName, result, label: str | None = None) -> None:
 
 def _format_reset_duration(seconds: float) -> str:
     """
-    @brief Format reset countdown for CLI text output.
-    @param seconds Remaining duration in seconds.
-    @returns str Countdown as `<d>d <h>h <m>m` when days exist, otherwise `<h>h <m>m`.
+    @brief Execute format reset duration.
+    @details Applies format reset duration logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+    @param seconds {float} Input parameter `seconds`.
+    @return {str} Function return value.
     """
     total_minutes = int(seconds // 60)
     days = total_minutes // (24 * 60)
@@ -209,7 +250,13 @@ def _format_reset_duration(seconds: float) -> str:
 
 
 def _progress_bar(percent: float, width: int = 20) -> str:
-    """Create a text progress bar."""
+    """
+    @brief Execute progress bar.
+    @details Applies progress bar logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+    @param percent {float} Input parameter `percent`.
+    @param width {int} Input parameter `width`.
+    @return {str} Function return value.
+    """
     filled = int(width * percent / 100)
     empty = width - filled
     return f"[{'#' * filled}{'-' * empty}]"
@@ -217,7 +264,11 @@ def _progress_bar(percent: float, width: int = 20) -> str:
 
 @main.command()
 def doctor() -> None:
-    """Check provider configuration and connectivity."""
+    """
+    @brief Execute doctor.
+    @details Applies doctor logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+    @return {None} Function return value.
+    """
     click.echo("Usage UI Doctor")
     click.echo("=" * 40)
     click.echo()
@@ -265,7 +316,11 @@ def doctor() -> None:
 
 @main.command()
 def ui() -> None:
-    """Launch the interactive UI."""
+    """
+    @brief Execute ui.
+    @details Applies ui logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+    @return {None} Function return value.
+    """
     from aibar.ui import run_ui
 
     run_ui()
@@ -273,13 +328,21 @@ def ui() -> None:
 
 @main.command()
 def env() -> None:
-    """Show required environment variables."""
+    """
+    @brief Execute env.
+    @details Applies env logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+    @return {None} Function return value.
+    """
     click.echo(config.get_env_var_help())
 
 
 @main.command()
 def setup() -> None:
-    """Interactive setup wizard for API keys."""
+    """
+    @brief Execute setup.
+    @details Applies setup logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+    @return {None} Function return value.
+    """
     from aibar.config import ENV_FILE_PATH, write_env_file
 
     click.echo()
@@ -374,10 +437,10 @@ def setup() -> None:
 )
 def login(provider: str) -> None:
     """
-    Authenticate with a provider.
-
-    For Claude: Extracts token from existing Claude CLI installation.
-    For Copilot: Performs GitHub device flow authentication.
+    @brief Execute login.
+    @details Applies login logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+    @param provider {str} Input parameter `provider`.
+    @return {None} Function return value.
     """
     if provider == "claude":
         _login_claude()
@@ -390,7 +453,11 @@ def login(provider: str) -> None:
 
 
 def _login_claude() -> None:
-    """Login for Claude provider."""
+    """
+    @brief Execute login claude.
+    @details Applies login claude logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+    @return {None} Function return value.
+    """
     from aibar.claude_cli_auth import ClaudeCLIAuth
 
     auth = ClaudeCLIAuth()
@@ -435,7 +502,11 @@ def _login_claude() -> None:
 
 
 def _login_copilot() -> None:
-    """Login for GitHub Copilot provider via device flow."""
+    """
+    @brief Execute login copilot.
+    @details Applies login copilot logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+    @return {None} Function return value.
+    """
     from aibar.providers.copilot import CopilotProvider
 
     click.echo()

@@ -16,14 +16,21 @@ from aibar.providers.base import ProviderName, ProviderResult, WindowPeriod
 
 
 class CacheEntry(BaseModel):
-    """A cached provider result with metadata."""
+    """
+    @brief Define cache entry component.
+    @details Encapsulates cache entry state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
+    """
 
     result: ProviderResult
     cached_at: datetime
     ttl_seconds: int
 
     def is_expired(self) -> bool:
-        """Check if this cache entry has expired."""
+        """
+        @brief Execute is expired.
+        @details Applies is expired logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {bool} Function return value.
+        """
         now = datetime.now(timezone.utc)
         cached_at_utc = self.cached_at.replace(tzinfo=timezone.utc)
         return now > cached_at_utc + timedelta(seconds=self.ttl_seconds)
@@ -31,12 +38,8 @@ class CacheEntry(BaseModel):
 
 class ResultCache:
     """
-    In-memory and disk cache for provider results.
-
-    Features:
-    - Configurable TTL per provider
-    - Disk persistence for last good result
-    - Never logs or persists tokens
+    @brief Define result cache component.
+    @details Encapsulates result cache state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
     """
 
     DEFAULT_TTL = 120  # 2 minutes
@@ -49,39 +52,60 @@ class ResultCache:
 
     def __init__(self, cache_dir: Path | None = None) -> None:
         """
-        Initialize the cache.
-
-        Args:
-            cache_dir: Directory for disk persistence.
-                      Defaults to ~/.cache/aibar/
+        @brief Execute init.
+        @details Applies init logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param cache_dir {Path | None} Input parameter `cache_dir`.
+        @return {None} Function return value.
         """
         self._memory_cache: dict[str, CacheEntry] = {}
         self._cache_dir = cache_dir or self._default_cache_dir()
         self._ensure_cache_dir()
 
     def _default_cache_dir(self) -> Path:
-        """Get default cache directory following XDG spec."""
+        """
+        @brief Execute default cache dir.
+        @details Applies default cache dir logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {Path} Function return value.
+        """
         xdg_cache = os.environ.get("XDG_CACHE_HOME")
         base = Path(xdg_cache) if xdg_cache else Path.home() / ".cache"
         return base / "aibar"
 
     def _ensure_cache_dir(self) -> None:
-        """Create cache directory if it doesn't exist."""
+        """
+        @brief Execute ensure cache dir.
+        @details Applies ensure cache dir logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {None} Function return value.
+        """
         self._cache_dir.mkdir(parents=True, exist_ok=True)
 
     def _cache_key(self, provider: ProviderName, window: WindowPeriod) -> str:
-        """Generate cache key for provider/window combination."""
+        """
+        @brief Execute cache key.
+        @details Applies cache key logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param provider {ProviderName} Input parameter `provider`.
+        @param window {WindowPeriod} Input parameter `window`.
+        @return {str} Function return value.
+        """
         return f"{provider.value}:{window.value}"
 
     def _disk_path(self, provider: ProviderName, window: WindowPeriod) -> Path:
-        """Get disk cache path for provider/window."""
+        """
+        @brief Execute disk path.
+        @details Applies disk path logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param provider {ProviderName} Input parameter `provider`.
+        @param window {WindowPeriod} Input parameter `window`.
+        @return {Path} Function return value.
+        """
         return self._cache_dir / f"{provider.value}_{window.value}.json"
 
     def get(self, provider: ProviderName, window: WindowPeriod) -> ProviderResult | None:
         """
-        Get cached result if available and not expired.
-
-        First checks memory cache, then falls back to disk.
+        @brief Execute get.
+        @details Applies get logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param provider {ProviderName} Input parameter `provider`.
+        @param window {WindowPeriod} Input parameter `window`.
+        @return {ProviderResult | None} Function return value.
         """
         key = self._cache_key(provider, window)
 
@@ -96,9 +120,10 @@ class ResultCache:
 
     def set(self, result: ProviderResult) -> None:
         """
-        Cache a provider result in memory and on disk.
-
-        Only successful results (no error) are persisted to disk.
+        @brief Execute set.
+        @details Applies set logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param result {ProviderResult} Input parameter `result`.
+        @return {None} Function return value.
         """
         key = self._cache_key(result.provider, result.window)
         ttl = self.PROVIDER_TTLS.get(result.provider, self.DEFAULT_TTL)
@@ -116,9 +141,11 @@ class ResultCache:
 
     def get_last_good(self, provider: ProviderName, window: WindowPeriod) -> ProviderResult | None:
         """
-        Get the last successful result from disk, regardless of TTL.
-
-        Useful for showing stale data when API is unavailable.
+        @brief Execute get last good.
+        @details Applies get last good logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param provider {ProviderName} Input parameter `provider`.
+        @param window {WindowPeriod} Input parameter `window`.
+        @return {ProviderResult | None} Function return value.
         """
         return self._load_from_disk(provider, window, ignore_ttl=True)
 
@@ -126,11 +153,11 @@ class ResultCache:
         self, provider: ProviderName | None = None, window: WindowPeriod | None = None
     ) -> None:
         """
-        Invalidate cached entries.
-
-        Args:
-            provider: If set, only invalidate entries for this provider
-            window: If set, only invalidate entries for this window
+        @brief Execute invalidate.
+        @details Applies invalidate logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param provider {ProviderName | None} Input parameter `provider`.
+        @param window {WindowPeriod | None} Input parameter `window`.
+        @return {None} Function return value.
         """
         if provider is None and window is None:
             # Clear all
@@ -147,7 +174,12 @@ class ResultCache:
             del self._memory_cache[key]
 
     def _save_to_disk(self, result: ProviderResult) -> None:
-        """Save result to disk cache."""
+        """
+        @brief Execute save to disk.
+        @details Applies save to disk logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param result {ProviderResult} Input parameter `result`.
+        @return {None} Function return value.
+        """
         path = self._disk_path(result.provider, result.window)
         try:
             # Sanitize raw data to remove any potential tokens
@@ -166,7 +198,14 @@ class ResultCache:
         window: WindowPeriod,
         ignore_ttl: bool = False,
     ) -> ProviderResult | None:
-        """Load result from disk cache."""
+        """
+        @brief Execute load from disk.
+        @details Applies load from disk logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param provider {ProviderName} Input parameter `provider`.
+        @param window {WindowPeriod} Input parameter `window`.
+        @param ignore_ttl {bool} Input parameter `ignore_ttl`.
+        @return {ProviderResult | None} Function return value.
+        """
         path = self._disk_path(provider, window)
         if not path.exists():
             return None
@@ -190,10 +229,21 @@ class ResultCache:
             return None
 
     def _sanitize_raw(self, raw: dict[str, Any]) -> dict[str, Any]:
-        """Remove any potential sensitive data from raw response."""
+        """
+        @brief Execute sanitize raw.
+        @details Applies sanitize raw logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param raw {dict[str, Any]} Input parameter `raw`.
+        @return {dict[str, Any]} Function return value.
+        """
         sensitive_keys = {"token", "key", "secret", "password", "authorization"}
 
         def clean(obj: Any) -> Any:
+            """
+            @brief Execute clean.
+            @details Applies clean logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+            @param obj {Any} Input parameter `obj`.
+            @return {Any} Function return value.
+            """
             if isinstance(obj, dict):
                 return {
                     k: "[REDACTED]" if k.lower() in sensitive_keys else clean(v)

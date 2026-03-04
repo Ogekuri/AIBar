@@ -21,17 +21,8 @@ from aibar.providers.base import (
 
 class OpenAIUsageProvider(BaseProvider):
     """
-    Provider for OpenAI API usage and cost metrics.
-
-    Uses the official OpenAI Admin API to fetch organization usage data.
-    Requires an admin/org API key with appropriate permissions.
-
-    Environment Variables:
-        OPENAI_ADMIN_KEY: Organization admin API key (sk-...)
-
-    Official API endpoints:
-        - GET /v1/organization/usage/completions
-        - GET /v1/organization/costs
+    @brief Define open a i usage provider component.
+    @details Encapsulates open a i usage provider state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
     """
 
     name = ProviderName.OPENAI
@@ -40,10 +31,10 @@ class OpenAIUsageProvider(BaseProvider):
 
     def __init__(self, api_key: str | None = None) -> None:
         """
-        Initialize the OpenAI usage provider.
-
-        Args:
-            api_key: Admin API key. If not provided, reads from config (env var or env file).
+        @brief Execute init.
+        @details Applies init logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param api_key {str | None} Input parameter `api_key`.
+        @return {None} Function return value.
         """
         if api_key:
             self._api_key = api_key
@@ -52,11 +43,19 @@ class OpenAIUsageProvider(BaseProvider):
             self._api_key = config.get_token(ProviderName.OPENAI)
 
     def is_configured(self) -> bool:
-        """Check if API key is available."""
+        """
+        @brief Execute is configured.
+        @details Applies is configured logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {bool} Function return value.
+        """
         return self._api_key is not None and self._api_key.startswith("sk-")
 
     def get_config_help(self) -> str:
-        """Get configuration instructions."""
+        """
+        @brief Execute get config help.
+        @details Applies get config help logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {str} Function return value.
+        """
         return f"""OpenAI Usage Provider Configuration:
 
 1. Get an admin API key from your OpenAI organization settings
@@ -66,14 +65,25 @@ class OpenAIUsageProvider(BaseProvider):
 Note: Must be an organization/admin key with usage permissions."""
 
     def _get_time_range(self, window: WindowPeriod) -> tuple[int, int]:
-        """Get Unix timestamps for the time window."""
+        """
+        @brief Execute get time range.
+        @details Applies get time range logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param window {WindowPeriod} Input parameter `window`.
+        @return {tuple[int, int]} Function return value.
+        """
         now = datetime.now(timezone.utc)
         days = {"5h": 1, "7d": 7, "30d": 30}[window.value]  # 5h maps to 1 day for OpenAI
         start = now - timedelta(days=days)
         return int(start.timestamp()), int(now.timestamp())
 
     async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult:
-        """Fetch OpenAI usage and cost data."""
+        """
+        @brief Execute fetch.
+        @details Applies fetch logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param window {WindowPeriod} Input parameter `window`.
+        @return {ProviderResult} Function return value.
+        @throws {Exception} Propagates explicit raised error states from internal validation or provider operations.
+        """
         if not self.is_configured():
             return self._make_error_result(
                 window=window,
@@ -109,7 +119,15 @@ Note: Must be an organization/admin key with usage permissions."""
         start_time: int,
         end_time: int,
     ) -> dict:
-        """Fetch completions usage data."""
+        """
+        @brief Execute fetch usage.
+        @details Applies fetch usage logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param client {httpx.AsyncClient} Input parameter `client`.
+        @param headers {dict} Input parameter `headers`.
+        @param start_time {int} Input parameter `start_time`.
+        @param end_time {int} Input parameter `end_time`.
+        @return {dict} Function return value.
+        """
         response = await client.get(
             f"{self.BASE_URL}/usage/completions",
             headers=headers,
@@ -129,7 +147,15 @@ Note: Must be an organization/admin key with usage permissions."""
         start_time: int,
         end_time: int,
     ) -> dict:
-        """Fetch cost data."""
+        """
+        @brief Execute fetch costs.
+        @details Applies fetch costs logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param client {httpx.AsyncClient} Input parameter `client`.
+        @param headers {dict} Input parameter `headers`.
+        @param start_time {int} Input parameter `start_time`.
+        @param end_time {int} Input parameter `end_time`.
+        @return {dict} Function return value.
+        """
         response = await client.get(
             f"{self.BASE_URL}/costs",
             headers=headers,
@@ -143,7 +169,13 @@ Note: Must be an organization/admin key with usage permissions."""
         return response.json()
 
     def _check_response(self, response: httpx.Response) -> None:
-        """Check response status and raise appropriate errors."""
+        """
+        @brief Execute check response.
+        @details Applies check response logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param response {httpx.Response} Input parameter `response`.
+        @return {None} Function return value.
+        @throws {Exception} Propagates explicit raised error states from internal validation or provider operations.
+        """
         if response.status_code == 401:
             raise AuthenticationError("Invalid API key")
 
@@ -156,7 +188,14 @@ Note: Must be an organization/admin key with usage permissions."""
     def _build_result(
         self, window: WindowPeriod, usage_data: dict, costs_data: dict
     ) -> ProviderResult:
-        """Build normalized result from usage and cost data."""
+        """
+        @brief Execute build result.
+        @details Applies build result logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param window {WindowPeriod} Input parameter `window`.
+        @param usage_data {dict} Input parameter `usage_data`.
+        @param costs_data {dict} Input parameter `costs_data`.
+        @return {ProviderResult} Function return value.
+        """
         # Aggregate usage from buckets
         total_input_tokens = 0
         total_output_tokens = 0

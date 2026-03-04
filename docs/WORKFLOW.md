@@ -25,7 +25,7 @@
 - `Lifecycle/Trigger`
   - Starts when `aibar` binary is executed by a shell or by `Gio.SubprocessLauncher.spawnv(...)` from `PROC:gnome-shell`.
   - Executes one command path (`show|doctor|ui|env|setup|login`) per invocation, then exits; `ui` command blocks in Textual event loop until user quit.
-  - Source-file documentation updates under `src/aibar/aibar/**` do not alter execution units or internal call ordering.
+  - Source-file Doxygen standardization across declarations under `src/aibar/aibar/**` does not alter execution units or internal call ordering.
 - `Internal Call-Trace Tree`
   - `main(...)`: command router [`src/aibar/aibar/cli.py:67`]
     - `show(provider, window, output_json)`: fetch/report usage metrics [`src/aibar/aibar/cli.py:91`]
@@ -126,7 +126,7 @@
   - On enable: panel indicator initialized, immediate refresh run, periodic refresh timer scheduled.
   - On disable: indicator destroyed and timeout removed.
   - `dev.sh start`: launches nested GNOME shell with forced `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800` dummy-mode resolution [`src/aibar/extension/aibar@aibar.panel/dev.sh:9`].
-  - Source-file documentation updates under `src/aibar/extension/**` do not alter execution units or internal call ordering.
+  - Source-file Doxygen standardization across declarations under `src/aibar/extension/**` does not alter execution units or internal call ordering.
 - `Internal Call-Trace Tree`
   - `AIBarExtension.enable(...)`: construct and register indicator [`src/aibar/extension/aibar@aibar.panel/extension.js:770`]
     - `AIBarIndicator._init()`: initialize state and bootstrap UI/runtime [`src/aibar/extension/aibar@aibar.panel/extension.js:95`]

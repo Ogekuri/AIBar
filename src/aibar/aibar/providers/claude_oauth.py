@@ -23,15 +23,8 @@ from aibar.providers.base import (
 
 class ClaudeOAuthProvider(BaseProvider):
     """
-    Provider for Claude Code OAuth usage metrics.
-
-    Uses the OAuth token generated via `claude setup-token` to fetch
-    subscription quota information.
-
-    Environment Variables:
-        CLAUDE_CODE_OAUTH_TOKEN: OAuth token (sk-ant-oat...)
-
-    Note: This endpoint is unofficial and may change. Code parses defensively.
+    @brief Define claude o auth provider component.
+    @details Encapsulates claude o auth provider state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
     """
 
     name = ProviderName.CLAUDE
@@ -40,20 +33,27 @@ class ClaudeOAuthProvider(BaseProvider):
 
     def __init__(self, token: str | None = None) -> None:
         """
-        Initialize the Claude OAuth provider.
-
-        Args:
-            token: OAuth token. If not provided, reads from environment,
-                   then falls back to Claude CLI credentials.
+        @brief Execute init.
+        @details Applies init logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param token {str | None} Input parameter `token`.
+        @return {None} Function return value.
         """
         self._token = token or os.environ.get(self.TOKEN_ENV_VAR) or extract_claude_cli_token()
 
     def is_configured(self) -> bool:
-        """Check if OAuth token is available."""
+        """
+        @brief Execute is configured.
+        @details Applies is configured logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {bool} Function return value.
+        """
         return self._token is not None and self._token.startswith("sk-ant-")
 
     def get_config_help(self) -> str:
-        """Get configuration instructions."""
+        """
+        @brief Execute get config help.
+        @details Applies get config help logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {str} Function return value.
+        """
         return f"""Claude OAuth Provider Configuration:
 
 1. Run: claude setup-token
@@ -64,10 +64,11 @@ Note: Token must start with 'sk-ant-' prefix."""
 
     async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult:
         """
-        Fetch Claude Code subscription quota.
-
-        Note: The window parameter is ignored as Claude's OAuth endpoint
-        returns current quota state, not historical data.
+        @brief Execute fetch.
+        @details Applies fetch logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param window {WindowPeriod} Input parameter `window`.
+        @return {ProviderResult} Function return value.
+        @throws {Exception} Propagates explicit raised error states from internal validation or provider operations.
         """
         if not self.is_configured():
             return self._make_error_result(
@@ -138,16 +139,11 @@ Note: Token must start with 'sk-ant-' prefix."""
 
     def _parse_response(self, data: dict, window: WindowPeriod) -> ProviderResult:
         """
-        Parse the API response defensively.
-
-        Expected response format:
-        {
-            "five_hour": {"utilization": 61.0, "resets_at": "2026-01-28T07:59:59..."},
-            "seven_day": {"utilization": 22.0, "resets_at": "2026-02-03T09:59:59..."},
-            "extra_usage": {"is_enabled": false, ...}
-        }
-
-        utilization is a percentage (0-100) of quota used.
+        @brief Execute parse response.
+        @details Applies parse response logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param data {dict} Input parameter `data`.
+        @param window {WindowPeriod} Input parameter `window`.
+        @return {ProviderResult} Function return value.
         """
         # Select the appropriate window based on the requested period
         window_key = "seven_day" if window == WindowPeriod.DAY_7 else "five_hour"

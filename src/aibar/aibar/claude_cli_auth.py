@@ -12,34 +12,34 @@ from typing import Any
 
 class ClaudeCLIAuth:
     """
-    Extract authentication from existing Claude CLI installation.
-
-    This is a workaround since Claude's OAuth is not publicly documented
-    for third-party applications. Instead, we read the credentials that
-    the official Claude CLI has already obtained.
+    @brief Define claude c l i auth component.
+    @details Encapsulates claude c l i auth state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
     """
 
     DEFAULT_CREDS_PATH = Path.home() / ".claude" / ".credentials.json"
 
     def __init__(self, creds_path: Path | None = None) -> None:
         """
-        Initialize with path to Claude CLI credentials.
-
-        Args:
-            creds_path: Path to Claude CLI credentials. Defaults to ~/.claude/.credentials.json
+        @brief Execute init.
+        @details Applies init logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param creds_path {Path | None} Input parameter `creds_path`.
+        @return {None} Function return value.
         """
         self.creds_path = creds_path or self.DEFAULT_CREDS_PATH
 
     def is_available(self) -> bool:
-        """Check if Claude CLI credentials exist."""
+        """
+        @brief Execute is available.
+        @details Applies is available logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {bool} Function return value.
+        """
         return self.creds_path.exists()
 
     def get_credentials(self) -> dict[str, Any] | None:
         """
-        Load credentials from Claude CLI.
-
-        Returns:
-            Dict with OAuth credentials or None if not found
+        @brief Execute get credentials.
+        @details Applies get credentials logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {dict[str, Any] | None} Function return value.
         """
         if not self.is_available():
             return None
@@ -51,12 +51,20 @@ class ClaudeCLIAuth:
             return None
 
     def get_access_token(self) -> str | None:
-        """Get the current access token."""
+        """
+        @brief Execute get access token.
+        @details Applies get access token logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {str | None} Function return value.
+        """
         creds = self.get_credentials()
         return creds.get("accessToken") if creds else None
 
     def is_token_expired(self) -> bool:
-        """Check if the token is expired."""
+        """
+        @brief Execute is token expired.
+        @details Applies is token expired logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {bool} Function return value.
+        """
         creds = self.get_credentials()
         if not creds or "expiresAt" not in creds:
             return True
@@ -70,7 +78,11 @@ class ClaudeCLIAuth:
             return True
 
     def get_token_info(self) -> dict[str, Any]:
-        """Get information about the token."""
+        """
+        @brief Execute get token info.
+        @details Applies get token info logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {dict[str, Any]} Function return value.
+        """
         creds = self.get_credentials()
         if not creds:
             return {
@@ -109,10 +121,9 @@ class ClaudeCLIAuth:
 
 def extract_claude_cli_token() -> str | None:
     """
-    Helper function to extract token from Claude CLI.
-
-    Returns:
-        Access token if available, None otherwise
+    @brief Execute extract claude cli token.
+    @details Applies extract claude cli token logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+    @return {str | None} Function return value.
     """
     auth = ClaudeCLIAuth()
     return auth.get_access_token()

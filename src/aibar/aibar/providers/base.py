@@ -13,7 +13,10 @@ from pydantic import BaseModel, Field
 
 
 class WindowPeriod(str, Enum):
-    """Supported time windows for usage queries."""
+    """
+    @brief Define window period component.
+    @details Encapsulates window period state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
+    """
 
     HOUR_5 = "5h"
     DAY_7 = "7d"
@@ -21,7 +24,10 @@ class WindowPeriod(str, Enum):
 
 
 class ProviderName(str, Enum):
-    """Supported provider names."""
+    """
+    @brief Define provider name component.
+    @details Encapsulates provider name state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
+    """
 
     CLAUDE = "claude"
     OPENAI = "openai"
@@ -31,7 +37,10 @@ class ProviderName(str, Enum):
 
 
 class UsageMetrics(BaseModel):
-    """Normalized usage metrics across all providers."""
+    """
+    @brief Define usage metrics component.
+    @details Encapsulates usage metrics state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
+    """
 
     cost: float | None = Field(default=None, description="Total cost in USD")
     requests: int | None = Field(default=None, description="Number of API requests")
@@ -43,7 +52,11 @@ class UsageMetrics(BaseModel):
 
     @property
     def usage_percent(self) -> float | None:
-        """Calculate usage percentage if limit is available."""
+        """
+        @brief Execute usage percent.
+        @details Applies usage percent logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {float | None} Function return value.
+        """
         if self.limit is None or self.limit == 0:
             return None
         if self.remaining is not None:
@@ -52,14 +65,21 @@ class UsageMetrics(BaseModel):
 
     @property
     def total_tokens(self) -> int | None:
-        """Calculate total tokens if both input and output are available."""
+        """
+        @brief Execute total tokens.
+        @details Applies total tokens logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {int | None} Function return value.
+        """
         if self.input_tokens is None and self.output_tokens is None:
             return None
         return (self.input_tokens or 0) + (self.output_tokens or 0)
 
 
 class ProviderResult(BaseModel):
-    """Normalized result from any provider."""
+    """
+    @brief Define provider result component.
+    @details Encapsulates provider result state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
+    """
 
     provider: ProviderName
     window: WindowPeriod
@@ -70,74 +90,88 @@ class ProviderResult(BaseModel):
 
     @property
     def is_error(self) -> bool:
-        """Check if this result represents an error."""
+        """
+        @brief Execute is error.
+        @details Applies is error logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {bool} Function return value.
+        """
         return self.error is not None
 
 
 class ProviderError(Exception):
-    """Base exception for provider errors."""
+    """
+    @brief Define provider error component.
+    @details Encapsulates provider error state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
+    """
 
     pass
 
 
 class AuthenticationError(ProviderError):
-    """Raised when authentication fails."""
+    """
+    @brief Define authentication error component.
+    @details Encapsulates authentication error state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
+    """
 
     pass
 
 
 class RateLimitError(ProviderError):
-    """Raised when rate limited."""
+    """
+    @brief Define rate limit error component.
+    @details Encapsulates rate limit error state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
+    """
 
     pass
 
 
 class BaseProvider(ABC):
-    """Abstract base class for usage providers."""
+    """
+    @brief Define base provider component.
+    @details Encapsulates base provider state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
+    """
 
     name: ProviderName
 
     @abstractmethod
     async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult:
         """
-        Fetch usage metrics for the given time window.
-
-        Args:
-            window: Time period to fetch metrics for
-
-        Returns:
-            Normalized ProviderResult with metrics
-
-        Raises:
-            AuthenticationError: If authentication fails
-            ProviderError: For other provider-specific errors
+        @brief Execute fetch.
+        @details Applies fetch logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param window {WindowPeriod} Input parameter `window`.
+        @return {ProviderResult} Function return value.
         """
         pass
 
     @abstractmethod
     def is_configured(self) -> bool:
         """
-        Check if the provider is properly configured (has required credentials).
-
-        Returns:
-            True if provider can be used, False otherwise
+        @brief Execute is configured.
+        @details Applies is configured logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {bool} Function return value.
         """
         pass
 
     @abstractmethod
     def get_config_help(self) -> str:
         """
-        Get help text for configuring this provider.
-
-        Returns:
-            Human-readable configuration instructions
+        @brief Execute get config help.
+        @details Applies get config help logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {str} Function return value.
         """
         pass
 
     def _make_error_result(
         self, window: WindowPeriod, error: str, raw: dict[str, Any] | None = None
     ) -> ProviderResult:
-        """Helper to create an error result."""
+        """
+        @brief Execute make error result.
+        @details Applies make error result logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param window {WindowPeriod} Input parameter `window`.
+        @param error {str} Input parameter `error`.
+        @param raw {dict[str, Any] | None} Input parameter `raw`.
+        @return {ProviderResult} Function return value.
+        """
         return ProviderResult(
             provider=self.name,
             window=window,

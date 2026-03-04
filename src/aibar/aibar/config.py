@@ -16,7 +16,11 @@ ENV_FILE_PATH = Path.home() / ".config" / "aibar" / "env"
 
 
 def load_env_file() -> dict[str, str]:
-    """Load key=value pairs from env file. Returns empty dict if missing/unreadable."""
+    """
+    @brief Execute load env file.
+    @details Applies load env file logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+    @return {dict[str, str]} Function return value.
+    """
     result: dict[str, str] = {}
     try:
         if ENV_FILE_PATH.exists():
@@ -31,7 +35,12 @@ def load_env_file() -> dict[str, str]:
 
 
 def write_env_file(updates: dict[str, str]) -> None:
-    """Write/update keys in env file. Preserves other lines."""
+    """
+    @brief Execute write env file.
+    @details Applies write env file logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+    @param updates {dict[str, str]} Input parameter `updates`.
+    @return {None} Function return value.
+    """
     ENV_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
 
     existing_lines: list[str] = []
@@ -67,10 +76,8 @@ def write_env_file(updates: dict[str, str]) -> None:
 
 class Config:
     """
-    Application configuration.
-
-    Currently reads only from environment variables.
-    Follows the principle of preferring env vars for security.
+    @brief Define config component.
+    @details Encapsulates config state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
     """
 
     # Environment variable mappings
@@ -118,9 +125,10 @@ class Config:
 
     def get_token(self, provider: ProviderName) -> str | None:
         """
-        Get authentication token for a provider.
-
-        Priority: environment variable > env file > provider-specific credential stores.
+        @brief Execute get token.
+        @details Applies get token logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param provider {ProviderName} Input parameter `provider`.
+        @return {str | None} Function return value.
         """
         env_var = self.ENV_VARS.get(provider)
 
@@ -155,9 +163,10 @@ class Config:
 
     def is_provider_configured(self, provider: ProviderName) -> bool:
         """
-        Check if a provider has required credentials.
-
-        Delegates to provider's is_configured() method for accurate detection.
+        @brief Execute is provider configured.
+        @details Applies is provider configured logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param provider {ProviderName} Input parameter `provider`.
+        @return {bool} Function return value.
         """
         # Import providers lazily to avoid circular imports
         from aibar.providers import (
@@ -183,7 +192,12 @@ class Config:
         return False
 
     def get_provider_status(self, provider: ProviderName) -> dict[str, Any]:
-        """Get detailed status for a provider."""
+        """
+        @brief Execute get provider status.
+        @details Applies get provider status logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param provider {ProviderName} Input parameter `provider`.
+        @return {dict[str, Any]} Function return value.
+        """
         info = self.PROVIDER_INFO.get(provider, {})
         env_var = self.ENV_VARS.get(provider, "UNKNOWN")
         configured = self.is_provider_configured(provider)
@@ -200,18 +214,31 @@ class Config:
         }
 
     def get_all_provider_status(self) -> list[dict[str, Any]]:
-        """Get status for all providers."""
+        """
+        @brief Execute get all provider status.
+        @details Applies get all provider status logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {list[dict[str, Any]]} Function return value.
+        """
         return [self.get_provider_status(p) for p in ProviderName]
 
     def _get_token_preview(self, provider: ProviderName) -> str | None:
-        """Get a safe preview of the token (first/last few chars)."""
+        """
+        @brief Execute get token preview.
+        @details Applies get token preview logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param provider {ProviderName} Input parameter `provider`.
+        @return {str | None} Function return value.
+        """
         token = self.get_token(provider)
         if not token or len(token) < 12:
             return None
         return f"{token[:8]}...{token[-4:]}"
 
     def get_env_var_help(self) -> str:
-        """Get help text for setting up environment variables."""
+        """
+        @brief Execute get env var help.
+        @details Applies get env var help logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {str} Function return value.
+        """
         lines = ["Required environment variables:\n"]
 
         for provider in ProviderName:

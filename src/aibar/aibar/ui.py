@@ -43,7 +43,10 @@ from aibar.providers.base import (
 
 
 class ProviderCard(Static):
-    """A card displaying metrics for a single provider."""
+    """
+    @brief Define provider card component.
+    @details Encapsulates provider card state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
+    """
 
     DEFAULT_CSS = """
     ProviderCard {
@@ -121,11 +124,23 @@ class ProviderCard(Static):
         provider_name: ProviderName,
         **kwargs,
     ) -> None:
+        """
+        @brief Execute init.
+        @details Applies init logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param provider_name {ProviderName} Input parameter `provider_name`.
+        @param kwargs {None} Input parameter `kwargs`.
+        @return {None} Function return value.
+        """
         super().__init__(**kwargs)
         self.provider_name = provider_name
         self.provider_info = config.get_provider_status(provider_name)
 
     def compose(self) -> ComposeResult:
+        """
+        @brief Execute compose.
+        @details Applies compose logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {ComposeResult} Function return value.
+        """
         name = self.provider_info["name"]
         configured = self.provider_info["configured"]
 
@@ -145,7 +160,12 @@ class ProviderCard(Static):
         yield VerticalGroup(id="metrics-container")
 
     def watch_result(self, result: ProviderResult | None) -> None:
-        """Update display when result changes."""
+        """
+        @brief Execute watch result.
+        @details Applies watch result logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param result {ProviderResult | None} Input parameter `result`.
+        @return {None} Function return value.
+        """
         if result is None:
             return
 
@@ -230,7 +250,12 @@ class ProviderCard(Static):
             )
 
     def watch_is_loading(self, loading: bool) -> None:
-        """Update loading state."""
+        """
+        @brief Execute watch is loading.
+        @details Applies watch is loading logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param loading {bool} Input parameter `loading`.
+        @return {None} Function return value.
+        """
         if not self.provider_info["configured"]:
             return
         status_line = self.query_one("#status-line", Label)
@@ -238,7 +263,12 @@ class ProviderCard(Static):
             status_line.update("Loading...")
 
     def _format_age(self, seconds: float) -> str:
-        """Format age in human-readable form."""
+        """
+        @brief Execute format age.
+        @details Applies format age logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param seconds {float} Input parameter `seconds`.
+        @return {str} Function return value.
+        """
         if seconds < 60:
             return f"{int(seconds)}s"
         elif seconds < 3600:
@@ -247,7 +277,12 @@ class ProviderCard(Static):
             return f"{int(seconds / 3600)}h"
 
     def _format_duration(self, seconds: float) -> str:
-        """Format duration in human-readable form."""
+        """
+        @brief Execute format duration.
+        @details Applies format duration logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param seconds {float} Input parameter `seconds`.
+        @return {str} Function return value.
+        """
         total_minutes = int(seconds // 60)
         days = total_minutes // (24 * 60)
         hours = (total_minutes // 60) % 24
@@ -262,7 +297,10 @@ class ProviderCard(Static):
 
 
 class RawJsonView(Static):
-    """View for displaying raw JSON data."""
+    """
+    @brief Define raw json view component.
+    @details Encapsulates raw json view state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
+    """
 
     DEFAULT_CSS = """
     RawJsonView {
@@ -281,13 +319,23 @@ class RawJsonView(Static):
     data: reactive[dict | None] = reactive(None)
 
     def compose(self) -> ComposeResult:
+        """
+        @brief Execute compose.
+        @details Applies compose logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {ComposeResult} Function return value.
+        """
         yield VerticalScroll(
             Static("No data", id="json-display"),
             classes="json-content",
         )
 
     def watch_data(self, data: dict | None) -> None:
-        """Update JSON display when data changes."""
+        """
+        @brief Execute watch data.
+        @details Applies watch data logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param data {dict | None} Input parameter `data`.
+        @return {None} Function return value.
+        """
         display = self.query_one("#json-display", Static)
         if data is None:
             display.update("No data")
@@ -297,7 +345,10 @@ class RawJsonView(Static):
 
 
 class AIBarUI(App):
-    """Main UI application for usage metrics."""
+    """
+    @brief Define a i bar u i component.
+    @details Encapsulates a i bar u i state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
+    """
 
     CSS = """
     Screen {
@@ -367,6 +418,11 @@ class AIBarUI(App):
     show_json: reactive[bool] = reactive(False)
 
     def __init__(self) -> None:
+        """
+        @brief Execute init.
+        @details Applies init logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {None} Function return value.
+        """
         super().__init__()
         self.cache = ResultCache()
         self.providers: dict[ProviderName, BaseProvider] = {
@@ -379,6 +435,11 @@ class AIBarUI(App):
         self.results: dict[ProviderName, ProviderResult | None] = {}
 
     def compose(self) -> ComposeResult:
+        """
+        @brief Execute compose.
+        @details Applies compose logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {ComposeResult} Function return value.
+        """
         yield Header()
         with Container(id="main-container"):
             with TabbedContent():
@@ -402,27 +463,47 @@ class AIBarUI(App):
         yield Footer()
 
     async def on_mount(self) -> None:
-        """Initialize and fetch data on mount."""
+        """
+        @brief Execute on mount.
+        @details Applies on mount logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {None} Function return value.
+        """
         self._update_window_buttons()
         await self.action_refresh()
 
     @on(Button.Pressed, "#refresh-btn")
     async def on_refresh_pressed(self) -> None:
-        """Handle refresh button press."""
+        """
+        @brief Execute on refresh pressed.
+        @details Applies on refresh pressed logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {None} Function return value.
+        """
         await self.action_refresh()
 
     @on(Button.Pressed, "#btn-5h")
     async def on_5h_pressed(self) -> None:
-        """Handle 5h button press."""
+        """
+        @brief Execute on 5h pressed.
+        @details Applies on 5h pressed logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {None} Function return value.
+        """
         await self.action_window_5h()
 
     @on(Button.Pressed, "#btn-7d")
     async def on_7d_pressed(self) -> None:
-        """Handle 7d button press."""
+        """
+        @brief Execute on 7d pressed.
+        @details Applies on 7d pressed logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {None} Function return value.
+        """
         await self.action_window_7d()
 
     async def action_refresh(self) -> None:
-        """Refresh all provider data."""
+        """
+        @brief Execute action refresh.
+        @details Applies action refresh logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {None} Function return value.
+        """
         for provider_name, provider in self.providers.items():
             if not provider.is_configured():
                 continue
@@ -457,21 +538,33 @@ class AIBarUI(App):
         self._update_json_view()
 
     async def action_window_5h(self) -> None:
-        """Switch to 5 hour window."""
+        """
+        @brief Execute action window 5h.
+        @details Applies action window 5h logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {None} Function return value.
+        """
         self.window = WindowPeriod.HOUR_5
         self._update_window_buttons()
         self.cache.invalidate()  # Clear cache to force refresh with new window
         await self.action_refresh()
 
     async def action_window_7d(self) -> None:
-        """Switch to 7 day window."""
+        """
+        @brief Execute action window 7d.
+        @details Applies action window 7d logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {None} Function return value.
+        """
         self.window = WindowPeriod.DAY_7
         self._update_window_buttons()
         self.cache.invalidate()
         await self.action_refresh()
 
     async def action_toggle_json(self) -> None:
-        """Toggle JSON view."""
+        """
+        @brief Execute action toggle json.
+        @details Applies action toggle json logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {None} Function return value.
+        """
         self.show_json = not self.show_json
         tabbed = self.query_one(TabbedContent)
         if self.show_json:
@@ -480,7 +573,12 @@ class AIBarUI(App):
             tabbed.active = "overview-tab"
 
     def _get_card(self, provider: ProviderName) -> ProviderCard | None:
-        """Get the card widget for a provider."""
+        """
+        @brief Execute get card.
+        @details Applies get card logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param provider {ProviderName} Input parameter `provider`.
+        @return {ProviderCard | None} Function return value.
+        """
         card_id = f"card-{provider.value}"
         try:
             return self.query_one(f"#{card_id}", ProviderCard)
@@ -488,7 +586,11 @@ class AIBarUI(App):
             return None
 
     def _update_window_buttons(self) -> None:
-        """Update window button states."""
+        """
+        @brief Execute update window buttons.
+        @details Applies update window buttons logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {None} Function return value.
+        """
         buttons = {
             WindowPeriod.HOUR_5: "#btn-5h",
             WindowPeriod.DAY_7: "#btn-7d",
@@ -504,7 +606,11 @@ class AIBarUI(App):
                 pass
 
     def _update_json_view(self) -> None:
-        """Update the JSON view with current results."""
+        """
+        @brief Execute update json view.
+        @details Applies update json view logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {None} Function return value.
+        """
         json_view = self.query_one("#json-view", RawJsonView)
         data = {}
         for provider_name, result in self.results.items():
@@ -514,7 +620,11 @@ class AIBarUI(App):
 
 
 def run_ui() -> None:
-    """Run the UI application."""
+    """
+    @brief Execute run ui.
+    @details Applies run ui logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+    @return {None} Function return value.
+    """
     app = AIBarUI()
     app.run()
 

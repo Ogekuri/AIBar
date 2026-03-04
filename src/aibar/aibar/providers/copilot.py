@@ -25,10 +25,8 @@ from aibar.providers.base import (
 
 class CopilotDeviceFlow:
     """
-    GitHub OAuth device flow for Copilot authentication.
-
-    Uses the VS Code client ID to authenticate with GitHub,
-    similar to how the official Copilot extension works.
+    @brief Define copilot device flow component.
+    @details Encapsulates copilot device flow state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
     """
 
     # VS Code's public client ID for Copilot
@@ -40,10 +38,10 @@ class CopilotDeviceFlow:
 
     async def request_device_code(self) -> dict[str, Any]:
         """
-        Request a device code from GitHub.
-
-        Returns:
-            Dict with device_code, user_code, verification_uri, expires_in, interval
+        @brief Execute request device code.
+        @details Applies request device code logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {dict[str, Any]} Function return value.
+        @throws {Exception} Propagates explicit raised error states from internal validation or provider operations.
         """
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
@@ -65,14 +63,12 @@ class CopilotDeviceFlow:
 
     async def poll_for_token(self, device_code: str, interval: int = 5) -> str:
         """
-        Poll GitHub for the access token after user authorizes.
-
-        Args:
-            device_code: The device code from request_device_code()
-            interval: Polling interval in seconds
-
-        Returns:
-            Access token string
+        @brief Execute poll for token.
+        @details Applies poll for token logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param device_code {str} Input parameter `device_code`.
+        @param interval {int} Input parameter `interval`.
+        @return {str} Function return value.
+        @throws {Exception} Propagates explicit raised error states from internal validation or provider operations.
         """
         import asyncio
 
@@ -118,10 +114,8 @@ class CopilotDeviceFlow:
 
 class CopilotCredentialStore:
     """
-    Store and retrieve Copilot credentials.
-
-    Stores tokens in ~/.config/aibar/copilot.json
-    Also checks ~/.codexbar/config.json for existing tokens.
+    @brief Define copilot credential store component.
+    @details Encapsulates copilot credential store state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
     """
 
     CONFIG_DIR = Path.home() / ".config" / "aibar"
@@ -130,12 +124,9 @@ class CopilotCredentialStore:
 
     def load_token(self) -> str | None:
         """
-        Load token from storage.
-
-        Checks in order:
-        1. Environment variable GITHUB_TOKEN
-        2. Our own credentials file
-        3. CodexBar config file
+        @brief Execute load token.
+        @details Applies load token logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {str | None} Function return value.
         """
         # 1. Environment variable
         if token := os.environ.get("GITHUB_TOKEN"):
@@ -164,7 +155,12 @@ class CopilotCredentialStore:
         return None
 
     def save_token(self, token: str) -> None:
-        """Save token to our credentials file."""
+        """
+        @brief Execute save token.
+        @details Applies save token logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param token {str} Input parameter `token`.
+        @return {None} Function return value.
+        """
         self.CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         data = {
             "access_token": token,
@@ -175,13 +171,8 @@ class CopilotCredentialStore:
 
 class CopilotProvider(BaseProvider):
     """
-    Provider for GitHub Copilot usage metrics.
-
-    Uses the GitHub Copilot internal API to fetch quota information.
-    Authentication via GitHub OAuth device flow.
-
-    Environment Variables:
-        GITHUB_TOKEN: GitHub OAuth token with read:user scope
+    @brief Define copilot provider component.
+    @details Encapsulates copilot provider state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
     """
 
     name = ProviderName.COPILOT
@@ -195,20 +186,28 @@ class CopilotProvider(BaseProvider):
 
     def __init__(self, token: str | None = None) -> None:
         """
-        Initialize the Copilot provider.
-
-        Args:
-            token: GitHub OAuth token. If not provided, loads from storage.
+        @brief Execute init.
+        @details Applies init logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param token {str | None} Input parameter `token`.
+        @return {None} Function return value.
         """
         self._store = CopilotCredentialStore()
         self._token = token or self._store.load_token()
 
     def is_configured(self) -> bool:
-        """Check if GitHub token is available."""
+        """
+        @brief Execute is configured.
+        @details Applies is configured logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {bool} Function return value.
+        """
         return self._token is not None and len(self._token) > 0
 
     def get_config_help(self) -> str:
-        """Get configuration instructions."""
+        """
+        @brief Execute get config help.
+        @details Applies get config help logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {str} Function return value.
+        """
         return """GitHub Copilot Provider Configuration:
 
 1. Run: aibar login --provider copilot
@@ -222,10 +221,11 @@ Note: Token needs 'read:user' scope."""
 
     async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult:
         """
-        Fetch GitHub Copilot usage metrics.
-
-        Note: Copilot API returns current quota state on a fixed 30-day window.
-        The window parameter is ignored.
+        @brief Execute fetch.
+        @details Applies fetch logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param window {WindowPeriod} Input parameter `window`.
+        @return {ProviderResult} Function return value.
+        @throws {Exception} Propagates explicit raised error states from internal validation or provider operations.
         """
         effective_window = WindowPeriod.DAY_30
         if not self.is_configured():
@@ -281,33 +281,30 @@ Note: Token needs 'read:user' scope."""
 
     def _parse_response(self, data: dict, window: WindowPeriod) -> ProviderResult:
         """
-        Parse the Copilot API response.
-
-        Expected structure:
-        {
-            "quotaSnapshots": {
-                "premiumInteractions": {
-                    "percentRemaining": 10.8,
-                    "quota_remaining": 162,
-                    "entitlement": 1500
-                },
-                "chat": {"percentRemaining": 90}
-            },
-            "copilotPlan": "pro"
-        }
+        @brief Execute parse response.
+        @details Applies parse response logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param data {dict} Input parameter `data`.
+        @param window {WindowPeriod} Input parameter `window`.
+        @return {ProviderResult} Function return value.
         """
         quota = data.get("quotaSnapshots") or data.get("quota_snapshots") or {}
 
         def _get_snapshot(key_camel: str, key_snake: str) -> dict:
+            """
+            @brief Execute get snapshot.
+            @details Applies get snapshot logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+            @param key_camel {str} Input parameter `key_camel`.
+            @param key_snake {str} Input parameter `key_snake`.
+            @return {dict} Function return value.
+            """
             return quota.get(key_camel) or quota.get(key_snake) or {}
 
         def _extract_quota_data(snapshot: dict) -> tuple[float | None, float | None]:
             """
-            Extract remaining and limit from snapshot.
-
-            Returns:
-                Tuple of (remaining, limit) - actual credit numbers if available,
-                otherwise percentage-based values
+            @brief Execute extract quota data.
+            @details Applies extract quota data logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+            @param snapshot {dict} Input parameter `snapshot`.
+            @return {tuple[float | None, float | None]} Function return value.
             """
             # Try to get actual credit numbers first
             entitlement = snapshot.get("entitlement")
@@ -380,10 +377,9 @@ Note: Token needs 'read:user' scope."""
 
     async def login(self) -> str:
         """
-        Perform device flow login.
-
-        Returns:
-            The access token after successful authentication
+        @brief Execute login.
+        @details Applies login logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {str} Function return value.
         """
         flow = CopilotDeviceFlow()
 

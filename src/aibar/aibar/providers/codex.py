@@ -23,9 +23,8 @@ from aibar.providers.base import (
 
 class CodexCredentials:
     """
-    Credentials for OpenAI Codex OAuth.
-
-    Reads from ~/.codex/auth.json (or $CODEX_HOME/auth.json)
+    @brief Define codex credentials component.
+    @details Encapsulates codex credentials state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
     """
 
     def __init__(
@@ -36,6 +35,16 @@ class CodexCredentials:
         account_id: str | None = None,
         last_refresh: datetime | None = None,
     ) -> None:
+        """
+        @brief Execute init.
+        @details Applies init logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param access_token {str} Input parameter `access_token`.
+        @param refresh_token {str} Input parameter `refresh_token`.
+        @param id_token {str} Input parameter `id_token`.
+        @param account_id {str | None} Input parameter `account_id`.
+        @param last_refresh {datetime | None} Input parameter `last_refresh`.
+        @return {None} Function return value.
+        """
         self.access_token = access_token
         self.refresh_token = refresh_token
         self.id_token = id_token
@@ -43,7 +52,11 @@ class CodexCredentials:
         self.last_refresh = last_refresh or datetime.now(timezone.utc)
 
     def needs_refresh(self) -> bool:
-        """Check if token needs refresh (older than 8 days)."""
+        """
+        @brief Execute needs refresh.
+        @details Applies needs refresh logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {bool} Function return value.
+        """
         if not self.refresh_token:
             return False
         age = datetime.now(timezone.utc) - self.last_refresh
@@ -51,7 +64,12 @@ class CodexCredentials:
 
     @classmethod
     def from_auth_json(cls, data: dict) -> "CodexCredentials":
-        """Parse credentials from auth.json format."""
+        """
+        @brief Execute from auth json.
+        @details Applies from auth json logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param data {dict} Input parameter `data`.
+        @return {'CodexCredentials'} Function return value.
+        """
         last_refresh = None
         if lr := data.get("last_refresh"):
             try:
@@ -73,23 +91,36 @@ class CodexCredentials:
 
 class CodexCredentialStore:
     """
-    Store and retrieve Codex credentials from ~/.codex/auth.json.
+    @brief Define codex credential store component.
+    @details Encapsulates codex credential store state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
     """
 
     @property
     def codex_home(self) -> Path:
-        """Get Codex home directory."""
+        """
+        @brief Execute codex home.
+        @details Applies codex home logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {Path} Function return value.
+        """
         if env_home := os.environ.get("CODEX_HOME"):
             return Path(env_home)
         return Path.home() / ".codex"
 
     @property
     def auth_file(self) -> Path:
-        """Get auth.json path."""
+        """
+        @brief Execute auth file.
+        @details Applies auth file logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {Path} Function return value.
+        """
         return self.codex_home / "auth.json"
 
     def load(self) -> CodexCredentials | None:
-        """Load credentials from auth.json."""
+        """
+        @brief Execute load.
+        @details Applies load logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {CodexCredentials | None} Function return value.
+        """
         # First check environment variable
         if token := os.environ.get("CODEX_ACCESS_TOKEN"):
             return CodexCredentials(access_token=token)
@@ -125,7 +156,12 @@ class CodexCredentialStore:
             return None
 
     def save(self, credentials: CodexCredentials) -> None:
-        """Save credentials to auth.json."""
+        """
+        @brief Execute save.
+        @details Applies save logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param credentials {CodexCredentials} Input parameter `credentials`.
+        @return {None} Function return value.
+        """
         self.codex_home.mkdir(parents=True, exist_ok=True)
 
         # Use the nested format to match Codex CLI
@@ -146,9 +182,8 @@ class CodexCredentialStore:
 
 class CodexTokenRefresher:
     """
-    Refresh Codex OAuth tokens.
-
-    Uses OpenAI's auth endpoint to refresh access tokens.
+    @brief Define codex token refresher component.
+    @details Encapsulates codex token refresher state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
     """
 
     REFRESH_URL = "https://auth.openai.com/oauth/token"
@@ -156,13 +191,11 @@ class CodexTokenRefresher:
 
     async def refresh(self, credentials: CodexCredentials) -> CodexCredentials:
         """
-        Refresh the access token.
-
-        Args:
-            credentials: Current credentials with refresh_token
-
-        Returns:
-            New credentials with refreshed tokens
+        @brief Execute refresh.
+        @details Applies refresh logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param credentials {CodexCredentials} Input parameter `credentials`.
+        @return {CodexCredentials} Function return value.
+        @throws {Exception} Propagates explicit raised error states from internal validation or provider operations.
         """
         if not credentials.refresh_token:
             return credentials
@@ -213,14 +246,8 @@ class CodexTokenRefresher:
 
 class CodexProvider(BaseProvider):
     """
-    Provider for OpenAI Codex usage metrics.
-
-    Uses the ChatGPT backend API to fetch usage information.
-    Credentials are read from ~/.codex/auth.json.
-
-    Environment Variables:
-        CODEX_ACCESS_TOKEN: OAuth access token (optional, overrides auth.json)
-        CODEX_HOME: Custom Codex home directory (default: ~/.codex)
+    @brief Define codex provider component.
+    @details Encapsulates codex provider state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
     """
 
     name = ProviderName.CODEX
@@ -231,21 +258,29 @@ class CodexProvider(BaseProvider):
 
     def __init__(self, credentials: CodexCredentials | None = None) -> None:
         """
-        Initialize the Codex provider.
-
-        Args:
-            credentials: OAuth credentials. If not provided, loads from storage.
+        @brief Execute init.
+        @details Applies init logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param credentials {CodexCredentials | None} Input parameter `credentials`.
+        @return {None} Function return value.
         """
         self._store = CodexCredentialStore()
         self._refresher = CodexTokenRefresher()
         self._credentials = credentials or self._store.load()
 
     def is_configured(self) -> bool:
-        """Check if Codex credentials are available."""
+        """
+        @brief Execute is configured.
+        @details Applies is configured logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {bool} Function return value.
+        """
         return self._credentials is not None and len(self._credentials.access_token) > 0
 
     def get_config_help(self) -> str:
-        """Get configuration instructions."""
+        """
+        @brief Execute get config help.
+        @details Applies get config help logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @return {str} Function return value.
+        """
         return """OpenAI Codex Provider Configuration:
 
 1. Install Codex CLI and authenticate:
@@ -261,9 +296,11 @@ Note: Token is refreshed automatically when needed."""
 
     async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult:
         """
-        Fetch OpenAI Codex usage metrics.
-
-        Note: Returns current quota state, not historical data.
+        @brief Execute fetch.
+        @details Applies fetch logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param window {WindowPeriod} Input parameter `window`.
+        @return {ProviderResult} Function return value.
+        @throws {Exception} Propagates explicit raised error states from internal validation or provider operations.
         """
         if not self.is_configured():
             return self._make_error_result(
@@ -327,29 +364,11 @@ Note: Token is refreshed automatically when needed."""
 
     def _parse_response(self, data: dict, window: WindowPeriod) -> ProviderResult:
         """
-        Parse the Codex usage API response.
-
-        Expected structure:
-        {
-            "plan_type": "plus",
-            "rate_limit": {
-                "primary_window": {
-                    "used_percent": 20,
-                    "reset_at": 1706435999,
-                    "limit_window_seconds": 18000
-                },
-                "secondary_window": {
-                    "used_percent": 10,
-                    "reset_at": 1706867999,
-                    "limit_window_seconds": 604800
-                }
-            },
-            "credits": {
-                "has_credits": true,
-                "unlimited": false,
-                "balance": 50.0
-            }
-        }
+        @brief Execute parse response.
+        @details Applies parse response logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @param data {dict} Input parameter `data`.
+        @param window {WindowPeriod} Input parameter `window`.
+        @return {ProviderResult} Function return value.
         """
         rate_limit = data.get("rate_limit", {})
 
