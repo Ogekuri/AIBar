@@ -115,7 +115,7 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **REQ-014**: MUST attempt Codex token refresh when refresh token exists and `last_refresh` age is at least eight days.
 - **REQ-015**: SHOULD continue Codex fetch with existing credentials when non-authentication refresh exceptions occur, leaving refresh failures non-fatal.
 - **REQ-016**: MUST load `~/.config/aibar/env` into subprocess environment before GNOME extension executes `aibar show --json`.
-- **REQ-017**: MUST set GNOME panel label to total cost when cost metrics exist, otherwise configured-provider count when quota metrics exist, otherwise `N/A`; quota-only cards MUST render `<remaining> / <limit> remaining credits`.
+- **REQ-017**: MUST set GNOME panel label to total cost when cost metrics exist, otherwise configured-provider count when quota metrics exist, otherwise `N/A`; quota-only cards MUST render `<remaining> / <limit> remaining credits`; Copilot cards MUST render a `30d` window bar with reset text directly below that bar and before remaining-credits text.
 - **REQ-018**: MUST set GNOME panel label to `Err` and truncate popup error text to 40 characters when command execution or JSON parsing fails.
 - **REQ-019**: SHOULD order extension provider tabs/cards by `claude`, `openrouter`, `copilot`, `codex`, with providers not listed in ordering array appended alphabetically.
 - **REQ-020**: MUST include each discovered source symbol in `docs/REFERENCES.md` with file path, symbol kind, and line-range evidence.
@@ -127,7 +127,7 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 - **TST-001**: MUST verify `show` rejects unsupported window/provider values with non-zero exit and Click `BadParameter` diagnostics, and MUST verify `Remaining credits: <remaining> / <limit>` appears for Claude/Codex/Copilot when both quota values exist.
 - **TST-002**: MUST verify credential precedence by asserting env vars override env-file values and provider stores for at least one provider.
 - **TST-003**: MUST verify cache persistence writes only successful results and redacts sensitive raw keys before disk serialization.
-- **TST-004**: MUST verify GNOME extension error path sets panel text `Err`, caps displayed error string length to 40 characters, and renders quota-only card labels with `remaining credits` suffix.
+- **TST-004**: MUST verify GNOME extension error path sets panel text `Err`, caps displayed error string length to 40 characters, renders quota-only card labels with `remaining credits` suffix, and renders Copilot `30d` bar/reset placement before remaining-credits text.
 - **TST-005**: MUST verify Copilot provider always returns `window=30d` regardless of requested window argument.
 - **TST-006**: MUST verify `req --here --references` reproduces `docs/REFERENCES.md` without missing symbol entries for tracked `src/` files.
 
@@ -168,13 +168,13 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | REQ-014 | `src/aibar/aibar/providers/codex.py` + `CodexCredentials.needs_refresh` + threshold `age.days >= 8`; `CodexProvider.fetch` calls refresher. |
 | REQ-015 | `src/aibar/aibar/providers/codex.py` + `fetch` + catches generic refresh exception and continues (`pass  # Continue with existing token`). |
 | REQ-016 | `src/aibar/extension/extension.js` + `_refreshData` + loads env file and `launcher.setenv(key, value, true)` before spawn. |
-| REQ-017 | `src/aibar/extension/aibar@aibar.panel/extension.js` + `_updateUI/_populateProviderCard` + panel label set to `$totalCost`, else `${configuredProviders} active`, else `N/A`; quota-only cards show `remaining credits`. |
+| REQ-017 | `src/aibar/extension/aibar@aibar.panel/extension.js` + `_updateUI/_populateProviderCard` + panel label set to `$totalCost`, else `${configuredProviders} active`, else `N/A`; quota-only cards show `remaining credits`; Copilot card uses `30d` window bar and reset text above remaining-credits row. |
 | REQ-018 | `src/aibar/extension/extension.js` + `_handleError` + `this._panelLabel.set_text('Err')` and `message.substring(0, 40)`. |
 | REQ-019 | `src/aibar/extension/extension.js` + `_providerOrder` and `_updateUI` sorting + unknown providers rank `999` then lexical order. |
 | REQ-020 | `docs/REFERENCES.md` + per-symbol entries containing symbol identifier, file path, and line-range spans. |
 | TST-001 | `src/aibar/aibar/cli.py` + `parse_window/parse_provider/_print_result` provide validation points for invalid inputs and quota-line rendering for Claude/Codex/Copilot. |
 | TST-002 | `src/aibar/aibar/config.py` + `get_token` implements explicit precedence chain requiring regression coverage. |
 | TST-003 | `src/aibar/aibar/cache.py` + `_save_to_disk/_sanitize_raw` define redaction and success-only disk persistence behavior. |
-| TST-004 | `src/aibar/extension/aibar@aibar.panel/extension.js` + `_handleError/_populateProviderCard` define error label/truncation behavior and quota-only label suffix. |
+| TST-004 | `src/aibar/extension/aibar@aibar.panel/extension.js` + `_handleError/_populateProviderCard` define error label/truncation behavior, quota-only label suffix, and Copilot `30d` bar/reset placement ordering. |
 | TST-005 | `src/aibar/aibar/providers/copilot.py` + `fetch` hard-codes `effective_window` to `WindowPeriod.DAY_30`. |
 | TST-006 | `docs/REFERENCES.md` + generated symbol coverage for tracked `src/` files validates documentation inventory completeness. |

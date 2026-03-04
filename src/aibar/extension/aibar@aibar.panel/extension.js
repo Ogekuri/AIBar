@@ -361,7 +361,7 @@ class AIBarIndicator extends PanelMenu.Button {
             barContainer.add_child(resetLabel);
             barContainer.hide();
 
-            return {container: barContainer, row, barBg, barFill, pctLabel, resetLabel};
+            return {container: barContainer, row, label, barBg, barFill, pctLabel, resetLabel};
         };
 
         let windowBars = new St.BoxLayout({
@@ -512,23 +512,40 @@ class AIBarIndicator extends PanelMenu.Button {
         if (raw.rate_limit && raw.rate_limit.secondary_window && raw.rate_limit.secondary_window.reset_at)
             sevenDayReset = raw.rate_limit.secondary_window.reset_at;
 
-        let hasWindowBars = false;
-        if (fiveHourUtil !== null) {
-            card._barData.fiveHour = {pct: fiveHourUtil, resetTime: fiveHourReset};
-            updateWindowBar(card.fiveHourBar, fiveHourUtil, fiveHourReset, false);
-            hasWindowBars = true;
-        } else {
-            card._barData.fiveHour = null;
-            card.fiveHourBar.container.hide();
+        let usagePercent = metrics.usage_percent;
+        if ((usagePercent === null || usagePercent === undefined) &&
+            metrics.limit !== null && metrics.limit !== undefined &&
+            metrics.remaining !== null && metrics.remaining !== undefined) {
+            usagePercent = ((metrics.limit - metrics.remaining) / metrics.limit) * 100;
         }
 
-        if (sevenDayUtil !== null) {
-            card._barData.sevenDay = {pct: sevenDayUtil, resetTime: sevenDayReset};
-            updateWindowBar(card.sevenDayBar, sevenDayUtil, sevenDayReset, true);
-            hasWindowBars = true;
-        } else {
+        let hasWindowBars = false;
+        if (providerName === 'copilot' && usagePercent !== null && usagePercent !== undefined) {
+            card.fiveHourBar.label.text = '30d';
+            card._barData.fiveHour = {pct: usagePercent, resetTime: metrics.reset_at || null};
+            updateWindowBar(card.fiveHourBar, usagePercent, metrics.reset_at || null, true);
             card._barData.sevenDay = null;
             card.sevenDayBar.container.hide();
+            hasWindowBars = true;
+        } else {
+            card.fiveHourBar.label.text = '5h';
+            if (fiveHourUtil !== null) {
+                card._barData.fiveHour = {pct: fiveHourUtil, resetTime: fiveHourReset};
+                updateWindowBar(card.fiveHourBar, fiveHourUtil, fiveHourReset, false);
+                hasWindowBars = true;
+            } else {
+                card._barData.fiveHour = null;
+                card.fiveHourBar.container.hide();
+            }
+
+            if (sevenDayUtil !== null) {
+                card._barData.sevenDay = {pct: sevenDayUtil, resetTime: sevenDayReset};
+                updateWindowBar(card.sevenDayBar, sevenDayUtil, sevenDayReset, true);
+                hasWindowBars = true;
+            } else {
+                card._barData.sevenDay = null;
+                card.sevenDayBar.container.hide();
+            }
         }
 
         if (hasWindowBars) {
@@ -539,13 +556,6 @@ class AIBarIndicator extends PanelMenu.Button {
             card.windowBars.hide();
             card.progressContainer.show();
             card.resetsLabel.show();
-        }
-
-        let usagePercent = metrics.usage_percent;
-        if ((usagePercent === null || usagePercent === undefined) &&
-            metrics.limit !== null && metrics.limit !== undefined &&
-            metrics.remaining !== null && metrics.remaining !== undefined) {
-            usagePercent = ((metrics.limit - metrics.remaining) / metrics.limit) * 100;
         }
 
         if (!hasWindowBars) {

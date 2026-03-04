@@ -779,7 +779,7 @@ from aibar.providers.base import (
 
 ---
 
-# extension.js | JavaScript | 802L | 9 symbols | 8 imports | 6 comments
+# extension.js | JavaScript | 812L | 9 symbols | 8 imports | 6 comments
 > Path: `src/aibar/extension/aibar@aibar.panel/extension.js`
 - @brief GNOME Shell panel extension for aibar metrics.
 - @details Collects usage JSON from the aibar CLI and renders provider-specific quota/cost cards in the GNOME panel popup.
@@ -821,7 +821,7 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
 ### fn `const updateWindowBar = (bar, pct, resetTime, useDays) =>` (L459-500)
 
-### class `export default class AIBarExtension` (L783-802)
+### class `export default class AIBarExtension` (L793-812)
 - @brief GNOME extension lifecycle adapter for AIBarIndicator registration. */
 
 ## Symbol Index
@@ -835,5 +835,5 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 |`AIBarIndicator`|class||110-409|class AIBarIndicator extends PanelMenu.Button|
 |`AIBarIndicator.createWindowBar`|fn||319-365|const createWindowBar = (labelText) =>|
 |`updateWindowBar`|fn||459-500|const updateWindowBar = (bar, pct, resetTime, useDays) =>|
-|`AIBarExtension`|class||783-802|export default class AIBarExtension|
+|`AIBarExtension`|class||793-812|export default class AIBarExtension|
 
