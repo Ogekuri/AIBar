@@ -41,17 +41,17 @@ AIBar aggregates usage metrics for Claude, OpenAI, OpenRouter, GitHub Copilot, a
 
 ```bash
 # 1) From the repository root, run the launcher (creates .venv on first run)
-./aibar.sh --help
+./aibar --help
 
 # 2) Configure credentials interactively
-./aibar.sh setup
+./aibar setup
 
 # 3) Verify provider configuration and connectivity
-./aibar.sh doctor
+./aibar doctor
 
 # 4) Show usage
-./aibar.sh show
-./aibar.sh show --json
+./aibar show
+./aibar show --json
 ```
 
 
@@ -59,26 +59,26 @@ AIBar aggregates usage metrics for Claude, OpenAI, OpenRouter, GitHub Copilot, a
 
 ```bash
 # Show all configured providers (default window: 7d)
-./aibar.sh show
+./aibar show
 
 # Show one provider and select window
-./aibar.sh show --provider claude --window 5h
+./aibar show --provider claude --window 5h
 
 # JSON output
-./aibar.sh show --json
+./aibar show --json
 
 # Print required environment variables
-./aibar.sh env
+./aibar env
 
 # Interactive setup wizard
-./aibar.sh setup
+./aibar setup
 
 # Provider login helpers
-./aibar.sh login --provider claude
-./aibar.sh login --provider copilot
+./aibar login --provider claude
+./aibar login --provider copilot
 
 # Launch terminal UI
-./aibar.sh ui
+./aibar ui
 ```
 
 
