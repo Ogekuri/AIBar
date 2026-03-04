@@ -168,9 +168,7 @@ def _print_result(name: ProviderName, result, label: str | None = None) -> None:
 
         delta = m.reset_at - datetime.now(timezone.utc)
         if delta.total_seconds() > 0:
-            hours = int(delta.total_seconds() // 3600)
-            mins = int((delta.total_seconds() % 3600) // 60)
-            click.echo(f"Resets:   {hours}h {mins}m")
+            click.echo(f"Resets in: {_format_reset_duration(delta.total_seconds())}")
 
     # Cost
     if m.cost is not None:
@@ -186,6 +184,21 @@ def _print_result(name: ProviderName, result, label: str | None = None) -> None:
         click.echo(
             f"Tokens:   {total:,} ({m.input_tokens or 0:,} in / {m.output_tokens or 0:,} out)"
         )
+
+
+def _format_reset_duration(seconds: float) -> str:
+    """
+    @brief Format reset countdown for CLI text output.
+    @param seconds Remaining duration in seconds.
+    @returns str Countdown as `<d>d <h>h <m>m` when days exist, otherwise `<h>h <m>m`.
+    """
+    total_minutes = int(seconds // 60)
+    days = total_minutes // (24 * 60)
+    hours = (total_minutes // 60) % 24
+    minutes = total_minutes % 60
+    if days > 0:
+        return f"{days}d {hours}h {minutes}m"
+    return f"{hours}h {minutes}m"
 
 
 def _progress_bar(percent: float, width: int = 20) -> str:

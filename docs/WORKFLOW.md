@@ -71,14 +71,15 @@
           - `CodexTokenRefresher.refresh(...)`: refresh token exchange [`src/aibar/aibar/providers/codex.py:155`]
             - `CodexCredentialStore.save(...)`: persist refreshed credentials [`src/aibar/aibar/providers/codex.py:125`]
           - `CodexProvider._parse_response(...)`: normalize window utilization [`src/aibar/aibar/providers/codex.py:326`]
-      - `_print_result(name, result, label)`: text-mode renderer [`src/aibar/aibar/cli.py:140`]
-        - `_progress_bar(percent, width)`: text progress bar [`src/aibar/aibar/cli.py:187`]
-    - `doctor()`: provider config+connectivity checks [`src/aibar/aibar/cli.py:195`]
+      - `_print_result(name, result, label)`: text-mode renderer [`src/aibar/aibar/cli.py:144`]
+        - `_format_reset_duration(seconds)`: reset countdown formatter with optional day token [`src/aibar/aibar/cli.py:189`]
+        - `_progress_bar(percent, width)`: text progress bar [`src/aibar/aibar/cli.py:204`]
+    - `doctor()`: provider config+connectivity checks [`src/aibar/aibar/cli.py:212`]
       - `get_providers()` [`src/aibar/aibar/cli.py:21`]
       - `Config.get_provider_status(...)`: status object [`src/aibar/aibar/config.py`]
         - `Config.is_provider_configured(...)`: instantiate provider and call `is_configured` [`src/aibar/aibar/config.py`]
       - `_fetch_result(provider, WindowPeriod.HOUR_5)` [`src/aibar/aibar/cli.py:55`]
-    - `ui()`: launch Textual UI [`src/aibar/aibar/cli.py:243`]
+    - `ui()`: launch Textual UI [`src/aibar/aibar/cli.py:260`]
       - `run_ui()`: create and run app [`src/aibar/aibar/ui.py:512`]
         - `AIBarUI.__init__(...)`: provider registry + cache init [`src/aibar/aibar/ui.py:365`]
           - `ResultCache.__init__(...)`: memory/disk cache setup [`src/aibar/aibar/cache.py:46`]
@@ -94,18 +95,18 @@
         - `AIBarUI.action_window_5h(...)` / `AIBarUI.action_window_7d(...)`: switch window + invalidate cache [`src/aibar/aibar/ui.py:455`, `:462`]
           - `ResultCache.invalidate(...)` [`src/aibar/aibar/cache.py:121`]
         - `AIBarUI.action_toggle_json(...)`: tab switch [`src/aibar/aibar/ui.py:469`]
-    - `env()`: print env var help [`src/aibar/aibar/cli.py:251`]
+    - `env()`: print env var help [`src/aibar/aibar/cli.py:268`]
       - `Config.get_env_var_help(...)`: provider help text [`src/aibar/aibar/config.py`]
         - `Config.is_provider_configured(...)` [`src/aibar/aibar/config.py`]
-    - `setup()`: interactive key setup [`src/aibar/aibar/cli.py:257`]
+    - `setup()`: interactive key setup [`src/aibar/aibar/cli.py:274`]
       - `write_env_file(updates)`: persist provided keys [`src/aibar/aibar/config.py:29`]
-    - `login(provider)`: auth flow router [`src/aibar/aibar/cli.py:351`]
-      - `_login_claude()`: Claude CLI token validation flow [`src/aibar/aibar/cli.py:368`]
+    - `login(provider)`: auth flow router [`src/aibar/aibar/cli.py:368`]
+      - `_login_claude()`: Claude CLI token validation flow [`src/aibar/aibar/cli.py:385`]
         - `ClaudeCLIAuth.is_available(...)` [`src/aibar/aibar/claude_cli_auth.py:29`]
         - `ClaudeCLIAuth.get_token_info(...)` [`src/aibar/aibar/claude_cli_auth.py:68`]
           - `ClaudeCLIAuth.is_token_expired(...)` [`src/aibar/aibar/claude_cli_auth.py:54`]
         - `ClaudeCLIAuth.get_access_token(...)` [`src/aibar/aibar/claude_cli_auth.py:49`]
-      - `_login_copilot()`: Copilot device-flow auth [`src/aibar/aibar/cli.py:413`]
+      - `_login_copilot()`: Copilot device-flow auth [`src/aibar/aibar/cli.py:430`]
         - `CopilotProvider.login(...)` [`src/aibar/aibar/providers/copilot.py:377`]
           - `CopilotDeviceFlow.request_device_code(...)` [`src/aibar/aibar/providers/copilot.py:37`]
           - `CopilotDeviceFlow.poll_for_token(...)` [`src/aibar/aibar/providers/copilot.py:62`]
@@ -172,7 +173,7 @@
   - `mechanism: Gio.Subprocess.new(['gnome-terminal','--','bash','-c','aibar ui; ...'])`
   - `endpoint_or_channel: command string passed to shell in terminal subprocess`
   - `payload_data_shape: UTF-8 shell command text; no structured runtime payload returned to source unit`
-  - `evidence: src/aibar/extension/aibar@aibar.panel/extension.js:744-748, src/aibar/aibar/cli.py:243-247, src/aibar/aibar/ui.py:512-515`
+  - `evidence: src/aibar/extension/aibar@aibar.panel/extension.js:744-748, src/aibar/aibar/cli.py:260-264, src/aibar/aibar/ui.py:512-515`
 
 - `id: EDGE-003`
   - `source: PROC:gnome-shell`
