@@ -3,6 +3,16 @@
     margin-left: 5px;
 }
 
+.aibar-panel-percentages {
+    spacing: 6px;
+    margin-left: 6px;
+}
+
+.aibar-panel-pct {
+    font-size: 0.85em;
+    font-weight: bold;
+}
+
 /* Header */
 .aibar-header {
     padding: 4px 8px;

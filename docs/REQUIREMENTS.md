@@ -1,8 +1,8 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.3.0"
-date: "2026-03-03"
+version: "0.3.1"
+date: "2026-03-04"
 author: "req-create"
 scope:
   paths:
@@ -119,6 +119,8 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **REQ-018**: MUST set GNOME panel label to `Err` and truncate popup error text to 40 characters when command execution or JSON parsing fails.
 - **REQ-019**: SHOULD order extension provider tabs/cards by `claude`, `openrouter`, `copilot`, `codex`, with providers not listed in ordering array appended alphabetically.
 - **REQ-020**: MUST include each discovered source symbol in `docs/REFERENCES.md` with file path, symbol kind, line-range evidence, and parsed Doxygen fields (`@brief`, `@param`, `@return`, `@raises`) when present in source declarations.
+- **REQ-021**: MUST render GNOME panel percentage labels between the icon and panel summary label in fixed order: Claude 5h usage, Copilot usage, Codex 5h usage.
+- **REQ-022**: MUST style GNOME panel percentage labels with `aibar-tab-label-claude`, `aibar-tab-label-copilot`, and `aibar-tab-label-codex`, and MUST omit a provider percentage when the required usage metric is unavailable.
 
 ## 4. Test Requirements
 
@@ -130,6 +132,7 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 - **TST-004**: MUST verify GNOME extension error path sets panel text `Err`, caps displayed error string length to 40 characters, renders quota-only card labels with `remaining credits` suffix, renders Copilot `30d` bar/reset placement before remaining-credits text, renders popup labels `AIBar` and `Open AIBar UI`, and verifies `dev.sh start` includes `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800`.
 - **TST-005**: MUST verify Copilot provider always returns `window=30d` regardless of requested window argument.
 - **TST-006**: MUST verify `req --here --references` reproduces `docs/REFERENCES.md` without missing symbol entries and preserves Doxygen field extraction for documented symbols.
+- **TST-007**: MUST verify GNOME panel percentage labels render in Claude/Copilot/Codex order between icon and summary label, enforce provider style classes, and omit labels when source metrics are unavailable.
 
 ## 5. Evidence
 
@@ -172,9 +175,12 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | REQ-018 | `src/aibar/extension/extension.js` + `_handleError` + `this._panelLabel.set_text('Err')` and `message.substring(0, 40)`. |
 | REQ-019 | `src/aibar/extension/extension.js` + `_providerOrder` and `_updateUI` sorting + unknown providers rank `999` then lexical order. |
 | REQ-020 | `docs/REFERENCES.md` + per-symbol entries containing symbol identifier, file path, and line-range spans. |
+| REQ-021 | `src/aibar/extension/aibar@aibar.panel/extension.js` + `_buildPanelButton/_updateUI` + panel percentage labels inserted between icon and summary label in fixed Claude/Copilot/Codex order. |
+| REQ-022 | `src/aibar/extension/aibar@aibar.panel/extension.js` + `_buildPanelButton/_updateUI` + panel labels use `aibar-tab-label-{provider}` classes and hide metrics with unavailable source utilization. |
 | TST-001 | `src/aibar/aibar/cli.py` + `parse_window/parse_provider/_print_result` provide validation points for invalid inputs and quota-line rendering for Claude/Codex/Copilot. |
 | TST-002 | `src/aibar/aibar/config.py` + `get_token` implements explicit precedence chain requiring regression coverage. |
 | TST-003 | `src/aibar/aibar/cache.py` + `_save_to_disk/_sanitize_raw` define redaction and success-only disk persistence behavior. |
 | TST-004 | `tests/test_extension_quota_label.py` + popup-label assertions (`AIBar`, `Open AIBar UI`), `tests/test_extension_dev_script.py` + `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800` start-command assertion, and `src/aibar/extension/aibar@aibar.panel/extension.js` + `_handleError/_populateProviderCard/_buildPopupMenu` for error label/truncation, quota-only suffix, Copilot `30d` ordering, and popup branding text. |
 | TST-005 | `src/aibar/aibar/providers/copilot.py` + `fetch` hard-codes `effective_window` to `WindowPeriod.DAY_30`. |
 | TST-006 | `docs/REFERENCES.md` + generated symbol coverage for tracked `src/` files validates documentation inventory completeness. |
+| TST-007 | `tests/test_extension_quota_label.py` + panel-segment assertions for label order, provider style classes, and missing-metric omission behavior. |

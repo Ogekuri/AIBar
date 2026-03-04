@@ -1329,7 +1329,7 @@ from aibar.providers.base import (
 
 ---
 
-# extension.js | JavaScript | 913L | 9 symbols | 8 imports | 24 comments
+# extension.js | JavaScript | 1010L | 10 symbols | 8 imports | 24 comments
 > Path: `src/aibar/extension/aibar@aibar.panel/extension.js`
 - @brief GNOME Shell panel extension for aibar metrics.
 - @details Collects usage JSON from the aibar CLI and renders provider-specific quota/cost cards in the GNOME panel popup.
@@ -1370,13 +1370,14 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 - @brief Execute init.
 - @details Applies init logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @return s {any} Function return value.
-- fn `const createWindowBar = (labelText) =>` (L359-405)
-  - @brief Execute create provider card.
-  - @details Applies create provider card logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
-  - @param {any} providerName Input parameter `providerName`.
-  - @return s {any} Function return value.
 
-### fn `const updateWindowBar = (bar, pct, resetTime, useDays) =>` (L507-548)
+### fn `const createWindowBar = (labelText) =>` (L391-437)
+- @brief Execute create provider card.
+- @details Applies create provider card logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
+- @param {any} providerName Input parameter `providerName`.
+- @return s {any} Function return value.
+
+### fn `const updateWindowBar = (bar, pct, resetTime, useDays) =>` (L539-580)
 - @brief Execute populate provider card.
 - @details Applies populate provider card logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @param {any} card Input parameter `card`.
@@ -1384,7 +1385,12 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 - @param {any} data Input parameter `data`.
 - @return s {any} Function return value.
 
-### class `export default class AIBarExtension` (L879-913)
+### fn `const getPanelUsagePercent = (providerName, data) =>` (L818-856)
+- @brief Execute update u i.
+- @details Applies update u i logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
+- @return s {any} Function return value.
+
+### class `export default class AIBarExtension` (L976-1010)
 - @brief GNOME extension lifecycle adapter for AIBarIndicator registration. */
 - @brief Execute constructor.
 - @details Applies constructor logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
@@ -1399,7 +1405,8 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 |`_loadEnvFromFile`|fn||41-93|function _loadEnvFromFile()|
 |`_getProgressClass`|fn||100-106|function _getProgressClass(pct)|
 |`AIBarIndicator`|class||110-409|class AIBarIndicator extends PanelMenu.Button|
-|`AIBarIndicator.createWindowBar`|fn||359-405|const createWindowBar = (labelText) =>|
-|`updateWindowBar`|fn||507-548|const updateWindowBar = (bar, pct, resetTime, useDays) =>|
-|`AIBarExtension`|class||879-913|export default class AIBarExtension|
+|`createWindowBar`|fn||391-437|const createWindowBar = (labelText) =>|
+|`updateWindowBar`|fn||539-580|const updateWindowBar = (bar, pct, resetTime, useDays) =>|
+|`getPanelUsagePercent`|fn||818-856|const getPanelUsagePercent = (providerName, data) =>|
+|`AIBarExtension`|class||976-1010|export default class AIBarExtension|
 

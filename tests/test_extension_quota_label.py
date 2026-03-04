@@ -46,3 +46,34 @@ def test_popup_labels_use_aibar_brand_casing() -> None:
     assert "text: 'AIBar'," in source
     assert "PopupMenu.PopupMenuItem('Open AIBar UI')" in source
     assert "PopupMenu.PopupMenuItem('Open aibar UI')" not in source
+
+
+def test_panel_percentage_labels_use_fixed_order_and_provider_styles() -> None:
+    """
+    @brief Verify panel percentage labels use Claude/Copilot/Codex order and provider styles.
+    """
+    source = EXTENSION_PATH.read_text(encoding="utf-8")
+    assert "this._panelBox.add_child(this._icon);" in source
+    assert "this._panelBox.add_child(this._panelPercentages);" in source
+    assert "this._panelBox.add_child(this._panelLabel);" in source
+
+    claude_idx = source.index("this._panelPercentages.add_child(this._panelClaudePctLabel);")
+    copilot_idx = source.index("this._panelPercentages.add_child(this._panelCopilotPctLabel);")
+    codex_idx = source.index("this._panelPercentages.add_child(this._panelCodexPctLabel);")
+    assert claude_idx < copilot_idx < codex_idx
+
+    assert "style_class: 'aibar-panel-pct aibar-tab-label-claude'" in source
+    assert "style_class: 'aibar-panel-pct aibar-tab-label-copilot'" in source
+    assert "style_class: 'aibar-panel-pct aibar-tab-label-codex'" in source
+
+
+def test_panel_percentage_labels_hide_when_metrics_are_unavailable() -> None:
+    """
+    @brief Verify panel percentage labels are omitted when usage metrics are unavailable.
+    """
+    source = EXTENSION_PATH.read_text(encoding="utf-8")
+    assert "label.set_text('');" in source
+    assert "label.hide();" in source
+    assert "this._panelClaudePctLabel.hide();" in source
+    assert "this._panelCopilotPctLabel.hide();" in source
+    assert "this._panelCodexPctLabel.hide();" in source

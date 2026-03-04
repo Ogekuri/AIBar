@@ -152,7 +152,39 @@ class AIBarIndicator extends PanelMenu.Button {
             style_class: 'aibar-panel-label',
         });
 
+        this._panelPercentages = new St.BoxLayout({
+            vertical: false,
+            style_class: 'aibar-panel-percentages',
+        });
+
+        this._panelClaudePctLabel = new St.Label({
+            text: '',
+            y_align: Clutter.ActorAlign.CENTER,
+            style_class: 'aibar-panel-pct aibar-tab-label-claude',
+        });
+
+        this._panelCopilotPctLabel = new St.Label({
+            text: '',
+            y_align: Clutter.ActorAlign.CENTER,
+            style_class: 'aibar-panel-pct aibar-tab-label-copilot',
+        });
+
+        this._panelCodexPctLabel = new St.Label({
+            text: '',
+            y_align: Clutter.ActorAlign.CENTER,
+            style_class: 'aibar-panel-pct aibar-tab-label-codex',
+        });
+
+        this._panelClaudePctLabel.hide();
+        this._panelCopilotPctLabel.hide();
+        this._panelCodexPctLabel.hide();
+
+        this._panelPercentages.add_child(this._panelClaudePctLabel);
+        this._panelPercentages.add_child(this._panelCopilotPctLabel);
+        this._panelPercentages.add_child(this._panelCodexPctLabel);
+
         this._panelBox.add_child(this._icon);
+        this._panelBox.add_child(this._panelPercentages);
         this._panelBox.add_child(this._panelLabel);
         this.add_child(this._panelBox);
     }
@@ -777,6 +809,65 @@ class AIBarIndicator extends PanelMenu.Button {
         let totalCost = 0;
         let hasCostData = false;
         let configuredProviders = 0;
+        const usageLabels = {
+            claude: this._panelClaudePctLabel,
+            copilot: this._panelCopilotPctLabel,
+            codex: this._panelCodexPctLabel,
+        };
+
+        const getPanelUsagePercent = (providerName, data) => {
+            if (!data)
+                return null;
+
+            const metrics = data.metrics || {};
+            const raw = data.raw || {};
+
+            if (providerName === 'copilot') {
+                if (metrics.usage_percent !== null && metrics.usage_percent !== undefined)
+                    return Number(metrics.usage_percent);
+                if (
+                    metrics.limit !== null && metrics.limit !== undefined &&
+                    metrics.remaining !== null && metrics.remaining !== undefined &&
+                    Number(metrics.limit) !== 0
+                ) {
+                    return ((Number(metrics.limit) - Number(metrics.remaining)) / Number(metrics.limit)) * 100;
+                }
+                return null;
+            }
+
+            if (raw.five_hour && raw.five_hour.utilization !== null && raw.five_hour.utilization !== undefined)
+                return Number(raw.five_hour.utilization);
+
+            if (raw.rate_limit && raw.rate_limit.primary_window &&
+                raw.rate_limit.primary_window.used_percent !== null &&
+                raw.rate_limit.primary_window.used_percent !== undefined) {
+                return Number(raw.rate_limit.primary_window.used_percent);
+            }
+
+            if (
+                metrics.limit !== null && metrics.limit !== undefined &&
+                metrics.remaining !== null && metrics.remaining !== undefined &&
+                Number(metrics.limit) !== 0
+            ) {
+                return ((Number(metrics.limit) - Number(metrics.remaining)) / Number(metrics.limit)) * 100;
+            }
+
+            return null;
+        };
+
+        for (let providerName of ['claude', 'copilot', 'codex']) {
+            const pct = getPanelUsagePercent(providerName, this._usageData[providerName]);
+            const label = usageLabels[providerName];
+            if (!label)
+                continue;
+            if (pct !== null && Number.isFinite(pct)) {
+                label.set_text(`${pct.toFixed(1)}%`);
+                label.show();
+            } else {
+                label.set_text('');
+                label.hide();
+            }
+        }
 
         const entries = Object.entries(this._usageData).sort((a, b) => {
             const aIndex = this._providerOrder.indexOf(a[0]);
@@ -839,6 +930,12 @@ class AIBarIndicator extends PanelMenu.Button {
      */
     _handleError(message) {
         console.debug(`aibar Error: ${message}`);
+        this._panelClaudePctLabel.set_text('');
+        this._panelCopilotPctLabel.set_text('');
+        this._panelCodexPctLabel.set_text('');
+        this._panelClaudePctLabel.hide();
+        this._panelCopilotPctLabel.hide();
+        this._panelCodexPctLabel.hide();
         this._panelLabel.set_text('Err');
         this._lastUpdatedItem.label.set_text(`Error: ${message.substring(0, 40)}`);
     }
