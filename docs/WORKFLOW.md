@@ -3,184 +3,212 @@
 - `id: PROC:main`
   - `type: Process`
   - `parent_process: null`
-  - `role: aibar executable process (CLI/UI), including direct shell invocation and GNOME-triggered invocations`
-  - `entrypoints: aibar.cli.main(...) [src/aibar/aibar/cli.py:67], run_ui(...) [src/aibar/aibar/ui.py:512]`
-  - `defining_files: src/aibar/aibar/cli.py, src/aibar/aibar/ui.py, src/aibar/aibar/config.py, src/aibar/aibar/cache.py, src/aibar/aibar/claude_cli_auth.py, src/aibar/aibar/providers/*.py`
-  - `thread_model: no explicit threads detected in repository source under src/`
+  - `role: aibar CLI and Textual UI runtime process`
+  - `entrypoint_symbols: main(...), run_ui(...)`
+  - `defining_files: src/aibar/aibar/cli.py, src/aibar/aibar/ui.py`
+  - `thread_model: no explicit threads detected`
 
 - `id: PROC:gnome-shell`
   - `type: Process`
   - `parent_process: null`
-  - `role: GNOME Shell extension host executing usage monitor panel logic`
-  - `entrypoints: AIBarExtension.enable(...) [src/aibar/extension/aibar@aibar.panel/extension.js:770], AIBarExtension.disable(...) [src/aibar/extension/aibar@aibar.panel/extension.js:776]`
-  - `defining_files: src/aibar/extension/aibar@aibar.panel/extension.js, src/aibar/extension/aibar@aibar.panel/metadata.json, src/aibar/extension/aibar@aibar.panel/stylesheet.css, src/aibar/extension/aibar@aibar.panel/dev.sh`
-  - `thread_model: no explicit threads detected in repository source under src/`
+  - `role: GNOME Shell extension host process for panel metrics`
+  - `entrypoint_symbols: AIBarExtension.enable(...), AIBarExtension.disable(...)`
+  - `defining_files: src/aibar/extension/aibar@aibar.panel/extension.js`
+  - `thread_model: no explicit threads detected`
 
 ## Execution Units
 
 ### PROC:main
 - `Entrypoints`
-  - `main(...)`: Click command group dispatcher [`src/aibar/aibar/cli.py:67`]
-  - `run_ui(...)`: Textual app runner [`src/aibar/aibar/ui.py:512`]
+  - `main(...)`: Click command-group entrypoint [`src/aibar/aibar/cli.py`]
+  - `run_ui(...)`: Textual application runner entrypoint [`src/aibar/aibar/ui.py`]
 - `Lifecycle/Trigger`
-  - Starts when `aibar` binary is executed by a shell or by `Gio.SubprocessLauncher.spawnv(...)` from `PROC:gnome-shell`.
-  - Executes one command path (`show|doctor|ui|env|setup|login`) per invocation, then exits; `ui` command blocks in Textual event loop until user quit.
-  - Source-file Doxygen standardization across declarations under `src/aibar/aibar/**` does not alter execution units or internal call ordering.
+  - Starts when `aibar` is invoked by a user shell or by subprocess spawn from `PROC:gnome-shell`.
+  - Executes one command route (`show`, `doctor`, `ui`, `env`, `setup`, `login`) per invocation.
+  - Blocks in Textual event loop only for UI route; otherwise exits after command completion.
 - `Internal Call-Trace Tree`
-  - `main(...)`: command router [`src/aibar/aibar/cli.py:67`]
-    - `show(provider, window, output_json)`: fetch/report usage metrics [`src/aibar/aibar/cli.py:91`]
-      - `parse_window(window)`: map CLI window string to enum [`src/aibar/aibar/cli.py:32`]
-      - `parse_provider(provider)`: map provider selector [`src/aibar/aibar/cli.py:44`]
-      - `get_providers()`: instantiate provider objects [`src/aibar/aibar/cli.py:21`]
-        - `ClaudeOAuthProvider.__init__(...)`: load Claude token [`src/aibar/aibar/providers/claude_oauth.py:37`]
-          - `extract_claude_cli_token()`: Claude CLI credential extraction [`src/aibar/aibar/claude_cli_auth.py:106`]
-            - `ClaudeCLIAuth.get_access_token(...)`: read access token [`src/aibar/aibar/claude_cli_auth.py:49`]
-              - `ClaudeCLIAuth.get_credentials(...)`: parse credential JSON [`src/aibar/aibar/claude_cli_auth.py:33`]
-        - `OpenAIUsageProvider.__init__(...)`: load OpenAI token [`src/aibar/aibar/providers/openai_usage.py:37`]
-          - `Config.get_token(...)`: credential resolution [`src/aibar/aibar/config.py`]
-            - `load_env_file()`: parse env file kv pairs [`src/aibar/aibar/config.py:14`]
-        - `OpenRouterUsageProvider.__init__(...)`: load OpenRouter key [`src/aibar/aibar/providers/openrouter.py:31`]
-          - `Config.get_token(...)` -> `load_env_file()` [`src/aibar/aibar/config.py:14`]
-        - `CopilotProvider.__init__(...)`: load GitHub token [`src/aibar/aibar/providers/copilot.py:192`]
-          - `CopilotCredentialStore.load_token(...)`: resolve token from env/file stores [`src/aibar/aibar/providers/copilot.py:127`]
-        - `CodexProvider.__init__(...)`: load Codex credentials [`src/aibar/aibar/providers/codex.py:230`]
-          - `CodexCredentialStore.load(...)`: parse auth store [`src/aibar/aibar/providers/codex.py:89`]
-      - `_fetch_result(provider, window)`: execute provider fetch via asyncio [`src/aibar/aibar/cli.py:55`]
-        - `ClaudeOAuthProvider.fetch(...)`: query Claude OAuth usage [`src/aibar/aibar/providers/claude_oauth.py:61`]
-          - `ClaudeOAuthProvider.is_configured(...)` [`src/aibar/aibar/providers/claude_oauth.py:47`]
-          - `ClaudeOAuthProvider._parse_response(...)`: normalize utilization/reset metrics [`src/aibar/aibar/providers/claude_oauth.py:135`]
-        - `OpenAIUsageProvider.fetch(...)`: query OpenAI org usage+costs [`src/aibar/aibar/providers/openai_usage.py:71`]
-          - `OpenAIUsageProvider.is_configured(...)` [`src/aibar/aibar/providers/openai_usage.py:50`]
-          - `OpenAIUsageProvider._get_time_range(...)`: derive unix range [`src/aibar/aibar/providers/openai_usage.py:64`]
-          - `OpenAIUsageProvider._fetch_usage(...)` -> `OpenAIUsageProvider._check_response(...)` [`src/aibar/aibar/providers/openai_usage.py:101`, `:141`]
-          - `OpenAIUsageProvider._fetch_costs(...)` -> `OpenAIUsageProvider._check_response(...)` [`src/aibar/aibar/providers/openai_usage.py:121`, `:141`]
-          - `OpenAIUsageProvider._build_result(...)`: aggregate tokens/requests/cost [`src/aibar/aibar/providers/openai_usage.py:152`]
-        - `OpenRouterUsageProvider.fetch(...)`: query key usage/limits [`src/aibar/aibar/providers/openrouter.py:57`]
-          - `OpenRouterUsageProvider.is_configured(...)` [`src/aibar/aibar/providers/openrouter.py:44`]
-          - `OpenRouterUsageProvider._parse_response(...)`: normalize usage/credits [`src/aibar/aibar/providers/openrouter.py:112`]
-            - `OpenRouterUsageProvider._get_usage(...)`: window-specific metric select [`src/aibar/aibar/providers/openrouter.py:136`]
-              - `OpenRouterUsageProvider._to_float(...)`: numeric conversion [`src/aibar/aibar/providers/openrouter.py:152`]
-        - `CopilotProvider.fetch(...)`: query Copilot internal quota API [`src/aibar/aibar/providers/copilot.py:219`]
-          - `CopilotProvider.is_configured(...)` [`src/aibar/aibar/providers/copilot.py:202`]
-          - `CopilotProvider._parse_response(...)`: normalize quota snapshots [`src/aibar/aibar/providers/copilot.py:278`]
-            - `_get_snapshot(...)`: nested extractor [`src/aibar/aibar/providers/copilot.py:297`]
-            - `_extract_quota_data(...)`: nested normalization helper [`src/aibar/aibar/providers/copilot.py:300`]
-        - `CodexProvider.fetch(...)`: query Codex usage endpoint [`src/aibar/aibar/providers/codex.py:260`]
-          - `CodexProvider.is_configured(...)` [`src/aibar/aibar/providers/codex.py:241`]
-          - `CodexCredentials.needs_refresh(...)`: refresh threshold check [`src/aibar/aibar/providers/codex.py:43`]
-          - `CodexTokenRefresher.refresh(...)`: refresh token exchange [`src/aibar/aibar/providers/codex.py:155`]
-            - `CodexCredentialStore.save(...)`: persist refreshed credentials [`src/aibar/aibar/providers/codex.py:125`]
-          - `CodexProvider._parse_response(...)`: normalize window utilization [`src/aibar/aibar/providers/codex.py:326`]
-      - `_print_result(name, result, label)`: text-mode renderer with quota-line output for Claude/Codex/Copilot [`src/aibar/aibar/cli.py:144`]
-        - `_format_reset_duration(seconds)`: reset countdown formatter with optional day token [`src/aibar/aibar/cli.py:196`]
-        - `_progress_bar(percent, width)`: text progress bar [`src/aibar/aibar/cli.py:211`]
-    - `doctor()`: provider config+connectivity checks [`src/aibar/aibar/cli.py:219`]
-      - `get_providers()` [`src/aibar/aibar/cli.py:21`]
-      - `Config.get_provider_status(...)`: status object [`src/aibar/aibar/config.py`]
-        - `Config.is_provider_configured(...)`: instantiate provider and call `is_configured` [`src/aibar/aibar/config.py`]
-      - `_fetch_result(provider, WindowPeriod.HOUR_5)` [`src/aibar/aibar/cli.py:55`]
-    - `ui()`: launch Textual UI [`src/aibar/aibar/cli.py:267`]
-      - `run_ui()`: create and run app [`src/aibar/aibar/ui.py:512`]
-        - `AIBarUI.__init__(...)`: provider registry + cache init [`src/aibar/aibar/ui.py:365`]
-          - `ResultCache.__init__(...)`: memory/disk cache setup [`src/aibar/aibar/cache.py:46`]
-        - `AIBarUI.on_mount(...)`: initial refresh trigger [`src/aibar/aibar/ui.py:400`]
-          - `AIBarUI.action_refresh(...)`: fetch flow [`src/aibar/aibar/ui.py:420`]
-            - `AIBarUI._get_card(...)` [`src/aibar/aibar/ui.py:478`]
-            - `ResultCache.get(provider, window)`: cached read [`src/aibar/aibar/cache.py:76`]
-            - provider `fetch(...)` path (same provider call chain as `show(...)`)
-            - `ResultCache.set(result)`: cache write [`src/aibar/aibar/cache.py:93`]
-              - `ResultCache._save_to_disk(...)`: persist successful result [`src/aibar/aibar/cache.py:145`]
-                - `ResultCache._sanitize_raw(...)`: redact sensitive keys [`src/aibar/aibar/cache.py:188`]
-            - `AIBarUI._update_json_view(...)`: JSON tab update [`src/aibar/aibar/ui.py:502`]
-        - `AIBarUI.action_window_5h(...)` / `AIBarUI.action_window_7d(...)`: switch window + invalidate cache [`src/aibar/aibar/ui.py:455`, `:462`]
-          - `ResultCache.invalidate(...)` [`src/aibar/aibar/cache.py:121`]
-        - `AIBarUI.action_toggle_json(...)`: tab switch [`src/aibar/aibar/ui.py:469`]
-    - `env()`: print env var help [`src/aibar/aibar/cli.py:275`]
-      - `Config.get_env_var_help(...)`: provider help text [`src/aibar/aibar/config.py`]
-        - `Config.is_provider_configured(...)` [`src/aibar/aibar/config.py`]
-    - `setup()`: interactive key setup [`src/aibar/aibar/cli.py:281`]
-      - `write_env_file(updates)`: persist provided keys [`src/aibar/aibar/config.py:29`]
-    - `login(provider)`: auth flow router [`src/aibar/aibar/cli.py:375`]
-      - `_login_claude()`: Claude CLI token validation flow [`src/aibar/aibar/cli.py:392`]
-        - `ClaudeCLIAuth.is_available(...)` [`src/aibar/aibar/claude_cli_auth.py:29`]
-        - `ClaudeCLIAuth.get_token_info(...)` [`src/aibar/aibar/claude_cli_auth.py:68`]
-          - `ClaudeCLIAuth.is_token_expired(...)` [`src/aibar/aibar/claude_cli_auth.py:54`]
-        - `ClaudeCLIAuth.get_access_token(...)` [`src/aibar/aibar/claude_cli_auth.py:49`]
-      - `_login_copilot()`: Copilot device-flow auth [`src/aibar/aibar/cli.py:437`]
-        - `CopilotProvider.login(...)` [`src/aibar/aibar/providers/copilot.py:377`]
-          - `CopilotDeviceFlow.request_device_code(...)` [`src/aibar/aibar/providers/copilot.py:37`]
-          - `CopilotDeviceFlow.poll_for_token(...)` [`src/aibar/aibar/providers/copilot.py:62`]
-          - `CopilotCredentialStore.save_token(...)` [`src/aibar/aibar/providers/copilot.py:162`]
+  - `main(...)`: CLI command router [`src/aibar/aibar/cli.py`]
+    - `show(...)`: usage fetch/report route [`src/aibar/aibar/cli.py`]
+      - `parse_window(...)`: CLI window selector normalization [`src/aibar/aibar/cli.py`]
+      - `parse_provider(...)`: provider selector normalization [`src/aibar/aibar/cli.py`]
+      - `get_providers(...)`: provider object graph construction [`src/aibar/aibar/cli.py`]
+        - `ClaudeOAuthProvider.__init__(...)`: resolve Claude token source [`src/aibar/aibar/providers/claude_oauth.py`]
+          - `extract_claude_cli_token(...)`: Claude CLI token extraction [`src/aibar/aibar/claude_cli_auth.py`]
+            - `ClaudeCLIAuth.get_access_token(...)`: access token read [`src/aibar/aibar/claude_cli_auth.py`]
+              - `ClaudeCLIAuth.get_credentials(...)`: credential payload parse [`src/aibar/aibar/claude_cli_auth.py`]
+                - `ClaudeCLIAuth.is_available(...)`: credential file presence check [`src/aibar/aibar/claude_cli_auth.py`]
+        - `OpenAIUsageProvider.__init__(...)`: resolve OpenAI token source [`src/aibar/aibar/providers/openai_usage.py`]
+          - `Config.get_token(...)`: provider token resolution [`src/aibar/aibar/config.py`]
+            - `load_env_file(...)`: env-file parse [`src/aibar/aibar/config.py`]
+        - `OpenRouterUsageProvider.__init__(...)`: resolve OpenRouter token source [`src/aibar/aibar/providers/openrouter.py`]
+          - `Config.get_token(...)`: provider token resolution [`src/aibar/aibar/config.py`]
+            - `load_env_file(...)`: env-file parse [`src/aibar/aibar/config.py`]
+        - `CopilotProvider.__init__(...)`: resolve Copilot token source [`src/aibar/aibar/providers/copilot.py`]
+          - `CopilotCredentialStore.load_token(...)`: token lookup from env/files [`src/aibar/aibar/providers/copilot.py`]
+        - `CodexProvider.__init__(...)`: resolve Codex credential source [`src/aibar/aibar/providers/codex.py`]
+          - `CodexCredentialStore.load(...)`: credential payload lookup [`src/aibar/aibar/providers/codex.py`]
+            - `CodexCredentials.from_auth_json(...)`: fallback auth schema parse [`src/aibar/aibar/providers/codex.py`]
+      - `_fetch_result(...)`: synchronous wrapper over provider coroutine [`src/aibar/aibar/cli.py`]
+        - `ClaudeOAuthProvider.fetch(...)`: Claude OAuth usage retrieval [`src/aibar/aibar/providers/claude_oauth.py`]
+          - `ClaudeOAuthProvider.is_configured(...)`: token validity precheck [`src/aibar/aibar/providers/claude_oauth.py`]
+          - `ClaudeOAuthProvider._parse_response(...)`: window metrics normalization [`src/aibar/aibar/providers/claude_oauth.py`]
+        - `OpenAIUsageProvider.fetch(...)`: OpenAI usage/cost retrieval [`src/aibar/aibar/providers/openai_usage.py`]
+          - `OpenAIUsageProvider.is_configured(...)`: API key precheck [`src/aibar/aibar/providers/openai_usage.py`]
+          - `OpenAIUsageProvider._get_time_range(...)`: epoch bounds calculation [`src/aibar/aibar/providers/openai_usage.py`]
+          - `OpenAIUsageProvider._fetch_usage(...)`: usage endpoint request wrapper [`src/aibar/aibar/providers/openai_usage.py`]
+            - `OpenAIUsageProvider._check_response(...)`: response validation [`src/aibar/aibar/providers/openai_usage.py`]
+          - `OpenAIUsageProvider._fetch_costs(...)`: cost endpoint request wrapper [`src/aibar/aibar/providers/openai_usage.py`]
+            - `OpenAIUsageProvider._check_response(...)`: response validation [`src/aibar/aibar/providers/openai_usage.py`]
+          - `OpenAIUsageProvider._build_result(...)`: aggregate metrics materialization [`src/aibar/aibar/providers/openai_usage.py`]
+        - `OpenRouterUsageProvider.fetch(...)`: OpenRouter key snapshot retrieval [`src/aibar/aibar/providers/openrouter.py`]
+          - `OpenRouterUsageProvider.is_configured(...)`: API key precheck [`src/aibar/aibar/providers/openrouter.py`]
+          - `OpenRouterUsageProvider._parse_response(...)`: payload to metrics normalization [`src/aibar/aibar/providers/openrouter.py`]
+            - `OpenRouterUsageProvider._get_usage(...)`: window-specific usage extraction [`src/aibar/aibar/providers/openrouter.py`]
+              - `OpenRouterUsageProvider._to_float(...)`: numeric coercion [`src/aibar/aibar/providers/openrouter.py`]
+        - `CopilotProvider.fetch(...)`: Copilot quota snapshot retrieval [`src/aibar/aibar/providers/copilot.py`]
+          - `CopilotProvider.is_configured(...)`: token precheck [`src/aibar/aibar/providers/copilot.py`]
+          - `CopilotProvider._parse_response(...)`: quota snapshot normalization [`src/aibar/aibar/providers/copilot.py`]
+            - `_get_snapshot(...)`: nested snapshot selector [`src/aibar/aibar/providers/copilot.py`]
+            - `_extract_quota_data(...)`: nested quota value extractor [`src/aibar/aibar/providers/copilot.py`]
+        - `CodexProvider.fetch(...)`: Codex usage retrieval and refresh orchestration [`src/aibar/aibar/providers/codex.py`]
+          - `CodexProvider.is_configured(...)`: credential precheck [`src/aibar/aibar/providers/codex.py`]
+          - `CodexCredentials.needs_refresh(...)`: refresh-threshold check [`src/aibar/aibar/providers/codex.py`]
+          - `CodexTokenRefresher.refresh(...)`: refresh-token exchange [`src/aibar/aibar/providers/codex.py`]
+          - `CodexCredentialStore.save(...)`: refreshed credential persistence [`src/aibar/aibar/providers/codex.py`]
+          - `CodexProvider._parse_response(...)`: rate-limit payload normalization [`src/aibar/aibar/providers/codex.py`]
+      - `_print_result(...)`: human-readable metric rendering [`src/aibar/aibar/cli.py`]
+        - `_format_reset_duration(...)`: reset countdown formatter [`src/aibar/aibar/cli.py`]
+        - `_progress_bar(...)`: fixed-width usage bar formatter [`src/aibar/aibar/cli.py`]
+    - `doctor(...)`: provider status and connectivity route [`src/aibar/aibar/cli.py`]
+      - `get_providers(...)`: provider object graph construction [`src/aibar/aibar/cli.py`]
+      - `Config.get_provider_status(...)`: provider status synthesis [`src/aibar/aibar/config.py`]
+        - `Config.is_provider_configured(...)`: provider probe via provider class [`src/aibar/aibar/config.py`]
+      - `_fetch_result(...)`: provider fetch execution wrapper [`src/aibar/aibar/cli.py`]
+    - `ui(...)`: Textual UI launch route [`src/aibar/aibar/cli.py`]
+      - `run_ui(...)`: app bootstrap [`src/aibar/aibar/ui.py`]
+        - `AIBarUI.__init__(...)`: provider registry + cache initialization [`src/aibar/aibar/ui.py`]
+          - `ResultCache.__init__(...)`: cache state bootstrap [`src/aibar/aibar/cache.py`]
+            - `ResultCache._default_cache_dir(...)`: cache directory resolution [`src/aibar/aibar/cache.py`]
+            - `ResultCache._ensure_cache_dir(...)`: cache directory creation [`src/aibar/aibar/cache.py`]
+        - `AIBarUI.on_mount(...)`: first-refresh trigger [`src/aibar/aibar/ui.py`]
+          - `AIBarUI._update_window_buttons(...)`: active-window control state update [`src/aibar/aibar/ui.py`]
+          - `AIBarUI.action_refresh(...)`: refresh loop over configured providers [`src/aibar/aibar/ui.py`]
+            - `AIBarUI._get_card(...)`: provider-card lookup [`src/aibar/aibar/ui.py`]
+            - `ResultCache.get(...)`: in-memory/disk cache read [`src/aibar/aibar/cache.py`]
+              - `ResultCache._cache_key(...)`: cache key materialization [`src/aibar/aibar/cache.py`]
+              - `ResultCache._load_from_disk(...)`: disk cache read [`src/aibar/aibar/cache.py`]
+                - `ResultCache._disk_path(...)`: cache file path resolution [`src/aibar/aibar/cache.py`]
+            - `ResultCache.set(...)`: cache write path [`src/aibar/aibar/cache.py`]
+              - `ResultCache._cache_key(...)`: cache key materialization [`src/aibar/aibar/cache.py`]
+              - `ResultCache._save_to_disk(...)`: successful result persistence [`src/aibar/aibar/cache.py`]
+                - `ResultCache._disk_path(...)`: cache file path resolution [`src/aibar/aibar/cache.py`]
+                - `ResultCache._sanitize_raw(...)`: raw payload redaction [`src/aibar/aibar/cache.py`]
+            - `AIBarUI._update_json_view(...)`: raw JSON tab state update [`src/aibar/aibar/ui.py`]
+          - `AIBarUI.action_window_5h(...)`: 5h window route [`src/aibar/aibar/ui.py`]
+            - `AIBarUI._update_window_buttons(...)`: button-class update [`src/aibar/aibar/ui.py`]
+            - `ResultCache.invalidate(...)`: cache invalidation [`src/aibar/aibar/cache.py`]
+            - `AIBarUI.action_refresh(...)`: refresh loop reuse [`src/aibar/aibar/ui.py`]
+          - `AIBarUI.action_window_7d(...)`: 7d window route [`src/aibar/aibar/ui.py`]
+            - `AIBarUI._update_window_buttons(...)`: button-class update [`src/aibar/aibar/ui.py`]
+            - `ResultCache.invalidate(...)`: cache invalidation [`src/aibar/aibar/cache.py`]
+            - `AIBarUI.action_refresh(...)`: refresh loop reuse [`src/aibar/aibar/ui.py`]
+          - `AIBarUI.action_toggle_json(...)`: tab switch route [`src/aibar/aibar/ui.py`]
+        - `ProviderCard.watch_result(...)`: per-provider card rendering update [`src/aibar/aibar/ui.py`]
+          - `ProviderCard._format_age(...)`: age formatter [`src/aibar/aibar/ui.py`]
+          - `ProviderCard._format_duration(...)`: reset-duration formatter [`src/aibar/aibar/ui.py`]
+        - `ProviderCard.watch_is_loading(...)`: loading state update [`src/aibar/aibar/ui.py`]
+        - `RawJsonView.watch_data(...)`: JSON text render update [`src/aibar/aibar/ui.py`]
+    - `env(...)`: environment-help route [`src/aibar/aibar/cli.py`]
+      - `Config.get_env_var_help(...)`: provider help block synthesis [`src/aibar/aibar/config.py`]
+        - `Config.is_provider_configured(...)`: provider probe via provider class [`src/aibar/aibar/config.py`]
+    - `setup(...)`: interactive key setup route [`src/aibar/aibar/cli.py`]
+      - `write_env_file(...)`: env-file update/persist [`src/aibar/aibar/config.py`]
+    - `login(...)`: provider login router [`src/aibar/aibar/cli.py`]
+      - `_login_claude(...)`: Claude credential health check route [`src/aibar/aibar/cli.py`]
+        - `ClaudeCLIAuth.is_available(...)`: credential file presence check [`src/aibar/aibar/claude_cli_auth.py`]
+        - `ClaudeCLIAuth.get_token_info(...)`: token metadata synthesis [`src/aibar/aibar/claude_cli_auth.py`]
+          - `ClaudeCLIAuth.get_credentials(...)`: credential payload parse [`src/aibar/aibar/claude_cli_auth.py`]
+          - `ClaudeCLIAuth.is_token_expired(...)`: expiry computation [`src/aibar/aibar/claude_cli_auth.py`]
+        - `ClaudeCLIAuth.get_access_token(...)`: access token read [`src/aibar/aibar/claude_cli_auth.py`]
+          - `ClaudeCLIAuth.get_credentials(...)`: credential payload parse [`src/aibar/aibar/claude_cli_auth.py`]
+      - `_login_copilot(...)`: Copilot OAuth device-flow route [`src/aibar/aibar/cli.py`]
+        - `CopilotProvider.login(...)`: login orchestration [`src/aibar/aibar/providers/copilot.py`]
+          - `CopilotDeviceFlow.request_device_code(...)`: device-code request [`src/aibar/aibar/providers/copilot.py`]
+          - `CopilotDeviceFlow.poll_for_token(...)`: token polling loop [`src/aibar/aibar/providers/copilot.py`]
+          - `CopilotCredentialStore.save_token(...)`: token persistence [`src/aibar/aibar/providers/copilot.py`]
+  - `run_ui(...)`: standalone module entrypoint path [`src/aibar/aibar/ui.py`]
+    - `AIBarUI.__init__(...)`: provider registry + cache initialization [`src/aibar/aibar/ui.py`]
+    - `AIBarUI.on_mount(...)`: first-refresh trigger [`src/aibar/aibar/ui.py`]
+    - `AIBarUI.action_refresh(...)`: refresh loop over configured providers [`src/aibar/aibar/ui.py`]
 - `External Boundaries`
-  - `click` CLI parsing/dispatch.
-  - `textual` event loop/rendering.
-  - `httpx` network I/O to external APIs (Anthropic/OpenAI/OpenRouter/GitHub/Auth servers/ChatGPT backend).
-  - local filesystem credential/cache reads+writes under user home (`~/.claude`, `~/.codex`, `~/.config/aibar`, `~/.cache/aibar`).
+  - Click command parsing and dispatch.
+  - Textual event loop, rendering, and widget runtime.
+  - HTTP network interactions through provider endpoints.
+  - Local filesystem reads/writes under user home for env, credentials, and cache.
+  - Process environment and terminal stdout/stderr streams.
 
 ### PROC:gnome-shell
 - `Entrypoints`
-  - `AIBarExtension.enable(...)`: extension activation [`src/aibar/extension/aibar@aibar.panel/extension.js:770`]
-  - `AIBarExtension.disable(...)`: extension deactivation [`src/aibar/extension/aibar@aibar.panel/extension.js:776`]
+  - `AIBarExtension.enable(...)`: extension activation [`src/aibar/extension/aibar@aibar.panel/extension.js`]
+  - `AIBarExtension.disable(...)`: extension deactivation [`src/aibar/extension/aibar@aibar.panel/extension.js`]
 - `Lifecycle/Trigger`
-  - Starts with GNOME Shell session; extension methods invoked by GNOME extension manager.
-  - On enable: panel indicator initialized, immediate refresh run, periodic refresh timer scheduled.
-  - On disable: indicator destroyed and timeout removed.
-  - `dev.sh start`: launches nested GNOME shell with forced `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800` dummy-mode resolution [`src/aibar/extension/aibar@aibar.panel/dev.sh:9`].
-  - Source-file Doxygen standardization across declarations under `src/aibar/extension/**` does not alter execution units or internal call ordering.
+  - Starts in GNOME Shell extension host process.
+  - On enable, constructs panel indicator, performs immediate refresh, and schedules periodic refresh timer.
+  - On disable, destroys indicator and removes timer source.
 - `Internal Call-Trace Tree`
-  - `AIBarExtension.enable(...)`: construct and register indicator [`src/aibar/extension/aibar@aibar.panel/extension.js:770`]
-    - `AIBarIndicator._init()`: initialize state and bootstrap UI/runtime [`src/aibar/extension/aibar@aibar.panel/extension.js:95`]
-      - `_buildPanelButton()`: panel icon/label widgets [`src/aibar/extension/aibar@aibar.panel/extension.js:112`]
-      - `_buildPopupMenu()`: popup layout, action items, handlers, and AIBar-branded header/action labels [`src/aibar/extension/aibar@aibar.panel/extension.js:133`]
-        - action handler -> `_refreshData()` [`src/aibar/extension/aibar@aibar.panel/extension.js:633`]
-        - action handler -> `_openTerminalWithCommand(command)` [`src/aibar/extension/aibar@aibar.panel/extension.js:744`]
-      - `_refreshData()`: execute `aibar show --json` subprocess [`src/aibar/extension/aibar@aibar.panel/extension.js:633`]
-        - `_loadEnvFromFile()`: read env file values [`src/aibar/extension/aibar@aibar.panel/extension.js:30`]
-        - `_getAiBarPath()`: resolve binary path [`src/aibar/extension/aibar@aibar.panel/extension.js:18`]
-        - async callback path:
-          - `_parseOutput(output)`: JSON decode and state update [`src/aibar/extension/aibar@aibar.panel/extension.js:666`]
-          - `_updateUI()`: recalc panel/popup from parsed provider data [`src/aibar/extension/aibar@aibar.panel/extension.js:680`]
-            - `_createTab(providerName)`: tab widget creation [`src/aibar/extension/aibar@aibar.panel/extension.js:205`]
-            - `_updateProviderCard(providerName, data)`: create/update card [`src/aibar/extension/aibar@aibar.panel/extension.js:265`]
-              - `_createProviderCard(providerName)`: card widget graph [`src/aibar/extension/aibar@aibar.panel/extension.js:280`]
-              - `_populateProviderCard(card, providerName, data)`: metric rendering, Copilot `30d` window-bar/reset placement, and quota-label text composition [`src/aibar/extension/aibar@aibar.panel/extension.js:423`]
-                - `_getProgressClass(pct)`: threshold-to-style mapping [`src/aibar/extension/aibar@aibar.panel/extension.js:84`]
-            - `_switchToProvider(providerName)`: active tab/card switch [`src/aibar/extension/aibar@aibar.panel/extension.js:224`]
-          - `_handleError(message)`: error-state update [`src/aibar/extension/aibar@aibar.panel/extension.js:738`]
-      - `_startAutoRefresh()`: periodic refresh timer setup [`src/aibar/extension/aibar@aibar.panel/extension.js:619`]
-        - timer callback -> `_refreshData()` [`src/aibar/extension/aibar@aibar.panel/extension.js:633`]
-  - `AIBarExtension.disable(...)`: teardown indicator [`src/aibar/extension/aibar@aibar.panel/extension.js:776`]
-    - `AIBarIndicator.destroy()`: remove timer and call parent destroy [`src/aibar/extension/aibar@aibar.panel/extension.js:755`]
+  - `AIBarExtension.enable(...)`: extension enable adapter [`src/aibar/extension/aibar@aibar.panel/extension.js`]
+    - `AIBarIndicator._init(...)`: indicator runtime bootstrap [`src/aibar/extension/aibar@aibar.panel/extension.js`]
+      - `AIBarIndicator._buildPanelButton(...)`: panel icon/label setup [`src/aibar/extension/aibar@aibar.panel/extension.js`]
+      - `AIBarIndicator._buildPopupMenu(...)`: popup structure and actions setup [`src/aibar/extension/aibar@aibar.panel/extension.js`]
+        - `AIBarIndicator._refreshData(...)`: refresh action handler [`src/aibar/extension/aibar@aibar.panel/extension.js`]
+        - `AIBarIndicator._openTerminalWithCommand(...)`: UI-launch action handler [`src/aibar/extension/aibar@aibar.panel/extension.js`]
+      - `AIBarIndicator._refreshData(...)`: subprocess-based JSON refresh [`src/aibar/extension/aibar@aibar.panel/extension.js`]
+        - `_loadEnvFromFile(...)`: extension env map parse [`src/aibar/extension/aibar@aibar.panel/extension.js`]
+        - `_getAiBarPath(...)`: executable path resolution [`src/aibar/extension/aibar@aibar.panel/extension.js`]
+        - callback chain
+          - `AIBarIndicator._parseOutput(...)`: JSON decode + state update [`src/aibar/extension/aibar@aibar.panel/extension.js`]
+          - `AIBarIndicator._updateUI(...)`: provider tab/card rendering update [`src/aibar/extension/aibar@aibar.panel/extension.js`]
+            - `AIBarIndicator._createTab(...)`: provider tab creation [`src/aibar/extension/aibar@aibar.panel/extension.js`]
+            - `AIBarIndicator._updateProviderCard(...)`: card lifecycle update [`src/aibar/extension/aibar@aibar.panel/extension.js`]
+              - `AIBarIndicator._createProviderCard(...)`: card widget graph creation [`src/aibar/extension/aibar@aibar.panel/extension.js`]
+              - `AIBarIndicator._populateProviderCard(...)`: metrics-to-widget projection [`src/aibar/extension/aibar@aibar.panel/extension.js`]
+                - `_getProgressClass(...)`: usage-threshold class mapping [`src/aibar/extension/aibar@aibar.panel/extension.js`]
+            - `AIBarIndicator._switchToProvider(...)`: active provider switch [`src/aibar/extension/aibar@aibar.panel/extension.js`]
+          - `AIBarIndicator._handleError(...)`: error-state update [`src/aibar/extension/aibar@aibar.panel/extension.js`]
+      - `AIBarIndicator._startAutoRefresh(...)`: periodic refresh timer registration [`src/aibar/extension/aibar@aibar.panel/extension.js`]
+        - timer callback -> `AIBarIndicator._refreshData(...)`: recurring fetch trigger [`src/aibar/extension/aibar@aibar.panel/extension.js`]
+  - `AIBarExtension.disable(...)`: extension disable adapter [`src/aibar/extension/aibar@aibar.panel/extension.js`]
+    - `AIBarIndicator.destroy(...)`: timer teardown + parent destroy [`src/aibar/extension/aibar@aibar.panel/extension.js`]
 - `External Boundaries`
-  - GNOME Shell APIs (`Main.panel`, `PanelMenu`, `PopupMenu`, `St`, `Gio`, `GLib`).
-  - Subprocess execution via `Gio.SubprocessLauncher` and `Gio.Subprocess`.
-  - Terminal emulator process spawn (`gnome-terminal` command path).
+  - GNOME Shell UI/runtime APIs (`Main`, `PanelMenu`, `PopupMenu`, `St`, `GLib`, `Gio`, `Clutter`, `GObject`).
+  - Subprocess creation and asynchronous stdio communication.
+  - Terminal emulator process launch.
 
 ## Communication Edges
 
 - `id: EDGE-001`
   - `source: PROC:gnome-shell`
   - `destination: PROC:main`
-  - `direction: unidirectional request/response (process spawn + stdio return)`
-  - `mechanism: Gio.SubprocessLauncher.spawnv([...,'show','--json']) + communicate_utf8_async`
-  - `endpoint_or_channel: child-process argv + STDOUT JSON payload`
-  - `payload_data_shape: { "<provider_name>": ProviderResult.model_dump(mode="json"), ... }`
-  - `evidence: src/aibar/extension/aibar@aibar.panel/extension.js:637-653, src/aibar/aibar/cli.py:135-137, src/aibar/aibar/providers/base.py:57-66`
+  - `direction: request-response`
+  - `mechanism: subprocess spawn + async stdio`
+  - `endpoint_or_channel: argv [aibar, show, --json] + child stdout`
+  - `payload_data_shape: JSON object keyed by provider name to ProviderResult JSON payload`
+  - `declaration_files: src/aibar/extension/aibar@aibar.panel/extension.js, src/aibar/aibar/cli.py, src/aibar/aibar/providers/base.py`
 
 - `id: EDGE-002`
   - `source: PROC:gnome-shell`
   - `destination: PROC:main`
-  - `direction: unidirectional launch trigger (indirect via external terminal process)`
-  - `mechanism: Gio.Subprocess.new(['gnome-terminal','--','bash','-c','aibar ui; ...'])`
-  - `endpoint_or_channel: command string passed to shell in terminal subprocess`
-  - `payload_data_shape: UTF-8 shell command text; no structured runtime payload returned to source unit`
-  - `evidence: src/aibar/extension/aibar@aibar.panel/extension.js:744-748, src/aibar/aibar/cli.py:267-271, src/aibar/aibar/ui.py:512-515`
+  - `direction: launch-trigger`
+  - `mechanism: terminal subprocess spawn`
+  - `endpoint_or_channel: shell command string passed to gnome-terminal bash -c`
+  - `payload_data_shape: UTF-8 command text (no structured return payload to source unit)`
+  - `declaration_files: src/aibar/extension/aibar@aibar.panel/extension.js, src/aibar/aibar/cli.py, src/aibar/aibar/ui.py`
 
 - `id: EDGE-003`
   - `source: PROC:gnome-shell`
   - `destination: PROC:main`
-  - `direction: unidirectional environment injection before spawn`
-  - `mechanism: env-file parse + launcher.setenv(key,value,true) prior to child launch`
-  - `endpoint_or_channel: inherited process environment variables`
-  - `payload_data_shape: key/value map parsed from ~/.config/aibar/env (string->string)`
-  - `evidence: src/aibar/extension/aibar@aibar.panel/extension.js:30-82, src/aibar/extension/aibar@aibar.panel/extension.js:641-645`
+  - `direction: environment-injection`
+  - `mechanism: env-file parse + launcher.setenv(...) before spawn`
+  - `endpoint_or_channel: inherited child process environment`
+  - `payload_data_shape: string key/value map loaded from ~/.config/aibar/env`
+  - `declaration_files: src/aibar/extension/aibar@aibar.panel/extension.js, src/aibar/aibar/config.py`
