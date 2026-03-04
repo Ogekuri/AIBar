@@ -170,6 +170,13 @@ def _print_result(name: ProviderName, result, label: str | None = None) -> None:
         if delta.total_seconds() > 0:
             click.echo(f"Resets in: {_format_reset_duration(delta.total_seconds())}")
 
+    if (
+        name in (ProviderName.CLAUDE, ProviderName.CODEX, ProviderName.COPILOT)
+        and m.remaining is not None
+        and m.limit is not None
+    ):
+        click.echo(f"Remaining credits: {m.remaining:.1f} / {m.limit:.1f}")
+
     # Cost
     if m.cost is not None:
         click.echo(f"Cost:     ${m.cost:.4f}")

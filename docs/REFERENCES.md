@@ -137,7 +137,7 @@ from typing import Any
 
 ---
 
-# cli.py | Python | 455L | 16 symbols | 13 imports | 34 comments
+# cli.py | Python | 462L | 16 symbols | 13 imports | 34 comments
 > Path: `src/aibar/aibar/cli.py`
 - @brief Command-line interface for aibar.
 - @details Defines command parsing, provider dispatch, formatted output, setup helpers, login flows, and UI launch hooks.
@@ -173,28 +173,28 @@ from aibar.providers.copilot import CopilotProvider
 
 ### fn `def show(provider: str, window: str, output_json: bool) -> None` (L95-143)
 
-### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L144-188)
+### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L144-195)
 
-### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L189-203)
+### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L196-210)
 - @brief Format reset countdown for CLI text output.
 - @param seconds Remaining duration in seconds.
 - @return s str Countdown as `<d>d <h>h <m>m` when days exist, otherwise `<h>h <m>m`.
 
-### fn `def _progress_bar(percent: float, width: int = 20) -> str` `priv` (L204-210)
+### fn `def _progress_bar(percent: float, width: int = 20) -> str` `priv` (L211-217)
 
-### fn `def doctor() -> None` `@main.command()` (L212-258)
+### fn `def doctor() -> None` `@main.command()` (L219-265)
 
-### fn `def ui() -> None` `@main.command()` (L260-266)
+### fn `def ui() -> None` `@main.command()` (L267-273)
 
-### fn `def env() -> None` `@main.command()` (L268-272)
+### fn `def env() -> None` `@main.command()` (L275-279)
 
-### fn `def setup() -> None` `@main.command()` (L274-360)
+### fn `def setup() -> None` `@main.command()` (L281-367)
 
-### fn `def login(provider: str) -> None` (L368-384)
+### fn `def login(provider: str) -> None` (L375-391)
 
-### fn `def _login_claude() -> None` `priv` (L385-429)
+### fn `def _login_claude() -> None` `priv` (L392-436)
 
-### fn `def _login_copilot() -> None` `priv` (L430-453)
+### fn `def _login_copilot() -> None` `priv` (L437-460)
 
 ## Symbol Index
 |Symbol|Kind|Vis|Lines|Sig|
@@ -205,16 +205,16 @@ from aibar.providers.copilot import CopilotProvider
 |`_fetch_result`|fn|priv|59-68|def _fetch_result(provider: BaseProvider, window: WindowP...|
 |`main`|fn|pub|71-75|def main() -> None|
 |`show`|fn|pub|95-143|def show(provider: str, window: str, output_json: bool) -...|
-|`_print_result`|fn|priv|144-188|def _print_result(name: ProviderName, result, label: str ...|
-|`_format_reset_duration`|fn|priv|189-203|def _format_reset_duration(seconds: float) -> str|
-|`_progress_bar`|fn|priv|204-210|def _progress_bar(percent: float, width: int = 20) -> str|
-|`doctor`|fn|pub|212-258|def doctor() -> None|
-|`ui`|fn|pub|260-266|def ui() -> None|
-|`env`|fn|pub|268-272|def env() -> None|
-|`setup`|fn|pub|274-360|def setup() -> None|
-|`login`|fn|pub|368-384|def login(provider: str) -> None|
-|`_login_claude`|fn|priv|385-429|def _login_claude() -> None|
-|`_login_copilot`|fn|priv|430-453|def _login_copilot() -> None|
+|`_print_result`|fn|priv|144-195|def _print_result(name: ProviderName, result, label: str ...|
+|`_format_reset_duration`|fn|priv|196-210|def _format_reset_duration(seconds: float) -> str|
+|`_progress_bar`|fn|priv|211-217|def _progress_bar(percent: float, width: int = 20) -> str|
+|`doctor`|fn|pub|219-265|def doctor() -> None|
+|`ui`|fn|pub|267-273|def ui() -> None|
+|`env`|fn|pub|275-279|def env() -> None|
+|`setup`|fn|pub|281-367|def setup() -> None|
+|`login`|fn|pub|375-391|def login(provider: str) -> None|
+|`_login_claude`|fn|priv|392-436|def _login_claude() -> None|
+|`_login_copilot`|fn|priv|437-460|def _login_copilot() -> None|
 
 
 ---

@@ -19,3 +19,12 @@ def test_show_reset_output_uses_ui_style_day_token() -> None:
     assert 'click.echo(f"Resets in: {_format_reset_duration(delta.total_seconds())}")' in source
     assert 'return f"{days}d {hours}h {minutes}m"' in source
     assert 'return f"{hours}h {minutes}m"' in source
+
+
+def test_show_output_prints_remaining_credits_for_quota_providers() -> None:
+    """
+    @brief Verify CLI source renders remaining-credits line for Claude, Codex, and Copilot.
+    """
+    source = CLI_PATH.read_text(encoding="utf-8")
+    assert "ProviderName.CLAUDE, ProviderName.CODEX, ProviderName.COPILOT" in source
+    assert 'click.echo(f"Remaining credits: {m.remaining:.1f} / {m.limit:.1f}")' in source

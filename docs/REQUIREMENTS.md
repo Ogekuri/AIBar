@@ -100,7 +100,7 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 
 ### 3.2 Functions
 - **REQ-001**: MUST skip unconfigured providers in `show` output and print missing environment-variable hints when text mode is used.
-- **REQ-002**: MUST print both 5-hour and 7-day outputs for Claude and Codex when `show` runs with default window and non-JSON mode, and MUST render reset countdown as `Resets in: <d>d <h>h <m>m` for durations >= 24 hours.
+- **REQ-002**: MUST print both 5-hour and 7-day outputs for Claude and Codex when `show` runs with default window and non-JSON mode, MUST render reset countdown as `Resets in: <d>d <h>h <m>m` for durations >= 24 hours, and MUST print `Remaining credits: <remaining> / <limit>` for Claude, Codex, and Copilot when both values exist.
 - **REQ-003**: MUST emit pretty-printed JSON (`indent=2`) for fetched providers when `show --json` is requested.
 - **REQ-004**: MUST run provider health checks in `doctor` using the 5-hour window and report per-provider configuration and test status.
 - **REQ-005**: MUST prompt for OpenRouter and OpenAI keys and optional GitHub token in `setup`, then persist provided keys to `~/.config/aibar/env`.
@@ -124,7 +124,7 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 
 Existing automated unit-test coverage under `tests/` is absent (`tests/.place-holder` only), so no behavioral assertions are currently enforced by repository tests.
 
-- **TST-001**: MUST verify `show` rejects unsupported window/provider values with non-zero exit and Click `BadParameter` diagnostics.
+- **TST-001**: MUST verify `show` rejects unsupported window/provider values with non-zero exit and Click `BadParameter` diagnostics, and MUST verify `Remaining credits: <remaining> / <limit>` appears for Claude/Codex/Copilot when both quota values exist.
 - **TST-002**: MUST verify credential precedence by asserting env vars override env-file values and provider stores for at least one provider.
 - **TST-003**: MUST verify cache persistence writes only successful results and redacts sensitive raw keys before disk serialization.
 - **TST-004**: MUST verify GNOME extension error path sets panel text `Err`, caps displayed error string length to 40 characters, and renders quota-only card labels with `remaining credits` suffix.
@@ -153,7 +153,7 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | DES-005 | `src/aibar/extension/extension.js` + `_loadEnvFromFile` + parses `export KEY=VALUE`, handles quotes/comments/semicolon cleanup. |
 | DES-006 | `src/aibar/extension/extension.js` + `REFRESH_INTERVAL_SECONDS/_startAutoRefresh` + timeout 300 seconds; popup menu has `"Refresh Now"` action. |
 | REQ-001 | `src/aibar/aibar/cli.py` + `show` loop + `if not prov.is_configured(): ... continue` and text hint `Set {config.ENV_VARS.get(name)}`. |
-| REQ-002 | `src/aibar/aibar/cli.py` + `show/_print_result/_format_reset_duration` + default-window Claude/Codex dual fetch and text reset countdown with day token for durations >= 24h. |
+| REQ-002 | `src/aibar/aibar/cli.py` + `show/_print_result/_format_reset_duration` + default-window Claude/Codex dual fetch, reset countdown day token, and remaining-credits line for Claude/Codex/Copilot when `remaining` and `limit` exist. |
 | REQ-003 | `src/aibar/aibar/cli.py` + `show` + `json.dumps(output, indent=2)` from `result.model_dump(mode="json")`. |
 | REQ-004 | `src/aibar/aibar/cli.py` + `doctor` + configuration status and `_fetch_result(provider, WindowPeriod.HOUR_5)` health check. |
 | REQ-005 | `src/aibar/aibar/cli.py` + `setup` + prompts for keys then `write_env_file(updates)` to `ENV_FILE_PATH`. |
@@ -172,7 +172,7 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | REQ-018 | `src/aibar/extension/extension.js` + `_handleError` + `this._panelLabel.set_text('Err')` and `message.substring(0, 40)`. |
 | REQ-019 | `src/aibar/extension/extension.js` + `_providerOrder` and `_updateUI` sorting + unknown providers rank `999` then lexical order. |
 | REQ-020 | `docs/REFERENCES.md` + per-symbol entries containing symbol identifier, file path, and line-range spans. |
-| TST-001 | `src/aibar/aibar/cli.py` + `parse_window/parse_provider` provide direct validation points for invalid inputs. |
+| TST-001 | `src/aibar/aibar/cli.py` + `parse_window/parse_provider/_print_result` provide validation points for invalid inputs and quota-line rendering for Claude/Codex/Copilot. |
 | TST-002 | `src/aibar/aibar/config.py` + `get_token` implements explicit precedence chain requiring regression coverage. |
 | TST-003 | `src/aibar/aibar/cache.py` + `_save_to_disk/_sanitize_raw` define redaction and success-only disk persistence behavior. |
 | TST-004 | `src/aibar/extension/aibar@aibar.panel/extension.js` + `_handleError/_populateProviderCard` define error label/truncation behavior and quota-only label suffix. |
