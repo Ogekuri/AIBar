@@ -12,8 +12,8 @@
   - `type: Process`
   - `parent_process: null`
   - `role: GNOME Shell extension host executing usage monitor panel logic`
-  - `entrypoints: AIBarExtension.enable(...) [src/aibar/extension/extension.js:770], AIBarExtension.disable(...) [src/aibar/extension/extension.js:776]`
-  - `defining_files: src/aibar/extension/extension.js, src/aibar/extension/metadata.json, src/aibar/extension/stylesheet.css`
+  - `entrypoints: AIBarExtension.enable(...) [src/aibar/extension/aibar@aibar.panel/extension.js:770], AIBarExtension.disable(...) [src/aibar/extension/aibar@aibar.panel/extension.js:776]`
+  - `defining_files: src/aibar/extension/aibar@aibar.panel/extension.js, src/aibar/extension/aibar@aibar.panel/metadata.json, src/aibar/extension/aibar@aibar.panel/stylesheet.css`
   - `thread_model: no explicit threads detected in repository source under src/`
 
 ## Execution Units
@@ -118,37 +118,37 @@
 
 ### PROC:gnome-shell
 - `Entrypoints`
-  - `AIBarExtension.enable(...)`: extension activation [`src/aibar/extension/extension.js:770`]
-  - `AIBarExtension.disable(...)`: extension deactivation [`src/aibar/extension/extension.js:776`]
+  - `AIBarExtension.enable(...)`: extension activation [`src/aibar/extension/aibar@aibar.panel/extension.js:770`]
+  - `AIBarExtension.disable(...)`: extension deactivation [`src/aibar/extension/aibar@aibar.panel/extension.js:776`]
 - `Lifecycle/Trigger`
   - Starts with GNOME Shell session; extension methods invoked by GNOME extension manager.
   - On enable: panel indicator initialized, immediate refresh run, periodic refresh timer scheduled.
   - On disable: indicator destroyed and timeout removed.
   - Source-file documentation updates under `src/aibar/extension/**` do not alter execution units or internal call ordering.
 - `Internal Call-Trace Tree`
-  - `AIBarExtension.enable(...)`: construct and register indicator [`src/aibar/extension/extension.js:770`]
-    - `AIBarIndicator._init()`: initialize state and bootstrap UI/runtime [`src/aibar/extension/extension.js:95`]
-      - `_buildPanelButton()`: panel icon/label widgets [`src/aibar/extension/extension.js:112`]
-      - `_buildPopupMenu()`: popup layout, action items, and handlers [`src/aibar/extension/extension.js:133`]
-        - action handler -> `_refreshData()` [`src/aibar/extension/extension.js:633`]
-        - action handler -> `_openTerminalWithCommand(command)` [`src/aibar/extension/extension.js:744`]
-      - `_refreshData()`: execute `aibar show --json` subprocess [`src/aibar/extension/extension.js:633`]
-        - `_loadEnvFromFile()`: read env file values [`src/aibar/extension/extension.js:30`]
-        - `_getAiBarPath()`: resolve binary path [`src/aibar/extension/extension.js:18`]
+  - `AIBarExtension.enable(...)`: construct and register indicator [`src/aibar/extension/aibar@aibar.panel/extension.js:770`]
+    - `AIBarIndicator._init()`: initialize state and bootstrap UI/runtime [`src/aibar/extension/aibar@aibar.panel/extension.js:95`]
+      - `_buildPanelButton()`: panel icon/label widgets [`src/aibar/extension/aibar@aibar.panel/extension.js:112`]
+      - `_buildPopupMenu()`: popup layout, action items, and handlers [`src/aibar/extension/aibar@aibar.panel/extension.js:133`]
+        - action handler -> `_refreshData()` [`src/aibar/extension/aibar@aibar.panel/extension.js:633`]
+        - action handler -> `_openTerminalWithCommand(command)` [`src/aibar/extension/aibar@aibar.panel/extension.js:744`]
+      - `_refreshData()`: execute `aibar show --json` subprocess [`src/aibar/extension/aibar@aibar.panel/extension.js:633`]
+        - `_loadEnvFromFile()`: read env file values [`src/aibar/extension/aibar@aibar.panel/extension.js:30`]
+        - `_getAiBarPath()`: resolve binary path [`src/aibar/extension/aibar@aibar.panel/extension.js:18`]
         - async callback path:
-          - `_parseOutput(output)`: JSON decode and state update [`src/aibar/extension/extension.js:666`]
-          - `_updateUI()`: recalc panel/popup from parsed provider data [`src/aibar/extension/extension.js:680`]
-            - `_createTab(providerName)`: tab widget creation [`src/aibar/extension/extension.js:205`]
-            - `_updateProviderCard(providerName, data)`: create/update card [`src/aibar/extension/extension.js:248`]
-              - `_createProviderCard(providerName)`: card widget graph [`src/aibar/extension/extension.js:263`]
-              - `_populateProviderCard(card, providerName, data)`: metric rendering [`src/aibar/extension/extension.js:406`]
-                - `_getProgressClass(pct)`: threshold-to-style mapping [`src/aibar/extension/extension.js:84`]
-            - `_switchToProvider(providerName)`: active tab/card switch [`src/aibar/extension/extension.js:224`]
-          - `_handleError(message)`: error-state update [`src/aibar/extension/extension.js:738`]
-      - `_startAutoRefresh()`: periodic refresh timer setup [`src/aibar/extension/extension.js:619`]
-        - timer callback -> `_refreshData()` [`src/aibar/extension/extension.js:633`]
-  - `AIBarExtension.disable(...)`: teardown indicator [`src/aibar/extension/extension.js:776`]
-    - `AIBarIndicator.destroy()`: remove timer and call parent destroy [`src/aibar/extension/extension.js:755`]
+          - `_parseOutput(output)`: JSON decode and state update [`src/aibar/extension/aibar@aibar.panel/extension.js:666`]
+          - `_updateUI()`: recalc panel/popup from parsed provider data [`src/aibar/extension/aibar@aibar.panel/extension.js:680`]
+            - `_createTab(providerName)`: tab widget creation [`src/aibar/extension/aibar@aibar.panel/extension.js:205`]
+            - `_updateProviderCard(providerName, data)`: create/update card [`src/aibar/extension/aibar@aibar.panel/extension.js:248`]
+              - `_createProviderCard(providerName)`: card widget graph [`src/aibar/extension/aibar@aibar.panel/extension.js:263`]
+              - `_populateProviderCard(card, providerName, data)`: metric rendering [`src/aibar/extension/aibar@aibar.panel/extension.js:406`]
+                - `_getProgressClass(pct)`: threshold-to-style mapping [`src/aibar/extension/aibar@aibar.panel/extension.js:84`]
+            - `_switchToProvider(providerName)`: active tab/card switch [`src/aibar/extension/aibar@aibar.panel/extension.js:224`]
+          - `_handleError(message)`: error-state update [`src/aibar/extension/aibar@aibar.panel/extension.js:738`]
+      - `_startAutoRefresh()`: periodic refresh timer setup [`src/aibar/extension/aibar@aibar.panel/extension.js:619`]
+        - timer callback -> `_refreshData()` [`src/aibar/extension/aibar@aibar.panel/extension.js:633`]
+  - `AIBarExtension.disable(...)`: teardown indicator [`src/aibar/extension/aibar@aibar.panel/extension.js:776`]
+    - `AIBarIndicator.destroy()`: remove timer and call parent destroy [`src/aibar/extension/aibar@aibar.panel/extension.js:755`]
 - `External Boundaries`
   - GNOME Shell APIs (`Main.panel`, `PanelMenu`, `PopupMenu`, `St`, `Gio`, `GLib`).
   - Subprocess execution via `Gio.SubprocessLauncher` and `Gio.Subprocess`.
@@ -163,7 +163,7 @@
   - `mechanism: Gio.SubprocessLauncher.spawnv([...,'show','--json']) + communicate_utf8_async`
   - `endpoint_or_channel: child-process argv + STDOUT JSON payload`
   - `payload_data_shape: { "<provider_name>": ProviderResult.model_dump(mode="json"), ... }`
-  - `evidence: src/aibar/extension/extension.js:637-653, src/aibar/aibar/cli.py:135-137, src/aibar/aibar/providers/base.py:57-66`
+  - `evidence: src/aibar/extension/aibar@aibar.panel/extension.js:637-653, src/aibar/aibar/cli.py:135-137, src/aibar/aibar/providers/base.py:57-66`
 
 - `id: EDGE-002`
   - `source: PROC:gnome-shell`
@@ -172,7 +172,7 @@
   - `mechanism: Gio.Subprocess.new(['gnome-terminal','--','bash','-c','aibar ui; ...'])`
   - `endpoint_or_channel: command string passed to shell in terminal subprocess`
   - `payload_data_shape: UTF-8 shell command text; no structured runtime payload returned to source unit`
-  - `evidence: src/aibar/extension/extension.js:744-748, src/aibar/aibar/cli.py:243-247, src/aibar/aibar/ui.py:512-515`
+  - `evidence: src/aibar/extension/aibar@aibar.panel/extension.js:744-748, src/aibar/aibar/cli.py:243-247, src/aibar/aibar/ui.py:512-515`
 
 - `id: EDGE-003`
   - `source: PROC:gnome-shell`
@@ -181,4 +181,4 @@
   - `mechanism: env-file parse + launcher.setenv(key,value,true) prior to child launch`
   - `endpoint_or_channel: inherited process environment variables`
   - `payload_data_shape: key/value map parsed from ~/.config/aibar/env (string->string)`
-  - `evidence: src/aibar/extension/extension.js:30-82, src/aibar/extension/extension.js:641-645`
+  - `evidence: src/aibar/extension/aibar@aibar.panel/extension.js:30-82, src/aibar/extension/aibar@aibar.panel/extension.js:641-645`

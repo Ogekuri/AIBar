@@ -77,7 +77,7 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **PRJ-001**: MUST expose CLI subcommands `show`, `doctor`, `ui`, `env`, `setup`, and `login` under one Click command group.
 - **PRJ-002**: MUST aggregate provider metrics through a normalized provider contract for `claude`, `openai`, `openrouter`, `copilot`, and `codex`.
 - **PRJ-003**: MUST provide an interactive Textual UI with an Overview tab and a Raw JSON tab.
-- **PRJ-004**: MUST provide a GNOME Shell panel extension that executes `aibar show --json` and renders provider-specific cards.
+- **PRJ-004**: MUST provide a GNOME Shell panel extension named `IABar Monitor` that executes `aibar show --json` and renders provider-specific cards.
 - **PRJ-005**: MUST maintain a machine-readable symbol inventory for repository code documentation under `docs/REFERENCES.md`.
 
 ### 2.2 Project Constraints
@@ -138,7 +138,7 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | PRJ-001 | `src/aibar/aibar/cli.py` + `main/show/doctor/ui/env/setup/login` + `@main.command()` declarations for all subcommands. |
 | PRJ-002 | `src/aibar/aibar/cli.py` + `get_providers` + returns Claude/OpenAI/OpenRouter/Copilot/Codex provider instances keyed by `ProviderName`. |
 | PRJ-003 | `src/aibar/aibar/ui.py` + `AIBarUI.compose` + defines `TabPane("Overview")` and `TabPane("Raw JSON")`. |
-| PRJ-004 | `src/aibar/extension/extension.js` + `_refreshData/_updateProviderCard` + spawns `[_getAiBarPath(),'show','--json']` and renders provider cards. |
+| PRJ-004 | `src/aibar/extension/aibar@aibar.panel/metadata.json` + `name` and `src/aibar/extension/aibar@aibar.panel/extension.js` + `_refreshData/_updateProviderCard` + extension name and provider-card rendering behavior. |
 | PRJ-005 | `docs/REFERENCES.md` + repository-wide symbol sections + machine-readable file/symbol index entries. |
 | CTN-001 | `src/aibar/aibar/config.py` + `Config.get_token` + env var -> env file -> provider-specific stores (`ClaudeCLIAuth`, `CodexCredentialStore`, `CopilotCredentialStore`). |
 | CTN-002 | `src/aibar/aibar/providers/base.py` + `ProviderResult` model + fields `provider/window/metrics/updated_at/raw/error`. |

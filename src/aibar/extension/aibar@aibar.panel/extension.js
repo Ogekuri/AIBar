@@ -110,7 +110,7 @@ const AIBarIndicator = GObject.registerClass(
 class AIBarIndicator extends PanelMenu.Button {
 
     _init() {
-        super._init(0.0, 'aibar Monitor', false);
+        super._init(0.0, 'IABar Monitor', false);
 
         this._timeout = null;
         this._usageData = {};
