@@ -457,6 +457,7 @@ class AIBarIndicator extends PanelMenu.Button {
         });
 
         let costLabel = new St.Label({style_class: 'aibar-cost'});
+        costLabel.clutter_text.set_use_markup(true);
         let byokLabel = new St.Label({style_class: 'aibar-stat'});
         let requestsLabel = new St.Label({style_class: 'aibar-stat'});
         let tokensLabel = new St.Label({style_class: 'aibar-stat'});
@@ -563,9 +564,9 @@ class AIBarIndicator extends PanelMenu.Button {
                     let hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
                     let mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
                     if (useDays && days > 0)
-                        bar.resetLabel.text = `Resets in ${days}d ${hours}h ${mins}m`;
+                        bar.resetLabel.text = `Reset in: ${days}d ${hours}h ${mins}m`;
                     else
-                        bar.resetLabel.text = `Resets in ${days * 24 + hours}h ${mins}m`;
+                        bar.resetLabel.text = `Reset in: ${days * 24 + hours}h ${mins}m`;
                     bar.resetLabel.show();
                 } else {
                     bar.resetLabel.text = '';
@@ -669,7 +670,9 @@ class AIBarIndicator extends PanelMenu.Button {
             else
                 card.costLabel.text = `$${metrics.cost.toFixed(4)}`;
         } else if (metrics.remaining !== null && metrics.limit !== null) {
-            card.costLabel.text = `${metrics.remaining.toFixed(1)} / ${metrics.limit.toFixed(1)} remaining credits`;
+            card.costLabel.clutter_text.set_markup(
+                `Remaining credits: <b>${metrics.remaining.toFixed(1)}</b>/${metrics.limit.toFixed(1)}`
+            );
         } else {
             card.costLabel.text = '';
         }
@@ -712,9 +715,9 @@ class AIBarIndicator extends PanelMenu.Button {
                 let hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
                 let mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
                 if (days > 0)
-                    card.resetsLabel.text = `Resets in ${days}d ${hours}h ${mins}m`;
+                    card.resetsLabel.text = `Reset in: ${days}d ${hours}h ${mins}m`;
                 else
-                    card.resetsLabel.text = `Resets in ${hours}h ${mins}m`;
+                    card.resetsLabel.text = `Reset in: ${hours}h ${mins}m`;
             } else {
                 card.resetsLabel.text = '';
             }

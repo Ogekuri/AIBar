@@ -171,7 +171,7 @@
             - `AIBarIndicator._createTab(...)`: provider tab creation [`src/aibar/extension/aibar@aibar.panel/extension.js`]
             - `AIBarIndicator._updateProviderCard(...)`: card lifecycle update [`src/aibar/extension/aibar@aibar.panel/extension.js`]
               - `AIBarIndicator._createProviderCard(...)`: card widget graph creation [`src/aibar/extension/aibar@aibar.panel/extension.js`]
-              - `AIBarIndicator._populateProviderCard(...)`: metrics-to-widget projection [`src/aibar/extension/aibar@aibar.panel/extension.js`]
+              - `AIBarIndicator._populateProviderCard(...)`: metrics-to-widget projection with quota label `Remaining credits: <remaining>/<limit>` (bold remaining value) and `Reset in:` prefix formatting [`src/aibar/extension/aibar@aibar.panel/extension.js`]
                 - `_getProgressClass(...)`: usage-threshold class mapping [`src/aibar/extension/aibar@aibar.panel/extension.js`]
             - `AIBarIndicator._switchToProvider(...)`: active provider switch [`src/aibar/extension/aibar@aibar.panel/extension.js`]
           - `AIBarIndicator._handleError(...)`: error-state update with panel percentage-label reset [`src/aibar/extension/aibar@aibar.panel/extension.js`]

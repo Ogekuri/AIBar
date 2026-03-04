@@ -1,7 +1,7 @@
 """
 @file
 @brief GNOME extension quota-label regressions.
-@details Ensures quota-only provider cards use the "remaining credits" suffix.
+@details Ensures quota-only provider cards use the required credit/reset wording format.
 """
 
 from pathlib import Path
@@ -11,19 +11,25 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 EXTENSION_PATH = PROJECT_ROOT / "src" / "aibar" / "extension" / "aibar@aibar.panel" / "extension.js"
 
 
-def test_quota_only_label_uses_remaining_credits_suffix() -> None:
+def test_quota_only_label_uses_remaining_credits_prefix_and_bold_remaining() -> None:
     """
-    @brief Verify quota-only card labels use "remaining credits".
+    @brief Verify quota-only card labels use required prefix and bold remaining value.
     """
     source = EXTENSION_PATH.read_text(encoding="utf-8")
     assert (
-        "`${metrics.remaining.toFixed(1)} / ${metrics.limit.toFixed(1)} remaining credits`"
+        "Remaining credits: <b>${metrics.remaining.toFixed(1)}</b>/${metrics.limit.toFixed(1)}"
         in source
     )
-    assert (
-        "`${metrics.remaining.toFixed(1)} / ${metrics.limit.toFixed(1)} credits`"
-        not in source
-    )
+    assert "remaining credits" not in source
+
+
+def test_reset_labels_use_reset_in_prefix_with_colon() -> None:
+    """
+    @brief Verify extension reset labels use the 'Reset in:' prefix.
+    """
+    source = EXTENSION_PATH.read_text(encoding="utf-8")
+    assert "Reset in:" in source
+    assert "Resets in " not in source
 
 
 def test_copilot_uses_30d_window_bar_with_reset_before_credits() -> None:
