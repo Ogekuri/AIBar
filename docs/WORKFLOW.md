@@ -130,7 +130,7 @@
   - `AIBarExtension.enable(...)`: construct and register indicator [`src/aibar/extension/aibar@aibar.panel/extension.js:770`]
     - `AIBarIndicator._init()`: initialize state and bootstrap UI/runtime [`src/aibar/extension/aibar@aibar.panel/extension.js:95`]
       - `_buildPanelButton()`: panel icon/label widgets [`src/aibar/extension/aibar@aibar.panel/extension.js:112`]
-      - `_buildPopupMenu()`: popup layout, action items, and handlers [`src/aibar/extension/aibar@aibar.panel/extension.js:133`]
+      - `_buildPopupMenu()`: popup layout, action items, handlers, and AIBar-branded header/action labels [`src/aibar/extension/aibar@aibar.panel/extension.js:133`]
         - action handler -> `_refreshData()` [`src/aibar/extension/aibar@aibar.panel/extension.js:633`]
         - action handler -> `_openTerminalWithCommand(command)` [`src/aibar/extension/aibar@aibar.panel/extension.js:744`]
       - `_refreshData()`: execute `aibar show --json` subprocess [`src/aibar/extension/aibar@aibar.panel/extension.js:633`]

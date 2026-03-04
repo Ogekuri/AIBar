@@ -36,3 +36,13 @@ def test_copilot_uses_30d_window_bar_with_reset_before_credits() -> None:
     assert "updateWindowBar(card.fiveHourBar, usagePercent, metrics.reset_at || null, true);" in source
     assert "card._barData.sevenDay = null;" in source
     assert "card.sevenDayBar.container.hide();" in source
+
+
+def test_popup_labels_use_aibar_brand_casing() -> None:
+    """
+    @brief Verify popup label strings use AIBar casing.
+    """
+    source = EXTENSION_PATH.read_text(encoding="utf-8")
+    assert "text: 'AIBar'," in source
+    assert "PopupMenu.PopupMenuItem('Open AIBar UI')" in source
+    assert "PopupMenu.PopupMenuItem('Open aibar UI')" not in source

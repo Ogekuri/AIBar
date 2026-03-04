@@ -159,7 +159,7 @@ class AIBarIndicator extends PanelMenu.Button {
         });
 
         let headerLabel = new St.Label({
-            text: 'aibar',
+            text: 'AIBar',
             style_class: 'aibar-header-label',
             y_align: Clutter.ActorAlign.CENTER,
         });
@@ -204,7 +204,7 @@ class AIBarIndicator extends PanelMenu.Button {
         });
         this.menu.addMenuItem(refreshItem);
 
-        let openUiItem = new PopupMenu.PopupMenuItem('Open aibar UI');
+        let openUiItem = new PopupMenu.PopupMenuItem('Open AIBar UI');
         openUiItem.connect('activate', () => {
             this._openTerminalWithCommand(`${_getAiBarPath()} ui`);
         });
