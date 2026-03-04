@@ -77,7 +77,7 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **PRJ-001**: MUST expose CLI subcommands `show`, `doctor`, `ui`, `env`, `setup`, and `login` under one Click command group.
 - **PRJ-002**: MUST aggregate provider metrics through a normalized provider contract for `claude`, `openai`, `openrouter`, `copilot`, and `codex`.
 - **PRJ-003**: MUST provide an interactive Textual UI with an Overview tab and a Raw JSON tab.
-- **PRJ-004**: MUST provide a GNOME Shell panel extension named `IABar Monitor` that executes `aibar show --json`, renders provider-specific cards, and sets metadata owner identifiers (`url`, `github`) to `Ogekuri`.
+- **PRJ-004**: MUST provide a GNOME Shell panel extension named `IABar Monitor` that executes `aibar show --json`, renders provider-specific cards, sets metadata owner identifiers (`url`, `github`) to `Ogekuri`, and forces `dev.sh start` nested-shell resolution to `1024x800` via `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800`.
 - **PRJ-005**: MUST maintain a machine-readable symbol inventory for repository code documentation under `docs/REFERENCES.md`.
 
 ### 2.2 Project Constraints
@@ -127,7 +127,7 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 - **TST-001**: MUST verify `show` rejects unsupported window/provider values with non-zero exit and Click `BadParameter` diagnostics, and MUST verify `Remaining credits: <remaining> / <limit>` appears for Claude/Codex/Copilot when both quota values exist.
 - **TST-002**: MUST verify credential precedence by asserting env vars override env-file values and provider stores for at least one provider.
 - **TST-003**: MUST verify cache persistence writes only successful results and redacts sensitive raw keys before disk serialization.
-- **TST-004**: MUST verify GNOME extension error path sets panel text `Err`, caps displayed error string length to 40 characters, renders quota-only card labels with `remaining credits` suffix, renders Copilot `30d` bar/reset placement before remaining-credits text, and renders popup labels `AIBar` and `Open AIBar UI`.
+- **TST-004**: MUST verify GNOME extension error path sets panel text `Err`, caps displayed error string length to 40 characters, renders quota-only card labels with `remaining credits` suffix, renders Copilot `30d` bar/reset placement before remaining-credits text, renders popup labels `AIBar` and `Open AIBar UI`, and verifies `dev.sh start` includes `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800`.
 - **TST-005**: MUST verify Copilot provider always returns `window=30d` regardless of requested window argument.
 - **TST-006**: MUST verify `req --here --references` reproduces `docs/REFERENCES.md` without missing symbol entries for tracked `src/` files.
 
@@ -138,7 +138,7 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | PRJ-001 | `src/aibar/aibar/cli.py` + `main/show/doctor/ui/env/setup/login` + `@main.command()` declarations for all subcommands. |
 | PRJ-002 | `src/aibar/aibar/cli.py` + `get_providers` + returns Claude/OpenAI/OpenRouter/Copilot/Codex provider instances keyed by `ProviderName`. |
 | PRJ-003 | `src/aibar/aibar/ui.py` + `AIBarUI.compose` + defines `TabPane("Overview")` and `TabPane("Raw JSON")`. |
-| PRJ-004 | `src/aibar/extension/aibar@aibar.panel/metadata.json` + `name/url/github` with owner `Ogekuri` and `src/aibar/extension/aibar@aibar.panel/extension.js` + `_refreshData/_updateProviderCard` provider-card rendering behavior. |
+| PRJ-004 | `src/aibar/extension/aibar@aibar.panel/metadata.json` + `name/url/github` with owner `Ogekuri`, `src/aibar/extension/aibar@aibar.panel/extension.js` + `_refreshData/_updateProviderCard` provider-card rendering behavior, and `src/aibar/extension/aibar@aibar.panel/dev.sh` + `start)` command exports `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800`. |
 | PRJ-005 | `docs/REFERENCES.md` + repository-wide symbol sections + machine-readable file/symbol index entries. |
 | CTN-001 | `src/aibar/aibar/config.py` + `Config.get_token` + env var -> env file -> provider-specific stores (`ClaudeCLIAuth`, `CodexCredentialStore`, `CopilotCredentialStore`). |
 | CTN-002 | `src/aibar/aibar/providers/base.py` + `ProviderResult` model + fields `provider/window/metrics/updated_at/raw/error`. |
@@ -175,6 +175,6 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | TST-001 | `src/aibar/aibar/cli.py` + `parse_window/parse_provider/_print_result` provide validation points for invalid inputs and quota-line rendering for Claude/Codex/Copilot. |
 | TST-002 | `src/aibar/aibar/config.py` + `get_token` implements explicit precedence chain requiring regression coverage. |
 | TST-003 | `src/aibar/aibar/cache.py` + `_save_to_disk/_sanitize_raw` define redaction and success-only disk persistence behavior. |
-| TST-004 | `tests/test_extension_quota_label.py` + popup-label assertions (`AIBar`, `Open AIBar UI`) and `src/aibar/extension/aibar@aibar.panel/extension.js` + `_handleError/_populateProviderCard/_buildPopupMenu` for error label/truncation, quota-only suffix, Copilot `30d` ordering, and popup branding text. |
+| TST-004 | `tests/test_extension_quota_label.py` + popup-label assertions (`AIBar`, `Open AIBar UI`), `tests/test_extension_dev_script.py` + `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800` start-command assertion, and `src/aibar/extension/aibar@aibar.panel/extension.js` + `_handleError/_populateProviderCard/_buildPopupMenu` for error label/truncation, quota-only suffix, Copilot `30d` ordering, and popup branding text. |
 | TST-005 | `src/aibar/aibar/providers/copilot.py` + `fetch` hard-codes `effective_window` to `WindowPeriod.DAY_30`. |
 | TST-006 | `docs/REFERENCES.md` + generated symbol coverage for tracked `src/` files validates documentation inventory completeness. |

@@ -13,7 +13,7 @@
   - `parent_process: null`
   - `role: GNOME Shell extension host executing usage monitor panel logic`
   - `entrypoints: AIBarExtension.enable(...) [src/aibar/extension/aibar@aibar.panel/extension.js:770], AIBarExtension.disable(...) [src/aibar/extension/aibar@aibar.panel/extension.js:776]`
-  - `defining_files: src/aibar/extension/aibar@aibar.panel/extension.js, src/aibar/extension/aibar@aibar.panel/metadata.json, src/aibar/extension/aibar@aibar.panel/stylesheet.css`
+  - `defining_files: src/aibar/extension/aibar@aibar.panel/extension.js, src/aibar/extension/aibar@aibar.panel/metadata.json, src/aibar/extension/aibar@aibar.panel/stylesheet.css, src/aibar/extension/aibar@aibar.panel/dev.sh`
   - `thread_model: no explicit threads detected in repository source under src/`
 
 ## Execution Units
@@ -125,6 +125,7 @@
   - Starts with GNOME Shell session; extension methods invoked by GNOME extension manager.
   - On enable: panel indicator initialized, immediate refresh run, periodic refresh timer scheduled.
   - On disable: indicator destroyed and timeout removed.
+  - `dev.sh start`: launches nested GNOME shell with forced `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800` dummy-mode resolution [`src/aibar/extension/aibar@aibar.panel/dev.sh:9`].
   - Source-file documentation updates under `src/aibar/extension/**` do not alter execution units or internal call ordering.
 - `Internal Call-Trace Tree`
   - `AIBarExtension.enable(...)`: construct and register indicator [`src/aibar/extension/aibar@aibar.panel/extension.js:770`]

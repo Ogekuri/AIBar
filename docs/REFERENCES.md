@@ -770,7 +770,7 @@ from aibar.providers.base import (
 
 - var `EXT_UUID="aibar@aibar.panel"` (L6)
 - @brief Development helper commands for aibar GNOME extension.
-- @details Wraps nested-shell start, enable/disable/reload, and log tail commands for local extension workflows.
+- @details Wraps nested-shell start, enable/disable/reload, and log tail commands for local extension workflows with fixed 1024x800 nested-shell resolution.
 ## Symbol Index
 |Symbol|Kind|Vis|Lines|Sig|
 |---|---|---|---|---|
