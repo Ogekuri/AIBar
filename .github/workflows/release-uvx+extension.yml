@@ -1,4 +1,4 @@
-name: Release (uvx)
+name: Release (uvx+extension)
 
 on:
   push:
@@ -58,8 +58,13 @@ jobs:
       - name: Install build dependencies
         run: uv pip install --system -r requirements.txt
 
-      - name: Build distributions
+      - name: Build Python distributions
         run: python -m build
+
+      - name: Build GNOME extension zip
+        run: |
+          cd src/aibar/extension/aibar@aibar.panel
+          zip -r "$GITHUB_WORKSPACE/dist/aibar@aibar.panel.shell-extension.zip" . -x "*.md"
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@v1
