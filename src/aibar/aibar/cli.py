@@ -132,11 +132,13 @@ def _fetch_claude_dual(
     @details Uses ClaudeOAuthProvider.fetch_all_windows to avoid redundant
     HTTP requests. Checks cache before calling API; stores results after;
     falls back to last-known-good on error.
-    When rate-limit cooldown is active and a window has no last-good disk cache,
-    attempts to re-parse the missing window from any sibling window's raw payload
-    (since the Claude API returns all windows in a single response body).
+    When a window has no last-good disk cache (either because cooldown is active
+    or because a live fetch returned HTTP 429), attempts to re-parse the missing
+    window from any sibling window's raw payload (since the Claude API returns all
+    window periods in a single response body).
     This ensures symmetric behavior for both 5h and 7d regardless of which window
-    was historically cached first.
+    was historically cached first, covering both the cooldown pre-check path and
+    the post-fetch 429 path.
     @param provider {ClaudeOAuthProvider} Claude provider instance.
     @param cache {ResultCache} Cache instance for TTL-based result reuse.
     @return {tuple[ProviderResult, ProviderResult]} (5h_result, 7d_result).
@@ -202,7 +204,23 @@ def _fetch_claude_dual(
             if last_good is not None:
                 fetched[w] = last_good
 
+    # For windows still in error after last-good lookup, attempt cross-window
+    # raw re-parse.  The Claude API returns all window periods in a single
+    # payload, so any sibling result's raw field (from fetched or pre-cached)
+    # can serve as a parse source for the missing window.
     all_results = {**cached_results, **fetched}
+    sibling_raw: dict | None = None
+    for w in windows:
+        if w in all_results and not all_results[w].is_error:
+            candidate_raw = all_results[w].raw
+            if candidate_raw and candidate_raw.get("status_code") is None:
+                sibling_raw = candidate_raw
+                break
+
+    for w in windows:
+        if all_results[w].is_error and sibling_raw:
+            all_results[w] = provider._parse_response(sibling_raw, w)
+
     return all_results[WindowPeriod.HOUR_5], all_results[WindowPeriod.DAY_7]
 
 
