@@ -20,7 +20,13 @@ from aibar.providers import (
     CopilotProvider,
     CodexProvider,
 )
-from aibar.providers.base import BaseProvider, ProviderError, ProviderName, ProviderResult, WindowPeriod
+from aibar.providers.base import (
+    BaseProvider,
+    ProviderError,
+    ProviderName,
+    ProviderResult,
+    WindowPeriod,
+)
 
 
 def get_providers() -> dict[ProviderName, BaseProvider]:
@@ -52,7 +58,9 @@ def parse_window(window: str) -> WindowPeriod:
         "30d": WindowPeriod.DAY_30,
     }
     if window not in mapping:
-        raise click.BadParameter(f"Invalid window. Choose from: {', '.join(mapping.keys())}")
+        raise click.BadParameter(
+            f"Invalid window. Choose from: {', '.join(mapping.keys())}"
+        )
     return mapping[window]
 
 
@@ -101,7 +109,9 @@ def _fetch_result(
     except ProviderError as exc:
         result = provider._make_error_result(window=window, error=str(exc))
     except Exception as exc:
-        result = provider._make_error_result(window=window, error=f"Unexpected error: {exc}")
+        result = provider._make_error_result(
+            window=window, error=f"Unexpected error: {exc}"
+        )
 
     if cache is not None:
         cache.set(result)
@@ -122,9 +132,15 @@ def _fetch_claude_dual(
     @details Uses ClaudeOAuthProvider.fetch_all_windows to avoid redundant
     HTTP requests. Checks cache before calling API; stores results after;
     falls back to last-known-good on error.
+    When rate-limit cooldown is active and a window has no last-good disk cache,
+    attempts to re-parse the missing window from any sibling window's raw payload
+    (since the Claude API returns all windows in a single response body).
+    This ensures symmetric behavior for both 5h and 7d regardless of which window
+    was historically cached first.
     @param provider {ClaudeOAuthProvider} Claude provider instance.
     @param cache {ResultCache} Cache instance for TTL-based result reuse.
     @return {tuple[ProviderResult, ProviderResult]} (5h_result, 7d_result).
+    @satisfies REQ-002, CTN-004
     """
     windows = [WindowPeriod.HOUR_5, WindowPeriod.DAY_7]
     cached_results = {}
@@ -140,14 +156,30 @@ def _fetch_claude_dual(
         return cached_results[WindowPeriod.HOUR_5], cached_results[WindowPeriod.DAY_7]
 
     if cache.is_rate_limited(provider.name):
+        # Collect last-good results for all missing windows.
         for w in missing_windows:
             last_good = cache.get_last_good(provider.name, w)
             if last_good is not None:
                 cached_results[w] = last_good
-            else:
-                cached_results[w] = provider._make_error_result(
-                    window=w, error="Rate limited. Try again later.",
-                )
+
+        # For windows still missing a last-good, attempt cross-window raw re-parse.
+        # The Claude API response contains all window periods in a single payload,
+        # so any sibling last-good result's raw field can serve as a parse source.
+        sibling_raw: dict | None = None
+        for w in windows:
+            if w in cached_results and not cached_results[w].is_error:
+                sibling_raw = cached_results[w].raw
+                break
+
+        for w in missing_windows:
+            if w not in cached_results:
+                if sibling_raw:
+                    cached_results[w] = provider._parse_response(sibling_raw, w)
+                else:
+                    cached_results[w] = provider._make_error_result(
+                        window=w,
+                        error="Rate limited. Try again later.",
+                    )
         return cached_results[WindowPeriod.HOUR_5], cached_results[WindowPeriod.DAY_7]
 
     try:
@@ -227,7 +259,9 @@ def show(provider: str, window: str, output_json: bool) -> None:
     # Filter to specific provider if requested
     if provider_filter:
         if provider_filter not in providers:
-            click.echo(f"Provider {provider_filter.value} not implemented yet.", err=True)
+            click.echo(
+                f"Provider {provider_filter.value} not implemented yet.", err=True
+            )
             sys.exit(1)
         providers = {provider_filter: providers[provider_filter]}
 
@@ -375,7 +409,9 @@ def doctor() -> None:
 
         # Check configuration
         if info["configured"]:
-            click.echo(f"  Config:     {click.style('OK', fg='green')} ({info['token_preview']})")
+            click.echo(
+                f"  Config:     {click.style('OK', fg='green')} ({info['token_preview']})"
+            )
         else:
             click.echo(f"  Config:     {click.style('MISSING', fg='red')}")
             click.echo(f"              Set: {info['env_var']}")
@@ -450,7 +486,9 @@ def setup() -> None:
     # OpenRouter API key
     click.echo(click.style("OpenRouter", bold=True))
     click.echo("  Get your API key from: https://openrouter.ai/keys")
-    openrouter_key = click.prompt("  OPENROUTER_API_KEY", default="", show_default=False).strip()
+    openrouter_key = click.prompt(
+        "  OPENROUTER_API_KEY", default="", show_default=False
+    ).strip()
     if openrouter_key:
         updates["OPENROUTER_API_KEY"] = openrouter_key
         click.echo("  -> Set")
@@ -461,8 +499,12 @@ def setup() -> None:
     # OpenAI Admin key
     click.echo(click.style("OpenAI", bold=True))
     click.echo("  Requires organization admin API key.")
-    click.echo("  Get it from: https://platform.openai.com/settings/organization/admin-keys")
-    openai_key = click.prompt("  OPENAI_ADMIN_KEY", default="", show_default=False).strip()
+    click.echo(
+        "  Get it from: https://platform.openai.com/settings/organization/admin-keys"
+    )
+    openai_key = click.prompt(
+        "  OPENAI_ADMIN_KEY", default="", show_default=False
+    ).strip()
     if openai_key:
         updates["OPENAI_ADMIN_KEY"] = openai_key
         click.echo("  -> Set")
@@ -474,7 +516,9 @@ def setup() -> None:
     click.echo(click.style("GitHub Copilot", bold=True))
     click.echo("  Optional: provide a GitHub token, or use device flow login later.")
     click.echo("  Recommended: run 'aibar login --provider copilot' instead.")
-    github_token = click.prompt("  GITHUB_TOKEN", default="", show_default=False).strip()
+    github_token = click.prompt(
+        "  GITHUB_TOKEN", default="", show_default=False
+    ).strip()
     if github_token:
         updates["GITHUB_TOKEN"] = github_token
         click.echo("  -> Set")
