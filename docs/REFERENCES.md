@@ -296,7 +296,7 @@ from aibar.providers.copilot import CopilotProvider
 
 ### fn `def _fetch_claude_dual(` `priv` (L126-129)
 - @brief Fetch Claude 5h and 7d results via a single API call.
-- @details Uses ClaudeOAuthProvider.fetch_all_windows to avoid redundant HTTP requests. Checks cache before calling API; stores results after; falls back to last-known-good on error. When rate-limit cooldown is active and a window has no last-good disk cache, attempts to re-parse the missing window from any sibling window's raw payload (since the Claude API returns all windows in a single response body). This ensures symmetric behavior for both 5h and 7d regardless of which window was historically cached first.
+- @details Uses ClaudeOAuthProvider.fetch_all_windows to avoid redundant HTTP requests. Checks cache before calling API; stores results after; falls back to last-known-good on error. When a window has no last-good disk cache (either because cooldown is active or because a live fetch returned HTTP 429), attempts to re-parse the missing window from any sibling window's raw payload (since the Claude API returns all window periods in a single response body). This ensures symmetric behavior for both 5h and 7d regardless of which window was historically cached first, covering both the cooldown pre-check path and the post-fetch 429 path.
 - @param provider {ClaudeOAuthProvider} Claude provider instance.
 - @param cache {ResultCache} Cache instance for TTL-based result reuse.
 - @return {tuple[ProviderResult, ProviderResult]} (5h_result, 7d_result).
