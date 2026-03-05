@@ -1535,7 +1535,7 @@ from aibar.config import config
 
 ---
 
-# ui.py | Python | 637L | 27 symbols | 12 imports | 40 comments
+# ui.py | Python | 703L | 32 symbols | 12 imports | 45 comments
 > Path: `src/aibar/aibar/ui.py`
 - @brief Textual terminal UI for usage metrics.
 - @details Implements provider cards, refresh controls, window switching, and raw JSON visualization over normalized provider results.
@@ -1574,112 +1574,142 @@ from aibar.providers.base import (
   - @return {None} Function return value.
   - @return {ComposeResult} Function return value.
 
-### fn `def watch_result(self, result: ProviderResult | None) -> None` (L162-251)
+### fn `def watch_result(self, result: ProviderResult | None) -> None` (L162-254)
 - @brief Execute watch result.
 - @details Applies watch result logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param result {ProviderResult | None} Input parameter `result`.
 - @return {None} Function return value.
 
-### fn `def watch_is_loading(self, loading: bool) -> None` (L252-264)
+### fn `def watch_is_loading(self, loading: bool) -> None` (L255-267)
 - @brief Execute watch is loading.
 - @details Applies watch is loading logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param loading {bool} Input parameter `loading`.
 - @return {None} Function return value.
 
-### fn `def _format_age(self, seconds: float) -> str` `priv` (L265-278)
+### fn `def _is_rate_limit_quota_error(self, result: ProviderResult) -> bool` `priv` (L268-282)
+- @brief Check whether result is a rate-limit payload that still carries quota metrics.
+- @details Detects the normalized Claude/Codex/Copilot rate-limit message with available `limit` and `remaining` values so card rendering can continue without showing the textual error banner.
+- @param result {ProviderResult} Provider result candidate.
+- @return {bool} True when result error is rate-limit with quota metrics.
+
+### fn `def _is_displayed_full_percent(self, percent: float | None) -> bool` `priv` (L283-294)
+- @brief Check whether usage renders as `100.0%` in one-decimal output.
+- @details Applies display-rounding semantics used by Textual labels so near-full values (for example `99.96`) are treated as full usage.
+- @param percent {float | None} Candidate usage percentage.
+- @return {bool} True when rendered one-decimal value is `100.0%`.
+
+### fn `def _supports_limit_reached_hint(self, result: ProviderResult) -> bool` `priv` (L295-308)
+- @brief Validate whether provider/window pair supports `Limit reached!` hint.
+- @details Limits warning rendering scope to Claude/Codex `5h` or `7d` cards and Copilot `30d` cards.
+- @param result {ProviderResult} Provider result candidate.
+- @return {bool} True when provider/window pair is eligible.
+
+### fn `def _should_show_limit_reached_hint(self, result: ProviderResult) -> bool` `priv` (L309-319)
+- @brief Determine whether reset text must include `⚠️ Limit reached!`.
+- @details Evaluates provider/window scope and displayed usage rounding.
+- @param result {ProviderResult} Provider result candidate.
+- @return {bool} True when reset label must include limit-reached hint.
+
+### fn `def _format_reset_value(self, reset_str: str, result: ProviderResult) -> str` `priv` (L320-330)
+- @brief Compose reset label value with optional limit-reached suffix.
+- @param reset_str {str} Countdown text from `_format_duration`.
+- @param result {ProviderResult} Provider result candidate.
+- @return {str} Reset value with optional `⚠️ Limit reached!` suffix.
+
+### fn `def _format_age(self, seconds: float) -> str` `priv` (L331-344)
 - @brief Execute format age.
 - @details Applies format age logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param seconds {float} Input parameter `seconds`.
 - @return {str} Function return value.
 
-### fn `def _format_duration(self, seconds: float) -> str` `priv` (L279-298)
+### fn `def _format_duration(self, seconds: float) -> str` `priv` (L345-364)
 - @brief Execute format duration.
 - @details Applies format duration logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param seconds {float} Input parameter `seconds`.
 - @return {str} Function return value.
 
-### class `class RawJsonView(Static)` : Static (L299-346)
+### class `class RawJsonView(Static)` : Static (L365-412)
 - @brief Define raw json view component.
 - @details Encapsulates raw json view state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
-- fn `def compose(self) -> ComposeResult` (L321-331)
+- fn `def compose(self) -> ComposeResult` (L387-397)
   - @brief Define raw json view component.
   - @brief Execute compose.
   - @details Encapsulates raw json view state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
   - @details Applies compose logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {ComposeResult} Function return value.
-- fn `def watch_data(self, data: dict | None) -> None` (L332-346)
+- fn `def watch_data(self, data: dict | None) -> None` (L398-412)
   - @brief Execute watch data.
   - @details Applies watch data logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param data {dict | None} Input parameter `data`.
   - @return {None} Function return value.
 
-### class `class AIBarUI(App)` : App (L347-546)
+### class `class AIBarUI(App)` : App (L413-612)
 - @brief Define a i bar u i component.
 - @details Encapsulates a i bar u i state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
-- var `BINDINGS = [` (L407)
-- var `TITLE = "Usage Metrics UI"` (L415)
-- fn `def __init__(self) -> None` `priv` (L420-436)
+- var `BINDINGS = [` (L473)
+- var `TITLE = "Usage Metrics UI"` (L481)
+- fn `def __init__(self) -> None` `priv` (L486-502)
   - @brief Execute init.
   - @details Applies init logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {None} Function return value.
-- fn `def compose(self) -> ComposeResult` (L437-464)
+- fn `def compose(self) -> ComposeResult` (L503-530)
   - @brief Execute compose.
   - @details Applies compose logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {ComposeResult} Function return value.
-- fn `async def on_mount(self) -> None` (L465-473)
+- fn `async def on_mount(self) -> None` (L531-539)
   - @brief Execute on mount.
   - @details Applies on mount logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {None} Function return value.
-- fn `async def on_refresh_pressed(self) -> None` (L475-482)
+- fn `async def on_refresh_pressed(self) -> None` (L541-548)
   - @brief Execute on refresh pressed.
   - @details Applies on refresh pressed logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {None} Function return value.
-- fn `async def on_5h_pressed(self) -> None` (L484-491)
+- fn `async def on_5h_pressed(self) -> None` (L550-557)
   - @brief Execute on 5h pressed.
   - @details Applies on 5h pressed logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {None} Function return value.
-- fn `async def on_7d_pressed(self) -> None` (L493-500)
+- fn `async def on_7d_pressed(self) -> None` (L559-566)
   - @brief Execute on 7d pressed.
   - @details Applies on 7d pressed logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {None} Function return value.
-- fn `async def action_refresh(self) -> None` (L501-543)
+- fn `async def action_refresh(self) -> None` (L567-609)
   - @brief Execute action refresh.
   - @details Applies action refresh logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects. Cache hits are used only for non-Claude providers.
   - @return {None} Function return value.
   - @satisfies REQ-009
 
-### fn `async def action_window_5h(self) -> None` (L544-554)
+### fn `async def action_window_5h(self) -> None` (L610-620)
 - @brief Execute action window 5h.
 - @details Applies action window 5h logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `async def action_window_7d(self) -> None` (L555-565)
+### fn `async def action_window_7d(self) -> None` (L621-631)
 - @brief Execute action window 7d.
 - @details Applies action window 7d logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `async def action_toggle_json(self) -> None` (L566-578)
+### fn `async def action_toggle_json(self) -> None` (L632-644)
 - @brief Execute action toggle json.
 - @details Applies action toggle json logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _get_card(self, provider: ProviderName) -> ProviderCard | None` `priv` (L579-591)
+### fn `def _get_card(self, provider: ProviderName) -> ProviderCard | None` `priv` (L645-657)
 - @brief Execute get card.
 - @details Applies get card logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param provider {ProviderName} Input parameter `provider`.
 - @return {ProviderCard | None} Function return value.
 
-### fn `def _update_window_buttons(self) -> None` `priv` (L592-611)
+### fn `def _update_window_buttons(self) -> None` `priv` (L658-677)
 - @brief Execute update window buttons.
 - @details Applies update window buttons logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _update_json_view(self) -> None` `priv` (L612-625)
+### fn `def _update_json_view(self) -> None` `priv` (L678-691)
 - @brief Execute update json view.
 - @details Applies update json view logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def run_ui() -> None` (L626-635)
+### fn `def run_ui() -> None` (L692-701)
 - @brief Execute run ui.
 - @details Applies run ui logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
@@ -1690,35 +1720,40 @@ from aibar.providers.base import (
 |`ProviderCard`|class|pub|45-244|class ProviderCard(Static)|
 |`ProviderCard.__init__`|fn|priv|122-125|def __init__(|
 |`ProviderCard.compose`|fn|pub|138-161|def compose(self) -> ComposeResult|
-|`watch_result`|fn|pub|162-251|def watch_result(self, result: ProviderResult | None) -> ...|
-|`watch_is_loading`|fn|pub|252-264|def watch_is_loading(self, loading: bool) -> None|
-|`_format_age`|fn|priv|265-278|def _format_age(self, seconds: float) -> str|
-|`_format_duration`|fn|priv|279-298|def _format_duration(self, seconds: float) -> str|
-|`RawJsonView`|class|pub|299-346|class RawJsonView(Static)|
-|`RawJsonView.compose`|fn|pub|321-331|def compose(self) -> ComposeResult|
-|`RawJsonView.watch_data`|fn|pub|332-346|def watch_data(self, data: dict | None) -> None|
-|`AIBarUI`|class|pub|347-546|class AIBarUI(App)|
-|`AIBarUI.BINDINGS`|var|pub|407||
-|`AIBarUI.TITLE`|var|pub|415||
-|`AIBarUI.__init__`|fn|priv|420-436|def __init__(self) -> None|
-|`AIBarUI.compose`|fn|pub|437-464|def compose(self) -> ComposeResult|
-|`AIBarUI.on_mount`|fn|pub|465-473|async def on_mount(self) -> None|
-|`AIBarUI.on_refresh_pressed`|fn|pub|475-482|async def on_refresh_pressed(self) -> None|
-|`AIBarUI.on_5h_pressed`|fn|pub|484-491|async def on_5h_pressed(self) -> None|
-|`AIBarUI.on_7d_pressed`|fn|pub|493-500|async def on_7d_pressed(self) -> None|
-|`AIBarUI.action_refresh`|fn|pub|501-543|async def action_refresh(self) -> None|
-|`action_window_5h`|fn|pub|544-554|async def action_window_5h(self) -> None|
-|`action_window_7d`|fn|pub|555-565|async def action_window_7d(self) -> None|
-|`action_toggle_json`|fn|pub|566-578|async def action_toggle_json(self) -> None|
-|`_get_card`|fn|priv|579-591|def _get_card(self, provider: ProviderName) -> ProviderCa...|
-|`_update_window_buttons`|fn|priv|592-611|def _update_window_buttons(self) -> None|
-|`_update_json_view`|fn|priv|612-625|def _update_json_view(self) -> None|
-|`run_ui`|fn|pub|626-635|def run_ui() -> None|
+|`watch_result`|fn|pub|162-254|def watch_result(self, result: ProviderResult | None) -> ...|
+|`watch_is_loading`|fn|pub|255-267|def watch_is_loading(self, loading: bool) -> None|
+|`_is_rate_limit_quota_error`|fn|priv|268-282|def _is_rate_limit_quota_error(self, result: ProviderResu...|
+|`_is_displayed_full_percent`|fn|priv|283-294|def _is_displayed_full_percent(self, percent: float | Non...|
+|`_supports_limit_reached_hint`|fn|priv|295-308|def _supports_limit_reached_hint(self, result: ProviderRe...|
+|`_should_show_limit_reached_hint`|fn|priv|309-319|def _should_show_limit_reached_hint(self, result: Provide...|
+|`_format_reset_value`|fn|priv|320-330|def _format_reset_value(self, reset_str: str, result: Pro...|
+|`_format_age`|fn|priv|331-344|def _format_age(self, seconds: float) -> str|
+|`_format_duration`|fn|priv|345-364|def _format_duration(self, seconds: float) -> str|
+|`RawJsonView`|class|pub|365-412|class RawJsonView(Static)|
+|`RawJsonView.compose`|fn|pub|387-397|def compose(self) -> ComposeResult|
+|`RawJsonView.watch_data`|fn|pub|398-412|def watch_data(self, data: dict | None) -> None|
+|`AIBarUI`|class|pub|413-612|class AIBarUI(App)|
+|`AIBarUI.BINDINGS`|var|pub|473||
+|`AIBarUI.TITLE`|var|pub|481||
+|`AIBarUI.__init__`|fn|priv|486-502|def __init__(self) -> None|
+|`AIBarUI.compose`|fn|pub|503-530|def compose(self) -> ComposeResult|
+|`AIBarUI.on_mount`|fn|pub|531-539|async def on_mount(self) -> None|
+|`AIBarUI.on_refresh_pressed`|fn|pub|541-548|async def on_refresh_pressed(self) -> None|
+|`AIBarUI.on_5h_pressed`|fn|pub|550-557|async def on_5h_pressed(self) -> None|
+|`AIBarUI.on_7d_pressed`|fn|pub|559-566|async def on_7d_pressed(self) -> None|
+|`AIBarUI.action_refresh`|fn|pub|567-609|async def action_refresh(self) -> None|
+|`action_window_5h`|fn|pub|610-620|async def action_window_5h(self) -> None|
+|`action_window_7d`|fn|pub|621-631|async def action_window_7d(self) -> None|
+|`action_toggle_json`|fn|pub|632-644|async def action_toggle_json(self) -> None|
+|`_get_card`|fn|priv|645-657|def _get_card(self, provider: ProviderName) -> ProviderCa...|
+|`_update_window_buttons`|fn|priv|658-677|def _update_window_buttons(self) -> None|
+|`_update_json_view`|fn|priv|678-691|def _update_json_view(self) -> None|
+|`run_ui`|fn|pub|692-701|def run_ui() -> None|
 
 
 ---
 
-# extension.js | JavaScript | 1145L | 14 symbols | 8 imports | 26 comments
+# extension.js | JavaScript | 1173L | 17 symbols | 8 imports | 27 comments
 > Path: `src/aibar/extension/aibar@aibar.panel/extension.js`
 - @brief GNOME Shell panel extension for aibar metrics.
 - @details Collects usage JSON from the aibar CLI and renders provider-specific quota/cost cards in the GNOME panel popup.
@@ -1740,41 +1775,49 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 - const `const REFRESH_INTERVAL_SECONDS = 300;` (L16)
 - const `const ENV_FILE_PATH = GLib.get_home_dir() + '/.config/aibar/env';` (L17)
 - const `const RESET_PENDING_MESSAGE = 'Starts when the first message is sent';` (L18)
-### fn `function _getAiBarPath()` (L25-35)
+- const `const RATE_LIMIT_ERROR_MESSAGE = 'Rate limited. Try again later.';` (L19)
+### fn `function _getAiBarPath()` (L26-36)
 - @brief Resolve aibar executable path.
 - @details Prefers PATH discovery and falls back to AIBAR_PATH from the env file.
 - @return s {string} Resolved executable path or fallback command name.
 
-### fn `function _loadEnvFromFile()` (L42-94)
+### fn `function _loadEnvFromFile()` (L43-95)
 - @brief Load key-value environment variables from aibar env file.
 - @details Parses export syntax, quoted values, and inline comments.
 - @return s {Object<string,string>} Parsed environment map.
 
-### fn `function _getProgressClass(pct)` (L101-107)
+### fn `function _getProgressClass(pct)` (L102-108)
 - @brief Map percentage usage to CSS progress severity class.
 - @param {number} pct Usage percentage.
 - @return s {string} CSS class suffix for progress state.
 
-### fn `function _isDisplayedZeroPercent(pct)` (L116-123)
+### fn `function _isDisplayedZeroPercent(pct)` (L117-124)
 - @brief Check whether a percentage renders as `0.0%` in one-decimal UI output.
 - @details Mirrors display rounding semantics so fallback reset text is shown when
 usage is effectively zero from the user's perspective (e.g. internal 0.04 -> 0.0%).
 - @param {number} pct Usage percentage candidate.
 - @return s {boolean} True when value is finite, non-negative, and rounds to 0.0.
 
-### class `class AIBarIndicator extends PanelMenu.Button` : PanelMenu.Button (L127-426)
+### fn `function _isDisplayedFullPercent(pct)` (L133-138)
+- @brief Check whether a percentage renders as `100.0%` in one-decimal UI output.
+- @details Mirrors display rounding semantics so near-full values are treated as
+full usage for limit-reached warning rendering.
+- @param {number} pct Usage percentage candidate.
+- @return s {boolean} True when value is finite and rounds to `100.0`.
+
+### class `class AIBarIndicator extends PanelMenu.Button` : PanelMenu.Button (L142-441)
 - @brief Panel indicator widget that manages popup rendering and refresh lifecycle. */
 - @brief Execute init.
 - @details Applies init logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @return s {any} Function return value.
 
-### fn `const createWindowBar = (labelText) =>` (L470-516)
+### fn `const createWindowBar = (labelText) =>` (L485-531)
 - @brief Execute create provider card.
 - @details Applies create provider card logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @param {any} providerName Input parameter `providerName`.
 - @return s {any} Function return value.
 
-### fn `const updateWindowBar = (bar, pct, resetTime, useDays) =>` (L619-670)
+### fn `const updateWindowBar = (bar, pct, resetTime, useDays) =>` (L640-698)
 - @brief Execute populate provider card.
 - @details Applies populate provider card logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @param {any} card Input parameter `card`.
@@ -1782,16 +1825,18 @@ usage is effectively zero from the user's perspective (e.g. internal 0.04 -> 0.0
 - @param {any} data Input parameter `data`.
 - @return s {any} Function return value.
 
-### fn `const showResetPendingHint = () =>` (L633-636)
+### fn `const setResetLabel = (baseText) =>` (L646-652)
 
-### fn `const toPercent = (value) =>` (L912-917)
+### fn `const showResetPendingHint = () =>` (L663-665)
+
+### fn `const toPercent = (value) =>` (L940-945)
 - @brief Execute update u i.
 - @details Applies update u i logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @return s {any} Function return value.
 
-### fn `const getPanelUsageValues = (providerName, data) =>` (L919-976)
+### fn `const getPanelUsageValues = (providerName, data) =>` (L947-1004)
 
-### class `export default class AIBarExtension` (L1111-1145)
+### class `export default class AIBarExtension` (L1139-1173)
 - @brief GNOME extension lifecycle adapter for AIBarIndicator registration. */
 - @brief Execute constructor.
 - @details Applies constructor logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
@@ -1803,15 +1848,18 @@ usage is effectively zero from the user's perspective (e.g. internal 0.04 -> 0.0
 |`REFRESH_INTERVAL_SECONDS`|const||16||
 |`ENV_FILE_PATH`|const||17||
 |`RESET_PENDING_MESSAGE`|const||18||
-|`_getAiBarPath`|fn||25-35|function _getAiBarPath()|
-|`_loadEnvFromFile`|fn||42-94|function _loadEnvFromFile()|
-|`_getProgressClass`|fn||101-107|function _getProgressClass(pct)|
-|`_isDisplayedZeroPercent`|fn||116-123|function _isDisplayedZeroPercent(pct)|
-|`AIBarIndicator`|class||127-426|class AIBarIndicator extends PanelMenu.Button|
-|`createWindowBar`|fn||470-516|const createWindowBar = (labelText) =>|
-|`updateWindowBar`|fn||619-670|const updateWindowBar = (bar, pct, resetTime, useDays) =>|
-|`showResetPendingHint`|fn||633-636|const showResetPendingHint = () =>|
-|`toPercent`|fn||912-917|const toPercent = (value) =>|
-|`getPanelUsageValues`|fn||919-976|const getPanelUsageValues = (providerName, data) =>|
-|`AIBarExtension`|class||1111-1145|export default class AIBarExtension|
+|`RATE_LIMIT_ERROR_MESSAGE`|const||19||
+|`_getAiBarPath`|fn||26-36|function _getAiBarPath()|
+|`_loadEnvFromFile`|fn||43-95|function _loadEnvFromFile()|
+|`_getProgressClass`|fn||102-108|function _getProgressClass(pct)|
+|`_isDisplayedZeroPercent`|fn||117-124|function _isDisplayedZeroPercent(pct)|
+|`_isDisplayedFullPercent`|fn||133-138|function _isDisplayedFullPercent(pct)|
+|`AIBarIndicator`|class||142-441|class AIBarIndicator extends PanelMenu.Button|
+|`createWindowBar`|fn||485-531|const createWindowBar = (labelText) =>|
+|`updateWindowBar`|fn||640-698|const updateWindowBar = (bar, pct, resetTime, useDays) =>|
+|`setResetLabel`|fn||646-652|const setResetLabel = (baseText) =>|
+|`showResetPendingHint`|fn||663-665|const showResetPendingHint = () =>|
+|`toPercent`|fn||940-945|const toPercent = (value) =>|
+|`getPanelUsageValues`|fn||947-1004|const getPanelUsageValues = (providerName, data) =>|
+|`AIBarExtension`|class||1139-1173|export default class AIBarExtension|
 

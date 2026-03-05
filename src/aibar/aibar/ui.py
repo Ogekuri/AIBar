@@ -176,7 +176,7 @@ class ProviderCard(Static):
         metrics_container = self.query_one("#metrics-container", VerticalGroup)
         metrics_container.remove_children()
 
-        if result.is_error:
+        if result.is_error and not self._is_rate_limit_quota_error(result):
             self.add_class("error")
             status_line.update(f"Error: {result.error}")
             return
@@ -208,10 +208,13 @@ class ProviderCard(Static):
             reset_delta = metrics.reset_at - datetime.now(timezone.utc)
             if reset_delta.total_seconds() > 0:
                 reset_str = self._format_duration(reset_delta.total_seconds())
+                show_limit_reached = self._should_show_limit_reached_hint(result)
+                reset_value = self._format_reset_value(reset_str, result)
+                reset_value_classes = "metric-value warning" if show_limit_reached else "metric-value"
                 metrics_container.mount(
                     Horizontal(
                         Label("Resets in:", classes="metric-label"),
-                        Label(reset_str, classes="metric-value"),
+                        Label(reset_value, classes=reset_value_classes),
                         classes="metric-row",
                     )
                 )
@@ -261,6 +264,69 @@ class ProviderCard(Static):
         status_line = self.query_one("#status-line", Label)
         if loading:
             status_line.update("Loading...")
+
+    def _is_rate_limit_quota_error(self, result: ProviderResult) -> bool:
+        """
+        @brief Check whether result is a rate-limit payload that still carries quota metrics.
+        @details Detects the normalized Claude/Codex/Copilot rate-limit message with
+        available `limit` and `remaining` values so card rendering can continue without
+        showing the textual error banner.
+        @param result {ProviderResult} Provider result candidate.
+        @return {bool} True when result error is rate-limit with quota metrics.
+        """
+        if not result.is_error:
+            return False
+        if result.error != "Rate limited. Try again later.":
+            return False
+        return result.metrics.limit is not None and result.metrics.remaining is not None
+
+    def _is_displayed_full_percent(self, percent: float | None) -> bool:
+        """
+        @brief Check whether usage renders as `100.0%` in one-decimal output.
+        @details Applies display-rounding semantics used by Textual labels so near-full
+        values (for example `99.96`) are treated as full usage.
+        @param percent {float | None} Candidate usage percentage.
+        @return {bool} True when rendered one-decimal value is `100.0%`.
+        """
+        if percent is None:
+            return False
+        return round(percent, 1) >= 100.0
+
+    def _supports_limit_reached_hint(self, result: ProviderResult) -> bool:
+        """
+        @brief Validate whether provider/window pair supports `Limit reached!` hint.
+        @details Limits warning rendering scope to Claude/Codex `5h` or `7d` cards and
+        Copilot `30d` cards.
+        @param result {ProviderResult} Provider result candidate.
+        @return {bool} True when provider/window pair is eligible.
+        """
+        if result.provider == ProviderName.COPILOT:
+            return result.window == WindowPeriod.DAY_30
+        if result.provider in (ProviderName.CLAUDE, ProviderName.CODEX):
+            return result.window in (WindowPeriod.HOUR_5, WindowPeriod.DAY_7)
+        return False
+
+    def _should_show_limit_reached_hint(self, result: ProviderResult) -> bool:
+        """
+        @brief Determine whether reset text must include `⚠️ Limit reached!`.
+        @details Evaluates provider/window scope and displayed usage rounding.
+        @param result {ProviderResult} Provider result candidate.
+        @return {bool} True when reset label must include limit-reached hint.
+        """
+        if not self._supports_limit_reached_hint(result):
+            return False
+        return self._is_displayed_full_percent(result.metrics.usage_percent)
+
+    def _format_reset_value(self, reset_str: str, result: ProviderResult) -> str:
+        """
+        @brief Compose reset label value with optional limit-reached suffix.
+        @param reset_str {str} Countdown text from `_format_duration`.
+        @param result {ProviderResult} Provider result candidate.
+        @return {str} Reset value with optional `⚠️ Limit reached!` suffix.
+        """
+        if self._should_show_limit_reached_hint(result):
+            return f"{reset_str} ⚠️ Limit reached!"
+        return reset_str
 
     def _format_age(self, seconds: float) -> str:
         """

@@ -32,6 +32,28 @@ def test_reset_labels_use_reset_in_prefix_with_colon() -> None:
     assert "Resets in " not in source
 
 
+def test_rate_limit_quota_payloads_do_not_render_error_banner() -> None:
+    """
+    @brief Verify rate-limit quota payloads bypass extension error-card rendering.
+    @satisfies REQ-017
+    """
+    source = EXTENSION_PATH.read_text(encoding="utf-8")
+    assert "const RATE_LIMIT_ERROR_MESSAGE = 'Rate limited. Try again later.';" in source
+    assert "const isRateLimitQuotaError = (" in source
+    assert "const isError = data.error !== null && data.error !== undefined && !isRateLimitQuotaError;" in source
+
+
+def test_limit_reached_suffix_is_appended_to_reset_labels_at_displayed_full_usage() -> None:
+    """
+    @brief Verify reset labels append `⚠️ Limit reached!` for displayed full usage.
+    @satisfies REQ-017
+    """
+    source = EXTENSION_PATH.read_text(encoding="utf-8")
+    assert "function _isDisplayedFullPercent(pct)" in source
+    assert "const shouldShowLimitReached = allowLimitReached && _isDisplayedFullPercent(pct);" in source
+    assert "bar.resetLabel.text = `${baseText} ⚠️ Limit reached!`;" in source
+
+
 def test_copilot_uses_30d_window_bar_with_reset_before_credits() -> None:
     """
     @brief Verify Copilot card uses 30d window bar and reset label in window-bars section.

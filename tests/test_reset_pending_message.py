@@ -67,7 +67,8 @@ def test_extension_source_contains_reset_fallback_for_zero_usage() -> None:
     """
     source = EXTENSION_PATH.read_text(encoding="utf-8")
     assert "const RESET_PENDING_MESSAGE = 'Starts when the first message is sent';" in source
-    assert "bar.resetLabel.text = `Reset in: ${RESET_PENDING_MESSAGE}`;" in source
+    assert "const showResetPendingHint = () => {" in source
+    assert "setResetLabel(`Reset in: ${RESET_PENDING_MESSAGE}`);" in source
     assert "const shouldShowResetPending = _isDisplayedZeroPercent(pct);" in source
     assert "else if (shouldShowResetPending)" in source
 

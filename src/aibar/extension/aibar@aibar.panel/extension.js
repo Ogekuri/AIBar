@@ -16,6 +16,7 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 const REFRESH_INTERVAL_SECONDS = 300;
 const ENV_FILE_PATH = GLib.get_home_dir() + '/.config/aibar/env';
 const RESET_PENDING_MESSAGE = 'Starts when the first message is sent';
+const RATE_LIMIT_ERROR_MESSAGE = 'Rate limited. Try again later.';
 
 /**
  * @brief Resolve aibar executable path.
@@ -120,6 +121,20 @@ function _isDisplayedZeroPercent(pct) {
     if (numeric < 0)
         return false;
     return Math.round(numeric * 10) === 0;
+}
+
+/**
+ * @brief Check whether a percentage renders as `100.0%` in one-decimal UI output.
+ * @details Mirrors display rounding semantics so near-full values are treated as
+ * full usage for limit-reached warning rendering.
+ * @param {number} pct Usage percentage candidate.
+ * @returns {boolean} True when value is finite and rounds to `100.0`.
+ */
+function _isDisplayedFullPercent(pct) {
+    const numeric = Number(pct);
+    if (!Number.isFinite(numeric))
+        return false;
+    return Math.round(numeric * 10) >= 1000;
 }
 
 const AIBarIndicator = GObject.registerClass(
@@ -582,7 +597,13 @@ class AIBarIndicator extends PanelMenu.Button {
      */
     _populateProviderCard(card, providerName, data) {
         const metrics = data.metrics || {};
-        const isError = data.error !== null && data.error !== undefined;
+        const raw = data.raw || {};
+        const isRateLimitQuotaError = (
+            data.error === RATE_LIMIT_ERROR_MESSAGE &&
+            metrics.limit !== null && metrics.limit !== undefined &&
+            metrics.remaining !== null && metrics.remaining !== undefined
+        );
+        const isError = data.error !== null && data.error !== undefined && !isRateLimitQuotaError;
 
         if (isError) {
             card.errorLabel.text = `⚠️ ${data.error}`;
@@ -602,9 +623,8 @@ class AIBarIndicator extends PanelMenu.Button {
             return;
         }
 
+        card.errorLabel.text = '';
         card.errorLabel.hide();
-
-        const raw = data.raw || {};
         const fiveHourUtil = raw.five_hour && raw.five_hour.utilization !== null && raw.five_hour.utilization !== undefined
             ? raw.five_hour.utilization
             : (raw.rate_limit && raw.rate_limit.primary_window && raw.rate_limit.primary_window.used_percent !== null && raw.rate_limit.primary_window.used_percent !== undefined
@@ -615,11 +635,21 @@ class AIBarIndicator extends PanelMenu.Button {
             : (raw.rate_limit && raw.rate_limit.secondary_window && raw.rate_limit.secondary_window.used_percent !== null && raw.rate_limit.secondary_window.used_percent !== undefined
                 ? raw.rate_limit.secondary_window.used_percent
                 : null);
+        const allowLimitReached = providerName === 'claude' || providerName === 'codex' || providerName === 'copilot';
 
         const updateWindowBar = (bar, pct, resetTime, useDays) => {
             bar.pctLabel.text = `${pct.toFixed(1)}%`;
             bar.barFill.style_class = `aibar-progress-fill ${_getProgressClass(pct)}`;
             const shouldShowResetPending = _isDisplayedZeroPercent(pct);
+            const shouldShowLimitReached = allowLimitReached && _isDisplayedFullPercent(pct);
+
+            const setResetLabel = (baseText) => {
+                if (shouldShowLimitReached)
+                    bar.resetLabel.text = `${baseText} ⚠️ Limit reached!`;
+                else
+                    bar.resetLabel.text = baseText;
+                bar.resetLabel.show();
+            };
 
             GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
                 let barBgWidth = bar.barBg.get_width();
@@ -631,8 +661,7 @@ class AIBarIndicator extends PanelMenu.Button {
             });
 
             const showResetPendingHint = () => {
-                bar.resetLabel.text = `Reset in: ${RESET_PENDING_MESSAGE}`;
-                bar.resetLabel.show();
+                setResetLabel(`Reset in: ${RESET_PENDING_MESSAGE}`);
             };
 
             if (resetTime) {
@@ -649,10 +678,9 @@ class AIBarIndicator extends PanelMenu.Button {
                     let hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
                     let mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
                     if (useDays && days > 0)
-                        bar.resetLabel.text = `Reset in: ${days}d ${hours}h ${mins}m`;
+                        setResetLabel(`Reset in: ${days}d ${hours}h ${mins}m`);
                     else
-                        bar.resetLabel.text = `Reset in: ${days * 24 + hours}h ${mins}m`;
-                    bar.resetLabel.show();
+                        setResetLabel(`Reset in: ${days * 24 + hours}h ${mins}m`);
                 } else if (shouldShowResetPending) {
                     showResetPendingHint();
                 } else {
