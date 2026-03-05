@@ -16,7 +16,37 @@
   - `defining_files: src/aibar/extension/aibar@aibar.panel/extension.js`
   - `thread_model: no explicit threads detected`
 
+- `id: PROC:install-ext`
+  - `type: Process`
+  - `parent_process: null`
+  - `role: GNOME extension file installer script`
+  - `entrypoint_symbols: main(...)`
+  - `defining_files: scripts/install-gnome-extension.sh`
+  - `thread_model: no explicit threads detected`
+
 ## Execution Units
+
+### PROC:install-ext
+- `Entrypoints`
+  - `main(...)`: installer entrypoint [`scripts/install-gnome-extension.sh`]
+- `Lifecycle/Trigger`
+  - Starts when user invokes `scripts/install-gnome-extension.sh` from any directory within the git repository.
+  - Validates prerequisites, copies extension files, and exits.
+- `Internal Call-Trace Tree`
+  - `main(...)`: installer orchestrator [`scripts/install-gnome-extension.sh`]
+    - `print_header(...)`: ANSI banner output [`scripts/install-gnome-extension.sh`]
+    - `step(...)`: progress marker output [`scripts/install-gnome-extension.sh`]
+    - `success(...)`: success message output [`scripts/install-gnome-extension.sh`]
+    - `info(...)`: informational message output [`scripts/install-gnome-extension.sh`]
+    - `warn(...)`: warning message output [`scripts/install-gnome-extension.sh`]
+    - `die(...)`: fatal error output and exit [`scripts/install-gnome-extension.sh`]
+      - External boundary: `git rev-parse --show-toplevel` for project root resolution.
+      - External boundary: `cp -a` for file copy with attribute preservation.
+      - External boundary: `mkdir -p` for target directory creation.
+- `External Boundaries`
+  - Git CLI for project root detection.
+  - Local filesystem operations (directory creation, file copy).
+  - ANSI terminal output.
 
 ### PROC:main
 - `Entrypoints`

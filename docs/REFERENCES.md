@@ -3,7 +3,8 @@
 .
 ├── scripts
 │   ├── aibar.sh
-│   └── claude_token_refresh.sh
+│   ├── claude_token_refresh.sh
+│   └── install-gnome-extension.sh
 └── src
     └── aibar
         ├── aibar
@@ -90,6 +91,73 @@ source ${VENVDIR}/bin/activate
 |`stop_daemon`|fn||91|stop_daemon()|
 |`show_status`|fn||112|show_status()|
 |`show_usage`|fn||126|show_usage()|
+
+
+---
+
+# install-gnome-extension.sh | Shell | 144L | 18 symbols | 0 imports | 38 comments
+> Path: `scripts/install-gnome-extension.sh`
+
+## Definitions
+
+- var `readonly C_RESET='\033[0m'` (L14)
+- var `readonly C_BOLD='\033[1m'` (L15)
+- var `readonly C_RED='\033[1;31m'` (L16)
+- var `readonly C_GREEN='\033[1;32m'` (L17)
+- var `readonly C_YELLOW='\033[1;33m'` (L18)
+- var `readonly C_BLUE='\033[1;34m'` (L19)
+- var `readonly C_CYAN='\033[1;36m'` (L20)
+- var `readonly C_DIM='\033[2m'` (L21)
+- fn `print_header() {` (L27)
+- @brief Prints a formatted header banner.
+- @param $1 {string} Header text.
+- fn `info() {` (L37)
+- @brief Prints an informational message.
+- @param $* {string} Message text.
+- fn `success() {` (L43)
+- @brief Prints a success message.
+- @param $* {string} Message text.
+- fn `warn() {` (L49)
+- @brief Prints a warning message.
+- @param $* {string} Message text.
+- fn `die() {` (L56)
+- @brief Prints an error message to stderr and exits with status 1.
+- @param $* {string} Error text.
+- @return Does not return; exits with code 1.
+- fn `step() {` (L65)
+- @brief Prints a step progress marker.
+- @param $1 {string} Step number.
+- @param $2 {string} Step description.
+- var `readonly EXT_UUID="aibar@aibar.panel"` (L70)
+- var `readonly EXT_SRC_REL="src/aibar/extension/${EXT_UUID}"` (L71)
+- var `readonly EXT_TARGET_DIR="${HOME}/.local/share/gnome-shell/extensions/${EXT_UUID}"` (L72)
+- fn `main() {` (L81)
+- @brief Main installation function.
+- @details Executes sequential prerequisite checks (git availability, project root
+resolution, source directory validation, metadata.json presence), creates the
+target directory if absent, and copies all extension files preserving attributes.
+- @return Exit 0 on success; exit 1 on any prerequisite failure.
+## Symbol Index
+|Symbol|Kind|Vis|Lines|Sig|
+|---|---|---|---|---|
+|`C_RESET`|var||14||
+|`C_BOLD`|var||15||
+|`C_RED`|var||16||
+|`C_GREEN`|var||17||
+|`C_YELLOW`|var||18||
+|`C_BLUE`|var||19||
+|`C_CYAN`|var||20||
+|`C_DIM`|var||21||
+|`print_header`|fn||27|print_header()|
+|`info`|fn||37|info()|
+|`success`|fn||43|success()|
+|`warn`|fn||49|warn()|
+|`die`|fn||56|die()|
+|`step`|fn||65|step()|
+|`EXT_UUID`|var||70||
+|`EXT_SRC_REL`|var||71||
+|`EXT_TARGET_DIR`|var||72||
+|`main`|fn||81|main()|
 
 
 ---

@@ -1,8 +1,8 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.3.3"
-date: "2026-03-04"
+version: "0.3.4"
+date: "2026-03-05"
 author: "req-create"
 scope:
   paths:
@@ -10,6 +10,7 @@ scope:
     - "src/**/*.js"
     - "src/**/*.json"
     - "src/**/*.css"
+    - "scripts/**/*.sh"
     - ".github/workflows/**/*"
   excludes:
     - ".*/**"
@@ -31,7 +32,7 @@ This document MUST follow these authoring rules (LLM-first, normative SRS):
 - Requirement IDs MUST remain stable across updates; IDs MUST NOT be reused.
 
 ### 1.2 Project Scope
-AIBar implements a Python CLI/UI usage monitor for Claude, OpenAI, OpenRouter, Copilot, and Codex, plus a GNOME Shell extension that renders the CLI JSON output in the top panel popup UI.
+AIBar implements a Python CLI/UI usage monitor for Claude, OpenAI, OpenRouter, Copilot, and Codex, plus a GNOME Shell extension that renders the CLI JSON output in the top panel popup UI, and shell scripts for extension installation and maintenance.
 
 Used libraries/components evidenced by direct imports:
 - Python: `click`, `textual`, `pydantic`, `httpx` (`src/aibar/aibar/*.py`, `src/aibar/aibar/providers/*.py`)
@@ -49,6 +50,10 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 │   ├── .place-holder
 │   └── REQUIREMENTS.md
 ├── pyproject.toml
+├── scripts/
+│   ├── aibar.sh
+│   ├── claude_token_refresh.sh
+│   └── install-gnome-extension.sh
 ├── src/
 │   └── aibar/
 │       ├── extension/
@@ -83,6 +88,7 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **PRJ-005**: MUST maintain a machine-readable symbol inventory for repository code documentation under `docs/REFERENCES.md`.
 - **PRJ-006**: MUST provide a PEP 621-compliant `pyproject.toml` at repository root enabling installation via `uv pip install` and live execution via `uvx --from git+https://github.com/Ogekuri/AIBar.git aibar <command>`.
 - **PRJ-007**: MUST document in `README.md` a dedicated section covering `uv`-based installation, removal, and `uvx` live execution instructions.
+- **PRJ-008**: MUST provide `scripts/install-gnome-extension.sh` that copies GNOME extension files from `src/aibar/extension/aibar@aibar.panel/` to `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/`.
 
 ### 2.2 Project Constraints
 - **CTN-001**: MUST resolve provider credentials with precedence: environment variable, then `~/.config/aibar/env`, then provider-specific local credential stores.
@@ -128,6 +134,12 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **REQ-022**: MUST style Claude 5h/7d labels with `aibar-tab-label-claude`, Copilot label with `aibar-tab-label-copilot`, and Codex 5h/7d labels with `aibar-tab-label-codex`; MUST render Claude 5h, Copilot, and Codex 5h percentages in bold; MUST omit unavailable percentage metrics.
 - **REQ-023**: MUST declare a `[project.scripts]` entry `aibar = "aibar.cli:main"` in `pyproject.toml` so that `uv pip install` and `uvx` resolve the `aibar` console command.
 - **REQ-024**: MUST provide `src/aibar/aibar/__main__.py` that delegates to `aibar.cli:main` to enable `python -m aibar` execution.
+- **REQ-025**: MUST resolve the git project root via `git rev-parse --show-toplevel` in `scripts/install-gnome-extension.sh` so the script is invocable from any working directory.
+- **REQ-026**: MUST create target directory `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/` if it does not exist before copying extension files.
+- **REQ-027**: MUST validate prerequisites before copying: git availability, project root resolution, non-empty source directory, and presence of `metadata.json` in source.
+- **REQ-028**: MUST produce colored, formatted terminal output using ANSI escape sequences for status, success, error, and informational messages in `scripts/install-gnome-extension.sh`.
+- **REQ-029**: MUST copy all files from `src/aibar/extension/aibar@aibar.panel/` to target directory preserving file attributes via `cp -a`.
+- **REQ-030**: MUST exit with non-zero status and descriptive error message when any prerequisite check fails in `scripts/install-gnome-extension.sh`.
 
 ## 4. Test Requirements
 
@@ -141,6 +153,7 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 - **TST-006**: MUST verify `req --here --references` reproduces `docs/REFERENCES.md` without missing symbol entries and preserves Doxygen field extraction for documented symbols.
 - **TST-007**: MUST verify GNOME panel percentage labels render in Claude 5h, Claude 7d, Copilot, Codex 5h, Codex 7d order between icon and summary label, enforce provider style classes, enforce bold primary percentages (Claude 5h/Copilot/Codex 5h), and omit labels when source metrics are unavailable.
 - **TST-008**: MUST verify `pyproject.toml` declares `[build-system]` with `hatchling`, `[project.scripts]` entry `aibar = "aibar.cli:main"`, runtime `dependencies` list, and `requires-python` constraint.
+- **TST-009**: MUST verify `scripts/install-gnome-extension.sh` is executable, passes `bash -n` syntax check, resolves git root correctly, validates source directory, and produces non-zero exit on missing source.
 
 ## 5. Evidence
 
@@ -198,3 +211,11 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | TST-006 | `docs/REFERENCES.md` + generated symbol coverage for tracked `src/` files validates documentation inventory completeness. |
 | TST-007 | `tests/test_extension_quota_label.py` + panel-segment assertions for five-label order, provider style classes, bold primary percentages, and missing-metric omission behavior. |
 | TST-008 | `tests/test_pyproject_metadata.py` + assertions for `[build-system]` backend, `[project.scripts]` entry, `dependencies` list, and `requires-python` constraint in `pyproject.toml`. |
+| PRJ-008 | `scripts/install-gnome-extension.sh` + copies extension files from `src/aibar/extension/aibar@aibar.panel/` to `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/`. |
+| REQ-025 | `scripts/install-gnome-extension.sh` + `git rev-parse --show-toplevel` for project root resolution. |
+| REQ-026 | `scripts/install-gnome-extension.sh` + `mkdir -p` for target directory creation. |
+| REQ-027 | `scripts/install-gnome-extension.sh` + prerequisite checks for git, project root, source directory, and `metadata.json`. |
+| REQ-028 | `scripts/install-gnome-extension.sh` + ANSI color escape sequences for formatted output. |
+| REQ-029 | `scripts/install-gnome-extension.sh` + `cp -a` preserving file attributes. |
+| REQ-030 | `scripts/install-gnome-extension.sh` + `exit 1` on prerequisite failure with error message. |
+| TST-009 | `tests/test_install_gnome_extension.py` + executable check, syntax check, git root resolution, source validation, and missing-source exit code assertions. |
