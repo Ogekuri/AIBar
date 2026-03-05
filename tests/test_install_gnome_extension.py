@@ -81,6 +81,15 @@ class TestInstallGnomeExtensionAtomic:
         source = SCRIPT_PATH.read_text(encoding="utf-8")
         assert "cp -a" in source
 
+    def test_script_contains_gnome_extensions_enable(self) -> None:
+        """
+        @brief Verify script invokes gnome-extensions enable for the extension UUID.
+        @satisfies REQ-032
+        """
+        source = SCRIPT_PATH.read_text(encoding="utf-8")
+        assert "gnome-extensions enable" in source
+        assert "aibar@aibar.panel" in source
+
     def test_script_contains_ansi_colors(self) -> None:
         """
         @brief Verify script defines ANSI escape sequences for colored output.

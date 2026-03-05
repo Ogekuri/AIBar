@@ -1,7 +1,7 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.3.5"
+version: "0.3.6"
 date: "2026-03-05"
 author: "req-create"
 scope:
@@ -90,7 +90,7 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **PRJ-005**: MUST maintain a machine-readable symbol inventory for repository code documentation under `docs/REFERENCES.md`.
 - **PRJ-006**: MUST provide a PEP 621-compliant `pyproject.toml` at repository root enabling installation via `uv pip install` and live execution via `uvx --from git+https://github.com/Ogekuri/AIBar.git aibar <command>`.
 - **PRJ-007**: MUST document in `README.md` a dedicated section covering `uv`-based installation, removal, and `uvx` live execution instructions.
-- **PRJ-008**: MUST provide `scripts/install-gnome-extension.sh` that copies GNOME extension files from `src/aibar/extension/aibar@aibar.panel/` to `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/`.
+- **PRJ-008**: MUST provide `scripts/install-gnome-extension.sh` that copies GNOME extension files from `src/aibar/extension/aibar@aibar.panel/` to `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/` and enables the extension via `gnome-extensions enable`.
 
 ### 2.2 Project Constraints
 - **CTN-001**: MUST resolve provider credentials with precedence: environment variable, then `~/.config/aibar/env`, then provider-specific local credential stores.
@@ -142,7 +142,9 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **REQ-028**: MUST produce colored, formatted terminal output using ANSI escape sequences for status, success, error, and informational messages in `scripts/install-gnome-extension.sh`.
 - **REQ-029**: MUST copy all files from `src/aibar/extension/aibar@aibar.panel/` to target directory preserving file attributes via `cp -a`.
 - **REQ-030**: MUST exit with non-zero status and descriptive error message when any prerequisite check fails in `scripts/install-gnome-extension.sh`.
-- **REQ-031**: MUST invoke `scripts/install-gnome-extension.sh` before executing `start`, `enable`, or `reload` commands in `scripts/test-gnome-extension.sh` to update extension files.
+- **REQ-031**: MUST invoke `scripts/install-gnome-extension.sh` before executing `start` command in `scripts/test-gnome-extension.sh` to update extension files.
+- **REQ-032**: MUST enable the extension via `gnome-extensions enable aibar@aibar.panel` after successful file copy in `scripts/install-gnome-extension.sh` with colored status output.
+- **REQ-033**: `scripts/test-gnome-extension.sh` MUST expose only the `start` subcommand; `enable`, `disable`, `reload`, and `logs` subcommands MUST NOT be present in the script.
 
 ## 4. Test Requirements
 
@@ -214,12 +216,14 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | TST-006 | `docs/REFERENCES.md` + generated symbol coverage for tracked `src/` files validates documentation inventory completeness. |
 | TST-007 | `tests/test_extension_quota_label.py` + panel-segment assertions for five-label order, provider style classes, bold primary percentages, and missing-metric omission behavior. |
 | TST-008 | `tests/test_pyproject_metadata.py` + assertions for `[build-system]` backend, `[project.scripts]` entry, `dependencies` list, and `requires-python` constraint in `pyproject.toml`. |
-| PRJ-008 | `scripts/install-gnome-extension.sh` + copies extension files from `src/aibar/extension/aibar@aibar.panel/` to `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/`. |
+| PRJ-008 | `scripts/install-gnome-extension.sh` + copies extension files from `src/aibar/extension/aibar@aibar.panel/` to `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/` + enables extension via `gnome-extensions enable`. |
 | REQ-025 | `scripts/install-gnome-extension.sh` + `git rev-parse --show-toplevel` for project root resolution. |
 | REQ-026 | `scripts/install-gnome-extension.sh` + `mkdir -p` for target directory creation. |
 | REQ-027 | `scripts/install-gnome-extension.sh` + prerequisite checks for git, project root, source directory, and `metadata.json`. |
 | REQ-028 | `scripts/install-gnome-extension.sh` + ANSI color escape sequences for formatted output. |
 | REQ-029 | `scripts/install-gnome-extension.sh` + `cp -a` preserving file attributes. |
 | REQ-030 | `scripts/install-gnome-extension.sh` + `exit 1` on prerequisite failure with error message. |
-| REQ-031 | `scripts/test-gnome-extension.sh` + calls `install-gnome-extension.sh` before `start`, `enable`, and `reload` commands. |
+| REQ-031 | `scripts/test-gnome-extension.sh` + calls `install-gnome-extension.sh` before `start` command. |
+| REQ-032 | `scripts/install-gnome-extension.sh` + `gnome-extensions enable aibar@aibar.panel` after file copy with colored status output. |
+| REQ-033 | `scripts/test-gnome-extension.sh` + only `start` subcommand present; `enable`, `disable`, `reload`, `logs` absent. |
 | TST-009 | `tests/test_install_gnome_extension.py` + executable check, syntax check, git root resolution, source validation, and missing-source exit code assertions. |

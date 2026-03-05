@@ -27,7 +27,7 @@
 - `id: PROC:test-ext`
   - `type: Process`
   - `parent_process: null`
-  - `role: GNOME extension development helper (start/enable/disable/reload/logs)`
+  - `role: GNOME extension nested-shell test launcher (start only)`
   - `entrypoint_symbols: case dispatch`
   - `defining_files: scripts/test-gnome-extension.sh`
   - `thread_model: no explicit threads detected`
@@ -39,7 +39,7 @@
   - `main(...)`: installer entrypoint [`scripts/install-gnome-extension.sh`]
 - `Lifecycle/Trigger`
   - Starts when user invokes `scripts/install-gnome-extension.sh` from any directory within the git repository.
-  - Validates prerequisites, copies extension files, and exits.
+  - Validates prerequisites, copies extension files, enables the extension, and exits.
 - `Internal Call-Trace Tree`
   - `main(...)`: installer orchestrator [`scripts/install-gnome-extension.sh`]
     - `print_header(...)`: ANSI banner output [`scripts/install-gnome-extension.sh`]
@@ -51,31 +51,27 @@
       - External boundary: `git rev-parse --show-toplevel` for project root resolution.
       - External boundary: `cp -a` for file copy with attribute preservation.
       - External boundary: `mkdir -p` for target directory creation.
+      - External boundary: `gnome-extensions enable` for extension activation.
 - `External Boundaries`
   - Git CLI for project root detection.
   - Local filesystem operations (directory creation, file copy).
+  - `gnome-extensions` CLI for extension enable.
   - ANSI terminal output.
 
 ### PROC:test-ext
 - `Entrypoints`
   - case dispatch: command router [`scripts/test-gnome-extension.sh`]
 - `Lifecycle/Trigger`
-  - Starts when user invokes `scripts/test-gnome-extension.sh {start|enable|disable|reload|logs}`.
-  - For `start`, `enable`, and `reload` commands, invokes `PROC:install-ext` to update extension files before executing the command.
+  - Starts when user invokes `scripts/test-gnome-extension.sh start`.
+  - Invokes `PROC:install-ext` to update and enable extension files before launching nested shell.
 - `Internal Call-Trace Tree`
   - case dispatch: command router [`scripts/test-gnome-extension.sh`]
-    - `update_extension(...)`: invokes `scripts/install-gnome-extension.sh` to update extension files [`scripts/test-gnome-extension.sh`]
+    - `update_extension(...)`: invokes `scripts/install-gnome-extension.sh` to update and enable extension files [`scripts/test-gnome-extension.sh`]
       - External boundary: subprocess call to `scripts/install-gnome-extension.sh`.
     - `start)`: launches nested GNOME Shell with `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800` [`scripts/test-gnome-extension.sh`]
       - External boundary: `dbus-run-session -- gnome-shell --nested --wayland`.
-    - `enable)`: enables extension via `gnome-extensions enable` [`scripts/test-gnome-extension.sh`]
-    - `disable)`: disables extension via `gnome-extensions disable` [`scripts/test-gnome-extension.sh`]
-    - `reload)`: disables then re-enables extension [`scripts/test-gnome-extension.sh`]
-    - `logs)`: tails GNOME Shell journal filtered by aibar [`scripts/test-gnome-extension.sh`]
 - `External Boundaries`
-  - `gnome-extensions` CLI for extension enable/disable.
   - `dbus-run-session` and `gnome-shell` for nested shell.
-  - `journalctl` for log tailing.
 
 ### PROC:main
 - `Entrypoints`

@@ -95,7 +95,7 @@ source ${VENVDIR}/bin/activate
 
 ---
 
-# install-gnome-extension.sh | Shell | 144L | 18 symbols | 0 imports | 38 comments
+# install-gnome-extension.sh | Shell | 160L | 18 symbols | 0 imports | 43 comments
 > Path: `scripts/install-gnome-extension.sh`
 
 ## Definitions
@@ -162,7 +162,7 @@ target directory if absent, and copies all extension files preserving attributes
 
 ---
 
-# test-gnome-extension.sh | Shell | 62L | 4 symbols | 0 imports | 16 comments
+# test-gnome-extension.sh | Shell | 43L | 4 symbols | 0 imports | 16 comments
 > Path: `scripts/test-gnome-extension.sh`
 
 ## Definitions

@@ -6,7 +6,7 @@
 # files preserving attributes to `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/`.
 # Validates prerequisites (git, project root, source directory, metadata.json) and exits
 # non-zero with descriptive error on failure. Produces colored ANSI terminal output.
-# @satisfies PRJ-008, REQ-025, REQ-026, REQ-027, REQ-028, REQ-029, REQ-030
+# @satisfies PRJ-008, REQ-025, REQ-026, REQ-027, REQ-028, REQ-029, REQ-030, REQ-032
 
 set -euo pipefail
 
@@ -82,14 +82,14 @@ main() {
     print_header
 
     # Step 1: Check git availability
-    step "1/5" "Checking git availability..."
+    step "1/6" "Checking git availability..."
     if ! command -v git >/dev/null 2>&1; then
         die "git is not installed or not in PATH."
     fi
     success "git found: $(git --version)"
 
     # Step 2: Resolve project root
-    step "2/5" "Resolving project root..."
+    step "2/6" "Resolving project root..."
     local project_root
     if ! project_root="$(git rev-parse --show-toplevel 2>/dev/null)"; then
         die "Not inside a git repository. Run this script from within the AIBar project."
@@ -97,7 +97,7 @@ main() {
     success "Project root: ${C_DIM}${project_root}${C_RESET}"
 
     # Step 3: Validate source directory
-    step "3/5" "Validating extension source..."
+    step "3/6" "Validating extension source..."
     local src_dir="${project_root}/${EXT_SRC_REL}"
     if [[ ! -d "${src_dir}" ]]; then
         die "Source directory not found: ${src_dir}"
@@ -113,7 +113,7 @@ main() {
     success "Source valid: ${C_DIM}${src_dir}${C_RESET} (${file_count} files)"
 
     # Step 4: Create target directory
-    step "4/5" "Preparing target directory..."
+    step "4/6" "Preparing target directory..."
     if [[ -d "${EXT_TARGET_DIR}" ]]; then
         info "Target directory already exists: ${C_DIM}${EXT_TARGET_DIR}${C_RESET}"
     else
@@ -122,9 +122,25 @@ main() {
     fi
 
     # Step 5: Copy files
-    step "5/5" "Installing extension files..."
+    step "5/6" "Installing extension files..."
     cp -a "${src_dir}/"* "${EXT_TARGET_DIR}/"
     success "Copied ${file_count} files to target"
+
+    # Step 6: Enable extension
+    ## @brief Enables the GNOME extension via gnome-extensions CLI.
+    ## @details Invokes `gnome-extensions enable` for the extension UUID.
+    ## Gracefully warns if gnome-extensions is unavailable or enable fails.
+    ## @satisfies REQ-032
+    step "6/6" "Enabling extension..."
+    if command -v gnome-extensions >/dev/null 2>&1; then
+        if gnome-extensions enable "${EXT_UUID}" 2>/dev/null; then
+            success "Extension enabled: ${C_BOLD}${EXT_UUID}${C_RESET}"
+        else
+            warn "Could not enable extension (GNOME Shell may not be running)"
+        fi
+    else
+        warn "gnome-extensions CLI not found; enable manually after GNOME Shell restart"
+    fi
 
     # Summary
     echo ""

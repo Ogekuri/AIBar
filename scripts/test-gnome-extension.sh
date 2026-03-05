@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # @file test-gnome-extension.sh
-# @brief Development helper commands for aibar GNOME extension.
-# @details Wraps nested-shell start, enable/disable/reload, and log tail commands
-# for local extension workflows with fixed 1024x800 nested-shell resolution.
-# Commands `start`, `enable`, and `reload` invoke `install-gnome-extension.sh`
-# before execution to ensure extension files are up-to-date.
-# @satisfies PRJ-004, REQ-031
+# @brief Launches a nested GNOME Shell session for extension testing.
+# @details Invokes `install-gnome-extension.sh` to update extension files,
+# then starts a nested GNOME Shell at 1024x800 resolution via
+# `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800 dbus-run-session -- gnome-shell --nested --wayland`.
+# Accepts only the `start` subcommand.
+# @satisfies PRJ-004, REQ-031, REQ-033
 
 set -euo pipefail
 
@@ -36,27 +36,8 @@ case "${1:-}" in
         echo "Starting nested GNOME Shell at 1024x800..."
         env MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800 dbus-run-session -- gnome-shell --nested --wayland
         ;;
-    enable)
-        update_extension
-        gnome-extensions enable "$EXT_UUID"
-        echo "Extension enabled"
-        ;;
-    disable)
-        gnome-extensions disable "$EXT_UUID"
-        echo "Extension disabled"
-        ;;
-    reload)
-        update_extension
-        gnome-extensions disable "$EXT_UUID"
-        sleep 1
-        gnome-extensions enable "$EXT_UUID"
-        echo "Extension reloaded"
-        ;;
-    logs)
-        journalctl -f -o cat /usr/bin/gnome-shell | grep -i "aibar"
-        ;;
     *)
-        echo "Usage: $0 {start|enable|disable|reload|logs}"
+        echo "Usage: $0 {start}"
         exit 1
         ;;
 esac

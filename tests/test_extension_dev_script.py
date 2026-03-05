@@ -1,9 +1,10 @@
 """
 @file
-@brief GNOME extension dev launcher regressions.
-@details Ensures nested-shell start flow forces the fixed 1024x800 dummy mode
-and verifies install-gnome-extension.sh invocation before start/enable/reload.
-@satisfies TST-004, REQ-031
+@brief GNOME extension test launcher regressions.
+@details Ensures nested-shell start flow forces the fixed 1024x800 dummy mode,
+verifies install-gnome-extension.sh invocation before start, and validates
+that only the start subcommand is present per REQ-033.
+@satisfies TST-004, REQ-031, REQ-033
 """
 
 from pathlib import Path
@@ -31,33 +32,9 @@ def test_start_invokes_install_before_execution() -> None:
     """
     source = DEV_SCRIPT_PATH.read_text(encoding="utf-8")
     start_idx = source.index("start)")
-    mutter_idx = source.index("MUTTER_DEBUG_DUMMY_MODE_SPECS")
+    mutter_idx = source.index("MUTTER_DEBUG_DUMMY_MODE_SPECS", start_idx)
     update_idx = source.index("update_extension", start_idx)
     assert update_idx < mutter_idx, "update_extension must be called before nested shell launch"
-
-
-def test_enable_invokes_install_before_execution() -> None:
-    """
-    @brief Verify enable command calls update_extension before gnome-extensions enable.
-    @satisfies REQ-031
-    """
-    source = DEV_SCRIPT_PATH.read_text(encoding="utf-8")
-    enable_idx = source.index("enable)")
-    gnome_enable_idx = source.index("gnome-extensions enable", enable_idx)
-    update_idx = source.index("update_extension", enable_idx)
-    assert update_idx < gnome_enable_idx, "update_extension must be called before gnome-extensions enable"
-
-
-def test_reload_invokes_install_before_execution() -> None:
-    """
-    @brief Verify reload command calls update_extension before gnome-extensions disable/enable cycle.
-    @satisfies REQ-031
-    """
-    source = DEV_SCRIPT_PATH.read_text(encoding="utf-8")
-    reload_idx = source.index("reload)")
-    gnome_disable_idx = source.index("gnome-extensions disable", reload_idx)
-    update_idx = source.index("update_extension", reload_idx)
-    assert update_idx < gnome_disable_idx, "update_extension must be called before reload cycle"
 
 
 def test_update_extension_calls_install_script() -> None:
@@ -67,3 +44,27 @@ def test_update_extension_calls_install_script() -> None:
     """
     source = DEV_SCRIPT_PATH.read_text(encoding="utf-8")
     assert "install-gnome-extension.sh" in source
+
+
+def test_script_exposes_only_start_subcommand() -> None:
+    """
+    @brief Verify test script exposes only the start subcommand.
+    @details Ensures enable, disable, reload, and logs subcommands are not present
+    in the case dispatch of the script.
+    @satisfies REQ-033
+    """
+    source = DEV_SCRIPT_PATH.read_text(encoding="utf-8")
+    assert "start)" in source
+    assert "enable)" not in source
+    assert "disable)" not in source
+    assert "reload)" not in source
+    assert "logs)" not in source
+
+
+def test_usage_message_shows_only_start() -> None:
+    """
+    @brief Verify usage message advertises only the start subcommand.
+    @satisfies REQ-033
+    """
+    source = DEV_SCRIPT_PATH.read_text(encoding="utf-8")
+    assert "{start}" in source
