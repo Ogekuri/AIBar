@@ -614,7 +614,7 @@ from pydantic import BaseModel, Field
 
 ---
 
-# claude_oauth.py | Python | 280L | 13 symbols | 6 imports | 16 comments
+# claude_oauth.py | Python | 304L | 13 symbols | 6 imports | 16 comments
 > Path: `src/aibar/aibar/providers/claude_oauth.py`
 - @brief Claude OAuth usage provider.
 - @details Fetches Claude subscription utilization through OAuth credentials and normalizes provider quota state into the shared result contract.
@@ -631,85 +631,83 @@ from aibar.providers.base import (
 
 ## Definitions
 
-### class `class ClaudeOAuthProvider(BaseProvider)` : BaseProvider (L25-59)
+### class `class ClaudeOAuthProvider(BaseProvider)` : BaseProvider (L26-304)
 - @brief Define claude o auth provider component.
 - @details Encapsulates claude o auth provider state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
-- var `USAGE_URL = "https://api.anthropic.com/api/oauth/usage"` (L32)
+- var `USAGE_URL = "https://api.anthropic.com/api/oauth/usage"` (L33)
   - @brief Define claude o auth provider component.
   - @details Encapsulates claude o auth provider state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
-- var `TOKEN_ENV_VAR = "CLAUDE_CODE_OAUTH_TOKEN"` (L33)
-- fn `def __init__(self, token: str | None = None) -> None` `priv` (L35-43)
+- var `TOKEN_ENV_VAR = "CLAUDE_CODE_OAUTH_TOKEN"` (L34)
+- var `MAX_RETRIES = 3` (L69)
+- var `RETRY_BACKOFF_BASE = 2.0` (L70)
+- fn `def __init__(self, token: str | None = None) -> None` `priv` (L36-46)
   - @brief Execute init.
   - @details Applies init logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param token {str | None} Input parameter `token`.
   - @return {None} Function return value.
-- fn `def is_configured(self) -> bool` (L44-51)
+- fn `def is_configured(self) -> bool` (L47-54)
   - @brief Execute is configured.
   - @details Applies is configured logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {bool} Function return value.
-- fn `def get_config_help(self) -> str` (L52-59)
+- fn `def get_config_help(self) -> str` (L55-72)
   - @brief Execute get config help.
   - @details Applies get config help logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {str} Function return value.
 
-- var `MAX_RETRIES = 2` (L66)
-- var `RETRY_BACKOFF_BASE = 1.0` (L67)
-### fn `async def _request_usage(` `priv` (L69-70)
-
-### fn `async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult` (L95-134)
+### fn `async def _request_usage(self, client: httpx.AsyncClient) -> httpx.Response` `priv` (L73-99)
 - @brief Execute HTTP GET to usage endpoint with retry on HTTP 429.
-- @brief Execute fetch for a single window period.
-- @details Retries up to MAX_RETRIES times on 429 responses, respecting
-the retry-after header with exponential backoff fallback.
-- @details Makes one HTTP request to the usage endpoint (with retry on 429) and parses the response for the requested window.
+- @details Retries up to MAX_RETRIES times on 429 responses, respecting the retry-after header with exponential backoff fallback.
 - @param client {httpx.AsyncClient} Reusable HTTP client session.
-- @param window {WindowPeriod} Window period to parse from the API response.
 - @return {httpx.Response} Final HTTP response after retries exhausted or success.
+
+### fn `async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult` (L100-139)
+- @brief Execute fetch for a single window period.
+- @details Makes one HTTP request to the usage endpoint (with retry on 429) and parses the response for the requested window.
+- @param window {WindowPeriod} Window period to parse from the API response.
 - @return {ProviderResult} Parsed result for the requested window.
 - @throws {AuthenticationError} When the OAuth token is invalid or expired.
 - @throws {ProviderError} On unexpected non-HTTP errors.
 
-### fn `async def fetch_all_windows(` (L135-136)
-
-### fn `def _handle_response(` `priv` (L189-190)
+### fn `async def fetch_all_windows(self, windows: list[WindowPeriod]) -> dict[WindowPeriod, ProviderResult]` (L140-193)
 - @brief Execute a single API call and parse results for multiple windows.
-- @details The usage endpoint returns data for all windows in one response.
-This method avoids redundant HTTP requests when multiple windows are needed.
+- @details The usage endpoint returns data for all windows in one response. This method avoids redundant HTTP requests when multiple windows are needed.
 - @param windows {list[WindowPeriod]} Window periods to parse from one API response.
 - @return {dict[WindowPeriod, ProviderResult]} Map of window to parsed result.
 - @throws {AuthenticationError} When the OAuth token is invalid or expired.
 - @throws {ProviderError} On unexpected non-HTTP errors.
 
-### fn `def _parse_response(self, data: dict, window: WindowPeriod) -> ProviderResult` `priv` (L234-280)
+### fn `def _handle_response(self, response: httpx.Response, window: WindowPeriod) -> ProviderResult | None` `priv` (L194-238)
 - @brief Map HTTP error status codes to ProviderResult error payloads.
-- @brief Execute parse response.
-- @details Returns None on HTTP 200 (success), otherwise returns an error
-ProviderResult for the given window. Raises AuthenticationError on 401.
-- @details Applies parse response logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+- @details Returns None on HTTP 200 (success), otherwise returns an error ProviderResult for the given window. Raises AuthenticationError on 401.
 - @param response {httpx.Response} HTTP response to evaluate.
 - @param window {WindowPeriod} Window period for error result construction.
-- @param data {dict} Input parameter `data`.
-- @param window {WindowPeriod} Input parameter `window`.
 - @return {ProviderResult | None} Error result or None if response is 200.
-- @return {ProviderResult} Function return value.
 - @throws {AuthenticationError} When HTTP status is 401.
+
+### fn `def _parse_response(self, data: dict, window: WindowPeriod) -> ProviderResult` `priv` (L239-304)
+- @brief Normalize a raw Claude API payload dict into a ProviderResult for the given window.
+- @details Selects `five_hour` or `seven_day` sub-dict from `data` based on `window` (fallback to `seven_day` if the specific key is absent or empty). Derives `remaining` from `utilization` field and `reset_at` from `resets_at` field. `reset_at` is set to None when the parsed datetime is already in the past relative to the current UTC clock, preventing stale cached timestamps from propagating to the display layer and causing asymmetric suppression of the 'Resets in:' output between the 5h and 7d windows.
+- @param data {dict} Raw JSON payload from Claude usage API or stale disk cache. Expected keys: `five_hour` and/or `seven_day`, each containing optional `utilization` (float, 0-100) and `resets_at` (ISO 8601 string).
+- @param window {WindowPeriod} Target window period for result construction. `WindowPeriod.DAY_7` selects `seven_day`; all others select `five_hour`.
+- @return {ProviderResult} Normalized result with `metrics.remaining` set to `100 - utilization`, `metrics.reset_at` set to the parsed future datetime or None, and `raw` set to the full unmodified `data` payload.
+- @satisfies REQ-002
 
 ## Symbol Index
 |Symbol|Kind|Vis|Lines|Sig|
 |---|---|---|---|---|
-|`ClaudeOAuthProvider`|class|pub|25-59|class ClaudeOAuthProvider(BaseProvider)|
-|`ClaudeOAuthProvider.USAGE_URL`|var|pub|32||
-|`ClaudeOAuthProvider.TOKEN_ENV_VAR`|var|pub|33||
-|`ClaudeOAuthProvider.__init__`|fn|priv|35-43|def __init__(self, token: str | None = None) -> None|
-|`ClaudeOAuthProvider.is_configured`|fn|pub|44-51|def is_configured(self) -> bool|
-|`ClaudeOAuthProvider.get_config_help`|fn|pub|52-59|def get_config_help(self) -> str|
-|`MAX_RETRIES`|var|pub|66||
-|`RETRY_BACKOFF_BASE`|var|pub|67||
-|`_request_usage`|fn|priv|69-70|async def _request_usage(|
-|`fetch`|fn|pub|95-134|async def fetch(self, window: WindowPeriod = WindowPeriod...|
-|`fetch_all_windows`|fn|pub|135-136|async def fetch_all_windows(|
-|`_handle_response`|fn|priv|189-190|def _handle_response(|
-|`_parse_response`|fn|priv|234-280|def _parse_response(self, data: dict, window: WindowPerio...|
+|`ClaudeOAuthProvider`|class|pub|26-304|class ClaudeOAuthProvider(BaseProvider)|
+|`ClaudeOAuthProvider.USAGE_URL`|var|pub|33||
+|`ClaudeOAuthProvider.TOKEN_ENV_VAR`|var|pub|34||
+|`ClaudeOAuthProvider.MAX_RETRIES`|var|pub|69||
+|`ClaudeOAuthProvider.RETRY_BACKOFF_BASE`|var|pub|70||
+|`ClaudeOAuthProvider.__init__`|fn|priv|36-46|def __init__(self, token: str | None = None) -> None|
+|`ClaudeOAuthProvider.is_configured`|fn|pub|47-54|def is_configured(self) -> bool|
+|`ClaudeOAuthProvider.get_config_help`|fn|pub|55-72|def get_config_help(self) -> str|
+|`ClaudeOAuthProvider._request_usage`|fn|priv|73-99|async def _request_usage(self, client: httpx.AsyncClient...|
+|`ClaudeOAuthProvider.fetch`|fn|pub|100-139|async def fetch(self, window: WindowPeriod = WindowPerio...|
+|`ClaudeOAuthProvider.fetch_all_windows`|fn|pub|140-193|async def fetch_all_windows(self, windows: list[WindowPe...|
+|`ClaudeOAuthProvider._handle_response`|fn|priv|194-238|def _handle_response(self, response: httpx.Response, win...|
+|`ClaudeOAuthProvider._parse_response`|fn|priv|239-304|def _parse_response(self, data: dict, window: WindowPeri...|
 
 
 ---

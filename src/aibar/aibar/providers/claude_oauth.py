@@ -40,7 +40,9 @@ class ClaudeOAuthProvider(BaseProvider):
         @param token {str | None} Input parameter `token`.
         @return {None} Function return value.
         """
-        self._token = token or os.environ.get(self.TOKEN_ENV_VAR) or extract_claude_cli_token()
+        self._token = (
+            token or os.environ.get(self.TOKEN_ENV_VAR) or extract_claude_cli_token()
+        )
 
     def is_configured(self) -> bool:
         """
@@ -68,9 +70,7 @@ Note: Token must start with 'sk-ant-' prefix."""
     RETRY_BACKOFF_BASE = 2.0
     RETRY_JITTER_MAX = 1.0
 
-    async def _request_usage(
-        self, client: httpx.AsyncClient
-    ) -> httpx.Response:
+    async def _request_usage(self, client: httpx.AsyncClient) -> httpx.Response:
         """
         @brief Execute HTTP GET to usage endpoint with retry on HTTP 429.
         @details Retries up to MAX_RETRIES times on 429 responses, respecting
@@ -92,7 +92,7 @@ Note: Token must start with 'sk-ant-' prefix."""
                 return response
             retry_after = float(response.headers.get("retry-after", "0"))
             jitter = random.uniform(0, self.RETRY_JITTER_MAX)
-            delay = max(retry_after, self.RETRY_BACKOFF_BASE * (2 ** attempt)) + jitter
+            delay = max(retry_after, self.RETRY_BACKOFF_BASE * (2**attempt)) + jitter
             await asyncio.sleep(delay)
             response = await client.get(self.USAGE_URL, headers=headers)
         return response
@@ -238,12 +238,26 @@ Note: Token must start with 'sk-ant-' prefix."""
 
     def _parse_response(self, data: dict, window: WindowPeriod) -> ProviderResult:
         """
-        @brief Execute parse response.
-        @details Applies parse response logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
-        @param data {dict} Input parameter `data`.
-        @param window {WindowPeriod} Input parameter `window`.
-        @return {ProviderResult} Function return value.
+        @brief Normalize a raw Claude API payload dict into a ProviderResult for the given window.
+        @details Selects `five_hour` or `seven_day` sub-dict from `data` based on `window`
+        (fallback to `seven_day` if the specific key is absent or empty). Derives
+        `remaining` from `utilization` field and `reset_at` from `resets_at` field.
+        `reset_at` is set to None when the parsed datetime is already in the past relative
+        to the current UTC clock, preventing stale cached timestamps from propagating to
+        the display layer and causing asymmetric suppression of the 'Resets in:' output
+        between the 5h and 7d windows (REQ-002 symmetry requirement).
+        @param data {dict} Raw JSON payload from Claude usage API or stale disk cache.
+            Expected keys: `five_hour` and/or `seven_day`, each containing optional
+            `utilization` (float, 0-100) and `resets_at` (ISO 8601 string).
+        @param window {WindowPeriod} Target window period for result construction.
+            `WindowPeriod.DAY_7` selects `seven_day`; all others select `five_hour`.
+        @return {ProviderResult} Normalized result with `metrics.remaining` set to
+            `100 - utilization`, `metrics.reset_at` set to the parsed future datetime or
+            None, and `raw` set to the full unmodified `data` payload.
+        @satisfies REQ-002
         """
+        from datetime import timezone
+
         # Select the appropriate window based on the requested period
         window_key = "seven_day" if window == WindowPeriod.DAY_7 else "five_hour"
         window_data = data.get(window_key, {})
@@ -252,11 +266,16 @@ Note: Token must start with 'sk-ant-' prefix."""
             # Fallback to seven_day if specific window not available
             window_data = data.get("seven_day", {})
 
-        # Parse reset time if available
+        # Parse reset time if available; discard past timestamps to prevent
+        # stale cache data from causing asymmetric 'Resets in:' display suppression.
         reset_at = None
         if resets_at := window_data.get("resets_at"):
             try:
-                reset_at = datetime.fromisoformat(resets_at.replace("Z", "+00:00"))
+                parsed = datetime.fromisoformat(resets_at.replace("Z", "+00:00"))
+                if parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=timezone.utc)
+                if parsed > datetime.now(timezone.utc):
+                    reset_at = parsed
             except (ValueError, AttributeError):
                 pass
 
