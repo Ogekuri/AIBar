@@ -452,7 +452,7 @@ from typing import Any
 
 ---
 
-# cli.py | Python | 738L | 21 symbols | 16 imports | 40 comments
+# cli.py | Python | 826L | 24 symbols | 16 imports | 43 comments
 > Path: `src/aibar/aibar/cli.py`
 - @brief Command-line interface for aibar.
 - @details Defines command parsing, provider dispatch, formatted output, setup helpers, login flows, and UI launch hooks.
@@ -527,12 +527,32 @@ Claude provider requests always execute a fresh API fetch and skip cache state.
 - @return {ProviderResult} Cached, fresh, or last-good fallback result.
 - @satisfies CTN-004
 
-### fn `def main() -> None` `@click.version_option()` (L239-247)
+### fn `def _is_claude_rate_limited_result(result: ProviderResult) -> bool` `priv` (L260-275)
+- @brief Fetch Claude 5h and 7d results via a single API call.
+- @brief Check whether a ProviderResult represents Claude HTTP 429.
+- @details Executes ClaudeOAuthProvider.fetch_all_windows for 5h and 7d on each invocation.
+Cache parameter is accepted for call-site compatibility but intentionally unused
+because Claude requests MUST bypass cache reuse.
+If Claude returns HTTP 429 for both windows, normalize to a partial-window state:
+keep the user-facing error only on 5h, while both windows retain deterministic
+usage/reset metrics for CLI rendering continuity.
+- @details Matches normalized Claude error payloads by provider identity, error-state flag, and `raw.status_code == 429`.
+- @param provider {ClaudeOAuthProvider} Claude provider instance.
+- @param cache {ResultCache} Compatibility parameter; ignored for Claude fetch path.
+- @param result {ProviderResult} Result to classify.
+- @return {tuple[ProviderResult, ProviderResult]} (5h_result, 7d_result).
+- @return {bool} True when result is Claude 429.
+- @satisfies REQ-002, REQ-036, CTN-004
+- @satisfies REQ-036
+
+### fn `def _build_claude_rate_limited_partial_result(` `priv` (L276-278)
+
+### fn `def main() -> None` `@click.version_option()` (L306-314)
 - @brief Execute main.
 - @details Applies main logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def show(provider: str, window: str, output_json: bool) -> None` (L267-330)
+### fn `def show(provider: str, window: str, output_json: bool) -> None` (L334-397)
 - @brief Execute show with per-provider TTL cache and single-call dual-window optimization.
 - @details Instantiates a ResultCache for non-Claude providers (CTN-004). Claude dual-window mode uses fetch_all_windows to make one API call instead of two and bypasses cache reuse.
 - @param provider {str} CLI provider selector string.
@@ -540,7 +560,7 @@ Claude provider requests always execute a fresh API fetch and skip cache state.
 - @param output_json {bool} When True, emit JSON output instead of formatted text.
 - @return {None} Function return value.
 
-### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L331-391)
+### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L398-459)
 - @brief Execute print result.
 - @details Applies print result logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param name {ProviderName} Input parameter `name`.
@@ -548,15 +568,24 @@ Claude provider requests always execute a fresh API fetch and skip cache state.
 - @param label {str | None} Input parameter `label`.
 - @return {None} Function return value.
 
-### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L392-407)
+### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L460-475)
 - @brief Execute format reset duration.
 - @details Applies format reset duration logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param seconds {float} Input parameter `seconds`.
 - @return {str} Function return value.
 
-### fn `def _should_print_claude_reset_pending_hint(` `priv` (L408-410)
+### fn `def _should_render_metrics_after_error(` `priv` (L476-478)
 
-### fn `def _is_displayed_zero_percent(percent: float | None) -> bool` `priv` (L430-446)
+### fn `def _should_print_claude_reset_pending_hint(` `priv` (L496-498)
+- @brief Check whether CLI output must render metrics after printing an error line.
+- @details Allows continuation only for Claude HTTP 429 partial-window state so the
+5h section can include `Error:` and still display usage/reset lines.
+- @param provider_name {ProviderName} Provider associated with rendered section.
+- @param result {ProviderResult} Result being rendered.
+- @return {bool} True when metrics should still be rendered after error line.
+- @satisfies REQ-036
+
+### fn `def _is_displayed_zero_percent(percent: float | None) -> bool` `priv` (L518-534)
 - @brief Determine whether CLI output must render the reset-pending fallback hint.
 - @brief Check whether a percentage renders as `0.0%` in one-decimal UI output.
 - @details The hint is only valid for Claude windows when no reset timestamp is
@@ -572,45 +601,45 @@ providers other than Claude.
 - @satisfies REQ-002
 - @satisfies REQ-002
 
-### fn `def _progress_bar(percent: float, width: int = 20) -> str` `priv` (L447-459)
+### fn `def _progress_bar(percent: float, width: int = 20) -> str` `priv` (L535-547)
 - @brief Execute progress bar.
 - @details Applies progress bar logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param percent {float} Input parameter `percent`.
 - @param width {int} Input parameter `width`.
 - @return {str} Function return value.
 
-### fn `def doctor() -> None` `@main.command()` (L461-513)
+### fn `def doctor() -> None` `@main.command()` (L549-601)
 - @brief Execute doctor.
 - @details Applies doctor logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def ui() -> None` `@main.command()` (L515-525)
+### fn `def ui() -> None` `@main.command()` (L603-613)
 - @brief Execute ui.
 - @details Applies ui logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def env() -> None` `@main.command()` (L527-535)
+### fn `def env() -> None` `@main.command()` (L615-623)
 - @brief Execute env.
 - @details Applies env logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def setup() -> None` `@main.command()` (L537-635)
+### fn `def setup() -> None` `@main.command()` (L625-723)
 - @brief Execute setup.
 - @details Applies setup logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def login(provider: str) -> None` (L643-659)
+### fn `def login(provider: str) -> None` (L731-747)
 - @brief Execute login.
 - @details Applies login logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param provider {str} Input parameter `provider`.
 - @return {None} Function return value.
 
-### fn `def _login_claude() -> None` `priv` (L660-708)
+### fn `def _login_claude() -> None` `priv` (L748-796)
 - @brief Execute login claude.
 - @details Applies login claude logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_copilot() -> None` `priv` (L709-736)
+### fn `def _login_copilot() -> None` `priv` (L797-824)
 - @brief Execute login copilot.
 - @details Applies login copilot logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
@@ -625,20 +654,23 @@ providers other than Claude.
 |`parse_provider`|fn|pub|145-161|def parse_provider(provider: str) -> ProviderName | None|
 |`_fetch_result`|fn|priv|162-165|def _fetch_result(|
 |`_fetch_claude_dual`|fn|priv|207-209|def _fetch_claude_dual(|
-|`main`|fn|pub|239-247|def main() -> None|
-|`show`|fn|pub|267-330|def show(provider: str, window: str, output_json: bool) -...|
-|`_print_result`|fn|priv|331-391|def _print_result(name: ProviderName, result, label: str ...|
-|`_format_reset_duration`|fn|priv|392-407|def _format_reset_duration(seconds: float) -> str|
-|`_should_print_claude_reset_pending_hint`|fn|priv|408-410|def _should_print_claude_reset_pending_hint(|
-|`_is_displayed_zero_percent`|fn|priv|430-446|def _is_displayed_zero_percent(percent: float | None) -> ...|
-|`_progress_bar`|fn|priv|447-459|def _progress_bar(percent: float, width: int = 20) -> str|
-|`doctor`|fn|pub|461-513|def doctor() -> None|
-|`ui`|fn|pub|515-525|def ui() -> None|
-|`env`|fn|pub|527-535|def env() -> None|
-|`setup`|fn|pub|537-635|def setup() -> None|
-|`login`|fn|pub|643-659|def login(provider: str) -> None|
-|`_login_claude`|fn|priv|660-708|def _login_claude() -> None|
-|`_login_copilot`|fn|priv|709-736|def _login_copilot() -> None|
+|`_is_claude_rate_limited_result`|fn|priv|260-275|def _is_claude_rate_limited_result(result: ProviderResult...|
+|`_build_claude_rate_limited_partial_result`|fn|priv|276-278|def _build_claude_rate_limited_partial_result(|
+|`main`|fn|pub|306-314|def main() -> None|
+|`show`|fn|pub|334-397|def show(provider: str, window: str, output_json: bool) -...|
+|`_print_result`|fn|priv|398-459|def _print_result(name: ProviderName, result, label: str ...|
+|`_format_reset_duration`|fn|priv|460-475|def _format_reset_duration(seconds: float) -> str|
+|`_should_render_metrics_after_error`|fn|priv|476-478|def _should_render_metrics_after_error(|
+|`_should_print_claude_reset_pending_hint`|fn|priv|496-498|def _should_print_claude_reset_pending_hint(|
+|`_is_displayed_zero_percent`|fn|priv|518-534|def _is_displayed_zero_percent(percent: float | None) -> ...|
+|`_progress_bar`|fn|priv|535-547|def _progress_bar(percent: float, width: int = 20) -> str|
+|`doctor`|fn|pub|549-601|def doctor() -> None|
+|`ui`|fn|pub|603-613|def ui() -> None|
+|`env`|fn|pub|615-623|def env() -> None|
+|`setup`|fn|pub|625-723|def setup() -> None|
+|`login`|fn|pub|731-747|def login(provider: str) -> None|
+|`_login_claude`|fn|priv|748-796|def _login_claude() -> None|
+|`_login_copilot`|fn|priv|797-824|def _login_copilot() -> None|
 
 
 ---

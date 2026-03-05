@@ -213,10 +213,13 @@ def _fetch_claude_dual(
     @details Executes ClaudeOAuthProvider.fetch_all_windows for 5h and 7d on each invocation.
     Cache parameter is accepted for call-site compatibility but intentionally unused
     because Claude requests MUST bypass cache reuse.
+    If Claude returns HTTP 429 for both windows, normalize to a partial-window state:
+    keep the user-facing error only on 5h, while both windows retain deterministic
+    usage/reset metrics for CLI rendering continuity.
     @param provider {ClaudeOAuthProvider} Claude provider instance.
     @param cache {ResultCache} Compatibility parameter; ignored for Claude fetch path.
     @return {tuple[ProviderResult, ProviderResult]} (5h_result, 7d_result).
-    @satisfies REQ-002, CTN-004
+    @satisfies REQ-002, REQ-036, CTN-004
     """
     del cache
     windows = [WindowPeriod.HOUR_5, WindowPeriod.DAY_7]
@@ -231,7 +234,71 @@ def _fetch_claude_dual(
             w: provider._make_error_result(window=w, error=f"Unexpected error: {exc}")
             for w in windows
         }
-    return fetched[WindowPeriod.HOUR_5], fetched[WindowPeriod.DAY_7]
+
+    result_5h = fetched.get(WindowPeriod.HOUR_5) or provider._make_error_result(
+        window=WindowPeriod.HOUR_5, error="Missing 5h result"
+    )
+    result_7d = fetched.get(WindowPeriod.DAY_7) or provider._make_error_result(
+        window=WindowPeriod.DAY_7, error="Missing 7d result"
+    )
+
+    if _is_claude_rate_limited_result(result_5h) and _is_claude_rate_limited_result(
+        result_7d
+    ):
+        return (
+            _build_claude_rate_limited_partial_result(
+                WindowPeriod.HOUR_5, include_error=True
+            ),
+            _build_claude_rate_limited_partial_result(
+                WindowPeriod.DAY_7, include_error=False
+            ),
+        )
+
+    return result_5h, result_7d
+
+
+def _is_claude_rate_limited_result(result: ProviderResult) -> bool:
+    """
+    @brief Check whether a ProviderResult represents Claude HTTP 429.
+    @details Matches normalized Claude error payloads by provider identity,
+    error-state flag, and `raw.status_code == 429`.
+    @param result {ProviderResult} Result to classify.
+    @return {bool} True when result is Claude 429.
+    @satisfies REQ-036
+    """
+    return (
+        result.provider == ProviderName.CLAUDE
+        and result.is_error
+        and result.raw.get("status_code") == 429
+    )
+
+
+def _build_claude_rate_limited_partial_result(
+    window: WindowPeriod,
+    include_error: bool,
+) -> ProviderResult:
+    """
+    @brief Build synthetic Claude 429 result with deterministic 100% usage/reset data.
+    @details Creates partial-window output state used by CLI rendering: remaining=0,
+    limit=100, and reset projected from current UTC time + window duration. The 5h
+    window keeps a visible error line; the 7d window suppresses the error line.
+    @param window {WindowPeriod} Window associated with the synthetic result.
+    @param include_error {bool} True to include `Rate limited...` error text.
+    @return {ProviderResult} Claude result suitable for partial-window display.
+    @satisfies REQ-036
+    """
+    reset_at = datetime.now(timezone.utc) + _WINDOW_PERIOD_TIMEDELTA[window]
+    return ProviderResult(
+        provider=ProviderName.CLAUDE,
+        window=window,
+        metrics=UsageMetrics(
+            remaining=0.0,
+            limit=100.0,
+            reset_at=reset_at,
+        ),
+        raw={"status_code": 429, "rate_limit_partial": True},
+        error="Rate limited. Try again later." if include_error else None,
+    )
 
 
 @click.group()
@@ -345,7 +412,8 @@ def _print_result(name: ProviderName, result, label: str | None = None) -> None:
 
     if result.is_error:
         click.echo(click.style(f"Error: {result.error}", fg="red"))
-        return
+        if not _should_render_metrics_after_error(name, result):
+            return
 
     m = result.metrics
 
@@ -403,6 +471,26 @@ def _format_reset_duration(seconds: float) -> str:
     if days > 0:
         return f"{days}d {hours}h {minutes}m"
     return f"{hours}h {minutes}m"
+
+
+def _should_render_metrics_after_error(
+    provider_name: ProviderName,
+    result: ProviderResult,
+) -> bool:
+    """
+    @brief Check whether CLI output must render metrics after printing an error line.
+    @details Allows continuation only for Claude HTTP 429 partial-window state so the
+    5h section can include `Error:` and still display usage/reset lines.
+    @param provider_name {ProviderName} Provider associated with rendered section.
+    @param result {ProviderResult} Result being rendered.
+    @return {bool} True when metrics should still be rendered after error line.
+    @satisfies REQ-036
+    """
+    if provider_name != ProviderName.CLAUDE:
+        return False
+    if result.raw.get("status_code") != 429:
+        return False
+    return result.metrics.limit is not None and result.metrics.remaining is not None
 
 
 def _should_print_claude_reset_pending_hint(

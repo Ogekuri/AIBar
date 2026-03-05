@@ -113,7 +113,7 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 
 ### 3.2 Functions
 - **REQ-001**: MUST skip unconfigured providers in `show` output and print missing environment-variable hints when text mode is used.
-- **REQ-002**: MUST print both 5-hour and 7-day outputs for Claude and Codex when `show` runs with default window and non-JSON mode, MUST render reset countdown as `Resets in: <d>d <h>h <m>m` for durations >= 24 hours, and MUST print `Remaining credits: <remaining> / <limit>` for Claude, Codex, and Copilot when both values exist.
+- **REQ-002**: MUST print both 5-hour and 7-day outputs for Claude and Codex when `show` runs with default window and non-JSON mode.
 - **REQ-003**: MUST emit pretty-printed JSON (`indent=2`) for fetched providers when `show --json` is requested.
 - **REQ-004**: MUST run provider health checks in `doctor` using the 5-hour window and report per-provider configuration and test status.
 - **REQ-005**: MUST prompt for OpenRouter and OpenAI keys and optional GitHub token in `setup`, then persist provided keys to `~/.config/aibar/env`.
@@ -145,12 +145,15 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **REQ-031**: MUST invoke `scripts/install-gnome-extension.sh` before launching the nested shell in `scripts/test-gnome-extension.sh` to update extension files.
 - **REQ-032**: MUST enable the extension via `gnome-extensions enable aibar@aibar.panel` after successful file copy in `scripts/install-gnome-extension.sh` with colored status output.
 - **REQ-033**: `scripts/test-gnome-extension.sh` MUST NOT accept any subcommand parameter; it MUST execute the nested-shell launch directly on invocation without arguments.
+- **REQ-034**: MUST render reset countdown as `Resets in: <d>d <h>h <m>m` for durations >= 24 hours in CLI text output.
+- **REQ-035**: MUST print `Remaining credits: <remaining> / <limit>` for Claude, Codex, and Copilot when both values exist in CLI text output.
+- **REQ-036**: MUST treat Claude HTTP 429 responses as partial-window state: 5h prints `Error: Rate limited. Try again later.` while 5h and 7d both render `Usage: ... 100.0%` and `Resets in:` lines.
 
 ## 4. Test Requirements
 
 Existing automated unit-test coverage under `tests/` is absent (`tests/.place-holder` only), so no behavioral assertions are currently enforced by repository tests.
 
-- **TST-001**: MUST verify `show` rejects unsupported window/provider values with non-zero exit and Click `BadParameter` diagnostics, and MUST verify `Remaining credits: <remaining> / <limit>` appears for Claude/Codex/Copilot when both quota values exist.
+- **TST-001**: MUST verify `show` rejects unsupported window/provider values with non-zero exit and Click `BadParameter` diagnostics.
 - **TST-002**: MUST verify credential precedence by asserting env vars override env-file values and provider stores for at least one provider.
 - **TST-003**: MUST verify cache persistence writes only successful non-Claude results, redacts sensitive raw keys before disk serialization, and bypasses cache reads/writes for Claude API fetch paths.
 - **TST-004**: MUST verify GNOME extension error path sets panel text `Err`, caps displayed error string length to 40 characters, renders quota-only card labels as `Remaining credits: <remaining>/<limit>` with bold `<remaining>`, renders reset labels with `Reset in:` prefix, renders Copilot `30d` bar/reset placement before remaining-credits text, renders popup labels `AIBar` and `Open AIBar UI`, and verifies `scripts/test-gnome-extension.sh` includes `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800`.
@@ -159,6 +162,8 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 - **TST-007**: MUST verify GNOME panel percentage labels render in Claude 5h, Claude 7d, Copilot, Codex 5h, Codex 7d order between icon and summary label, enforce provider style classes, enforce bold primary percentages (Claude 5h/Copilot/Codex 5h), and omit labels when source metrics are unavailable.
 - **TST-008**: MUST verify `pyproject.toml` declares `[build-system]` with `hatchling`, `[project.scripts]` entry `aibar = "aibar.cli:main"`, runtime `dependencies` list, and `requires-python` constraint.
 - **TST-009**: MUST verify `scripts/install-gnome-extension.sh` is executable, passes `bash -n` syntax check, resolves git root correctly, validates source directory, and produces non-zero exit on missing source.
+- **TST-010**: MUST verify `Remaining credits: <remaining> / <limit>` appears for Claude, Codex, and Copilot when both quota values exist.
+- **TST-011**: MUST verify Claude dual-window text output on HTTP 429 prints rate-limit error only in 5h and still renders `Usage: ... 100.0%` plus `Resets in:` in both 5h and 7d sections.
 
 ## 5. Evidence
 
@@ -185,7 +190,7 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | DES-005 | `src/aibar/extension/extension.js` + `_loadEnvFromFile` + parses `export KEY=VALUE`, handles quotes/comments/semicolon cleanup. |
 | DES-006 | `src/aibar/extension/extension.js` + `REFRESH_INTERVAL_SECONDS/_startAutoRefresh` + timeout 300 seconds; popup menu has `"Refresh Now"` action. |
 | REQ-001 | `src/aibar/aibar/cli.py` + `show` loop + `if not prov.is_configured(): ... continue` and text hint `Set {config.ENV_VARS.get(name)}`. |
-| REQ-002 | `src/aibar/aibar/cli.py` + `show/_print_result/_format_reset_duration` + default-window Claude/Codex dual fetch, reset countdown day token, and remaining-credits line for Claude/Codex/Copilot when `remaining` and `limit` exist. |
+| REQ-002 | `src/aibar/aibar/cli.py` + `show` + default-window Claude/Codex dual fetch output rendering. |
 | REQ-003 | `src/aibar/aibar/cli.py` + `show` + `json.dumps(output, indent=2)` from `result.model_dump(mode="json")`. |
 | REQ-004 | `src/aibar/aibar/cli.py` + `doctor` + configuration status and `_fetch_result(provider, WindowPeriod.HOUR_5)` health check. |
 | REQ-005 | `src/aibar/aibar/cli.py` + `setup` + prompts for keys then `write_env_file(updates)` to `ENV_FILE_PATH`. |
@@ -208,7 +213,10 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | REQ-022 | `src/aibar/extension/aibar@aibar.panel/extension.js` + `_buildPanelButton/_updateUI` + panel labels use provider color classes, primary percentages (Claude 5h/Copilot/Codex 5h) are bold, and labels hide when required metrics are unavailable. |
 | REQ-023 | `pyproject.toml` + `[project.scripts]` + `aibar = "aibar.cli:main"` declaration. |
 | REQ-024 | `src/aibar/aibar/__main__.py` + `main()` import and invocation from `aibar.cli`. |
-| TST-001 | `src/aibar/aibar/cli.py` + `parse_window/parse_provider/_print_result` provide validation points for invalid inputs and quota-line rendering for Claude/Codex/Copilot. |
+| REQ-034 | `src/aibar/aibar/cli.py` + `_format_reset_duration/_print_result` + day-token reset countdown formatting in text output. |
+| REQ-035 | `src/aibar/aibar/cli.py` + `_print_result` + remaining-credits line for Claude/Codex/Copilot when `remaining` and `limit` are present. |
+| REQ-036 | `src/aibar/aibar/cli.py` + `_fetch_claude_dual/_print_result` + Claude HTTP 429 partial-window rendering with 5h error-only marker and dual-window usage/reset output continuity. |
+| TST-001 | `src/aibar/aibar/cli.py` + `parse_window/parse_provider` provide validation points for invalid input diagnostics. |
 | TST-002 | `src/aibar/aibar/config.py` + `get_token` implements explicit precedence chain requiring regression coverage. |
 | TST-003 | `tests/test_claude_retry_and_cli_cache.py`, `tests/test_claude_dual_cooldown_symmetry.py`, `tests/test_ui_claude_cache_bypass.py`, and `src/aibar/aibar/cache.py` + validate non-Claude cache persistence/redaction and Claude cache bypass semantics. |
 | TST-004 | `tests/test_extension_quota_label.py` + popup-label assertions (`AIBar`, `Open AIBar UI`) and quota/reset label assertions, `tests/test_extension_dev_script.py` + `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800` start-command assertion against `scripts/test-gnome-extension.sh`, and `src/aibar/extension/aibar@aibar.panel/extension.js` + `_handleError/_populateProviderCard/_buildPopupMenu` for error label/truncation, quota-label format, reset-prefix format, Copilot `30d` ordering, and popup branding text. |
@@ -216,6 +224,8 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | TST-006 | `docs/REFERENCES.md` + generated symbol coverage for tracked `src/` files validates documentation inventory completeness. |
 | TST-007 | `tests/test_extension_quota_label.py` + panel-segment assertions for five-label order, provider style classes, bold primary percentages, and missing-metric omission behavior. |
 | TST-008 | `tests/test_pyproject_metadata.py` + assertions for `[build-system]` backend, `[project.scripts]` entry, `dependencies` list, and `requires-python` constraint in `pyproject.toml`. |
+| TST-010 | `tests/test_reset_pending_message.py` and `src/aibar/aibar/cli.py` + verify remaining-credits rendering path in text output for quota providers. |
+| TST-011 | `tests/test_claude_rate_limit_partial_window.py` and `src/aibar/aibar/cli.py` + verify Claude HTTP 429 renders error only in 5h while both windows still render usage/reset lines. |
 | PRJ-008 | `scripts/install-gnome-extension.sh` + copies extension files from `src/aibar/extension/aibar@aibar.panel/` to `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/` + enables extension via `gnome-extensions enable`. |
 | REQ-025 | `scripts/install-gnome-extension.sh` + `git rev-parse --show-toplevel` for project root resolution. |
 | REQ-026 | `scripts/install-gnome-extension.sh` + `mkdir -p` for target directory creation. |

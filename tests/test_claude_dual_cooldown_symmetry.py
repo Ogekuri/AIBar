@@ -90,7 +90,7 @@ class TestClaudeDualFetchBypass:
         tmp_path: Path,
     ) -> None:
         """
-        @brief Verify `_fetch_claude_dual` returns live 429 errors even when Claude cache exists.
+        @brief Verify `_fetch_claude_dual` normalizes HTTP 429 to partial-window output.
         """
         from aibar.cli import _fetch_claude_dual
 
@@ -111,6 +111,9 @@ class TestClaudeDualFetchBypass:
             result_5h, result_7d = _fetch_claude_dual(provider, cache)
 
         assert result_5h.is_error
-        assert result_7d.is_error
+        assert not result_7d.is_error
         assert "Rate limited" in result_5h.error
-        assert "Rate limited" in result_7d.error
+        assert result_5h.metrics.usage_percent == 100.0
+        assert result_7d.metrics.usage_percent == 100.0
+        assert result_5h.metrics.reset_at is not None
+        assert result_7d.metrics.reset_at is not None
