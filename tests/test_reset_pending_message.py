@@ -9,7 +9,7 @@ fallback text when timer is not started (`usage_percent == 0` and `reset_at is N
 
 from pathlib import Path
 
-from aibar.cli import _print_result
+from aibar.cli import _print_result, _should_print_claude_reset_pending_hint
 from aibar.providers.base import ProviderName, ProviderResult, UsageMetrics, WindowPeriod
 
 
@@ -68,4 +68,26 @@ def test_extension_source_contains_reset_fallback_for_zero_usage() -> None:
     source = EXTENSION_PATH.read_text(encoding="utf-8")
     assert "const RESET_PENDING_MESSAGE = 'Starts when the first message is sent';" in source
     assert "bar.resetLabel.text = `Reset in: ${RESET_PENDING_MESSAGE}`;" in source
-    assert "else if (pct <= 0)" in source
+    assert "const shouldShowResetPending = _isDisplayedZeroPercent(pct);" in source
+    assert "else if (shouldShowResetPending)" in source
+
+
+def test_cli_reset_pending_hint_triggers_for_display_rounded_zero_usage() -> None:
+    """
+    @brief Verify CLI fallback logic triggers when usage rounds to displayed 0.0%.
+    @details Uses `remaining=99.96` and `limit=100.0` so internal usage is `0.04%`.
+    Even though value is not mathematically zero, the UI renders `0.0%` with one
+    decimal; fallback reset text must therefore be shown to avoid silent omission.
+    @return {None} Function return value.
+    @satisfies REQ-002
+    """
+    metrics = UsageMetrics(
+        remaining=99.96,
+        limit=100.0,
+        reset_at=None,
+        cost=None,
+        requests=None,
+        input_tokens=None,
+        output_tokens=None,
+    )
+    assert _should_print_claude_reset_pending_hint(ProviderName.CLAUDE, metrics)

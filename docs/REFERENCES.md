@@ -350,7 +350,7 @@ from typing import Any
 
 ---
 
-# cli.py | Python | 800L | 20 symbols | 16 imports | 48 comments
+# cli.py | Python | 814L | 21 symbols | 16 imports | 49 comments
 > Path: `src/aibar/aibar/cli.py`
 - @brief Command-line interface for aibar.
 - @details Defines command parsing, provider dispatch, formatted output, setup helpers, login flows, and UI launch hooks.
@@ -453,54 +453,61 @@ result in cache. On error, falls back to last-known-good cached result when avai
 
 ### fn `def _should_print_claude_reset_pending_hint(` `priv` (L484-486)
 
-### fn `def _progress_bar(percent: float, width: int = 20) -> str` `priv` (L509-521)
+### fn `def _is_displayed_zero_percent(percent: float | None) -> bool` `priv` (L506-522)
 - @brief Determine whether CLI output must render the reset-pending fallback hint.
-- @brief Execute progress bar.
+- @brief Check whether a percentage renders as `0.0%` in one-decimal UI output.
 - @details The hint is only valid for Claude windows when no reset timestamp is
 available yet and usage is exactly zero, which indicates the rate-limit timer has
 not started. This preserves the normal countdown path for non-zero usage and for
 providers other than Claude.
-- @details Applies progress bar logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+- @details Uses the same one-decimal rounding semantic as output formatting. This treats small non-zero percentages (e.g. 0.04) as displayed zero, which is required for consistent reset-pending fallback visibility between CLI and GNOME UI.
 - @param provider_name {ProviderName} Provider associated with the rendered result.
 - @param metrics {UsageMetrics} Normalized quota metrics for the rendered result.
-- @param percent {float} Input parameter `percent`.
-- @param width {int} Input parameter `width`.
+- @param percent {float | None} Raw percentage value.
 - @return {bool} True when CLI must print `Resets in: Starts when the first message is sent`.
-- @return {str} Function return value.
+- @return {bool} True when `percent` is finite, non-negative, and rounds to `0.0`.
+- @satisfies REQ-002
 - @satisfies REQ-002
 
-### fn `def doctor() -> None` `@main.command()` (L523-575)
+### fn `def _progress_bar(percent: float, width: int = 20) -> str` `priv` (L523-535)
+- @brief Execute progress bar.
+- @details Applies progress bar logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+- @param percent {float} Input parameter `percent`.
+- @param width {int} Input parameter `width`.
+- @return {str} Function return value.
+
+### fn `def doctor() -> None` `@main.command()` (L537-589)
 - @brief Execute doctor.
 - @details Applies doctor logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def ui() -> None` `@main.command()` (L577-587)
+### fn `def ui() -> None` `@main.command()` (L591-601)
 - @brief Execute ui.
 - @details Applies ui logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def env() -> None` `@main.command()` (L589-597)
+### fn `def env() -> None` `@main.command()` (L603-611)
 - @brief Execute env.
 - @details Applies env logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def setup() -> None` `@main.command()` (L599-697)
+### fn `def setup() -> None` `@main.command()` (L613-711)
 - @brief Execute setup.
 - @details Applies setup logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def login(provider: str) -> None` (L705-721)
+### fn `def login(provider: str) -> None` (L719-735)
 - @brief Execute login.
 - @details Applies login logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param provider {str} Input parameter `provider`.
 - @return {None} Function return value.
 
-### fn `def _login_claude() -> None` `priv` (L722-770)
+### fn `def _login_claude() -> None` `priv` (L736-784)
 - @brief Execute login claude.
 - @details Applies login claude logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_copilot() -> None` `priv` (L771-798)
+### fn `def _login_copilot() -> None` `priv` (L785-812)
 - @brief Execute login copilot.
 - @details Applies login copilot logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
@@ -520,14 +527,15 @@ providers other than Claude.
 |`_print_result`|fn|priv|407-467|def _print_result(name: ProviderName, result, label: str ...|
 |`_format_reset_duration`|fn|priv|468-483|def _format_reset_duration(seconds: float) -> str|
 |`_should_print_claude_reset_pending_hint`|fn|priv|484-486|def _should_print_claude_reset_pending_hint(|
-|`_progress_bar`|fn|priv|509-521|def _progress_bar(percent: float, width: int = 20) -> str|
-|`doctor`|fn|pub|523-575|def doctor() -> None|
-|`ui`|fn|pub|577-587|def ui() -> None|
-|`env`|fn|pub|589-597|def env() -> None|
-|`setup`|fn|pub|599-697|def setup() -> None|
-|`login`|fn|pub|705-721|def login(provider: str) -> None|
-|`_login_claude`|fn|priv|722-770|def _login_claude() -> None|
-|`_login_copilot`|fn|priv|771-798|def _login_copilot() -> None|
+|`_is_displayed_zero_percent`|fn|priv|506-522|def _is_displayed_zero_percent(percent: float | None) -> ...|
+|`_progress_bar`|fn|priv|523-535|def _progress_bar(percent: float, width: int = 20) -> str|
+|`doctor`|fn|pub|537-589|def doctor() -> None|
+|`ui`|fn|pub|591-601|def ui() -> None|
+|`env`|fn|pub|603-611|def env() -> None|
+|`setup`|fn|pub|613-711|def setup() -> None|
+|`login`|fn|pub|719-735|def login(provider: str) -> None|
+|`_login_claude`|fn|priv|736-784|def _login_claude() -> None|
+|`_login_copilot`|fn|priv|785-812|def _login_copilot() -> None|
 
 
 ---
@@ -1523,7 +1531,7 @@ from aibar.providers.base import (
 
 ---
 
-# extension.js | JavaScript | 1082L | 13 symbols | 8 imports | 24 comments
+# extension.js | JavaScript | 1099L | 14 symbols | 8 imports | 25 comments
 > Path: `src/aibar/extension/aibar@aibar.panel/extension.js`
 - @brief GNOME Shell panel extension for aibar metrics.
 - @details Collects usage JSON from the aibar CLI and renders provider-specific quota/cost cards in the GNOME panel popup.
@@ -1560,19 +1568,26 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 - @param {number} pct Usage percentage.
 - @return s {string} CSS class suffix for progress state.
 
-### class `class AIBarIndicator extends PanelMenu.Button` : PanelMenu.Button (L111-410)
+### fn `function _isDisplayedZeroPercent(pct)` (L116-123)
+- @brief Check whether a percentage renders as `0.0%` in one-decimal UI output.
+- @details Mirrors display rounding semantics so fallback reset text is shown when
+usage is effectively zero from the user's perspective (e.g. internal 0.04 -> 0.0%).
+- @param {number} pct Usage percentage candidate.
+- @return s {boolean} True when value is finite, non-negative, and rounds to 0.0.
+
+### class `class AIBarIndicator extends PanelMenu.Button` : PanelMenu.Button (L127-426)
 - @brief Panel indicator widget that manages popup rendering and refresh lifecycle. */
 - @brief Execute init.
 - @details Applies init logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @return s {any} Function return value.
 
-### fn `const createWindowBar = (labelText) =>` (L408-454)
+### fn `const createWindowBar = (labelText) =>` (L424-470)
 - @brief Execute create provider card.
 - @details Applies create provider card logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @param {any} providerName Input parameter `providerName`.
 - @return s {any} Function return value.
 
-### fn `const updateWindowBar = (bar, pct, resetTime, useDays) =>` (L557-607)
+### fn `const updateWindowBar = (bar, pct, resetTime, useDays) =>` (L573-624)
 - @brief Execute populate provider card.
 - @details Applies populate provider card logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @param {any} card Input parameter `card`.
@@ -1580,16 +1595,16 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 - @param {any} data Input parameter `data`.
 - @return s {any} Function return value.
 
-### fn `const showResetPendingHint = () =>` (L570-573)
+### fn `const showResetPendingHint = () =>` (L587-590)
 
-### fn `const toPercent = (value) =>` (L849-854)
+### fn `const toPercent = (value) =>` (L866-871)
 - @brief Execute update u i.
 - @details Applies update u i logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @return s {any} Function return value.
 
-### fn `const getPanelUsageValues = (providerName, data) =>` (L856-913)
+### fn `const getPanelUsageValues = (providerName, data) =>` (L873-930)
 
-### class `export default class AIBarExtension` (L1048-1082)
+### class `export default class AIBarExtension` (L1065-1099)
 - @brief GNOME extension lifecycle adapter for AIBarIndicator registration. */
 - @brief Execute constructor.
 - @details Applies constructor logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
@@ -1604,11 +1619,12 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 |`_getAiBarPath`|fn||25-35|function _getAiBarPath()|
 |`_loadEnvFromFile`|fn||42-94|function _loadEnvFromFile()|
 |`_getProgressClass`|fn||101-107|function _getProgressClass(pct)|
-|`AIBarIndicator`|class||111-410|class AIBarIndicator extends PanelMenu.Button|
-|`createWindowBar`|fn||408-454|const createWindowBar = (labelText) =>|
-|`updateWindowBar`|fn||557-607|const updateWindowBar = (bar, pct, resetTime, useDays) =>|
-|`showResetPendingHint`|fn||570-573|const showResetPendingHint = () =>|
-|`toPercent`|fn||849-854|const toPercent = (value) =>|
-|`getPanelUsageValues`|fn||856-913|const getPanelUsageValues = (providerName, data) =>|
-|`AIBarExtension`|class||1048-1082|export default class AIBarExtension|
+|`_isDisplayedZeroPercent`|fn||116-123|function _isDisplayedZeroPercent(pct)|
+|`AIBarIndicator`|class||127-426|class AIBarIndicator extends PanelMenu.Button|
+|`createWindowBar`|fn||424-470|const createWindowBar = (labelText) =>|
+|`updateWindowBar`|fn||573-624|const updateWindowBar = (bar, pct, resetTime, useDays) =>|
+|`showResetPendingHint`|fn||587-590|const showResetPendingHint = () =>|
+|`toPercent`|fn||866-871|const toPercent = (value) =>|
+|`getPanelUsageValues`|fn||873-930|const getPanelUsageValues = (providerName, data) =>|
+|`AIBarExtension`|class||1065-1099|export default class AIBarExtension|
 

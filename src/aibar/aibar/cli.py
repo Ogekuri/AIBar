@@ -500,10 +500,24 @@ def _should_print_claude_reset_pending_hint(
         return False
     if metrics.reset_at is not None:
         return False
-    usage_percent = metrics.usage_percent
-    if usage_percent is None:
+    return _is_displayed_zero_percent(metrics.usage_percent)
+
+
+def _is_displayed_zero_percent(percent: float | None) -> bool:
+    """
+    @brief Check whether a percentage renders as `0.0%` in one-decimal UI output.
+    @details Uses the same one-decimal rounding semantic as output formatting. This
+    treats small non-zero percentages (e.g. 0.04) as displayed zero, which is required
+    for consistent reset-pending fallback visibility between CLI and GNOME UI.
+    @param percent {float | None} Raw percentage value.
+    @return {bool} True when `percent` is finite, non-negative, and rounds to `0.0`.
+    @satisfies REQ-002
+    """
+    if percent is None or not math.isfinite(percent):
         return False
-    return math.isclose(usage_percent, 0.0, abs_tol=1e-9)
+    if percent < 0:
+        return False
+    return round(percent, 1) == 0.0
 
 
 def _progress_bar(percent: float, width: int = 20) -> str:

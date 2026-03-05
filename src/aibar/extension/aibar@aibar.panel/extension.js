@@ -106,6 +106,22 @@ function _getProgressClass(pct) {
     return 'aibar-progress-danger';
 }
 
+/**
+ * @brief Check whether a percentage renders as `0.0%` in one-decimal UI output.
+ * @details Mirrors display rounding semantics so fallback reset text is shown when
+ * usage is effectively zero from the user's perspective (e.g. internal 0.04 -> 0.0%).
+ * @param {number} pct Usage percentage candidate.
+ * @returns {boolean} True when value is finite, non-negative, and rounds to 0.0.
+ */
+function _isDisplayedZeroPercent(pct) {
+    const numeric = Number(pct);
+    if (!Number.isFinite(numeric))
+        return false;
+    if (numeric < 0)
+        return false;
+    return Math.round(numeric * 10) === 0;
+}
+
 const AIBarIndicator = GObject.registerClass(
 /** @brief Panel indicator widget that manages popup rendering and refresh lifecycle. */
 class AIBarIndicator extends PanelMenu.Button {
@@ -557,6 +573,7 @@ class AIBarIndicator extends PanelMenu.Button {
         const updateWindowBar = (bar, pct, resetTime, useDays) => {
             bar.pctLabel.text = `${pct.toFixed(1)}%`;
             bar.barFill.style_class = `aibar-progress-fill ${_getProgressClass(pct)}`;
+            const shouldShowResetPending = _isDisplayedZeroPercent(pct);
 
             GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
                 let barBgWidth = bar.barBg.get_width();
@@ -590,13 +607,13 @@ class AIBarIndicator extends PanelMenu.Button {
                     else
                         bar.resetLabel.text = `Reset in: ${days * 24 + hours}h ${mins}m`;
                     bar.resetLabel.show();
-                } else if (pct <= 0) {
+                } else if (shouldShowResetPending) {
                     showResetPendingHint();
                 } else {
                     bar.resetLabel.text = '';
                     bar.resetLabel.hide();
                 }
-            } else if (pct <= 0) {
+            } else if (shouldShowResetPending) {
                 showResetPendingHint();
             } else {
                 bar.resetLabel.text = '';
