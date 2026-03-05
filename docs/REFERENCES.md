@@ -1,6 +1,9 @@
 # Files Structure
 ```
 .
+├── scripts
+│   ├── aibar.sh
+│   └── claude_token_refresh.sh
 └── src
     └── aibar
         ├── aibar
@@ -25,6 +28,72 @@
                 └── extension.js
 ```
 
+# aibar.sh | Shell | 49L | 6 symbols | 2 imports | 18 comments
+> Path: `scripts/aibar.sh`
+
+## Imports
+```
+source ${VENVDIR}/bin/activate
+source ${VENVDIR}/bin/activate
+```
+
+## Definitions
+
+- var `FULL_PATH=$(readlink -f "$0")` (L9)
+- var `SCRIPT_PATH=$(dirname "$FULL_PATH")` (L12)
+- var `SCRIPT_NAME=$(basename "$FULL_PATH")` (L15)
+- var `BASE_DIR=$(dirname "$SCRIPT_PATH")` (L18)
+- var `VENVDIR="${BASE_DIR}/.venv"` (L26)
+- var `PYTHONPATH="${BASE_DIR}/src/aibar:${PYTHONPATH}" \` (L48)
+## Symbol Index
+|Symbol|Kind|Vis|Lines|Sig|
+|---|---|---|---|---|
+|`FULL_PATH`|var||9||
+|`SCRIPT_PATH`|var||12||
+|`SCRIPT_NAME`|var||15||
+|`BASE_DIR`|var||18||
+|`VENVDIR`|var||26||
+|`PYTHONPATH`|var||48||
+
+
+---
+
+# claude_token_refresh.sh | Shell | 164L | 12 symbols | 0 imports | 26 comments
+> Path: `scripts/claude_token_refresh.sh`
+
+## Definitions
+
+- var `CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/aibar"` (L20)
+- var `PID_FILE="$CONFIG_DIR/claude_token_refresh.pid"` (L21)
+- var `LOG_FILE="$CONFIG_DIR/claude_token_refresh.log"` (L22)
+- var `INTERVAL="${AIBAR_CLAUDE_REFRESH_INTERVAL_SECONDS:-1800}"` (L23)
+- fn `log() {` (L29)
+- fn `do_refresh() {` (L34)
+- fn `run_loop() {` (L55)
+- fn `is_running() {` (L65)
+- fn `start_daemon() {` (L77)
+- fn `stop_daemon() {` (L91)
+- fn `show_status() {` (L112)
+- fn `show_usage() {` (L126)
+## Symbol Index
+|Symbol|Kind|Vis|Lines|Sig|
+|---|---|---|---|---|
+|`CONFIG_DIR`|var||20||
+|`PID_FILE`|var||21||
+|`LOG_FILE`|var||22||
+|`INTERVAL`|var||23||
+|`log`|fn||29|log()|
+|`do_refresh`|fn||34|do_refresh()|
+|`run_loop`|fn||55|run_loop()|
+|`is_running`|fn||65|is_running()|
+|`start_daemon`|fn||77|start_daemon()|
+|`stop_daemon`|fn||91|stop_daemon()|
+|`show_status`|fn||112|show_status()|
+|`show_usage`|fn||126|show_usage()|
+
+
+---
+
 # __init__.py | Python | 7L | 0 symbols | 0 imports | 1 comments
 > Path: `src/aibar/aibar/__init__.py`
 - @brief Package metadata for aibar.
@@ -47,7 +116,7 @@ from aibar.cli import main
 
 ---
 
-# cache.py | Python | 256L | 18 symbols | 7 imports | 24 comments
+# cache.py | Python | 320L | 23 symbols | 7 imports | 28 comments
 > Path: `src/aibar/aibar/cache.py`
 - @brief Provider result caching primitives.
 - @details Implements in-memory and disk cache entries, TTL invalidation, and raw-payload sanitization for provider metrics.
@@ -82,62 +151,86 @@ from aibar.providers.base import ProviderName, ProviderResult, WindowPeriod
   - @brief Define result cache component.
   - @details Encapsulates result cache state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
 - var `PROVIDER_TTLS =` (L46)
-- fn `def __init__(self, cache_dir: Path | None = None) -> None` `priv` (L53-63)
+- var `RATE_LIMIT_COOLDOWN = 30  # seconds to wait before retrying after HTTP 429` (L52)
+- fn `def __init__(self, cache_dir: Path | None = None) -> None` `priv` (L54-64)
   - @brief Execute init.
   - @details Applies init logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param cache_dir {Path | None} Input parameter `cache_dir`.
   - @return {None} Function return value.
-- fn `def _default_cache_dir(self) -> Path` `priv` (L64-73)
+- fn `def _default_cache_dir(self) -> Path` `priv` (L65-74)
   - @brief Execute default cache dir.
   - @details Applies default cache dir logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {Path} Function return value.
-- fn `def _ensure_cache_dir(self) -> None` `priv` (L74-81)
+- fn `def _ensure_cache_dir(self) -> None` `priv` (L75-82)
   - @brief Execute ensure cache dir.
   - @details Applies ensure cache dir logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {None} Function return value.
-- fn `def _cache_key(self, provider: ProviderName, window: WindowPeriod) -> str` `priv` (L82-91)
+- fn `def _cache_key(self, provider: ProviderName, window: WindowPeriod) -> str` `priv` (L83-92)
   - @brief Execute cache key.
   - @details Applies cache key logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param provider {ProviderName} Input parameter `provider`.
   - @param window {WindowPeriod} Input parameter `window`.
   - @return {str} Function return value.
-- fn `def _disk_path(self, provider: ProviderName, window: WindowPeriod) -> Path` `priv` (L92-101)
+- fn `def _disk_path(self, provider: ProviderName, window: WindowPeriod) -> Path` `priv` (L93-102)
   - @brief Execute disk path.
   - @details Applies disk path logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param provider {ProviderName} Input parameter `provider`.
   - @param window {WindowPeriod} Input parameter `window`.
   - @return {Path} Function return value.
-- fn `def get(self, provider: ProviderName, window: WindowPeriod) -> ProviderResult | None` (L102-120)
+- fn `def get(self, provider: ProviderName, window: WindowPeriod) -> ProviderResult | None` (L103-121)
   - @brief Execute get.
   - @details Applies get logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param provider {ProviderName} Input parameter `provider`.
   - @param window {WindowPeriod} Input parameter `window`.
   - @return {ProviderResult | None} Function return value.
-- fn `def set(self, result: ProviderResult) -> None` (L121-141)
+- fn `def set(self, result: ProviderResult) -> None` (L122-145)
   - @brief Execute set.
   - @details Applies set logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param result {ProviderResult} Input parameter `result`.
   - @return {None} Function return value.
-- fn `def get_last_good(self, provider: ProviderName, window: WindowPeriod) -> ProviderResult | None` (L142-151)
+- fn `def get_last_good(self, provider: ProviderName, window: WindowPeriod) -> ProviderResult | None` (L146-155)
   - @brief Execute get last good.
   - @details Applies get last good logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param provider {ProviderName} Input parameter `provider`.
   - @param window {WindowPeriod} Input parameter `window`.
   - @return {ProviderResult | None} Function return value.
-- fn `def invalidate(` (L152-153)
-- fn `def _save_to_disk(self, result: ProviderResult) -> None` `priv` (L176-194)
+- fn `def invalidate(` (L156-157)
+- fn `def _cooldown_path(self, provider: ProviderName) -> Path` `priv` (L180-188)
   - @brief Execute invalidate.
-  - @brief Execute save to disk.
+  - @brief Resolve disk path for provider rate-limit cooldown marker.
   - @details Applies invalidate logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
-  - @details Applies save to disk logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+  - @details Returns path under cache directory keyed by provider name.
   - @param provider {ProviderName | None} Input parameter `provider`.
   - @param window {WindowPeriod | None} Input parameter `window`.
-  - @param result {ProviderResult} Input parameter `result`.
+  - @param provider {ProviderName} Provider to resolve cooldown path for.
   - @return {None} Function return value.
-  - @return {None} Function return value.
-- fn `def _load_from_disk(` `priv` (L195-199)
+  - @return {Path} Absolute path to cooldown marker file.
+- fn `def set_rate_limited(self, provider: ProviderName) -> None` (L189-204)
+  - @brief Write rate-limit cooldown marker to disk for a provider.
+  - @details Persists current UTC timestamp to cooldown file. Subsequent is_rate_limited calls within RATE_LIMIT_COOLDOWN seconds return True. Silently ignores disk write failures.
+  - @param provider {ProviderName} Provider to mark as rate-limited.
+  - @return {None} No return value.
+- fn `def is_rate_limited(self, provider: ProviderName) -> bool` (L205-226)
+  - @brief Check whether provider is in rate-limit cooldown period.
+  - @details Reads timestamp from cooldown marker file. Returns True if age is less than RATE_LIMIT_COOLDOWN seconds. Expired markers are deleted.
+  - @param provider {ProviderName} Provider to check cooldown for.
+  - @return {bool} True if provider is within cooldown period.
 
-### fn `def _sanitize_raw(self, raw: dict[str, Any]) -> dict[str, Any]` `priv` (L231-256)
+### fn `def clear_rate_limit(self, provider: ProviderName) -> None` (L227-239)
+- @brief Remove rate-limit cooldown marker for a provider.
+- @details Deletes cooldown marker file if present. Called on successful fetch.
+- @param provider {ProviderName} Provider to clear cooldown for.
+- @return {None} No return value.
+
+### fn `def _save_to_disk(self, result: ProviderResult) -> None` `priv` (L240-258)
+- @brief Execute save to disk.
+- @details Applies save to disk logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+- @param result {ProviderResult} Input parameter `result`.
+- @return {None} Function return value.
+
+### fn `def _load_from_disk(` `priv` (L259-263)
+
+### fn `def _sanitize_raw(self, raw: dict[str, Any]) -> dict[str, Any]` `priv` (L295-320)
 - @brief Execute load from disk.
 - @brief Execute sanitize raw.
 - @details Applies load from disk logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
@@ -149,10 +242,14 @@ from aibar.providers.base import ProviderName, ProviderResult, WindowPeriod
 - @return {ProviderResult | None} Function return value.
 - @return {dict[str, Any]} Function return value.
 
-### fn `def clean(obj: Any) -> Any` (L240-255)
+### fn `def clean(obj: Any) -> Any` (L304-319)
+- @brief Execute sanitize raw.
 - @brief Execute clean.
+- @details Applies sanitize raw logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @details Applies clean logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+- @param raw {dict[str, Any]} Input parameter `raw`.
 - @param obj {Any} Input parameter `obj`.
+- @return {dict[str, Any]} Function return value.
 - @return {Any} Function return value.
 
 ## Symbol Index
@@ -163,19 +260,24 @@ from aibar.providers.base import ProviderName, ProviderResult, WindowPeriod
 |`ResultCache`|class|pub|39-238|class ResultCache|
 |`ResultCache.DEFAULT_TTL`|var|pub|45||
 |`ResultCache.PROVIDER_TTLS`|var|pub|46||
-|`ResultCache.__init__`|fn|priv|53-63|def __init__(self, cache_dir: Path | None = None) -> None|
-|`ResultCache._default_cache_dir`|fn|priv|64-73|def _default_cache_dir(self) -> Path|
-|`ResultCache._ensure_cache_dir`|fn|priv|74-81|def _ensure_cache_dir(self) -> None|
-|`ResultCache._cache_key`|fn|priv|82-91|def _cache_key(self, provider: ProviderName, window: Wind...|
-|`ResultCache._disk_path`|fn|priv|92-101|def _disk_path(self, provider: ProviderName, window: Wind...|
-|`ResultCache.get`|fn|pub|102-120|def get(self, provider: ProviderName, window: WindowPerio...|
-|`ResultCache.set`|fn|pub|121-141|def set(self, result: ProviderResult) -> None|
-|`ResultCache.get_last_good`|fn|pub|142-151|def get_last_good(self, provider: ProviderName, window: W...|
-|`ResultCache.invalidate`|fn|pub|152-153|def invalidate(|
-|`ResultCache._save_to_disk`|fn|priv|176-194|def _save_to_disk(self, result: ProviderResult) -> None|
-|`ResultCache._load_from_disk`|fn|priv|195-199|def _load_from_disk(|
-|`_sanitize_raw`|fn|priv|231-256|def _sanitize_raw(self, raw: dict[str, Any]) -> dict[str,...|
-|`clean`|fn|pub|240-255|def clean(obj: Any) -> Any|
+|`ResultCache.RATE_LIMIT_COOLDOWN`|var|pub|52||
+|`ResultCache.__init__`|fn|priv|54-64|def __init__(self, cache_dir: Path | None = None) -> None|
+|`ResultCache._default_cache_dir`|fn|priv|65-74|def _default_cache_dir(self) -> Path|
+|`ResultCache._ensure_cache_dir`|fn|priv|75-82|def _ensure_cache_dir(self) -> None|
+|`ResultCache._cache_key`|fn|priv|83-92|def _cache_key(self, provider: ProviderName, window: Wind...|
+|`ResultCache._disk_path`|fn|priv|93-102|def _disk_path(self, provider: ProviderName, window: Wind...|
+|`ResultCache.get`|fn|pub|103-121|def get(self, provider: ProviderName, window: WindowPerio...|
+|`ResultCache.set`|fn|pub|122-145|def set(self, result: ProviderResult) -> None|
+|`ResultCache.get_last_good`|fn|pub|146-155|def get_last_good(self, provider: ProviderName, window: W...|
+|`ResultCache.invalidate`|fn|pub|156-157|def invalidate(|
+|`ResultCache._cooldown_path`|fn|priv|180-188|def _cooldown_path(self, provider: ProviderName) -> Path|
+|`ResultCache.set_rate_limited`|fn|pub|189-204|def set_rate_limited(self, provider: ProviderName) -> None|
+|`ResultCache.is_rate_limited`|fn|pub|205-226|def is_rate_limited(self, provider: ProviderName) -> bool|
+|`clear_rate_limit`|fn|pub|227-239|def clear_rate_limit(self, provider: ProviderName) -> None|
+|`_save_to_disk`|fn|priv|240-258|def _save_to_disk(self, result: ProviderResult) -> None|
+|`_load_from_disk`|fn|priv|259-263|def _load_from_disk(|
+|`_sanitize_raw`|fn|priv|295-320|def _sanitize_raw(self, raw: dict[str, Any]) -> dict[str,...|
+|`clean`|fn|pub|304-319|def clean(obj: Any) -> Any|
 
 
 ---
@@ -248,10 +350,10 @@ from typing import Any
 
 ---
 
-# cli.py | Python | 771L | 20 symbols | 16 imports | 38 comments
+# cli.py | Python | 800L | 20 symbols | 16 imports | 48 comments
 > Path: `src/aibar/aibar/cli.py`
 - @brief Command-line interface for aibar.
-- @details Defines command parsing, provider dispatch, formatted output, setup helpers, login flows, and UI launch hooks. Includes reset-boundary projection helpers to recover 'Resets in:' display from stale cache entries.
+- @details Defines command parsing, provider dispatch, formatted output, setup helpers, login flows, and UI launch hooks.
 
 ## Imports
 ```
@@ -259,13 +361,14 @@ import asyncio
 import json
 import math
 import sys
+from datetime import datetime, timedelta, timezone
 import click
 from click.core import ParameterSource
 from aibar.cache import ResultCache
 from aibar.config import config
 from aibar.providers import (
-from aibar.providers.base import BaseProvider, ProviderError, ProviderName, ProviderResult, WindowPeriod
-from datetime import datetime, timedelta, timezone
+from aibar.providers.base import (
+from datetime import datetime, timezone
 from aibar.ui import run_ui
 from aibar.config import ENV_FILE_PATH, write_env_file
 from aibar.claude_cli_auth import ClaudeCLIAuth
@@ -274,12 +377,7 @@ from aibar.providers.copilot import CopilotProvider
 
 ## Definitions
 
-### var `_WINDOW_PERIOD_TIMEDELTA` (L34-38)
-- @brief Module-level mapping from WindowPeriod to its corresponding timedelta duration.
-- @details Used by `_project_next_reset` to determine the stride for projecting future reset boundaries from stale `resets_at` timestamps.
-- @satisfies REQ-002
-
-### fn `def _project_next_reset(resets_at_str: str, window: WindowPeriod) -> datetime | None` `priv` (L41-71)
+### fn `def _project_next_reset(resets_at_str: str, window: WindowPeriod) -> datetime | None` `priv` (L43-74)
 - @brief Compute the next reset boundary after a stale resets_at timestamp.
 - @details Advances `resets_at_str` by multiples of the window period until the result is strictly greater than current UTC time. Returns None if `resets_at_str` is unparseable or the window period is not in `_WINDOW_PERIOD_TIMEDELTA`.
 - @param resets_at_str {str} ISO 8601 timestamp string of the last known reset boundary. May have a Z suffix (converted to +00:00) or an explicit timezone offset.
@@ -288,50 +386,50 @@ from aibar.providers.copilot import CopilotProvider
 - @note Uses `math.ceil` to determine the minimum number of full cycles to advance.
 - @satisfies REQ-002
 
-### fn `def _apply_reset_projection(result: ProviderResult) -> ProviderResult` `priv` (L73-106)
+### fn `def _apply_reset_projection(result: ProviderResult) -> ProviderResult` `priv` (L75-109)
 - @brief Return a copy of `result` with `metrics.reset_at` set to the projected next reset boundary when it is currently None but the raw payload contains a parseable past `resets_at` string for the result's window.
 - @details When a ProviderResult is obtained from stale disk cache (last-good path) or from a cross-window raw re-parse, `_parse_response` correctly sets `reset_at=None` for past timestamps. This function recovers the display information by projecting the next future reset boundary from the raw payload's `resets_at` field, ensuring the 'Resets in:' countdown is shown even when the cached timestamp has already elapsed. If `reset_at` is already non-None, or the raw payload has no parseable `resets_at` for the window, or projection fails, the original result is returned unchanged.
 - @param result {ProviderResult} Candidate result whose reset_at may require projection.
 - @return {ProviderResult} Original result unchanged if no projection is needed; otherwise a new ProviderResult with metrics.reset_at set to the projected datetime.
-- @satisfies REQ-002
 - @see _project_next_reset
+- @satisfies REQ-002
 
-### fn `def get_providers() -> dict[ProviderName, BaseProvider]` (L108-122)
+### fn `def get_providers() -> dict[ProviderName, BaseProvider]` (L110-124)
 - @brief Execute get providers.
 - @details Applies get providers logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {dict[ProviderName, BaseProvider]} Function return value.
 
-### fn `def parse_window(window: str) -> WindowPeriod` (L123-141)
+### fn `def parse_window(window: str) -> WindowPeriod` (L125-144)
 - @brief Execute parse window.
 - @details Applies parse window logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param window {str} Input parameter `window`.
 - @return {WindowPeriod} Function return value.
 - @throws {Exception} Propagates explicit raised error states from internal validation or provider operations.
 
-### fn `def parse_provider(provider: str) -> ProviderName | None` (L143-159)
+### fn `def parse_provider(provider: str) -> ProviderName | None` (L145-161)
 - @brief Execute parse provider.
 - @details Applies parse provider logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param provider {str} Input parameter `provider`.
 - @return {ProviderName | None} Function return value.
 - @throws {Exception} Propagates explicit raised error states from internal validation or provider operations.
 
-### fn `def _fetch_result(` `priv` (L160-163)
+### fn `def _fetch_result(` `priv` (L162-165)
 
-### fn `def _fetch_claude_dual(` `priv` (L202-205)
-- @brief Fetch Claude 5h and 7d results via a single API call.
-- @details Uses ClaudeOAuthProvider.fetch_all_windows to avoid redundant HTTP requests. Checks cache before calling API; stores results after; falls back to last-known-good on error. When a window has no last-good disk cache (either because cooldown is active or because a live fetch returned HTTP 429), attempts to re-parse the missing window from any sibling window's raw payload. Applies `_apply_reset_projection` to every non-error result so that stale-cache entries whose resets_at timestamp is already in the past still carry a projected future reset_at, enabling the 'Resets in:' countdown to display correctly.
-- @param provider {ClaudeOAuthProvider} Claude provider instance.
-- @param cache {ResultCache} Cache instance for TTL-based result reuse.
-- @return {tuple[ProviderResult, ProviderResult]} (5h_result, 7d_result).
-- @satisfies REQ-002, CTN-004
-- @see _apply_reset_projection
+### fn `def _fetch_claude_dual(` `priv` (L204-206)
+- @brief Execute provider fetch with cache lookup, store, and last-good fallback.
+- @details Checks cache before API call (CTN-004). On successful fetch, stores
+result in cache. On error, falls back to last-known-good cached result when available.
+- @param provider {BaseProvider} Provider instance to fetch from.
+- @param window {WindowPeriod} Time window for the fetch.
+- @param cache {ResultCache | None} Optional cache instance for TTL-based result reuse.
+- @return {ProviderResult} Cached, fresh, or last-good fallback result.
 
-### fn `def main() -> None` `@click.version_option()` (L313-321)
+### fn `def main() -> None` `@click.version_option()` (L315-323)
 - @brief Execute main.
 - @details Applies main logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def show(provider: str, window: str, output_json: bool) -> None` (L341-404)
+### fn `def show(provider: str, window: str, output_json: bool) -> None` (L343-406)
 - @brief Execute show with per-provider TTL cache and single-call dual-window optimization.
 - @details Instantiates a ResultCache for CLI-path caching (CTN-004). For Claude dual-window mode, uses fetch_all_windows to make one API call instead of two. Falls back to last-known-good cached results on provider errors.
 - @param provider {str} CLI provider selector string.
@@ -339,7 +437,7 @@ from aibar.providers.copilot import CopilotProvider
 - @param output_json {bool} When True, emit JSON output instead of formatted text.
 - @return {None} Function return value.
 
-### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L405-463)
+### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L407-467)
 - @brief Execute print result.
 - @details Applies print result logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param name {ProviderName} Input parameter `name`.
@@ -347,51 +445,62 @@ from aibar.providers.copilot import CopilotProvider
 - @param label {str | None} Input parameter `label`.
 - @return {None} Function return value.
 
-### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L464-479)
+### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L468-483)
 - @brief Execute format reset duration.
 - @details Applies format reset duration logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param seconds {float} Input parameter `seconds`.
 - @return {str} Function return value.
 
-### fn `def _progress_bar(percent: float, width: int = 20) -> str` `priv` (L480-492)
+### fn `def _should_print_claude_reset_pending_hint(` `priv` (L484-486)
+
+### fn `def _progress_bar(percent: float, width: int = 20) -> str` `priv` (L509-521)
+- @brief Determine whether CLI output must render the reset-pending fallback hint.
 - @brief Execute progress bar.
+- @details The hint is only valid for Claude windows when no reset timestamp is
+available yet and usage is exactly zero, which indicates the rate-limit timer has
+not started. This preserves the normal countdown path for non-zero usage and for
+providers other than Claude.
 - @details Applies progress bar logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+- @param provider_name {ProviderName} Provider associated with the rendered result.
+- @param metrics {UsageMetrics} Normalized quota metrics for the rendered result.
 - @param percent {float} Input parameter `percent`.
 - @param width {int} Input parameter `width`.
+- @return {bool} True when CLI must print `Resets in: Starts when the first message is sent`.
 - @return {str} Function return value.
+- @satisfies REQ-002
 
-### fn `def doctor() -> None` `@main.command()` (L494-548)
+### fn `def doctor() -> None` `@main.command()` (L523-575)
 - @brief Execute doctor.
 - @details Applies doctor logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def ui() -> None` `@main.command()` (L548-560)
+### fn `def ui() -> None` `@main.command()` (L577-587)
 - @brief Execute ui.
 - @details Applies ui logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def env() -> None` `@main.command()` (L560-570)
+### fn `def env() -> None` `@main.command()` (L589-597)
 - @brief Execute env.
 - @details Applies env logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def setup() -> None` `@main.command()` (L570-675)
+### fn `def setup() -> None` `@main.command()` (L599-697)
 - @brief Execute setup.
 - @details Applies setup logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def login(provider: str) -> None` (L676-692)
+### fn `def login(provider: str) -> None` (L705-721)
 - @brief Execute login.
 - @details Applies login logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param provider {str} Input parameter `provider`.
 - @return {None} Function return value.
 
-### fn `def _login_claude() -> None` `priv` (L693-741)
+### fn `def _login_claude() -> None` `priv` (L722-770)
 - @brief Execute login claude.
 - @details Applies login claude logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_copilot() -> None` `priv` (L742-771)
+### fn `def _login_copilot() -> None` `priv` (L771-798)
 - @brief Execute login copilot.
 - @details Applies login copilot logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
@@ -399,26 +508,26 @@ from aibar.providers.copilot import CopilotProvider
 ## Symbol Index
 |Symbol|Kind|Vis|Lines|Sig|
 |---|---|---|---|---|
-|`_WINDOW_PERIOD_TIMEDELTA`|var|priv|34-38||
-|`_project_next_reset`|fn|priv|41-71|def _project_next_reset(resets_at_str: str, window: Wind...|
-|`_apply_reset_projection`|fn|priv|73-106|def _apply_reset_projection(result: ProviderResult) -> P...|
-|`get_providers`|fn|pub|108-122|def get_providers() -> dict[ProviderName, BaseProvider]|
-|`parse_window`|fn|pub|123-141|def parse_window(window: str) -> WindowPeriod|
-|`parse_provider`|fn|pub|143-159|def parse_provider(provider: str) -> ProviderName | None|
-|`_fetch_result`|fn|priv|160-163|def _fetch_result(|
-|`_fetch_claude_dual`|fn|priv|202-205|def _fetch_claude_dual(|
-|`main`|fn|pub|313-321|def main() -> None|
-|`show`|fn|pub|341-404|def show(provider: str, window: str, output_json: bool) -...|
-|`_print_result`|fn|priv|405-463|def _print_result(name: ProviderName, result, label: str ...|
-|`_format_reset_duration`|fn|priv|464-479|def _format_reset_duration(seconds: float) -> str|
-|`_progress_bar`|fn|priv|480-492|def _progress_bar(percent: float, width: int = 20) -> str|
-|`doctor`|fn|pub|494-548|def doctor() -> None|
-|`ui`|fn|pub|548-560|def ui() -> None|
-|`env`|fn|pub|560-570|def env() -> None|
-|`setup`|fn|pub|570-675|def setup() -> None|
-|`login`|fn|pub|676-692|def login(provider: str) -> None|
-|`_login_claude`|fn|priv|693-741|def _login_claude() -> None|
-|`_login_copilot`|fn|priv|742-771|def _login_copilot() -> None|
+|`_project_next_reset`|fn|priv|43-74|def _project_next_reset(resets_at_str: str, window: Windo...|
+|`_apply_reset_projection`|fn|priv|75-109|def _apply_reset_projection(result: ProviderResult) -> Pr...|
+|`get_providers`|fn|pub|110-124|def get_providers() -> dict[ProviderName, BaseProvider]|
+|`parse_window`|fn|pub|125-144|def parse_window(window: str) -> WindowPeriod|
+|`parse_provider`|fn|pub|145-161|def parse_provider(provider: str) -> ProviderName | None|
+|`_fetch_result`|fn|priv|162-165|def _fetch_result(|
+|`_fetch_claude_dual`|fn|priv|204-206|def _fetch_claude_dual(|
+|`main`|fn|pub|315-323|def main() -> None|
+|`show`|fn|pub|343-406|def show(provider: str, window: str, output_json: bool) -...|
+|`_print_result`|fn|priv|407-467|def _print_result(name: ProviderName, result, label: str ...|
+|`_format_reset_duration`|fn|priv|468-483|def _format_reset_duration(seconds: float) -> str|
+|`_should_print_claude_reset_pending_hint`|fn|priv|484-486|def _should_print_claude_reset_pending_hint(|
+|`_progress_bar`|fn|priv|509-521|def _progress_bar(percent: float, width: int = 20) -> str|
+|`doctor`|fn|pub|523-575|def doctor() -> None|
+|`ui`|fn|pub|577-587|def ui() -> None|
+|`env`|fn|pub|589-597|def env() -> None|
+|`setup`|fn|pub|599-697|def setup() -> None|
+|`login`|fn|pub|705-721|def login(provider: str) -> None|
+|`_login_claude`|fn|priv|722-770|def _login_claude() -> None|
+|`_login_copilot`|fn|priv|771-798|def _login_copilot() -> None|
 
 
 ---
@@ -641,7 +750,7 @@ from pydantic import BaseModel, Field
 
 ---
 
-# claude_oauth.py | Python | 304L | 13 symbols | 6 imports | 16 comments
+# claude_oauth.py | Python | 304L | 14 symbols | 8 imports | 17 comments
 > Path: `src/aibar/aibar/providers/claude_oauth.py`
 - @brief Claude OAuth usage provider.
 - @details Fetches Claude subscription utilization through OAuth credentials and normalizes provider quota state into the shared result contract.
@@ -650,23 +759,23 @@ from pydantic import BaseModel, Field
 ```
 import asyncio
 import os
+import random
 from datetime import datetime
 import httpx
 from aibar.claude_cli_auth import extract_claude_cli_token
 from aibar.providers.base import (
+from datetime import timezone
 ```
 
 ## Definitions
 
-### class `class ClaudeOAuthProvider(BaseProvider)` : BaseProvider (L26-304)
+### class `class ClaudeOAuthProvider(BaseProvider)` : BaseProvider (L26-62)
 - @brief Define claude o auth provider component.
 - @details Encapsulates claude o auth provider state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
 - var `USAGE_URL = "https://api.anthropic.com/api/oauth/usage"` (L33)
   - @brief Define claude o auth provider component.
   - @details Encapsulates claude o auth provider state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
 - var `TOKEN_ENV_VAR = "CLAUDE_CODE_OAUTH_TOKEN"` (L34)
-- var `MAX_RETRIES = 3` (L69)
-- var `RETRY_BACKOFF_BASE = 2.0` (L70)
 - fn `def __init__(self, token: str | None = None) -> None` `priv` (L36-46)
   - @brief Execute init.
   - @details Applies init logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
@@ -676,14 +785,17 @@ from aibar.providers.base import (
   - @brief Execute is configured.
   - @details Applies is configured logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {bool} Function return value.
-- fn `def get_config_help(self) -> str` (L55-72)
+- fn `def get_config_help(self) -> str` (L55-62)
   - @brief Execute get config help.
   - @details Applies get config help logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {str} Function return value.
 
+- var `MAX_RETRIES = 3` (L69)
+- var `RETRY_BACKOFF_BASE = 2.0` (L70)
+- var `RETRY_JITTER_MAX = 1.0` (L71)
 ### fn `async def _request_usage(self, client: httpx.AsyncClient) -> httpx.Response` `priv` (L73-99)
 - @brief Execute HTTP GET to usage endpoint with retry on HTTP 429.
-- @details Retries up to MAX_RETRIES times on 429 responses, respecting the retry-after header with exponential backoff fallback.
+- @details Retries up to MAX_RETRIES times on 429 responses, respecting the retry-after header with exponential backoff fallback and random jitter to prevent thundering-herd synchronization. Backoff sequence with RETRY_BACKOFF_BASE=2.0: ~2-3s, ~4-5s, ~8-9s (total ~14-17s).
 - @param client {httpx.AsyncClient} Reusable HTTP client session.
 - @return {httpx.Response} Final HTTP response after retries exhausted or success.
 
@@ -695,46 +807,49 @@ from aibar.providers.base import (
 - @throws {AuthenticationError} When the OAuth token is invalid or expired.
 - @throws {ProviderError} On unexpected non-HTTP errors.
 
-### fn `async def fetch_all_windows(self, windows: list[WindowPeriod]) -> dict[WindowPeriod, ProviderResult]` (L140-193)
+### fn `async def fetch_all_windows(` (L140-141)
+
+### fn `def _handle_response(` `priv` (L194-195)
 - @brief Execute a single API call and parse results for multiple windows.
-- @details The usage endpoint returns data for all windows in one response. This method avoids redundant HTTP requests when multiple windows are needed.
+- @details The usage endpoint returns data for all windows in one response.
+This method avoids redundant HTTP requests when multiple windows are needed.
 - @param windows {list[WindowPeriod]} Window periods to parse from one API response.
 - @return {dict[WindowPeriod, ProviderResult]} Map of window to parsed result.
 - @throws {AuthenticationError} When the OAuth token is invalid or expired.
 - @throws {ProviderError} On unexpected non-HTTP errors.
 
-### fn `def _handle_response(self, response: httpx.Response, window: WindowPeriod) -> ProviderResult | None` `priv` (L194-238)
+### fn `def _parse_response(self, data: dict, window: WindowPeriod) -> ProviderResult` `priv` (L239-304)
 - @brief Map HTTP error status codes to ProviderResult error payloads.
-- @details Returns None on HTTP 200 (success), otherwise returns an error ProviderResult for the given window. Raises AuthenticationError on 401.
+- @brief Normalize a raw Claude API payload dict into a ProviderResult for the given window.
+- @details Returns None on HTTP 200 (success), otherwise returns an error
+ProviderResult for the given window. Raises AuthenticationError on 401.
+- @details Selects `five_hour` or `seven_day` sub-dict from `data` based on `window` (fallback to `seven_day` if the specific key is absent or empty). Derives `remaining` from `utilization` field and `reset_at` from `resets_at` field. `reset_at` is set to None when the parsed datetime is already in the past relative to the current UTC clock, preventing stale cached timestamps from propagating to the display layer and causing asymmetric suppression of the 'Resets in:' output between the 5h and 7d windows (REQ-002 symmetry requirement).
 - @param response {httpx.Response} HTTP response to evaluate.
 - @param window {WindowPeriod} Window period for error result construction.
-- @return {ProviderResult | None} Error result or None if response is 200.
-- @throws {AuthenticationError} When HTTP status is 401.
-
-### fn `def _parse_response(self, data: dict, window: WindowPeriod) -> ProviderResult` `priv` (L239-304)
-- @brief Normalize a raw Claude API payload dict into a ProviderResult for the given window.
-- @details Selects `five_hour` or `seven_day` sub-dict from `data` based on `window` (fallback to `seven_day` if the specific key is absent or empty). Derives `remaining` from `utilization` field and `reset_at` from `resets_at` field. `reset_at` is set to None when the parsed datetime is already in the past relative to the current UTC clock, preventing stale cached timestamps from propagating to the display layer and causing asymmetric suppression of the 'Resets in:' output between the 5h and 7d windows.
 - @param data {dict} Raw JSON payload from Claude usage API or stale disk cache. Expected keys: `five_hour` and/or `seven_day`, each containing optional `utilization` (float, 0-100) and `resets_at` (ISO 8601 string).
 - @param window {WindowPeriod} Target window period for result construction. `WindowPeriod.DAY_7` selects `seven_day`; all others select `five_hour`.
+- @return {ProviderResult | None} Error result or None if response is 200.
 - @return {ProviderResult} Normalized result with `metrics.remaining` set to `100 - utilization`, `metrics.reset_at` set to the parsed future datetime or None, and `raw` set to the full unmodified `data` payload.
+- @throws {AuthenticationError} When HTTP status is 401.
 - @satisfies REQ-002
 
 ## Symbol Index
 |Symbol|Kind|Vis|Lines|Sig|
 |---|---|---|---|---|
-|`ClaudeOAuthProvider`|class|pub|26-304|class ClaudeOAuthProvider(BaseProvider)|
+|`ClaudeOAuthProvider`|class|pub|26-62|class ClaudeOAuthProvider(BaseProvider)|
 |`ClaudeOAuthProvider.USAGE_URL`|var|pub|33||
 |`ClaudeOAuthProvider.TOKEN_ENV_VAR`|var|pub|34||
-|`ClaudeOAuthProvider.MAX_RETRIES`|var|pub|69||
-|`ClaudeOAuthProvider.RETRY_BACKOFF_BASE`|var|pub|70||
 |`ClaudeOAuthProvider.__init__`|fn|priv|36-46|def __init__(self, token: str | None = None) -> None|
 |`ClaudeOAuthProvider.is_configured`|fn|pub|47-54|def is_configured(self) -> bool|
-|`ClaudeOAuthProvider.get_config_help`|fn|pub|55-72|def get_config_help(self) -> str|
-|`ClaudeOAuthProvider._request_usage`|fn|priv|73-99|async def _request_usage(self, client: httpx.AsyncClient...|
-|`ClaudeOAuthProvider.fetch`|fn|pub|100-139|async def fetch(self, window: WindowPeriod = WindowPerio...|
-|`ClaudeOAuthProvider.fetch_all_windows`|fn|pub|140-193|async def fetch_all_windows(self, windows: list[WindowPe...|
-|`ClaudeOAuthProvider._handle_response`|fn|priv|194-238|def _handle_response(self, response: httpx.Response, win...|
-|`ClaudeOAuthProvider._parse_response`|fn|priv|239-304|def _parse_response(self, data: dict, window: WindowPeri...|
+|`ClaudeOAuthProvider.get_config_help`|fn|pub|55-62|def get_config_help(self) -> str|
+|`MAX_RETRIES`|var|pub|69||
+|`RETRY_BACKOFF_BASE`|var|pub|70||
+|`RETRY_JITTER_MAX`|var|pub|71||
+|`_request_usage`|fn|priv|73-99|async def _request_usage(self, client: httpx.AsyncClient)...|
+|`fetch`|fn|pub|100-139|async def fetch(self, window: WindowPeriod = WindowPeriod...|
+|`fetch_all_windows`|fn|pub|140-141|async def fetch_all_windows(|
+|`_handle_response`|fn|priv|194-195|def _handle_response(|
+|`_parse_response`|fn|priv|239-304|def _parse_response(self, data: dict, window: WindowPerio...|
 
 
 ---
@@ -1408,7 +1523,7 @@ from aibar.providers.base import (
 
 ---
 
-# extension.js | JavaScript | 1072L | 11 symbols | 8 imports | 24 comments
+# extension.js | JavaScript | 1082L | 13 symbols | 8 imports | 24 comments
 > Path: `src/aibar/extension/aibar@aibar.panel/extension.js`
 - @brief GNOME Shell panel extension for aibar metrics.
 - @details Collects usage JSON from the aibar CLI and renders provider-specific quota/cost cards in the GNOME panel popup.
@@ -1429,34 +1544,35 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
 - const `const REFRESH_INTERVAL_SECONDS = 300;` (L16)
 - const `const ENV_FILE_PATH = GLib.get_home_dir() + '/.config/aibar/env';` (L17)
-### fn `function _getAiBarPath()` (L24-34)
+- const `const RESET_PENDING_MESSAGE = 'Starts when the first message is sent';` (L18)
+### fn `function _getAiBarPath()` (L25-35)
 - @brief Resolve aibar executable path.
 - @details Prefers PATH discovery and falls back to AIBAR_PATH from the env file.
 - @return s {string} Resolved executable path or fallback command name.
 
-### fn `function _loadEnvFromFile()` (L41-93)
+### fn `function _loadEnvFromFile()` (L42-94)
 - @brief Load key-value environment variables from aibar env file.
 - @details Parses export syntax, quoted values, and inline comments.
 - @return s {Object<string,string>} Parsed environment map.
 
-### fn `function _getProgressClass(pct)` (L100-106)
+### fn `function _getProgressClass(pct)` (L101-107)
 - @brief Map percentage usage to CSS progress severity class.
 - @param {number} pct Usage percentage.
 - @return s {string} CSS class suffix for progress state.
 
-### class `class AIBarIndicator extends PanelMenu.Button` : PanelMenu.Button (L110-409)
+### class `class AIBarIndicator extends PanelMenu.Button` : PanelMenu.Button (L111-410)
 - @brief Panel indicator widget that manages popup rendering and refresh lifecycle. */
 - @brief Execute init.
 - @details Applies init logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @return s {any} Function return value.
 
-### fn `const createWindowBar = (labelText) =>` (L407-453)
+### fn `const createWindowBar = (labelText) =>` (L408-454)
 - @brief Execute create provider card.
 - @details Applies create provider card logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @param {any} providerName Input parameter `providerName`.
 - @return s {any} Function return value.
 
-### fn `const updateWindowBar = (bar, pct, resetTime, useDays) =>` (L556-597)
+### fn `const updateWindowBar = (bar, pct, resetTime, useDays) =>` (L557-607)
 - @brief Execute populate provider card.
 - @details Applies populate provider card logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @param {any} card Input parameter `card`.
@@ -1464,14 +1580,16 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 - @param {any} data Input parameter `data`.
 - @return s {any} Function return value.
 
-### fn `const toPercent = (value) =>` (L839-844)
+### fn `const showResetPendingHint = () =>` (L570-573)
+
+### fn `const toPercent = (value) =>` (L849-854)
 - @brief Execute update u i.
 - @details Applies update u i logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @return s {any} Function return value.
 
-### fn `const getPanelUsageValues = (providerName, data) =>` (L846-903)
+### fn `const getPanelUsageValues = (providerName, data) =>` (L856-913)
 
-### class `export default class AIBarExtension` (L1038-1072)
+### class `export default class AIBarExtension` (L1048-1082)
 - @brief GNOME extension lifecycle adapter for AIBarIndicator registration. */
 - @brief Execute constructor.
 - @details Applies constructor logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
@@ -1482,13 +1600,15 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 |---|---|---|---|---|
 |`REFRESH_INTERVAL_SECONDS`|const||16||
 |`ENV_FILE_PATH`|const||17||
-|`_getAiBarPath`|fn||24-34|function _getAiBarPath()|
-|`_loadEnvFromFile`|fn||41-93|function _loadEnvFromFile()|
-|`_getProgressClass`|fn||100-106|function _getProgressClass(pct)|
-|`AIBarIndicator`|class||110-409|class AIBarIndicator extends PanelMenu.Button|
-|`createWindowBar`|fn||407-453|const createWindowBar = (labelText) =>|
-|`updateWindowBar`|fn||556-597|const updateWindowBar = (bar, pct, resetTime, useDays) =>|
-|`toPercent`|fn||839-844|const toPercent = (value) =>|
-|`getPanelUsageValues`|fn||846-903|const getPanelUsageValues = (providerName, data) =>|
-|`AIBarExtension`|class||1038-1072|export default class AIBarExtension|
+|`RESET_PENDING_MESSAGE`|const||18||
+|`_getAiBarPath`|fn||25-35|function _getAiBarPath()|
+|`_loadEnvFromFile`|fn||42-94|function _loadEnvFromFile()|
+|`_getProgressClass`|fn||101-107|function _getProgressClass(pct)|
+|`AIBarIndicator`|class||111-410|class AIBarIndicator extends PanelMenu.Button|
+|`createWindowBar`|fn||408-454|const createWindowBar = (labelText) =>|
+|`updateWindowBar`|fn||557-607|const updateWindowBar = (bar, pct, resetTime, useDays) =>|
+|`showResetPendingHint`|fn||570-573|const showResetPendingHint = () =>|
+|`toPercent`|fn||849-854|const toPercent = (value) =>|
+|`getPanelUsageValues`|fn||856-913|const getPanelUsageValues = (providerName, data) =>|
+|`AIBarExtension`|class||1048-1082|export default class AIBarExtension|
 

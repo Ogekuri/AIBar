@@ -27,6 +27,7 @@ from aibar.providers.base import (
     ProviderError,
     ProviderName,
     ProviderResult,
+    UsageMetrics,
     WindowPeriod,
 )
 
@@ -36,6 +37,7 @@ _WINDOW_PERIOD_TIMEDELTA: dict[WindowPeriod, timedelta] = {
     WindowPeriod.DAY_7: timedelta(days=7),
     WindowPeriod.DAY_30: timedelta(days=30),
 }
+_RESET_PENDING_MESSAGE = "Starts when the first message is sent"
 
 
 def _project_next_reset(resets_at_str: str, window: WindowPeriod) -> datetime | None:
@@ -437,6 +439,8 @@ def _print_result(name: ProviderName, result, label: str | None = None) -> None:
         delta = m.reset_at - datetime.now(timezone.utc)
         if delta.total_seconds() > 0:
             click.echo(f"Resets in: {_format_reset_duration(delta.total_seconds())}")
+    elif _should_print_claude_reset_pending_hint(name, m):
+        click.echo(f"Resets in: {_RESET_PENDING_MESSAGE}")
 
     if (
         name in (ProviderName.CLAUDE, ProviderName.CODEX, ProviderName.COPILOT)
@@ -475,6 +479,31 @@ def _format_reset_duration(seconds: float) -> str:
     if days > 0:
         return f"{days}d {hours}h {minutes}m"
     return f"{hours}h {minutes}m"
+
+
+def _should_print_claude_reset_pending_hint(
+    provider_name: ProviderName,
+    metrics: UsageMetrics,
+) -> bool:
+    """
+    @brief Determine whether CLI output must render the reset-pending fallback hint.
+    @details The hint is only valid for Claude windows when no reset timestamp is
+    available yet and usage is exactly zero, which indicates the rate-limit timer has
+    not started. This preserves the normal countdown path for non-zero usage and for
+    providers other than Claude.
+    @param provider_name {ProviderName} Provider associated with the rendered result.
+    @param metrics {UsageMetrics} Normalized quota metrics for the rendered result.
+    @return {bool} True when CLI must print `Resets in: Starts when the first message is sent`.
+    @satisfies REQ-002
+    """
+    if provider_name != ProviderName.CLAUDE:
+        return False
+    if metrics.reset_at is not None:
+        return False
+    usage_percent = metrics.usage_percent
+    if usage_percent is None:
+        return False
+    return math.isclose(usage_percent, 0.0, abs_tol=1e-9)
 
 
 def _progress_bar(percent: float, width: int = 20) -> str:

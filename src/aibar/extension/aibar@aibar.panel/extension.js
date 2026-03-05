@@ -15,6 +15,7 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
 const REFRESH_INTERVAL_SECONDS = 300;
 const ENV_FILE_PATH = GLib.get_home_dir() + '/.config/aibar/env';
+const RESET_PENDING_MESSAGE = 'Starts when the first message is sent';
 
 /**
  * @brief Resolve aibar executable path.
@@ -566,6 +567,11 @@ class AIBarIndicator extends PanelMenu.Button {
                 return GLib.SOURCE_REMOVE;
             });
 
+            const showResetPendingHint = () => {
+                bar.resetLabel.text = `Reset in: ${RESET_PENDING_MESSAGE}`;
+                bar.resetLabel.show();
+            };
+
             if (resetTime) {
                 let resetDate;
                 if (typeof resetTime === 'number')
@@ -584,10 +590,14 @@ class AIBarIndicator extends PanelMenu.Button {
                     else
                         bar.resetLabel.text = `Reset in: ${days * 24 + hours}h ${mins}m`;
                     bar.resetLabel.show();
+                } else if (pct <= 0) {
+                    showResetPendingHint();
                 } else {
                     bar.resetLabel.text = '';
                     bar.resetLabel.hide();
                 }
+            } else if (pct <= 0) {
+                showResetPendingHint();
             } else {
                 bar.resetLabel.text = '';
                 bar.resetLabel.hide();
