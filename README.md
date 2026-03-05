@@ -38,6 +38,24 @@ AIBar aggregates usage metrics for Claude, OpenAI, OpenRouter, GitHub Copilot, a
 - GNOME Shell extension support via `aibar show --json`.
 
 
+## Screenshots
+
+### Claude
+
+[![Screenshot1](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot1.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot1.png)
+
+
+### GitHub Copilot
+
+
+[![Screenshot2](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot2.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot2.png)
+
+
+### OpenIA Codex
+
+[![Screenshot3](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot3.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot3.png)
+
+
 ## Quick Start
 
 ```bash
