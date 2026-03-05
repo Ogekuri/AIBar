@@ -11,6 +11,7 @@ import sys
 import click
 from click.core import ParameterSource
 
+from aibar.cache import ResultCache
 from aibar.config import config
 from aibar.providers import (
     ClaudeOAuthProvider,
@@ -19,7 +20,7 @@ from aibar.providers import (
     CopilotProvider,
     CodexProvider,
 )
-from aibar.providers.base import BaseProvider, ProviderError, ProviderName, WindowPeriod
+from aibar.providers.base import BaseProvider, ProviderError, ProviderName, ProviderResult, WindowPeriod
 
 
 def get_providers() -> dict[ProviderName, BaseProvider]:
@@ -72,20 +73,90 @@ def parse_provider(provider: str) -> ProviderName | None:
         raise click.BadParameter(f"Invalid provider. Choose from: {valid}")
 
 
-def _fetch_result(provider: BaseProvider, window: WindowPeriod):
+def _fetch_result(
+    provider: BaseProvider,
+    window: WindowPeriod,
+    cache: ResultCache | None = None,
+) -> ProviderResult:
     """
-    @brief Execute fetch result.
-    @details Applies fetch result logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
-    @param provider {BaseProvider} Input parameter `provider`.
-    @param window {WindowPeriod} Input parameter `window`.
-    @return {None} Function return value.
+    @brief Execute provider fetch with cache lookup, store, and last-good fallback.
+    @details Checks cache before API call (CTN-004). On successful fetch, stores
+    result in cache. On error, falls back to last-known-good cached result when available.
+    @param provider {BaseProvider} Provider instance to fetch from.
+    @param window {WindowPeriod} Time window for the fetch.
+    @param cache {ResultCache | None} Optional cache instance for TTL-based result reuse.
+    @return {ProviderResult} Cached, fresh, or last-good fallback result.
     """
+    if cache is not None:
+        cached = cache.get(provider.name, window)
+        if cached is not None:
+            return cached
+
     try:
-        return asyncio.run(provider.fetch(window))
+        result = asyncio.run(provider.fetch(window))
     except ProviderError as exc:
-        return provider._make_error_result(window=window, error=str(exc))
+        result = provider._make_error_result(window=window, error=str(exc))
     except Exception as exc:
-        return provider._make_error_result(window=window, error=f"Unexpected error: {exc}")
+        result = provider._make_error_result(window=window, error=f"Unexpected error: {exc}")
+
+    if cache is not None:
+        cache.set(result)
+        if result.is_error:
+            last_good = cache.get_last_good(provider.name, window)
+            if last_good is not None:
+                return last_good
+
+    return result
+
+
+def _fetch_claude_dual(
+    provider: ClaudeOAuthProvider,
+    cache: ResultCache,
+) -> tuple[ProviderResult, ProviderResult]:
+    """
+    @brief Fetch Claude 5h and 7d results via a single API call.
+    @details Uses ClaudeOAuthProvider.fetch_all_windows to avoid redundant
+    HTTP requests. Checks cache before calling API; stores results after;
+    falls back to last-known-good on error.
+    @param provider {ClaudeOAuthProvider} Claude provider instance.
+    @param cache {ResultCache} Cache instance for TTL-based result reuse.
+    @return {tuple[ProviderResult, ProviderResult]} (5h_result, 7d_result).
+    """
+    windows = [WindowPeriod.HOUR_5, WindowPeriod.DAY_7]
+    cached_results = {}
+    missing_windows = []
+    for w in windows:
+        cached = cache.get(provider.name, w)
+        if cached is not None:
+            cached_results[w] = cached
+        else:
+            missing_windows.append(w)
+
+    if not missing_windows:
+        return cached_results[WindowPeriod.HOUR_5], cached_results[WindowPeriod.DAY_7]
+
+    try:
+        fetched = asyncio.run(provider.fetch_all_windows(missing_windows))
+    except ProviderError as exc:
+        fetched = {
+            w: provider._make_error_result(window=w, error=str(exc))
+            for w in missing_windows
+        }
+    except Exception as exc:
+        fetched = {
+            w: provider._make_error_result(window=w, error=f"Unexpected error: {exc}")
+            for w in missing_windows
+        }
+
+    for w, result in fetched.items():
+        cache.set(result)
+        if result.is_error:
+            last_good = cache.get_last_good(provider.name, w)
+            if last_good is not None:
+                fetched[w] = last_good
+
+    all_results = {**cached_results, **fetched}
+    return all_results[WindowPeriod.HOUR_5], all_results[WindowPeriod.DAY_7]
 
 
 @click.group()
@@ -120,11 +191,13 @@ def main() -> None:
 )
 def show(provider: str, window: str, output_json: bool) -> None:
     """
-    @brief Execute show.
-    @details Applies show logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
-    @param provider {str} Input parameter `provider`.
-    @param window {str} Input parameter `window`.
-    @param output_json {bool} Input parameter `output_json`.
+    @brief Execute show with per-provider TTL cache and single-call dual-window optimization.
+    @details Instantiates a ResultCache for CLI-path caching (CTN-004). For Claude
+    dual-window mode, uses fetch_all_windows to make one API call instead of two.
+    Falls back to last-known-good cached results on provider errors.
+    @param provider {str} CLI provider selector string.
+    @param window {str} CLI window period string.
+    @param output_json {bool} When True, emit JSON output instead of formatted text.
     @return {None} Function return value.
     """
     window_period = parse_window(window)
@@ -134,6 +207,7 @@ def show(provider: str, window: str, output_json: bool) -> None:
     window_source = ctx.get_parameter_source("window")
 
     providers = get_providers()
+    cache = ResultCache()
 
     # Filter to specific provider if requested
     if provider_filter:
@@ -158,13 +232,16 @@ def show(provider: str, window: str, output_json: bool) -> None:
         )
 
         if show_dual_windows:
-            result_5h = _fetch_result(prov, WindowPeriod.HOUR_5)
-            result_7d = _fetch_result(prov, WindowPeriod.DAY_7)
+            if name == ProviderName.CLAUDE and isinstance(prov, ClaudeOAuthProvider):
+                result_5h, result_7d = _fetch_claude_dual(prov, cache)
+            else:
+                result_5h = _fetch_result(prov, WindowPeriod.HOUR_5, cache)
+                result_7d = _fetch_result(prov, WindowPeriod.DAY_7, cache)
             results[name.value] = result_7d
             _print_result(name, result_5h, label="5h")
             _print_result(name, result_7d, label="7d")
         else:
-            result = _fetch_result(prov, window_period)
+            result = _fetch_result(prov, window_period, cache)
             results[name.value] = result
             if not output_json:
                 _print_result(name, result)

@@ -4,6 +4,7 @@
 @details Fetches Claude subscription utilization through OAuth credentials and normalizes provider quota state into the shared result contract.
 """
 
+import asyncio
 import os
 from datetime import datetime
 
@@ -62,13 +63,44 @@ class ClaudeOAuthProvider(BaseProvider):
 
 Note: Token must start with 'sk-ant-' prefix."""
 
+    MAX_RETRIES = 2
+    RETRY_BACKOFF_BASE = 1.0
+
+    async def _request_usage(
+        self, client: httpx.AsyncClient
+    ) -> httpx.Response:
+        """
+        @brief Execute HTTP GET to usage endpoint with retry on HTTP 429.
+        @details Retries up to MAX_RETRIES times on 429 responses, respecting
+        the retry-after header with exponential backoff fallback.
+        @param client {httpx.AsyncClient} Reusable HTTP client session.
+        @return {httpx.Response} Final HTTP response after retries exhausted or success.
+        """
+        headers = {
+            "Authorization": f"Bearer {self._token}",
+            "anthropic-beta": "oauth-2025-04-20",
+            "Accept": "application/json",
+            "User-Agent": "aibar",
+        }
+        response = await client.get(self.USAGE_URL, headers=headers)
+        for attempt in range(self.MAX_RETRIES):
+            if response.status_code != 429:
+                return response
+            retry_after = float(response.headers.get("retry-after", "0"))
+            delay = max(retry_after, self.RETRY_BACKOFF_BASE * (2 ** attempt))
+            await asyncio.sleep(delay)
+            response = await client.get(self.USAGE_URL, headers=headers)
+        return response
+
     async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult:
         """
-        @brief Execute fetch.
-        @details Applies fetch logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
-        @param window {WindowPeriod} Input parameter `window`.
-        @return {ProviderResult} Function return value.
-        @throws {Exception} Propagates explicit raised error states from internal validation or provider operations.
+        @brief Execute fetch for a single window period.
+        @details Makes one HTTP request to the usage endpoint (with retry on 429)
+        and parses the response for the requested window.
+        @param window {WindowPeriod} Window period to parse from the API response.
+        @return {ProviderResult} Parsed result for the requested window.
+        @throws {AuthenticationError} When the OAuth token is invalid or expired.
+        @throws {ProviderError} On unexpected non-HTTP errors.
         """
         if not self.is_configured():
             return self._make_error_result(
@@ -78,47 +110,10 @@ Note: Token must start with 'sk-ant-' prefix."""
 
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.get(
-                    self.USAGE_URL,
-                    headers={
-                        "Authorization": f"Bearer {self._token}",
-                        "anthropic-beta": "oauth-2025-04-20",
-                        "Accept": "application/json",
-                        "User-Agent": "aibar",
-                    },
-                )
-
-                if response.status_code == 401:
-                    raise AuthenticationError("Invalid or expired OAuth token")
-
-                if response.status_code == 403:
-                    error_body = response.text
-                    if "user:profile" in error_body:
-                        return self._make_error_result(
-                            window=window,
-                            error="OAuth scope error. Fix: unset CLAUDE_CODE_OAUTH_TOKEN && claude setup-token",
-                            raw={"status_code": 403, "body": error_body},
-                        )
-                    return self._make_error_result(
-                        window=window,
-                        error=f"API forbidden: HTTP {response.status_code}",
-                        raw={"status_code": 403, "body": error_body},
-                    )
-
-                if response.status_code == 429:
-                    return self._make_error_result(
-                        window=window,
-                        error="Rate limited. Try again later.",
-                        raw={"status_code": 429},
-                    )
-
-                if response.status_code != 200:
-                    return self._make_error_result(
-                        window=window,
-                        error=f"API error: HTTP {response.status_code}",
-                        raw={"status_code": response.status_code, "body": response.text},
-                    )
-
+                response = await self._request_usage(client)
+                result = self._handle_response(response, window)
+                if result is not None:
+                    return result
                 data = response.json()
                 return self._parse_response(data, window)
 
@@ -136,6 +131,105 @@ Note: Token must start with 'sk-ant-' prefix."""
             )
         except Exception as e:
             raise ProviderError(f"Unexpected error: {e}") from e
+
+    async def fetch_all_windows(
+        self, windows: list[WindowPeriod]
+    ) -> dict[WindowPeriod, ProviderResult]:
+        """
+        @brief Execute a single API call and parse results for multiple windows.
+        @details The usage endpoint returns data for all windows in one response.
+        This method avoids redundant HTTP requests when multiple windows are needed.
+        @param windows {list[WindowPeriod]} Window periods to parse from one API response.
+        @return {dict[WindowPeriod, ProviderResult]} Map of window to parsed result.
+        @throws {AuthenticationError} When the OAuth token is invalid or expired.
+        @throws {ProviderError} On unexpected non-HTTP errors.
+        """
+        if not self.is_configured():
+            return {
+                w: self._make_error_result(
+                    window=w,
+                    error=f"Not configured. Set {self.TOKEN_ENV_VAR} environment variable.",
+                )
+                for w in windows
+            }
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await self._request_usage(client)
+
+                error_result = self._handle_response(response, windows[0])
+                if error_result is not None:
+                    return {
+                        w: self._make_error_result(
+                            window=w,
+                            error=error_result.error or "Unknown error",
+                            raw=error_result.raw,
+                        )
+                        for w in windows
+                    }
+
+                data = response.json()
+                return {w: self._parse_response(data, w) for w in windows}
+
+        except AuthenticationError:
+            raise
+        except httpx.TimeoutException:
+            return {
+                w: self._make_error_result(window=w, error="Request timed out")
+                for w in windows
+            }
+        except httpx.RequestError as e:
+            return {
+                w: self._make_error_result(window=w, error=f"Network error: {e}")
+                for w in windows
+            }
+        except Exception as e:
+            raise ProviderError(f"Unexpected error: {e}") from e
+
+    def _handle_response(
+        self, response: httpx.Response, window: WindowPeriod
+    ) -> ProviderResult | None:
+        """
+        @brief Map HTTP error status codes to ProviderResult error payloads.
+        @details Returns None on HTTP 200 (success), otherwise returns an error
+        ProviderResult for the given window. Raises AuthenticationError on 401.
+        @param response {httpx.Response} HTTP response to evaluate.
+        @param window {WindowPeriod} Window period for error result construction.
+        @return {ProviderResult | None} Error result or None if response is 200.
+        @throws {AuthenticationError} When HTTP status is 401.
+        """
+        if response.status_code == 401:
+            raise AuthenticationError("Invalid or expired OAuth token")
+
+        if response.status_code == 403:
+            error_body = response.text
+            if "user:profile" in error_body:
+                return self._make_error_result(
+                    window=window,
+                    error="OAuth scope error. Fix: unset CLAUDE_CODE_OAUTH_TOKEN && claude setup-token",
+                    raw={"status_code": 403, "body": error_body},
+                )
+            return self._make_error_result(
+                window=window,
+                error=f"API forbidden: HTTP {response.status_code}",
+                raw={"status_code": 403, "body": error_body},
+            )
+
+        if response.status_code == 429:
+            return self._make_error_result(
+                window=window,
+                error="Rate limited. Try again later.",
+                raw={"status_code": 429},
+            )
+
+        if response.status_code != 200:
+            return self._make_error_result(
+                window=window,
+                error=f"API error: HTTP {response.status_code}",
+                raw={"status_code": response.status_code, "body": response.text},
+            )
+
+        return None
 
     def _parse_response(self, data: dict, window: WindowPeriod) -> ProviderResult:
         """

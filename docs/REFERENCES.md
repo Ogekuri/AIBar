@@ -248,7 +248,7 @@ from typing import Any
 
 ---
 
-# cli.py | Python | 533L | 16 symbols | 13 imports | 34 comments
+# cli.py | Python | 610L | 17 symbols | 14 imports | 35 comments
 > Path: `src/aibar/aibar/cli.py`
 - @brief Command-line interface for aibar.
 - @details Defines command parsing, provider dispatch, formatted output, setup helpers, login flows, and UI launch hooks.
@@ -260,9 +260,10 @@ import json
 import sys
 import click
 from click.core import ParameterSource
+from aibar.cache import ResultCache
 from aibar.config import config
 from aibar.providers import (
-from aibar.providers.base import BaseProvider, ProviderError, ProviderName, WindowPeriod
+from aibar.providers.base import BaseProvider, ProviderError, ProviderName, ProviderResult, WindowPeriod
 from datetime import datetime, timezone
 from aibar.ui import run_ui
 from aibar.config import ENV_FILE_PATH, write_env_file
@@ -272,46 +273,50 @@ from aibar.providers.copilot import CopilotProvider
 
 ## Definitions
 
-### fn `def get_providers() -> dict[ProviderName, BaseProvider]` (L25-39)
+### fn `def get_providers() -> dict[ProviderName, BaseProvider]` (L26-40)
 - @brief Execute get providers.
 - @details Applies get providers logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {dict[ProviderName, BaseProvider]} Function return value.
 
-### fn `def parse_window(window: str) -> WindowPeriod` (L40-57)
+### fn `def parse_window(window: str) -> WindowPeriod` (L41-58)
 - @brief Execute parse window.
 - @details Applies parse window logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param window {str} Input parameter `window`.
 - @return {WindowPeriod} Function return value.
 - @throws {Exception} Propagates explicit raised error states from internal validation or provider operations.
 
-### fn `def parse_provider(provider: str) -> ProviderName | None` (L58-74)
+### fn `def parse_provider(provider: str) -> ProviderName | None` (L59-75)
 - @brief Execute parse provider.
 - @details Applies parse provider logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param provider {str} Input parameter `provider`.
 - @return {ProviderName | None} Function return value.
 - @throws {Exception} Propagates explicit raised error states from internal validation or provider operations.
 
-### fn `def _fetch_result(provider: BaseProvider, window: WindowPeriod)` `priv` (L75-90)
-- @brief Execute fetch result.
-- @details Applies fetch result logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
-- @param provider {BaseProvider} Input parameter `provider`.
-- @param window {WindowPeriod} Input parameter `window`.
-- @return {None} Function return value.
+### fn `def _fetch_result(` `priv` (L76-79)
 
-### fn `def main() -> None` `@click.version_option()` (L93-101)
+### fn `def _fetch_claude_dual(` `priv` (L112-114)
+- @brief Execute provider fetch with cache lookup, store, and last-good fallback.
+- @details Checks cache before API call (CTN-004). On successful fetch, stores
+result in cache. On error, falls back to last-known-good cached result when available.
+- @param provider {BaseProvider} Provider instance to fetch from.
+- @param window {WindowPeriod} Time window for the fetch.
+- @param cache {ResultCache | None} Optional cache instance for TTL-based result reuse.
+- @return {ProviderResult} Cached, fresh, or last-good fallback result.
+
+### fn `def main() -> None` `@click.version_option()` (L164-172)
 - @brief Execute main.
 - @details Applies main logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def show(provider: str, window: str, output_json: bool) -> None` (L121-176)
-- @brief Execute show.
-- @details Applies show logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
-- @param provider {str} Input parameter `provider`.
-- @param window {str} Input parameter `window`.
-- @param output_json {bool} Input parameter `output_json`.
+### fn `def show(provider: str, window: str, output_json: bool) -> None` (L192-253)
+- @brief Execute show with per-provider TTL cache and single-call dual-window optimization.
+- @details Instantiates a ResultCache for CLI-path caching (CTN-004). For Claude dual-window mode, uses fetch_all_windows to make one API call instead of two. Falls back to last-known-good cached results on provider errors.
+- @param provider {str} CLI provider selector string.
+- @param window {str} CLI window period string.
+- @param output_json {bool} When True, emit JSON output instead of formatted text.
 - @return {None} Function return value.
 
-### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L177-235)
+### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L254-312)
 - @brief Execute print result.
 - @details Applies print result logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param name {ProviderName} Input parameter `name`.
@@ -319,51 +324,51 @@ from aibar.providers.copilot import CopilotProvider
 - @param label {str | None} Input parameter `label`.
 - @return {None} Function return value.
 
-### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L236-251)
+### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L313-328)
 - @brief Execute format reset duration.
 - @details Applies format reset duration logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param seconds {float} Input parameter `seconds`.
 - @return {str} Function return value.
 
-### fn `def _progress_bar(percent: float, width: int = 20) -> str` `priv` (L252-264)
+### fn `def _progress_bar(percent: float, width: int = 20) -> str` `priv` (L329-341)
 - @brief Execute progress bar.
 - @details Applies progress bar logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param percent {float} Input parameter `percent`.
 - @param width {int} Input parameter `width`.
 - @return {str} Function return value.
 
-### fn `def doctor() -> None` `@main.command()` (L266-316)
+### fn `def doctor() -> None` `@main.command()` (L343-393)
 - @brief Execute doctor.
 - @details Applies doctor logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def ui() -> None` `@main.command()` (L318-328)
+### fn `def ui() -> None` `@main.command()` (L395-405)
 - @brief Execute ui.
 - @details Applies ui logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def env() -> None` `@main.command()` (L330-338)
+### fn `def env() -> None` `@main.command()` (L407-415)
 - @brief Execute env.
 - @details Applies env logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def setup() -> None` `@main.command()` (L340-430)
+### fn `def setup() -> None` `@main.command()` (L417-507)
 - @brief Execute setup.
 - @details Applies setup logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def login(provider: str) -> None` (L438-454)
+### fn `def login(provider: str) -> None` (L515-531)
 - @brief Execute login.
 - @details Applies login logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param provider {str} Input parameter `provider`.
 - @return {None} Function return value.
 
-### fn `def _login_claude() -> None` `priv` (L455-503)
+### fn `def _login_claude() -> None` `priv` (L532-580)
 - @brief Execute login claude.
 - @details Applies login claude logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_copilot() -> None` `priv` (L504-531)
+### fn `def _login_copilot() -> None` `priv` (L581-608)
 - @brief Execute login copilot.
 - @details Applies login copilot logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
@@ -371,22 +376,23 @@ from aibar.providers.copilot import CopilotProvider
 ## Symbol Index
 |Symbol|Kind|Vis|Lines|Sig|
 |---|---|---|---|---|
-|`get_providers`|fn|pub|25-39|def get_providers() -> dict[ProviderName, BaseProvider]|
-|`parse_window`|fn|pub|40-57|def parse_window(window: str) -> WindowPeriod|
-|`parse_provider`|fn|pub|58-74|def parse_provider(provider: str) -> ProviderName | None|
-|`_fetch_result`|fn|priv|75-90|def _fetch_result(provider: BaseProvider, window: WindowP...|
-|`main`|fn|pub|93-101|def main() -> None|
-|`show`|fn|pub|121-176|def show(provider: str, window: str, output_json: bool) -...|
-|`_print_result`|fn|priv|177-235|def _print_result(name: ProviderName, result, label: str ...|
-|`_format_reset_duration`|fn|priv|236-251|def _format_reset_duration(seconds: float) -> str|
-|`_progress_bar`|fn|priv|252-264|def _progress_bar(percent: float, width: int = 20) -> str|
-|`doctor`|fn|pub|266-316|def doctor() -> None|
-|`ui`|fn|pub|318-328|def ui() -> None|
-|`env`|fn|pub|330-338|def env() -> None|
-|`setup`|fn|pub|340-430|def setup() -> None|
-|`login`|fn|pub|438-454|def login(provider: str) -> None|
-|`_login_claude`|fn|priv|455-503|def _login_claude() -> None|
-|`_login_copilot`|fn|priv|504-531|def _login_copilot() -> None|
+|`get_providers`|fn|pub|26-40|def get_providers() -> dict[ProviderName, BaseProvider]|
+|`parse_window`|fn|pub|41-58|def parse_window(window: str) -> WindowPeriod|
+|`parse_provider`|fn|pub|59-75|def parse_provider(provider: str) -> ProviderName | None|
+|`_fetch_result`|fn|priv|76-79|def _fetch_result(|
+|`_fetch_claude_dual`|fn|priv|112-114|def _fetch_claude_dual(|
+|`main`|fn|pub|164-172|def main() -> None|
+|`show`|fn|pub|192-253|def show(provider: str, window: str, output_json: bool) -...|
+|`_print_result`|fn|priv|254-312|def _print_result(name: ProviderName, result, label: str ...|
+|`_format_reset_duration`|fn|priv|313-328|def _format_reset_duration(seconds: float) -> str|
+|`_progress_bar`|fn|priv|329-341|def _progress_bar(percent: float, width: int = 20) -> str|
+|`doctor`|fn|pub|343-393|def doctor() -> None|
+|`ui`|fn|pub|395-405|def ui() -> None|
+|`env`|fn|pub|407-415|def env() -> None|
+|`setup`|fn|pub|417-507|def setup() -> None|
+|`login`|fn|pub|515-531|def login(provider: str) -> None|
+|`_login_claude`|fn|priv|532-580|def _login_claude() -> None|
+|`_login_copilot`|fn|priv|581-608|def _login_copilot() -> None|
 
 
 ---
@@ -609,13 +615,14 @@ from pydantic import BaseModel, Field
 
 ---
 
-# claude_oauth.py | Python | 186L | 8 symbols | 5 imports | 13 comments
+# claude_oauth.py | Python | 280L | 13 symbols | 6 imports | 16 comments
 > Path: `src/aibar/aibar/providers/claude_oauth.py`
 - @brief Claude OAuth usage provider.
 - @details Fetches Claude subscription utilization through OAuth credentials and normalizes provider quota state into the shared result contract.
 
 ## Imports
 ```
+import asyncio
 import os
 from datetime import datetime
 import httpx
@@ -625,52 +632,85 @@ from aibar.providers.base import (
 
 ## Definitions
 
-### class `class ClaudeOAuthProvider(BaseProvider)` : BaseProvider (L24-58)
+### class `class ClaudeOAuthProvider(BaseProvider)` : BaseProvider (L25-59)
 - @brief Define claude o auth provider component.
 - @details Encapsulates claude o auth provider state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
-- var `USAGE_URL = "https://api.anthropic.com/api/oauth/usage"` (L31)
+- var `USAGE_URL = "https://api.anthropic.com/api/oauth/usage"` (L32)
   - @brief Define claude o auth provider component.
   - @details Encapsulates claude o auth provider state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
-- var `TOKEN_ENV_VAR = "CLAUDE_CODE_OAUTH_TOKEN"` (L32)
-- fn `def __init__(self, token: str | None = None) -> None` `priv` (L34-42)
+- var `TOKEN_ENV_VAR = "CLAUDE_CODE_OAUTH_TOKEN"` (L33)
+- fn `def __init__(self, token: str | None = None) -> None` `priv` (L35-43)
   - @brief Execute init.
   - @details Applies init logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param token {str | None} Input parameter `token`.
   - @return {None} Function return value.
-- fn `def is_configured(self) -> bool` (L43-50)
+- fn `def is_configured(self) -> bool` (L44-51)
   - @brief Execute is configured.
   - @details Applies is configured logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {bool} Function return value.
-- fn `def get_config_help(self) -> str` (L51-58)
+- fn `def get_config_help(self) -> str` (L52-59)
   - @brief Execute get config help.
   - @details Applies get config help logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {str} Function return value.
 
-### fn `async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult` (L65-139)
-- @brief Execute fetch.
-- @details Applies fetch logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
-- @param window {WindowPeriod} Input parameter `window`.
-- @return {ProviderResult} Function return value.
-- @throws {Exception} Propagates explicit raised error states from internal validation or provider operations.
+- var `MAX_RETRIES = 2` (L66)
+- var `RETRY_BACKOFF_BASE = 1.0` (L67)
+### fn `async def _request_usage(` `priv` (L69-70)
 
-### fn `def _parse_response(self, data: dict, window: WindowPeriod) -> ProviderResult` `priv` (L140-186)
+### fn `async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult` (L95-134)
+- @brief Execute HTTP GET to usage endpoint with retry on HTTP 429.
+- @brief Execute fetch for a single window period.
+- @details Retries up to MAX_RETRIES times on 429 responses, respecting
+the retry-after header with exponential backoff fallback.
+- @details Makes one HTTP request to the usage endpoint (with retry on 429) and parses the response for the requested window.
+- @param client {httpx.AsyncClient} Reusable HTTP client session.
+- @param window {WindowPeriod} Window period to parse from the API response.
+- @return {httpx.Response} Final HTTP response after retries exhausted or success.
+- @return {ProviderResult} Parsed result for the requested window.
+- @throws {AuthenticationError} When the OAuth token is invalid or expired.
+- @throws {ProviderError} On unexpected non-HTTP errors.
+
+### fn `async def fetch_all_windows(` (L135-136)
+
+### fn `def _handle_response(` `priv` (L189-190)
+- @brief Execute a single API call and parse results for multiple windows.
+- @details The usage endpoint returns data for all windows in one response.
+This method avoids redundant HTTP requests when multiple windows are needed.
+- @param windows {list[WindowPeriod]} Window periods to parse from one API response.
+- @return {dict[WindowPeriod, ProviderResult]} Map of window to parsed result.
+- @throws {AuthenticationError} When the OAuth token is invalid or expired.
+- @throws {ProviderError} On unexpected non-HTTP errors.
+
+### fn `def _parse_response(self, data: dict, window: WindowPeriod) -> ProviderResult` `priv` (L234-280)
+- @brief Map HTTP error status codes to ProviderResult error payloads.
 - @brief Execute parse response.
+- @details Returns None on HTTP 200 (success), otherwise returns an error
+ProviderResult for the given window. Raises AuthenticationError on 401.
 - @details Applies parse response logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+- @param response {httpx.Response} HTTP response to evaluate.
+- @param window {WindowPeriod} Window period for error result construction.
 - @param data {dict} Input parameter `data`.
 - @param window {WindowPeriod} Input parameter `window`.
+- @return {ProviderResult | None} Error result or None if response is 200.
 - @return {ProviderResult} Function return value.
+- @throws {AuthenticationError} When HTTP status is 401.
 
 ## Symbol Index
 |Symbol|Kind|Vis|Lines|Sig|
 |---|---|---|---|---|
-|`ClaudeOAuthProvider`|class|pub|24-58|class ClaudeOAuthProvider(BaseProvider)|
-|`ClaudeOAuthProvider.USAGE_URL`|var|pub|31||
-|`ClaudeOAuthProvider.TOKEN_ENV_VAR`|var|pub|32||
-|`ClaudeOAuthProvider.__init__`|fn|priv|34-42|def __init__(self, token: str | None = None) -> None|
-|`ClaudeOAuthProvider.is_configured`|fn|pub|43-50|def is_configured(self) -> bool|
-|`ClaudeOAuthProvider.get_config_help`|fn|pub|51-58|def get_config_help(self) -> str|
-|`fetch`|fn|pub|65-139|async def fetch(self, window: WindowPeriod = WindowPeriod...|
-|`_parse_response`|fn|priv|140-186|def _parse_response(self, data: dict, window: WindowPerio...|
+|`ClaudeOAuthProvider`|class|pub|25-59|class ClaudeOAuthProvider(BaseProvider)|
+|`ClaudeOAuthProvider.USAGE_URL`|var|pub|32||
+|`ClaudeOAuthProvider.TOKEN_ENV_VAR`|var|pub|33||
+|`ClaudeOAuthProvider.__init__`|fn|priv|35-43|def __init__(self, token: str | None = None) -> None|
+|`ClaudeOAuthProvider.is_configured`|fn|pub|44-51|def is_configured(self) -> bool|
+|`ClaudeOAuthProvider.get_config_help`|fn|pub|52-59|def get_config_help(self) -> str|
+|`MAX_RETRIES`|var|pub|66||
+|`RETRY_BACKOFF_BASE`|var|pub|67||
+|`_request_usage`|fn|priv|69-70|async def _request_usage(|
+|`fetch`|fn|pub|95-134|async def fetch(self, window: WindowPeriod = WindowPeriod...|
+|`fetch_all_windows`|fn|pub|135-136|async def fetch_all_windows(|
+|`_handle_response`|fn|priv|189-190|def _handle_response(|
+|`_parse_response`|fn|priv|234-280|def _parse_response(self, data: dict, window: WindowPerio...|
 
 
 ---
