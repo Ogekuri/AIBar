@@ -24,6 +24,14 @@
   - `defining_files: scripts/install-gnome-extension.sh`
   - `thread_model: no explicit threads detected`
 
+- `id: PROC:test-ext`
+  - `type: Process`
+  - `parent_process: null`
+  - `role: GNOME extension development helper (start/enable/disable/reload/logs)`
+  - `entrypoint_symbols: case dispatch`
+  - `defining_files: scripts/test-gnome-extension.sh`
+  - `thread_model: no explicit threads detected`
+
 ## Execution Units
 
 ### PROC:install-ext
@@ -47,6 +55,27 @@
   - Git CLI for project root detection.
   - Local filesystem operations (directory creation, file copy).
   - ANSI terminal output.
+
+### PROC:test-ext
+- `Entrypoints`
+  - case dispatch: command router [`scripts/test-gnome-extension.sh`]
+- `Lifecycle/Trigger`
+  - Starts when user invokes `scripts/test-gnome-extension.sh {start|enable|disable|reload|logs}`.
+  - For `start`, `enable`, and `reload` commands, invokes `PROC:install-ext` to update extension files before executing the command.
+- `Internal Call-Trace Tree`
+  - case dispatch: command router [`scripts/test-gnome-extension.sh`]
+    - `update_extension(...)`: invokes `scripts/install-gnome-extension.sh` to update extension files [`scripts/test-gnome-extension.sh`]
+      - External boundary: subprocess call to `scripts/install-gnome-extension.sh`.
+    - `start)`: launches nested GNOME Shell with `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800` [`scripts/test-gnome-extension.sh`]
+      - External boundary: `dbus-run-session -- gnome-shell --nested --wayland`.
+    - `enable)`: enables extension via `gnome-extensions enable` [`scripts/test-gnome-extension.sh`]
+    - `disable)`: disables extension via `gnome-extensions disable` [`scripts/test-gnome-extension.sh`]
+    - `reload)`: disables then re-enables extension [`scripts/test-gnome-extension.sh`]
+    - `logs)`: tails GNOME Shell journal filtered by aibar [`scripts/test-gnome-extension.sh`]
+- `External Boundaries`
+  - `gnome-extensions` CLI for extension enable/disable.
+  - `dbus-run-session` and `gnome-shell` for nested shell.
+  - `journalctl` for log tailing.
 
 ### PROC:main
 - `Entrypoints`
@@ -252,6 +281,15 @@
   - Terminal emulator process launch.
 
 ## Communication Edges
+
+- `id: EDGE-004`
+  - `source: PROC:test-ext`
+  - `destination: PROC:install-ext`
+  - `direction: request-response`
+  - `mechanism: subprocess invocation`
+  - `endpoint_or_channel: scripts/install-gnome-extension.sh direct execution`
+  - `payload_data_shape: no structured payload; exit code signals success/failure`
+  - `declaration_files: scripts/test-gnome-extension.sh, scripts/install-gnome-extension.sh`
 
 - `id: EDGE-001`
   - `source: PROC:gnome-shell`

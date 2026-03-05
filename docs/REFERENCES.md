@@ -4,7 +4,8 @@
 ├── scripts
 │   ├── aibar.sh
 │   ├── claude_token_refresh.sh
-│   └── install-gnome-extension.sh
+│   ├── install-gnome-extension.sh
+│   └── test-gnome-extension.sh
 └── src
     └── aibar
         ├── aibar
@@ -25,7 +26,6 @@
         │   └── ui.py
         └── extension
             └── aibar@aibar.panel
-                ├── dev.sh
                 └── extension.js
 ```
 
@@ -158,6 +158,34 @@ target directory if absent, and copies all extension files preserving attributes
 |`EXT_SRC_REL`|var||71||
 |`EXT_TARGET_DIR`|var||72||
 |`main`|fn||81|main()|
+
+
+---
+
+# test-gnome-extension.sh | Shell | 62L | 4 symbols | 0 imports | 16 comments
+> Path: `scripts/test-gnome-extension.sh`
+
+## Definitions
+
+- var `SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"` (L15)
+- @brief Resolves the directory containing this script.
+- @details Uses readlink -f to resolve symlinks, then extracts dirname.
+- @return Absolute path to the script's parent directory.
+- var `readonly EXT_UUID="aibar@aibar.panel"` (L17)
+- var `readonly INSTALL_SCRIPT="${SCRIPT_DIR}/install-gnome-extension.sh"` (L18)
+- fn `update_extension() {` (L25)
+- @brief Runs the extension installer to update extension files.
+- @details Invokes install-gnome-extension.sh from the same scripts/ directory.
+Exits with non-zero status if the installer fails.
+- @return Exit 0 on success; propagates installer exit code on failure.
+- @satisfies REQ-031
+## Symbol Index
+|Symbol|Kind|Vis|Lines|Sig|
+|---|---|---|---|---|
+|`SCRIPT_DIR`|var||15||
+|`EXT_UUID`|var||17||
+|`INSTALL_SCRIPT`|var||18||
+|`update_extension`|fn||25|update_extension()|
 
 
 ---
@@ -1579,22 +1607,6 @@ from aibar.providers.base import (
 |`_update_window_buttons`|fn|priv|588-607|def _update_window_buttons(self) -> None|
 |`_update_json_view`|fn|priv|608-621|def _update_json_view(self) -> None|
 |`run_ui`|fn|pub|622-631|def run_ui() -> None|
-
-
----
-
-# dev.sh | Shell | 34L | 1 symbols | 0 imports | 4 comments
-> Path: `src/aibar/extension/aibar@aibar.panel/dev.sh`
-
-## Definitions
-
-- var `EXT_UUID="aibar@aibar.panel"` (L6)
-- @brief Development helper commands for aibar GNOME extension.
-- @details Wraps nested-shell start, enable/disable/reload, and log tail commands for local extension workflows with fixed 1024x800 nested-shell resolution.
-## Symbol Index
-|Symbol|Kind|Vis|Lines|Sig|
-|---|---|---|---|---|
-|`EXT_UUID`|var||6||
 
 
 ---
