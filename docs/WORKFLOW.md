@@ -27,8 +27,8 @@
 - `id: PROC:test-ext`
   - `type: Process`
   - `parent_process: null`
-  - `role: GNOME extension nested-shell test launcher (start only)`
-  - `entrypoint_symbols: case dispatch`
+  - `role: GNOME extension nested-shell test launcher (no subcommand)`
+  - `entrypoint_symbols: main script body`
   - `defining_files: scripts/test-gnome-extension.sh`
   - `thread_model: no explicit threads detected`
 
@@ -60,15 +60,15 @@
 
 ### PROC:test-ext
 - `Entrypoints`
-  - case dispatch: command router [`scripts/test-gnome-extension.sh`]
+  - main script body: direct execution [`scripts/test-gnome-extension.sh`]
 - `Lifecycle/Trigger`
-  - Starts when user invokes `scripts/test-gnome-extension.sh start`.
-  - Invokes `PROC:install-ext` to update and enable extension files before launching nested shell.
+  - Starts when user invokes `scripts/test-gnome-extension.sh` (no arguments required).
+  - Invokes `PROC:install-ext` to update and enable extension files, then launches nested shell.
 - `Internal Call-Trace Tree`
-  - case dispatch: command router [`scripts/test-gnome-extension.sh`]
+  - main script body: direct execution [`scripts/test-gnome-extension.sh`]
     - `update_extension(...)`: invokes `scripts/install-gnome-extension.sh` to update and enable extension files [`scripts/test-gnome-extension.sh`]
       - External boundary: subprocess call to `scripts/install-gnome-extension.sh`.
-    - `start)`: launches nested GNOME Shell with `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800` [`scripts/test-gnome-extension.sh`]
+    - nested shell launch: `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800 dbus-run-session -- gnome-shell --nested --wayland` [`scripts/test-gnome-extension.sh`]
       - External boundary: `dbus-run-session -- gnome-shell --nested --wayland`.
 - `External Boundaries`
   - `dbus-run-session` and `gnome-shell` for nested shell.

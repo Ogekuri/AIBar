@@ -162,7 +162,7 @@ target directory if absent, and copies all extension files preserving attributes
 
 ---
 
-# test-gnome-extension.sh | Shell | 43L | 4 symbols | 0 imports | 16 comments
+# test-gnome-extension.sh | Shell | 34L | 3 symbols | 0 imports | 16 comments
 > Path: `scripts/test-gnome-extension.sh`
 
 ## Definitions
@@ -171,9 +171,8 @@ target directory if absent, and copies all extension files preserving attributes
 - @brief Resolves the directory containing this script.
 - @details Uses readlink -f to resolve symlinks, then extracts dirname.
 - @return Absolute path to the script's parent directory.
-- var `readonly EXT_UUID="aibar@aibar.panel"` (L17)
-- var `readonly INSTALL_SCRIPT="${SCRIPT_DIR}/install-gnome-extension.sh"` (L18)
-- fn `update_extension() {` (L25)
+- var `readonly INSTALL_SCRIPT="${SCRIPT_DIR}/install-gnome-extension.sh"` (L17)
+- fn `update_extension() {` (L24)
 - @brief Runs the extension installer to update extension files.
 - @details Invokes install-gnome-extension.sh from the same scripts/ directory.
 Exits with non-zero status if the installer fails.
@@ -183,9 +182,8 @@ Exits with non-zero status if the installer fails.
 |Symbol|Kind|Vis|Lines|Sig|
 |---|---|---|---|---|
 |`SCRIPT_DIR`|var||15||
-|`EXT_UUID`|var||17||
-|`INSTALL_SCRIPT`|var||18||
-|`update_extension`|fn||25|update_extension()|
+|`INSTALL_SCRIPT`|var||17||
+|`update_extension`|fn||24|update_extension()|
 
 
 ---

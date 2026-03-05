@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # @file test-gnome-extension.sh
 # @brief Launches a nested GNOME Shell session for extension testing.
-# @details Invokes `install-gnome-extension.sh` to update extension files,
+# @details Invokes `install-gnome-extension.sh` to update and enable extension files,
 # then starts a nested GNOME Shell at 1024x800 resolution via
 # `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800 dbus-run-session -- gnome-shell --nested --wayland`.
-# Accepts only the `start` subcommand.
+# No subcommand parameter required; executes directly on invocation.
 # @satisfies PRJ-004, REQ-031, REQ-033
 
 set -euo pipefail
@@ -14,7 +14,6 @@ set -euo pipefail
 ## @return Absolute path to the script's parent directory.
 SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 
-readonly EXT_UUID="aibar@aibar.panel"
 readonly INSTALL_SCRIPT="${SCRIPT_DIR}/install-gnome-extension.sh"
 
 ## @brief Runs the extension installer to update extension files.
@@ -30,14 +29,6 @@ update_extension() {
     "${INSTALL_SCRIPT}"
 }
 
-case "${1:-}" in
-    start)
-        update_extension
-        echo "Starting nested GNOME Shell at 1024x800..."
-        env MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800 dbus-run-session -- gnome-shell --nested --wayland
-        ;;
-    *)
-        echo "Usage: $0 {start}"
-        exit 1
-        ;;
-esac
+update_extension
+echo "Starting nested GNOME Shell at 1024x800..."
+env MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800 dbus-run-session -- gnome-shell --nested --wayland

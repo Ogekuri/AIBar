@@ -1,7 +1,7 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.3.6"
+version: "0.3.7"
 date: "2026-03-05"
 author: "req-create"
 scope:
@@ -86,7 +86,7 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **PRJ-001**: MUST expose CLI subcommands `show`, `doctor`, `ui`, `env`, `setup`, and `login` under one Click command group.
 - **PRJ-002**: MUST aggregate provider metrics through a normalized provider contract for `claude`, `openai`, `openrouter`, `copilot`, and `codex`.
 - **PRJ-003**: MUST provide an interactive Textual UI with an Overview tab and a Raw JSON tab.
-- **PRJ-004**: MUST provide a GNOME Shell panel extension named `IABar Monitor` that executes `aibar show --json`, renders provider-specific cards, sets metadata owner identifiers (`url`, `github`) to `Ogekuri`, and forces `scripts/test-gnome-extension.sh start` nested-shell resolution to `1024x800` via `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800`.
+- **PRJ-004**: MUST provide a GNOME Shell panel extension named `IABar Monitor` that executes `aibar show --json`, renders provider-specific cards, sets metadata owner identifiers (`url`, `github`) to `Ogekuri`, and forces `scripts/test-gnome-extension.sh` nested-shell resolution to `1024x800` via `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800`.
 - **PRJ-005**: MUST maintain a machine-readable symbol inventory for repository code documentation under `docs/REFERENCES.md`.
 - **PRJ-006**: MUST provide a PEP 621-compliant `pyproject.toml` at repository root enabling installation via `uv pip install` and live execution via `uvx --from git+https://github.com/Ogekuri/AIBar.git aibar <command>`.
 - **PRJ-007**: MUST document in `README.md` a dedicated section covering `uv`-based installation, removal, and `uvx` live execution instructions.
@@ -142,9 +142,9 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **REQ-028**: MUST produce colored, formatted terminal output using ANSI escape sequences for status, success, error, and informational messages in `scripts/install-gnome-extension.sh`.
 - **REQ-029**: MUST copy all files from `src/aibar/extension/aibar@aibar.panel/` to target directory preserving file attributes via `cp -a`.
 - **REQ-030**: MUST exit with non-zero status and descriptive error message when any prerequisite check fails in `scripts/install-gnome-extension.sh`.
-- **REQ-031**: MUST invoke `scripts/install-gnome-extension.sh` before executing `start` command in `scripts/test-gnome-extension.sh` to update extension files.
+- **REQ-031**: MUST invoke `scripts/install-gnome-extension.sh` before launching the nested shell in `scripts/test-gnome-extension.sh` to update extension files.
 - **REQ-032**: MUST enable the extension via `gnome-extensions enable aibar@aibar.panel` after successful file copy in `scripts/install-gnome-extension.sh` with colored status output.
-- **REQ-033**: `scripts/test-gnome-extension.sh` MUST expose only the `start` subcommand; `enable`, `disable`, `reload`, and `logs` subcommands MUST NOT be present in the script.
+- **REQ-033**: `scripts/test-gnome-extension.sh` MUST NOT accept any subcommand parameter; it MUST execute the nested-shell launch directly on invocation without arguments.
 
 ## 4. Test Requirements
 
@@ -153,7 +153,7 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 - **TST-001**: MUST verify `show` rejects unsupported window/provider values with non-zero exit and Click `BadParameter` diagnostics, and MUST verify `Remaining credits: <remaining> / <limit>` appears for Claude/Codex/Copilot when both quota values exist.
 - **TST-002**: MUST verify credential precedence by asserting env vars override env-file values and provider stores for at least one provider.
 - **TST-003**: MUST verify cache persistence writes only successful results and redacts sensitive raw keys before disk serialization.
-- **TST-004**: MUST verify GNOME extension error path sets panel text `Err`, caps displayed error string length to 40 characters, renders quota-only card labels as `Remaining credits: <remaining>/<limit>` with bold `<remaining>`, renders reset labels with `Reset in:` prefix, renders Copilot `30d` bar/reset placement before remaining-credits text, renders popup labels `AIBar` and `Open AIBar UI`, and verifies `scripts/test-gnome-extension.sh start` includes `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800`.
+- **TST-004**: MUST verify GNOME extension error path sets panel text `Err`, caps displayed error string length to 40 characters, renders quota-only card labels as `Remaining credits: <remaining>/<limit>` with bold `<remaining>`, renders reset labels with `Reset in:` prefix, renders Copilot `30d` bar/reset placement before remaining-credits text, renders popup labels `AIBar` and `Open AIBar UI`, and verifies `scripts/test-gnome-extension.sh` includes `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800`.
 - **TST-005**: MUST verify Copilot provider always returns `window=30d` regardless of requested window argument.
 - **TST-006**: MUST verify `req --here --references` reproduces `docs/REFERENCES.md` without missing symbol entries and preserves Doxygen field extraction for documented symbols.
 - **TST-007**: MUST verify GNOME panel percentage labels render in Claude 5h, Claude 7d, Copilot, Codex 5h, Codex 7d order between icon and summary label, enforce provider style classes, enforce bold primary percentages (Claude 5h/Copilot/Codex 5h), and omit labels when source metrics are unavailable.
@@ -167,7 +167,7 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | PRJ-001 | `src/aibar/aibar/cli.py` + `main/show/doctor/ui/env/setup/login` + `@main.command()` declarations for all subcommands. |
 | PRJ-002 | `src/aibar/aibar/cli.py` + `get_providers` + returns Claude/OpenAI/OpenRouter/Copilot/Codex provider instances keyed by `ProviderName`. |
 | PRJ-003 | `src/aibar/aibar/ui.py` + `AIBarUI.compose` + defines `TabPane("Overview")` and `TabPane("Raw JSON")`. |
-| PRJ-004 | `src/aibar/extension/aibar@aibar.panel/metadata.json` + `name/url/github` with owner `Ogekuri`, `src/aibar/extension/aibar@aibar.panel/extension.js` + `_refreshData/_updateProviderCard` provider-card rendering behavior, and `scripts/test-gnome-extension.sh` + `start)` command exports `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800`. |
+| PRJ-004 | `src/aibar/extension/aibar@aibar.panel/metadata.json` + `name/url/github` with owner `Ogekuri`, `src/aibar/extension/aibar@aibar.panel/extension.js` + `_refreshData/_updateProviderCard` provider-card rendering behavior, and `scripts/test-gnome-extension.sh` exports `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800`. |
 | PRJ-005 | `docs/REFERENCES.md` + repository-wide symbol sections + machine-readable file/symbol index entries. |
 | PRJ-006 | `pyproject.toml` + `[build-system]`/`[project]`/`[project.scripts]` sections + `aibar = "aibar.cli:main"` console entry point enabling `uv pip install` and `uvx` execution. |
 | PRJ-007 | `README.md` + `## Installation (uv)` section + `uv pip install`, `uv pip uninstall`, `uvx --from` commands. |
@@ -223,7 +223,7 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | REQ-028 | `scripts/install-gnome-extension.sh` + ANSI color escape sequences for formatted output. |
 | REQ-029 | `scripts/install-gnome-extension.sh` + `cp -a` preserving file attributes. |
 | REQ-030 | `scripts/install-gnome-extension.sh` + `exit 1` on prerequisite failure with error message. |
-| REQ-031 | `scripts/test-gnome-extension.sh` + calls `install-gnome-extension.sh` before `start` command. |
+| REQ-031 | `scripts/test-gnome-extension.sh` + calls `install-gnome-extension.sh` before nested-shell launch. |
 | REQ-032 | `scripts/install-gnome-extension.sh` + `gnome-extensions enable aibar@aibar.panel` after file copy with colored status output. |
-| REQ-033 | `scripts/test-gnome-extension.sh` + only `start` subcommand present; `enable`, `disable`, `reload`, `logs` absent. |
+| REQ-033 | `scripts/test-gnome-extension.sh` + no subcommand parameter; executes nested-shell launch directly on invocation. |
 | TST-009 | `tests/test_install_gnome_extension.py` + executable check, syntax check, git root resolution, source validation, and missing-source exit code assertions. |
