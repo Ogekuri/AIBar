@@ -1611,7 +1611,7 @@ from aibar.providers.base import (
 
 ---
 
-# extension.js | JavaScript | 1099L | 14 symbols | 8 imports | 25 comments
+# extension.js | JavaScript | 1145L | 14 symbols | 8 imports | 26 comments
 > Path: `src/aibar/extension/aibar@aibar.panel/extension.js`
 - @brief GNOME Shell panel extension for aibar metrics.
 - @details Collects usage JSON from the aibar CLI and renders provider-specific quota/cost cards in the GNOME panel popup.
@@ -1661,13 +1661,13 @@ usage is effectively zero from the user's perspective (e.g. internal 0.04 -> 0.0
 - @details Applies init logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @return s {any} Function return value.
 
-### fn `const createWindowBar = (labelText) =>` (L424-470)
+### fn `const createWindowBar = (labelText) =>` (L470-516)
 - @brief Execute create provider card.
 - @details Applies create provider card logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @param {any} providerName Input parameter `providerName`.
 - @return s {any} Function return value.
 
-### fn `const updateWindowBar = (bar, pct, resetTime, useDays) =>` (L573-624)
+### fn `const updateWindowBar = (bar, pct, resetTime, useDays) =>` (L619-670)
 - @brief Execute populate provider card.
 - @details Applies populate provider card logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @param {any} card Input parameter `card`.
@@ -1675,16 +1675,16 @@ usage is effectively zero from the user's perspective (e.g. internal 0.04 -> 0.0
 - @param {any} data Input parameter `data`.
 - @return s {any} Function return value.
 
-### fn `const showResetPendingHint = () =>` (L587-590)
+### fn `const showResetPendingHint = () =>` (L633-636)
 
-### fn `const toPercent = (value) =>` (L866-871)
+### fn `const toPercent = (value) =>` (L912-917)
 - @brief Execute update u i.
 - @details Applies update u i logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @return s {any} Function return value.
 
-### fn `const getPanelUsageValues = (providerName, data) =>` (L873-930)
+### fn `const getPanelUsageValues = (providerName, data) =>` (L919-976)
 
-### class `export default class AIBarExtension` (L1065-1099)
+### class `export default class AIBarExtension` (L1111-1145)
 - @brief GNOME extension lifecycle adapter for AIBarIndicator registration. */
 - @brief Execute constructor.
 - @details Applies constructor logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
@@ -1701,10 +1701,10 @@ usage is effectively zero from the user's perspective (e.g. internal 0.04 -> 0.0
 |`_getProgressClass`|fn||101-107|function _getProgressClass(pct)|
 |`_isDisplayedZeroPercent`|fn||116-123|function _isDisplayedZeroPercent(pct)|
 |`AIBarIndicator`|class||127-426|class AIBarIndicator extends PanelMenu.Button|
-|`createWindowBar`|fn||424-470|const createWindowBar = (labelText) =>|
-|`updateWindowBar`|fn||573-624|const updateWindowBar = (bar, pct, resetTime, useDays) =>|
-|`showResetPendingHint`|fn||587-590|const showResetPendingHint = () =>|
-|`toPercent`|fn||866-871|const toPercent = (value) =>|
-|`getPanelUsageValues`|fn||873-930|const getPanelUsageValues = (providerName, data) =>|
-|`AIBarExtension`|class||1065-1099|export default class AIBarExtension|
+|`createWindowBar`|fn||470-516|const createWindowBar = (labelText) =>|
+|`updateWindowBar`|fn||619-670|const updateWindowBar = (bar, pct, resetTime, useDays) =>|
+|`showResetPendingHint`|fn||633-636|const showResetPendingHint = () =>|
+|`toPercent`|fn||912-917|const toPercent = (value) =>|
+|`getPanelUsageValues`|fn||919-976|const getPanelUsageValues = (providerName, data) =>|
+|`AIBarExtension`|class||1111-1145|export default class AIBarExtension|
 

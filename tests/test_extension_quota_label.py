@@ -77,6 +77,24 @@ def test_panel_percentage_labels_use_fixed_order_provider_styles_and_primary_bol
     assert "style_class: 'aibar-panel-pct aibar-panel-pct-secondary aibar-tab-label-codex'" in source
 
 
+def test_popup_open_triggers_bar_width_reapply() -> None:
+    """
+    @brief Verify popup open-state-changed handler invokes _applyBarWidths.
+    @details Ensures progress bar fill widths are recalculated on popup open
+    to fix zero-width bars when data arrived while popup was closed.
+    @satisfies REQ-017
+    """
+    source = EXTENSION_PATH.read_text(encoding="utf-8")
+    assert "open-state-changed" in source
+    assert "_applyBarWidths" in source
+    open_idx = source.index("open-state-changed")
+    apply_def_idx = source.index("_applyBarWidths()")
+    assert open_idx < apply_def_idx, "_applyBarWidths must be defined after open-state-changed connection"
+    assert "card._barData.fiveHour" in source
+    assert "card._barData.sevenDay" in source
+    assert "card._barData.progress" in source
+
+
 def test_panel_percentage_labels_hide_when_metrics_are_unavailable() -> None:
     """
     @brief Verify panel percentage labels are omitted when usage metrics are unavailable.

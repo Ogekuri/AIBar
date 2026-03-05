@@ -297,6 +297,52 @@ class AIBarIndicator extends PanelMenu.Button {
         });
         this._lastUpdatedItem.label.style_class = 'aibar-last-updated';
         this.menu.addMenuItem(this._lastUpdatedItem);
+
+        this.menu.connect('open-state-changed', (_menu, isOpen) => {
+            if (isOpen)
+                this._applyBarWidths();
+        });
+    }
+
+    /**
+     * @brief Re-apply progress bar fill widths for all provider cards.
+     * @details Scheduled via GLib.idle_add after popup open so widgets have
+     * valid allocation widths. Reads cached _barData written by
+     * _populateProviderCard to avoid redundant data lookup.
+     * @satisfies REQ-017
+     */
+    _applyBarWidths() {
+        GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+            for (let [, card] of Object.entries(this._providerRows)) {
+                if (!card._barData)
+                    continue;
+
+                if (card._barData.fiveHour) {
+                    let bgW = card.fiveHourBar.barBg.get_width();
+                    if (bgW > 0) {
+                        let w = Math.round((card._barData.fiveHour.pct / 100) * bgW);
+                        card.fiveHourBar.barFill.set_width(w);
+                    }
+                }
+
+                if (card._barData.sevenDay) {
+                    let bgW = card.sevenDayBar.barBg.get_width();
+                    if (bgW > 0) {
+                        let w = Math.round((card._barData.sevenDay.pct / 100) * bgW);
+                        card.sevenDayBar.barFill.set_width(w);
+                    }
+                }
+
+                if (card._barData.progress) {
+                    let bgW = card.progressBg ? card.progressBg.get_width() : 0;
+                    if (bgW > 0) {
+                        let w = Math.round((card._barData.progress.pct / 100) * bgW);
+                        card.progressFill.set_width(w);
+                    }
+                }
+            }
+            return GLib.SOURCE_REMOVE;
+        });
     }
 
     /**

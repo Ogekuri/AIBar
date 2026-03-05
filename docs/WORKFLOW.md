@@ -257,6 +257,7 @@
       - `AIBarIndicator._buildPopupMenu(...)`: popup structure and actions setup [`src/aibar/extension/aibar@aibar.panel/extension.js`]
         - `AIBarIndicator._refreshData(...)`: refresh action handler [`src/aibar/extension/aibar@aibar.panel/extension.js`]
         - `AIBarIndicator._openTerminalWithCommand(...)`: UI-launch action handler [`src/aibar/extension/aibar@aibar.panel/extension.js`]
+        - menu `open-state-changed` callback -> `AIBarIndicator._applyBarWidths(...)`: re-apply progress bar fill widths on popup open using cached `_barData` [`src/aibar/extension/aibar@aibar.panel/extension.js`]
       - `AIBarIndicator._refreshData(...)`: subprocess-based JSON refresh [`src/aibar/extension/aibar@aibar.panel/extension.js`]
         - `_loadEnvFromFile(...)`: extension env map parse [`src/aibar/extension/aibar@aibar.panel/extension.js`]
         - `_getAiBarPath(...)`: executable path resolution [`src/aibar/extension/aibar@aibar.panel/extension.js`]
