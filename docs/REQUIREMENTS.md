@@ -96,7 +96,7 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **CTN-001**: MUST resolve provider credentials with precedence: environment variable, then `~/.config/aibar/env`, then provider-specific local credential stores.
 - **CTN-002**: MUST represent provider fetch output with `ProviderResult` containing `provider`, `window`, `metrics`, `updated_at`, `raw`, and optional `error`.
 - **CTN-003**: MUST perform external HTTP API calls with `httpx.AsyncClient(timeout=30.0)` for provider integrations.
-- **CTN-004**: MUST cache successful non-Claude provider results with per-provider TTL and disk persistence under `~/.cache/aibar`.
+- **CTN-004**: MUST cache successful non-Claude provider results with per-provider TTL and disk persistence under `~/.cache/aibar`, and MUST persist latest successful Claude dual-window payload for HTTP 429 fallback rendering.
 - **CTN-005**: MAY depend on unofficial/internal endpoints when official usage APIs are unavailable for Claude, Copilot, or Codex integrations.
 - **CTN-006**: MUST keep `docs/REFERENCES.md` synchronized with symbols defined under `src/` and `.github/workflows/`.
 - **CTN-007**: MUST declare `hatchling` as `[build-system]` backend in `pyproject.toml` with `[project]` metadata including `name`, `version`, `requires-python`, `dependencies`, and `[project.scripts]` console entry point.
@@ -147,7 +147,8 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **REQ-033**: `scripts/test-gnome-extension.sh` MUST NOT accept any subcommand parameter; it MUST execute the nested-shell launch directly on invocation without arguments.
 - **REQ-034**: MUST render reset countdown as `Resets in: <d>d <h>h <m>m` for durations >= 24 hours in CLI text output.
 - **REQ-035**: MUST print `Remaining credits: <remaining> / <limit>` for Claude, Codex, and Copilot when both values exist in CLI text output.
-- **REQ-036**: MUST treat Claude HTTP 429 responses as partial-window state: 5h prints `Error: Rate limited. Try again later.` while 5h and 7d both render `Usage: ... 100.0%` and `Resets in:` lines.
+- **REQ-036**: MUST render Claude HTTP 429 as partial-window output: 5h shows `Error: Rate limited. Try again later.` and `Usage: ... 100.0%`; 5h reset and all 7d usage/reset values MUST use persisted Claude payload when available.
+- **REQ-037**: MUST use synthetic Claude partial-window fallback values when persisted Claude payload is unavailable during HTTP 429 rendering.
 
 ## 4. Test Requirements
 
@@ -155,7 +156,7 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 
 - **TST-001**: MUST verify `show` rejects unsupported window/provider values with non-zero exit and Click `BadParameter` diagnostics.
 - **TST-002**: MUST verify credential precedence by asserting env vars override env-file values and provider stores for at least one provider.
-- **TST-003**: MUST verify cache persistence writes only successful non-Claude results, redacts sensitive raw keys before disk serialization, and bypasses cache reads/writes for Claude API fetch paths.
+- **TST-003**: MUST verify cache persistence writes only successful non-Claude results, redacts sensitive raw keys before disk serialization, bypasses TTL cache reuse for Claude fetch paths, and persists Claude dual-window snapshot data for HTTP 429 fallback.
 - **TST-004**: MUST verify GNOME extension error path sets panel text `Err`, caps displayed error string length to 40 characters, renders quota-only card labels as `Remaining credits: <remaining>/<limit>` with bold `<remaining>`, renders reset labels with `Reset in:` prefix, renders Copilot `30d` bar/reset placement before remaining-credits text, renders popup labels `AIBar` and `Open AIBar UI`, and verifies `scripts/test-gnome-extension.sh` includes `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800`.
 - **TST-005**: MUST verify Copilot provider always returns `window=30d` regardless of requested window argument.
 - **TST-006**: MUST verify `req --here --references` reproduces `docs/REFERENCES.md` without missing symbol entries and preserves Doxygen field extraction for documented symbols.
@@ -163,7 +164,7 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 - **TST-008**: MUST verify `pyproject.toml` declares `[build-system]` with `hatchling`, `[project.scripts]` entry `aibar = "aibar.cli:main"`, runtime `dependencies` list, and `requires-python` constraint.
 - **TST-009**: MUST verify `scripts/install-gnome-extension.sh` is executable, passes `bash -n` syntax check, resolves git root correctly, validates source directory, and produces non-zero exit on missing source.
 - **TST-010**: MUST verify `Remaining credits: <remaining> / <limit>` appears for Claude, Codex, and Copilot when both quota values exist.
-- **TST-011**: MUST verify Claude dual-window text output on HTTP 429 prints rate-limit error only in 5h and still renders `Usage: ... 100.0%` plus `Resets in:` in both 5h and 7d sections.
+- **TST-011**: MUST verify Claude dual-window text output on HTTP 429 prints rate-limit error only in 5h, keeps 5h usage at `100.0%`, and renders 7d usage/reset values from persisted Claude payload.
 
 ## 5. Evidence
 
@@ -179,7 +180,7 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | CTN-001 | `src/aibar/aibar/config.py` + `Config.get_token` + env var -> env file -> provider-specific stores (`ClaudeCLIAuth`, `CodexCredentialStore`, `CopilotCredentialStore`). |
 | CTN-002 | `src/aibar/aibar/providers/base.py` + `ProviderResult` model + fields `provider/window/metrics/updated_at/raw/error`. |
 | CTN-003 | `src/aibar/aibar/providers/*.py` + `fetch` methods + `httpx.AsyncClient(timeout=30.0)` in Claude/OpenAI/OpenRouter/Copilot/Codex providers. |
-| CTN-004 | `src/aibar/aibar/cache.py` + `ResultCache` + `_is_cacheable_provider` disables Claude cache/cooldown while preserving TTL+disk cache for non-Claude providers. |
+| CTN-004 | `src/aibar/aibar/cache.py` + `ResultCache` + non-Claude TTL+disk cache plus `src/aibar/aibar/cli.py` + Claude dual-window snapshot persistence for HTTP 429 fallback rendering. |
 | CTN-005 | `src/aibar/aibar/config.py` + `PROVIDER_INFO` notes + entries describing unofficial/internal usage for Claude, Copilot, and Codex. |
 | CTN-006 | `docs/REFERENCES.md` + full symbol index grouped by source file, regenerated from repository code. |
 | CTN-007 | `pyproject.toml` + `[build-system] requires = ["hatchling"]` + `[project]` metadata fields `name`, `version`, `requires-python`, `dependencies`, `[project.scripts]`. |
@@ -215,17 +216,18 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | REQ-024 | `src/aibar/aibar/__main__.py` + `main()` import and invocation from `aibar.cli`. |
 | REQ-034 | `src/aibar/aibar/cli.py` + `_format_reset_duration/_print_result` + day-token reset countdown formatting in text output. |
 | REQ-035 | `src/aibar/aibar/cli.py` + `_print_result` + remaining-credits line for Claude/Codex/Copilot when `remaining` and `limit` are present. |
-| REQ-036 | `src/aibar/aibar/cli.py` + `_fetch_claude_dual/_print_result` + Claude HTTP 429 partial-window rendering with 5h error-only marker and dual-window usage/reset output continuity. |
+| REQ-036 | `src/aibar/aibar/cli.py` + `_fetch_claude_dual/_print_result` + Claude HTTP 429 output keeps 5h error+100% while 7d usage/reset are restored from persisted Claude payload. |
+| REQ-037 | `src/aibar/aibar/cli.py` + Claude HTTP 429 fallback path synthesizes deterministic values when no persisted Claude payload is available. |
 | TST-001 | `src/aibar/aibar/cli.py` + `parse_window/parse_provider` provide validation points for invalid input diagnostics. |
 | TST-002 | `src/aibar/aibar/config.py` + `get_token` implements explicit precedence chain requiring regression coverage. |
-| TST-003 | `tests/test_claude_retry_and_cli_cache.py`, `tests/test_claude_dual_cooldown_symmetry.py`, `tests/test_ui_claude_cache_bypass.py`, and `src/aibar/aibar/cache.py` + validate non-Claude cache persistence/redaction and Claude cache bypass semantics. |
+| TST-003 | `tests/test_claude_retry_and_cli_cache.py`, `tests/test_claude_dual_cooldown_symmetry.py`, `tests/test_ui_claude_cache_bypass.py`, and `src/aibar/aibar/cache.py` + validate non-Claude cache persistence/redaction, Claude TTL-cache bypass, and Claude dual-window snapshot persistence. |
 | TST-004 | `tests/test_extension_quota_label.py` + popup-label assertions (`AIBar`, `Open AIBar UI`) and quota/reset label assertions, `tests/test_extension_dev_script.py` + `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800` start-command assertion against `scripts/test-gnome-extension.sh`, and `src/aibar/extension/aibar@aibar.panel/extension.js` + `_handleError/_populateProviderCard/_buildPopupMenu` for error label/truncation, quota-label format, reset-prefix format, Copilot `30d` ordering, and popup branding text. |
 | TST-005 | `src/aibar/aibar/providers/copilot.py` + `fetch` hard-codes `effective_window` to `WindowPeriod.DAY_30`. |
 | TST-006 | `docs/REFERENCES.md` + generated symbol coverage for tracked `src/` files validates documentation inventory completeness. |
 | TST-007 | `tests/test_extension_quota_label.py` + panel-segment assertions for five-label order, provider style classes, bold primary percentages, and missing-metric omission behavior. |
 | TST-008 | `tests/test_pyproject_metadata.py` + assertions for `[build-system]` backend, `[project.scripts]` entry, `dependencies` list, and `requires-python` constraint in `pyproject.toml`. |
 | TST-010 | `tests/test_reset_pending_message.py` and `src/aibar/aibar/cli.py` + verify remaining-credits rendering path in text output for quota providers. |
-| TST-011 | `tests/test_claude_rate_limit_partial_window.py` and `src/aibar/aibar/cli.py` + verify Claude HTTP 429 renders error only in 5h while both windows still render usage/reset lines. |
+| TST-011 | `tests/test_claude_rate_limit_partial_window.py` and `src/aibar/aibar/cli.py` + verify Claude HTTP 429 renders error only in 5h, keeps 5h at 100%, and restores 7d usage/reset from persisted payload. |
 | PRJ-008 | `scripts/install-gnome-extension.sh` + copies extension files from `src/aibar/extension/aibar@aibar.panel/` to `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/` + enables extension via `gnome-extensions enable`. |
 | REQ-025 | `scripts/install-gnome-extension.sh` + `git rev-parse --show-toplevel` for project root resolution. |
 | REQ-026 | `scripts/install-gnome-extension.sh` + `mkdir -p` for target directory creation. |

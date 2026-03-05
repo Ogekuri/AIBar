@@ -7,8 +7,10 @@
 import asyncio
 import json
 import math
+import os
 import sys
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import click
 from click.core import ParameterSource
@@ -38,6 +40,21 @@ _WINDOW_PERIOD_TIMEDELTA: dict[WindowPeriod, timedelta] = {
     WindowPeriod.DAY_30: timedelta(days=30),
 }
 _RESET_PENDING_MESSAGE = "Starts when the first message is sent"
+_CLAUDE_DUAL_SNAPSHOT_FILENAME = "claude_dual_last_success.json"
+
+
+def _claude_snapshot_path() -> Path:
+    """
+    @brief Resolve file path for persisted Claude dual-window success payload.
+    @details Uses `XDG_CACHE_HOME` when defined; otherwise falls back to
+    `~/.cache/aibar`. Returned path is used only for Claude HTTP 429 fallback
+    rendering and does not participate in generic ResultCache TTL reads.
+    @return {Path} Absolute snapshot path for Claude dual-window payload.
+    @satisfies CTN-004
+    """
+    xdg_cache = os.environ.get("XDG_CACHE_HOME")
+    base = Path(xdg_cache) if xdg_cache else Path.home() / ".cache"
+    return base / "aibar" / _CLAUDE_DUAL_SNAPSHOT_FILENAME
 
 
 def _project_next_reset(resets_at_str: str, window: WindowPeriod) -> datetime | None:
@@ -214,12 +231,12 @@ def _fetch_claude_dual(
     Cache parameter is accepted for call-site compatibility but intentionally unused
     because Claude requests MUST bypass cache reuse.
     If Claude returns HTTP 429 for both windows, normalize to a partial-window state:
-    keep the user-facing error only on 5h, while both windows retain deterministic
-    usage/reset metrics for CLI rendering continuity.
+    keep the user-facing error only on 5h, force 5h usage to 100%, and restore 7d
+    usage/reset plus 5h reset from persisted Claude success payload when available.
     @param provider {ClaudeOAuthProvider} Claude provider instance.
     @param cache {ResultCache} Compatibility parameter; ignored for Claude fetch path.
     @return {tuple[ProviderResult, ProviderResult]} (5h_result, 7d_result).
-    @satisfies REQ-002, REQ-036, CTN-004
+    @satisfies REQ-002, REQ-036, REQ-037, CTN-004
     """
     del cache
     windows = [WindowPeriod.HOUR_5, WindowPeriod.DAY_7]
@@ -242,19 +259,186 @@ def _fetch_claude_dual(
         window=WindowPeriod.DAY_7, error="Missing 7d result"
     )
 
+    if not result_5h.is_error and not result_7d.is_error:
+        _persist_claude_dual_snapshot(result_5h, result_7d)
+
     if _is_claude_rate_limited_result(result_5h) and _is_claude_rate_limited_result(
         result_7d
     ):
+        snapshot_payload = _load_claude_dual_snapshot()
         return (
             _build_claude_rate_limited_partial_result(
-                WindowPeriod.HOUR_5, include_error=True
+                WindowPeriod.HOUR_5,
+                include_error=True,
+                snapshot_payload=snapshot_payload,
             ),
             _build_claude_rate_limited_partial_result(
-                WindowPeriod.DAY_7, include_error=False
+                WindowPeriod.DAY_7,
+                include_error=False,
+                snapshot_payload=snapshot_payload,
             ),
         )
 
     return result_5h, result_7d
+
+
+def _persist_claude_dual_snapshot(
+    result_5h: ProviderResult,
+    result_7d: ProviderResult,
+) -> None:
+    """
+    @brief Persist latest successful Claude dual-window payload for 429 restoration.
+    @details Extracts a valid dual-window raw payload (`five_hour` and `seven_day`)
+    from successful Claude results and writes it to disk under cache home. Errors
+    during serialization or I/O are ignored to keep fetch path non-fatal.
+    @param result_5h {ProviderResult} Claude five-hour successful result.
+    @param result_7d {ProviderResult} Claude seven-day successful result.
+    @return {None} Function return value.
+    @satisfies CTN-004
+    @satisfies REQ-036
+    """
+    payload = _extract_claude_dual_payload(result_5h, result_7d)
+    if payload is None:
+        return
+
+    path = _claude_snapshot_path()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload), encoding="utf-8")
+    except (OSError, ValueError, TypeError):
+        return
+
+
+def _extract_claude_dual_payload(
+    result_5h: ProviderResult,
+    result_7d: ProviderResult,
+) -> dict[str, object] | None:
+    """
+    @brief Extract dual-window Claude payload dictionary from successful results.
+    @details Returns first raw payload containing both `five_hour` and `seven_day`
+    mapping objects. Returns None when payload shape is invalid.
+    @param result_5h {ProviderResult} Claude five-hour result.
+    @param result_7d {ProviderResult} Claude seven-day result.
+    @return {dict[str, object] | None} Serializable payload or None.
+    @satisfies CTN-004
+    """
+    for payload in (result_7d.raw, result_5h.raw):
+        if not isinstance(payload, dict):
+            continue
+        if isinstance(payload.get("five_hour"), dict) and isinstance(
+            payload.get("seven_day"), dict
+        ):
+            return payload
+    return None
+
+
+def _load_claude_dual_snapshot() -> dict[str, object] | None:
+    """
+    @brief Load persisted Claude dual-window payload for HTTP 429 fallback.
+    @details Reads prioritized snapshot candidates from cache home, validates
+    required keys, and returns parsed payload when both `five_hour` and
+    `seven_day` objects exist. Supports direct raw payload files and serialized
+    ProviderResult files (`raw` field). Invalid/missing files return None.
+    @return {dict[str, object] | None} Parsed payload or None.
+    @satisfies REQ-036
+    @satisfies REQ-037
+    """
+    primary = _claude_snapshot_path()
+    candidates = [
+        primary,
+        primary.with_name("claude_7d.json"),
+        primary.with_name("claude_5h.json"),
+    ]
+    for path in candidates:
+        if not path.exists():
+            continue
+        try:
+            decoded = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        payload = _normalize_claude_dual_payload(decoded)
+        if payload is not None:
+            return payload
+    return None
+
+
+def _normalize_claude_dual_payload(payload: object) -> dict[str, object] | None:
+    """
+    @brief Normalize persisted Claude payload shape into dual-window raw dictionary.
+    @details Accepts either direct dual-window payload (`five_hour`/`seven_day`) or
+    serialized ProviderResult dictionaries containing a `raw` field with that shape.
+    @param payload {object} Decoded JSON object from snapshot candidate file.
+    @return {dict[str, object] | None} Normalized dual-window payload or None.
+    @satisfies REQ-036
+    """
+    if not isinstance(payload, dict):
+        return None
+
+    raw_payload = payload
+    if "raw" in payload and isinstance(payload.get("raw"), dict):
+        raw_payload = payload["raw"]
+
+    if not isinstance(raw_payload.get("five_hour"), dict):
+        return None
+    if not isinstance(raw_payload.get("seven_day"), dict):
+        return None
+    return raw_payload
+
+
+def _extract_snapshot_reset_at(
+    snapshot_payload: dict[str, object] | None,
+    window: WindowPeriod,
+) -> datetime | None:
+    """
+    @brief Resolve projected reset timestamp from persisted Claude snapshot payload.
+    @details Uses window-specific `resets_at` string from persisted payload and
+    projects next reset boundary through `_project_next_reset`.
+    @param snapshot_payload {dict[str, object] | None} Persisted dual-window payload.
+    @param window {WindowPeriod} Target window period.
+    @return {datetime | None} Projected reset timestamp or None.
+    @satisfies REQ-036
+    """
+    if snapshot_payload is None:
+        return None
+    window_key = "seven_day" if window == WindowPeriod.DAY_7 else "five_hour"
+    window_data = snapshot_payload.get(window_key)
+    if not isinstance(window_data, dict):
+        return None
+    resets_at = window_data.get("resets_at")
+    if not isinstance(resets_at, str) or not resets_at:
+        return None
+    return _project_next_reset(resets_at, window)
+
+
+def _extract_snapshot_utilization(
+    snapshot_payload: dict[str, object] | None,
+    window: WindowPeriod,
+) -> float | None:
+    """
+    @brief Resolve utilization percentage from persisted Claude snapshot payload.
+    @details Reads window-specific `utilization`, validates finite range, and clamps
+    values to [0.0, 100.0] for deterministic percentage rendering.
+    @param snapshot_payload {dict[str, object] | None} Persisted dual-window payload.
+    @param window {WindowPeriod} Target window period.
+    @return {float | None} Clamped utilization percentage or None.
+    @satisfies REQ-036
+    """
+    if snapshot_payload is None:
+        return None
+    window_key = "seven_day" if window == WindowPeriod.DAY_7 else "five_hour"
+    window_data = snapshot_payload.get(window_key)
+    if not isinstance(window_data, dict):
+        return None
+    value = window_data.get("utilization")
+    if not isinstance(value, (int, float, str)):
+        return None
+    try:
+        utilization = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(utilization):
+        return None
+    return max(0.0, min(100.0, utilization))
 
 
 def _is_claude_rate_limited_result(result: ProviderResult) -> bool:
@@ -276,27 +460,46 @@ def _is_claude_rate_limited_result(result: ProviderResult) -> bool:
 def _build_claude_rate_limited_partial_result(
     window: WindowPeriod,
     include_error: bool,
+    snapshot_payload: dict[str, object] | None = None,
 ) -> ProviderResult:
     """
-    @brief Build synthetic Claude 429 result with deterministic 100% usage/reset data.
-    @details Creates partial-window output state used by CLI rendering: remaining=0,
-    limit=100, and reset projected from current UTC time + window duration. The 5h
-    window keeps a visible error line; the 7d window suppresses the error line.
+    @brief Build Claude 429 partial-window result using persisted payload when available.
+    @details For 5h window, usage is always forced to 100.0% while reset time is read
+    from persisted payload (`five_hour.resets_at`) when possible. For 7d window,
+    utilization and reset are restored from persisted payload (`seven_day`) when
+    available; otherwise synthetic window-based fallback values are used.
     @param window {WindowPeriod} Window associated with the synthetic result.
     @param include_error {bool} True to include `Rate limited...` error text.
+    @param snapshot_payload {dict[str, object] | None} Persisted Claude payload for
+        429 restoration.
     @return {ProviderResult} Claude result suitable for partial-window display.
     @satisfies REQ-036
+    @satisfies REQ-037
     """
-    reset_at = datetime.now(timezone.utc) + _WINDOW_PERIOD_TIMEDELTA[window]
+    reset_at = _extract_snapshot_reset_at(snapshot_payload, window)
+    if reset_at is None:
+        reset_at = datetime.now(timezone.utc) + _WINDOW_PERIOD_TIMEDELTA[window]
+
+    utilization = 100.0
+    if window == WindowPeriod.DAY_7:
+        persisted_utilization = _extract_snapshot_utilization(snapshot_payload, window)
+        if persisted_utilization is not None:
+            utilization = persisted_utilization
+
+    remaining = max(0.0, min(100.0, 100.0 - utilization))
     return ProviderResult(
         provider=ProviderName.CLAUDE,
         window=window,
         metrics=UsageMetrics(
-            remaining=0.0,
+            remaining=remaining,
             limit=100.0,
             reset_at=reset_at,
         ),
-        raw={"status_code": 429, "rate_limit_partial": True},
+        raw={
+            "status_code": 429,
+            "rate_limit_partial": True,
+            "snapshot_restored": snapshot_payload is not None,
+        },
         error="Rate limited. Try again later." if include_error else None,
     )
 
