@@ -6,6 +6,7 @@
 
 import asyncio
 import os
+import random
 from datetime import datetime
 
 import httpx
@@ -63,8 +64,9 @@ class ClaudeOAuthProvider(BaseProvider):
 
 Note: Token must start with 'sk-ant-' prefix."""
 
-    MAX_RETRIES = 2
-    RETRY_BACKOFF_BASE = 1.0
+    MAX_RETRIES = 3
+    RETRY_BACKOFF_BASE = 2.0
+    RETRY_JITTER_MAX = 1.0
 
     async def _request_usage(
         self, client: httpx.AsyncClient
@@ -72,7 +74,9 @@ Note: Token must start with 'sk-ant-' prefix."""
         """
         @brief Execute HTTP GET to usage endpoint with retry on HTTP 429.
         @details Retries up to MAX_RETRIES times on 429 responses, respecting
-        the retry-after header with exponential backoff fallback.
+        the retry-after header with exponential backoff fallback and random
+        jitter to prevent thundering-herd synchronization. Backoff sequence
+        with RETRY_BACKOFF_BASE=2.0: ~2-3s, ~4-5s, ~8-9s (total ~14-17s).
         @param client {httpx.AsyncClient} Reusable HTTP client session.
         @return {httpx.Response} Final HTTP response after retries exhausted or success.
         """
@@ -87,7 +91,8 @@ Note: Token must start with 'sk-ant-' prefix."""
             if response.status_code != 429:
                 return response
             retry_after = float(response.headers.get("retry-after", "0"))
-            delay = max(retry_after, self.RETRY_BACKOFF_BASE * (2 ** attempt))
+            jitter = random.uniform(0, self.RETRY_JITTER_MAX)
+            delay = max(retry_after, self.RETRY_BACKOFF_BASE * (2 ** attempt)) + jitter
             await asyncio.sleep(delay)
             response = await client.get(self.USAGE_URL, headers=headers)
         return response

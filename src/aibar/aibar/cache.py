@@ -49,6 +49,7 @@ class ResultCache:
         ProviderName.OPENROUTER: 180,  # 3 minutes - credits update periodically
         ProviderName.COPILOT: 300,  # 5 minutes - reports are slow to update
     }
+    RATE_LIMIT_COOLDOWN = 30  # seconds to wait before retrying after HTTP 429
 
     def __init__(self, cache_dir: Path | None = None) -> None:
         """
@@ -135,9 +136,12 @@ class ResultCache:
         )
         self._memory_cache[key] = entry
 
-        # Persist to disk if successful
+        # Persist to disk if successful; activate cooldown on 429
         if not result.is_error:
             self._save_to_disk(result)
+            self.clear_rate_limit(result.provider)
+        elif result.raw.get("status_code") == 429:
+            self.set_rate_limited(result.provider)
 
     def get_last_good(self, provider: ProviderName, window: WindowPeriod) -> ProviderResult | None:
         """
@@ -172,6 +176,66 @@ class ResultCache:
 
         for key in keys_to_remove:
             del self._memory_cache[key]
+
+    def _cooldown_path(self, provider: ProviderName) -> Path:
+        """
+        @brief Resolve disk path for provider rate-limit cooldown marker.
+        @details Returns path under cache directory keyed by provider name.
+        @param provider {ProviderName} Provider to resolve cooldown path for.
+        @return {Path} Absolute path to cooldown marker file.
+        """
+        return self._cache_dir / f"{provider.value}_rate_limited"
+
+    def set_rate_limited(self, provider: ProviderName) -> None:
+        """
+        @brief Write rate-limit cooldown marker to disk for a provider.
+        @details Persists current UTC timestamp to cooldown file. Subsequent
+        is_rate_limited calls within RATE_LIMIT_COOLDOWN seconds return True.
+        Silently ignores disk write failures.
+        @param provider {ProviderName} Provider to mark as rate-limited.
+        @return {None} No return value.
+        """
+        path = self._cooldown_path(provider)
+        try:
+            with open(path, "w") as f:
+                f.write(str(datetime.now(timezone.utc).timestamp()))
+        except (OSError, IOError):
+            pass
+
+    def is_rate_limited(self, provider: ProviderName) -> bool:
+        """
+        @brief Check whether provider is in rate-limit cooldown period.
+        @details Reads timestamp from cooldown marker file. Returns True if age
+        is less than RATE_LIMIT_COOLDOWN seconds. Expired markers are deleted.
+        @param provider {ProviderName} Provider to check cooldown for.
+        @return {bool} True if provider is within cooldown period.
+        """
+        path = self._cooldown_path(provider)
+        if not path.exists():
+            return False
+        try:
+            with open(path) as f:
+                ts = float(f.read().strip())
+            age = datetime.now(timezone.utc).timestamp() - ts
+            if age < self.RATE_LIMIT_COOLDOWN:
+                return True
+            path.unlink(missing_ok=True)
+            return False
+        except (OSError, IOError, ValueError):
+            return False
+
+    def clear_rate_limit(self, provider: ProviderName) -> None:
+        """
+        @brief Remove rate-limit cooldown marker for a provider.
+        @details Deletes cooldown marker file if present. Called on successful fetch.
+        @param provider {ProviderName} Provider to clear cooldown for.
+        @return {None} No return value.
+        """
+        path = self._cooldown_path(provider)
+        try:
+            path.unlink(missing_ok=True)
+        except (OSError, IOError):
+            pass
 
     def _save_to_disk(self, result: ProviderResult) -> None:
         """

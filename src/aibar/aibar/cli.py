@@ -91,6 +91,10 @@ def _fetch_result(
         cached = cache.get(provider.name, window)
         if cached is not None:
             return cached
+        if cache.is_rate_limited(provider.name):
+            last_good = cache.get_last_good(provider.name, window)
+            if last_good is not None:
+                return last_good
 
     try:
         result = asyncio.run(provider.fetch(window))
@@ -133,6 +137,17 @@ def _fetch_claude_dual(
             missing_windows.append(w)
 
     if not missing_windows:
+        return cached_results[WindowPeriod.HOUR_5], cached_results[WindowPeriod.DAY_7]
+
+    if cache.is_rate_limited(provider.name):
+        for w in missing_windows:
+            last_good = cache.get_last_good(provider.name, w)
+            if last_good is not None:
+                cached_results[w] = last_good
+            else:
+                cached_results[w] = provider._make_error_result(
+                    window=w, error="Rate limited. Try again later.",
+                )
         return cached_results[WindowPeriod.HOUR_5], cached_results[WindowPeriod.DAY_7]
 
     try:

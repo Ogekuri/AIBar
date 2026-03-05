@@ -10,6 +10,7 @@ retry-after header, (2) CLI show path uses ResultCache before API calls,
 
 import asyncio
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -89,13 +90,14 @@ class TestClaudeRetryOn429:
         mock_responses = [_make_429_response("0"), _make_200_response()]
 
         with patch("aibar.providers.claude_oauth.asyncio.sleep", new_callable=AsyncMock):
-            with patch.object(
-                httpx.AsyncClient,
-                "get",
-                new_callable=AsyncMock,
-                side_effect=mock_responses,
-            ):
-                result = asyncio.run(provider.fetch(WindowPeriod.DAY_7))
+            with patch("aibar.providers.claude_oauth.random.uniform", return_value=0.0):
+                with patch.object(
+                    httpx.AsyncClient,
+                    "get",
+                    new_callable=AsyncMock,
+                    side_effect=mock_responses,
+                ):
+                    result = asyncio.run(provider.fetch(WindowPeriod.DAY_7))
 
         assert not result.is_error
         assert result.metrics.remaining == 70.0
@@ -103,18 +105,20 @@ class TestClaudeRetryOn429:
     def test_returns_error_after_max_retries_exhausted(self) -> None:
         """
         @brief Verify provider returns rate-limit error when all retries fail.
+        @details MAX_RETRIES=3 → 1 initial + 3 retries = 4 total HTTP calls.
         """
         provider = ClaudeOAuthProvider(token="sk-ant-test-token")
-        all_429 = [_make_429_response("0")] * 3
+        all_429 = [_make_429_response("0")] * 4
 
         with patch("aibar.providers.claude_oauth.asyncio.sleep", new_callable=AsyncMock):
-            with patch.object(
-                httpx.AsyncClient,
-                "get",
-                new_callable=AsyncMock,
-                side_effect=all_429,
-            ):
-                result = asyncio.run(provider.fetch(WindowPeriod.DAY_7))
+            with patch("aibar.providers.claude_oauth.random.uniform", return_value=0.0):
+                with patch.object(
+                    httpx.AsyncClient,
+                    "get",
+                    new_callable=AsyncMock,
+                    side_effect=all_429,
+                ):
+                    result = asyncio.run(provider.fetch(WindowPeriod.DAY_7))
 
         assert result.is_error
         assert "Rate limited" in result.error
@@ -203,3 +207,73 @@ class TestCLICacheIntegration:
 
         assert not result.is_error
         assert result.metrics.remaining == 80.0
+
+
+class TestRateLimitCooldown:
+    """
+    @brief Verify rate-limit cooldown prevents API hammering across CLI invocations.
+    @satisfies CTN-004
+    """
+
+    def test_cache_set_activates_cooldown_on_429(self, tmp_path: Path) -> None:
+        """
+        @brief Verify cache.set() writes rate-limit cooldown marker on 429 error result.
+        """
+        cache = ResultCache(cache_dir=tmp_path)
+        error_result = ProviderResult(
+            provider=ProviderName.CLAUDE,
+            window=WindowPeriod.DAY_7,
+            metrics=UsageMetrics(),
+            error="Rate limited. Try again later.",
+            raw={"status_code": 429},
+        )
+        cache.set(error_result)
+        assert cache.is_rate_limited(ProviderName.CLAUDE)
+
+    def test_successful_fetch_clears_cooldown(self, tmp_path: Path) -> None:
+        """
+        @brief Verify successful result clears rate-limit cooldown marker.
+        """
+        cache = ResultCache(cache_dir=tmp_path)
+        cache.set_rate_limited(ProviderName.CLAUDE)
+        assert cache.is_rate_limited(ProviderName.CLAUDE)
+
+        good_result = _make_good_result(WindowPeriod.DAY_7)
+        cache.set(good_result)
+        assert not cache.is_rate_limited(ProviderName.CLAUDE)
+
+    def test_fetch_result_returns_last_good_during_cooldown(self, tmp_path: Path) -> None:
+        """
+        @brief Verify _fetch_result returns last-good cached data when rate-limited.
+        """
+        from aibar.cli import _fetch_result
+
+        cache = ResultCache(cache_dir=tmp_path)
+        good_result = _make_good_result(WindowPeriod.DAY_7)
+        cache._save_to_disk(good_result)
+        cache.set_rate_limited(ProviderName.CLAUDE)
+
+        provider = ClaudeOAuthProvider(token="sk-ant-test-token")
+
+        with patch.object(
+            ClaudeOAuthProvider,
+            "fetch",
+            new_callable=AsyncMock,
+        ) as mock_fetch:
+            result = _fetch_result(provider, WindowPeriod.DAY_7, cache=cache)
+
+        mock_fetch.assert_not_called()
+        assert not result.is_error
+        assert result.metrics.remaining == 80.0
+
+    def test_cooldown_expired_allows_api_call(self, tmp_path: Path) -> None:
+        """
+        @brief Verify expired cooldown does not block API calls.
+        """
+        cache = ResultCache(cache_dir=tmp_path)
+        cooldown_path = cache._cooldown_path(ProviderName.CLAUDE)
+        expired_ts = datetime.now(timezone.utc).timestamp() - cache.RATE_LIMIT_COOLDOWN - 1
+        with open(cooldown_path, "w") as f:
+            f.write(str(expired_ts))
+
+        assert not cache.is_rate_limited(ProviderName.CLAUDE)
