@@ -51,7 +51,7 @@ AIBar aggregates usage metrics for Claude, OpenAI, OpenRouter, GitHub Copilot, a
 [![Screenshot2](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot2.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot2.png)
 
 
-### OpenIA Codex
+### OpenAI Codex
 
 [![Screenshot3](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot3.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot3.png)
 
