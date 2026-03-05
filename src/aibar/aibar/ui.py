@@ -501,8 +501,9 @@ class AIBarUI(App):
     async def action_refresh(self) -> None:
         """
         @brief Execute action refresh.
-        @details Applies action refresh logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+        @details Applies action refresh logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects. Cache hits are used only for non-Claude providers.
         @return {None} Function return value.
+        @satisfies REQ-009
         """
         for provider_name, provider in self.providers.items():
             if not provider.is_configured():
@@ -512,19 +513,22 @@ class AIBarUI(App):
             if card:
                 card.is_loading = True
 
-            # Check cache first
-            cached = self.cache.get(provider_name, self.window)
-            if cached:
-                self.results[provider_name] = cached
-                if card:
-                    card.result = cached
-                    card.is_loading = False
-                continue
+            use_cache = provider_name != ProviderName.CLAUDE
+            if use_cache:
+                # Check cache first for non-Claude providers.
+                cached = self.cache.get(provider_name, self.window)
+                if cached:
+                    self.results[provider_name] = cached
+                    if card:
+                        card.result = cached
+                        card.is_loading = False
+                    continue
 
             # Fetch fresh data
             try:
                 result = await provider.fetch(self.window)
-                self.cache.set(result)
+                if use_cache:
+                    self.cache.set(result)
                 self.results[provider_name] = result
             except Exception as e:
                 result = provider._make_error_result(self.window, str(e))

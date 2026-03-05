@@ -38,7 +38,7 @@ Used libraries/components evidenced by direct imports:
 - Python: `click`, `textual`, `pydantic`, `httpx` (`src/aibar/aibar/*.py`, `src/aibar/aibar/providers/*.py`)
 - GNOME JS: `GLib`, `St`, `Gio`, `Clutter`, `GObject`, `Main`, `PanelMenu`, `PopupMenu` (`src/aibar/extension/extension.js`)
 
-Performance note: explicit caching optimization is implemented via in-memory + disk TTL cache (`ResultCache` in `src/aibar/aibar/cache.py`); no other explicit performance optimizations were identified.
+Performance note: explicit caching optimization is implemented via in-memory + disk TTL cache for non-Claude providers (`ResultCache` in `src/aibar/aibar/cache.py`); no other explicit performance optimizations were identified.
 
 ### 1.3 Repository Structure (evidence snapshot)
 ```text
@@ -96,7 +96,7 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **CTN-001**: MUST resolve provider credentials with precedence: environment variable, then `~/.config/aibar/env`, then provider-specific local credential stores.
 - **CTN-002**: MUST represent provider fetch output with `ProviderResult` containing `provider`, `window`, `metrics`, `updated_at`, `raw`, and optional `error`.
 - **CTN-003**: MUST perform external HTTP API calls with `httpx.AsyncClient(timeout=30.0)` for provider integrations.
-- **CTN-004**: MUST cache successful provider results with per-provider TTL and disk persistence under `~/.cache/aibar`.
+- **CTN-004**: MUST cache successful non-Claude provider results with per-provider TTL and disk persistence under `~/.cache/aibar`.
 - **CTN-005**: MAY depend on unofficial/internal endpoints when official usage APIs are unavailable for Claude, Copilot, or Codex integrations.
 - **CTN-006**: MUST keep `docs/REFERENCES.md` synchronized with symbols defined under `src/` and `.github/workflows/`.
 - **CTN-007**: MUST declare `hatchling` as `[build-system]` backend in `pyproject.toml` with `[project]` metadata including `name`, `version`, `requires-python`, `dependencies`, and `[project.scripts]` console entry point.
@@ -120,7 +120,7 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **REQ-006**: MUST fail Claude login when CLI credentials are missing or expired and MUST print `claude setup-token` remediation guidance.
 - **REQ-007**: MUST execute GitHub device-flow login for Copilot and save the token in `~/.config/aibar/copilot.json`.
 - **REQ-008**: MUST render Textual provider cards for all providers, support refresh, support 5h/7d switching, and support JSON-tab toggling.
-- **REQ-009**: MUST use cache hits before API fetches in Textual refresh flow and invalidate cache when window selection changes.
+- **REQ-009**: MUST use cache hits before API fetches only for non-Claude providers in Textual refresh flow and invalidate cache when window selection changes.
 - **REQ-010**: MUST map OpenAI `5h` requests to a one-day API range before requesting usage and costs.
 - **REQ-011**: MUST derive OpenRouter `cost` from window-specific usage fields (`usage_daily`, `usage_weekly`, `usage_monthly`) and include `limit` and `limit_remaining`.
 - **REQ-012**: MUST ignore requested window for Copilot fetch and return results with effective window `30d`.
@@ -152,7 +152,7 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 
 - **TST-001**: MUST verify `show` rejects unsupported window/provider values with non-zero exit and Click `BadParameter` diagnostics, and MUST verify `Remaining credits: <remaining> / <limit>` appears for Claude/Codex/Copilot when both quota values exist.
 - **TST-002**: MUST verify credential precedence by asserting env vars override env-file values and provider stores for at least one provider.
-- **TST-003**: MUST verify cache persistence writes only successful results and redacts sensitive raw keys before disk serialization.
+- **TST-003**: MUST verify cache persistence writes only successful non-Claude results, redacts sensitive raw keys before disk serialization, and bypasses cache reads/writes for Claude API fetch paths.
 - **TST-004**: MUST verify GNOME extension error path sets panel text `Err`, caps displayed error string length to 40 characters, renders quota-only card labels as `Remaining credits: <remaining>/<limit>` with bold `<remaining>`, renders reset labels with `Reset in:` prefix, renders Copilot `30d` bar/reset placement before remaining-credits text, renders popup labels `AIBar` and `Open AIBar UI`, and verifies `scripts/test-gnome-extension.sh` includes `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800`.
 - **TST-005**: MUST verify Copilot provider always returns `window=30d` regardless of requested window argument.
 - **TST-006**: MUST verify `req --here --references` reproduces `docs/REFERENCES.md` without missing symbol entries and preserves Doxygen field extraction for documented symbols.
@@ -174,7 +174,7 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | CTN-001 | `src/aibar/aibar/config.py` + `Config.get_token` + env var -> env file -> provider-specific stores (`ClaudeCLIAuth`, `CodexCredentialStore`, `CopilotCredentialStore`). |
 | CTN-002 | `src/aibar/aibar/providers/base.py` + `ProviderResult` model + fields `provider/window/metrics/updated_at/raw/error`. |
 | CTN-003 | `src/aibar/aibar/providers/*.py` + `fetch` methods + `httpx.AsyncClient(timeout=30.0)` in Claude/OpenAI/OpenRouter/Copilot/Codex providers. |
-| CTN-004 | `src/aibar/aibar/cache.py` + `ResultCache` + provider TTL map, memory cache, disk path `~/.cache/aibar`, `_save_to_disk` on successful results. |
+| CTN-004 | `src/aibar/aibar/cache.py` + `ResultCache` + `_is_cacheable_provider` disables Claude cache/cooldown while preserving TTL+disk cache for non-Claude providers. |
 | CTN-005 | `src/aibar/aibar/config.py` + `PROVIDER_INFO` notes + entries describing unofficial/internal usage for Claude, Copilot, and Codex. |
 | CTN-006 | `docs/REFERENCES.md` + full symbol index grouped by source file, regenerated from repository code. |
 | CTN-007 | `pyproject.toml` + `[build-system] requires = ["hatchling"]` + `[project]` metadata fields `name`, `version`, `requires-python`, `dependencies`, `[project.scripts]`. |
@@ -192,7 +192,7 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | REQ-006 | `src/aibar/aibar/cli.py` + `_login_claude` + missing/expired flows print `claude setup-token` then `sys.exit(1)`. |
 | REQ-007 | `src/aibar/aibar/providers/copilot.py` + `CopilotDeviceFlow` and `CopilotProvider.login` + device-code request/poll and `save_token`. |
 | REQ-008 | `src/aibar/aibar/ui.py` + `AIBarUI.compose/BINDINGS` + provider cards, refresh button, 5h/7d actions, `j` binding toggles JSON tab. |
-| REQ-009 | `src/aibar/aibar/ui.py` + `action_refresh/action_window_5h/action_window_7d` + cache `get`/`set` and `invalidate` on window switch. |
+| REQ-009 | `src/aibar/aibar/ui.py` + `action_refresh/action_window_5h/action_window_7d` + cache `get`/`set` path gated to non-Claude providers, with cache invalidation on window switch. |
 | REQ-010 | `src/aibar/aibar/providers/openai_usage.py` + `_get_time_range` + dict maps `"5h"` to `1` day. |
 | REQ-011 | `src/aibar/aibar/providers/openrouter.py` + `_get_usage/_parse_response` + cost from usage field and limit metrics from payload. |
 | REQ-012 | `src/aibar/aibar/providers/copilot.py` + `fetch` + sets `effective_window = WindowPeriod.DAY_30` and returns that window. |
@@ -210,7 +210,7 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | REQ-024 | `src/aibar/aibar/__main__.py` + `main()` import and invocation from `aibar.cli`. |
 | TST-001 | `src/aibar/aibar/cli.py` + `parse_window/parse_provider/_print_result` provide validation points for invalid inputs and quota-line rendering for Claude/Codex/Copilot. |
 | TST-002 | `src/aibar/aibar/config.py` + `get_token` implements explicit precedence chain requiring regression coverage. |
-| TST-003 | `src/aibar/aibar/cache.py` + `_save_to_disk/_sanitize_raw` define redaction and success-only disk persistence behavior. |
+| TST-003 | `tests/test_claude_retry_and_cli_cache.py`, `tests/test_claude_dual_cooldown_symmetry.py`, `tests/test_ui_claude_cache_bypass.py`, and `src/aibar/aibar/cache.py` + validate non-Claude cache persistence/redaction and Claude cache bypass semantics. |
 | TST-004 | `tests/test_extension_quota_label.py` + popup-label assertions (`AIBar`, `Open AIBar UI`) and quota/reset label assertions, `tests/test_extension_dev_script.py` + `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800` start-command assertion against `scripts/test-gnome-extension.sh`, and `src/aibar/extension/aibar@aibar.panel/extension.js` + `_handleError/_populateProviderCard/_buildPopupMenu` for error label/truncation, quota-label format, reset-prefix format, Copilot `30d` ordering, and popup branding text. |
 | TST-005 | `src/aibar/aibar/providers/copilot.py` + `fetch` hard-codes `effective_window` to `WindowPeriod.DAY_30`. |
 | TST-006 | `docs/REFERENCES.md` + generated symbol coverage for tracked `src/` files validates documentation inventory completeness. |

@@ -166,14 +166,17 @@ def _fetch_result(
 ) -> ProviderResult:
     """
     @brief Execute provider fetch with cache lookup, store, and last-good fallback.
-    @details Checks cache before API call (CTN-004). On successful fetch, stores
-    result in cache. On error, falls back to last-known-good cached result when available.
+    @details Applies cache lookup/store/fallback only for non-Claude providers.
+    Claude provider requests always execute a fresh API fetch and skip cache state.
     @param provider {BaseProvider} Provider instance to fetch from.
     @param window {WindowPeriod} Time window for the fetch.
     @param cache {ResultCache | None} Optional cache instance for TTL-based result reuse.
     @return {ProviderResult} Cached, fresh, or last-good fallback result.
+    @satisfies CTN-004
     """
-    if cache is not None:
+    use_cache = cache is not None and provider.name != ProviderName.CLAUDE
+
+    if use_cache and cache is not None:
         cached = cache.get(provider.name, window)
         if cached is not None:
             return cached
@@ -191,7 +194,7 @@ def _fetch_result(
             window=window, error=f"Unexpected error: {exc}"
         )
 
-    if cache is not None:
+    if use_cache and cache is not None:
         cache.set(result)
         if result.is_error:
             last_good = cache.get_last_good(provider.name, window)
@@ -207,107 +210,28 @@ def _fetch_claude_dual(
 ) -> tuple[ProviderResult, ProviderResult]:
     """
     @brief Fetch Claude 5h and 7d results via a single API call.
-    @details Uses ClaudeOAuthProvider.fetch_all_windows to avoid redundant
-    HTTP requests. Checks cache before calling API; stores results after;
-    falls back to last-known-good on error.
-    When a window has no last-good disk cache (either because cooldown is active
-    or because a live fetch returned HTTP 429), attempts to re-parse the missing
-    window from any sibling window's raw payload (since the Claude API returns all
-    window periods in a single response body).
-    This ensures symmetric behavior for both 5h and 7d regardless of which window
-    was historically cached first, covering both the cooldown pre-check path and
-    the post-fetch 429 path.
-    After all last-good and cross-window re-parse fallbacks, applies
-    `_apply_reset_projection` to every non-error result so that stale-cache entries
-    whose resets_at timestamp is already in the past still carry a projected future
-    reset_at, enabling the 'Resets in:' countdown to display correctly.
+    @details Executes ClaudeOAuthProvider.fetch_all_windows for 5h and 7d on each invocation.
+    Cache parameter is accepted for call-site compatibility but intentionally unused
+    because Claude requests MUST bypass cache reuse.
     @param provider {ClaudeOAuthProvider} Claude provider instance.
-    @param cache {ResultCache} Cache instance for TTL-based result reuse.
+    @param cache {ResultCache} Compatibility parameter; ignored for Claude fetch path.
     @return {tuple[ProviderResult, ProviderResult]} (5h_result, 7d_result).
     @satisfies REQ-002, CTN-004
-    @see _apply_reset_projection
     """
+    del cache
     windows = [WindowPeriod.HOUR_5, WindowPeriod.DAY_7]
-    cached_results = {}
-    missing_windows = []
-    for w in windows:
-        cached = cache.get(provider.name, w)
-        if cached is not None:
-            cached_results[w] = cached
-        else:
-            missing_windows.append(w)
-
-    if not missing_windows:
-        return cached_results[WindowPeriod.HOUR_5], cached_results[WindowPeriod.DAY_7]
-
-    if cache.is_rate_limited(provider.name):
-        # Collect last-good results for all missing windows; apply reset projection
-        # so that stale cached resets_at values still produce a 'Resets in:' display.
-        for w in missing_windows:
-            last_good = cache.get_last_good(provider.name, w)
-            if last_good is not None:
-                cached_results[w] = _apply_reset_projection(last_good)
-
-        # For windows still missing a last-good, attempt cross-window raw re-parse.
-        # The Claude API response contains all window periods in a single payload,
-        # so any sibling last-good result's raw field can serve as a parse source.
-        sibling_raw: dict | None = None
-        for w in windows:
-            if w in cached_results and not cached_results[w].is_error:
-                sibling_raw = cached_results[w].raw
-                break
-
-        for w in missing_windows:
-            if w not in cached_results:
-                if sibling_raw:
-                    parsed = provider._parse_response(sibling_raw, w)
-                    cached_results[w] = _apply_reset_projection(parsed)
-                else:
-                    cached_results[w] = provider._make_error_result(
-                        window=w,
-                        error="Rate limited. Try again later.",
-                    )
-        return cached_results[WindowPeriod.HOUR_5], cached_results[WindowPeriod.DAY_7]
-
     try:
-        fetched = asyncio.run(provider.fetch_all_windows(missing_windows))
+        fetched = asyncio.run(provider.fetch_all_windows(windows))
     except ProviderError as exc:
         fetched = {
-            w: provider._make_error_result(window=w, error=str(exc))
-            for w in missing_windows
+            w: provider._make_error_result(window=w, error=str(exc)) for w in windows
         }
     except Exception as exc:
         fetched = {
             w: provider._make_error_result(window=w, error=f"Unexpected error: {exc}")
-            for w in missing_windows
+            for w in windows
         }
-
-    for w, result in fetched.items():
-        cache.set(result)
-        if result.is_error:
-            last_good = cache.get_last_good(provider.name, w)
-            if last_good is not None:
-                fetched[w] = _apply_reset_projection(last_good)
-
-    # For windows still in error after last-good lookup, attempt cross-window
-    # raw re-parse.  The Claude API returns all window periods in a single
-    # payload, so any sibling result's raw field (from fetched or pre-cached)
-    # can serve as a parse source for the missing window.
-    all_results = {**cached_results, **fetched}
-    sibling_raw: dict | None = None
-    for w in windows:
-        if w in all_results and not all_results[w].is_error:
-            candidate_raw = all_results[w].raw
-            if candidate_raw and candidate_raw.get("status_code") is None:
-                sibling_raw = candidate_raw
-                break
-
-    for w in windows:
-        if all_results[w].is_error and sibling_raw:
-            parsed = provider._parse_response(sibling_raw, w)
-            all_results[w] = _apply_reset_projection(parsed)
-
-    return all_results[WindowPeriod.HOUR_5], all_results[WindowPeriod.DAY_7]
+    return fetched[WindowPeriod.HOUR_5], fetched[WindowPeriod.DAY_7]
 
 
 @click.group()
@@ -343,9 +267,9 @@ def main() -> None:
 def show(provider: str, window: str, output_json: bool) -> None:
     """
     @brief Execute show with per-provider TTL cache and single-call dual-window optimization.
-    @details Instantiates a ResultCache for CLI-path caching (CTN-004). For Claude
-    dual-window mode, uses fetch_all_windows to make one API call instead of two.
-    Falls back to last-known-good cached results on provider errors.
+    @details Instantiates a ResultCache for non-Claude providers (CTN-004). Claude
+    dual-window mode uses fetch_all_windows to make one API call instead of two and
+    bypasses cache reuse.
     @param provider {str} CLI provider selector string.
     @param window {str} CLI window period string.
     @param output_json {bool} When True, emit JSON output instead of formatted text.

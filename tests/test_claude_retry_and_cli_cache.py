@@ -1,21 +1,17 @@
 """
 @file
-@brief Reproducer tests for Claude 429 retry logic and CLI cache integration.
+@brief Claude provider retry and cache-bypass tests.
 @details Verifies: (1) ClaudeOAuthProvider retries on HTTP 429 respecting
-retry-after header, (2) CLI show path uses ResultCache before API calls,
-(3) CLI show falls back to last-good cached data on fetch errors,
-(4) fetch_all_windows makes a single API call for both 5h and 7d windows.
-@satisfies CTN-004, CTN-003, REQ-002
+retry-after header, (2) fetch_all_windows uses one API call for dual windows,
+(3) Claude CLI fetch path bypasses cache reads/writes and cooldown fallback.
+@satisfies CTN-003, CTN-004, REQ-002
 """
 
 import asyncio
-import json
-from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
-import pytest
 
 from aibar.cache import ResultCache
 from aibar.providers.base import (
@@ -105,7 +101,7 @@ class TestClaudeRetryOn429:
     def test_returns_error_after_max_retries_exhausted(self) -> None:
         """
         @brief Verify provider returns rate-limit error when all retries fail.
-        @details MAX_RETRIES=3 → 1 initial + 3 retries = 4 total HTTP calls.
+        @details MAX_RETRIES=3 implies one initial request plus three retries.
         """
         provider = ClaudeOAuthProvider(token="sk-ant-test-token")
         all_429 = [_make_429_response("0")] * 4
@@ -153,39 +149,48 @@ class TestFetchAllWindows:
         assert results[WindowPeriod.DAY_7].metrics.remaining == 70.0
 
 
-class TestCLICacheIntegration:
+class TestCLICacheBypassForClaude:
     """
-    @brief Verify CLI show path uses cache (CTN-004) and falls back on errors.
+    @brief Verify Claude CLI fetch path bypasses cache and cooldown fallback.
     @satisfies CTN-004
     """
 
-    def test_fetch_result_returns_cached_value(self, tmp_path: Path) -> None:
+    def test_fetch_result_ignores_cached_value_for_claude(self, tmp_path: Path) -> None:
         """
-        @brief Verify _fetch_result returns cached result without calling provider.
+        @brief Verify _fetch_result calls Claude provider even when a stale disk cache exists.
         """
         from aibar.cli import _fetch_result
 
         cache = ResultCache(cache_dir=tmp_path)
-        good_result = _make_good_result(WindowPeriod.DAY_7)
-        cache.set(good_result)
+        cache._save_to_disk(_make_good_result(WindowPeriod.DAY_7))
+
+        fresh_result = ProviderResult(
+            provider=ProviderName.CLAUDE,
+            window=WindowPeriod.DAY_7,
+            metrics=UsageMetrics(remaining=55.0, limit=100.0),
+            raw={"fresh": True},
+        )
 
         provider = MagicMock(spec=ClaudeOAuthProvider)
         provider.name = ProviderName.CLAUDE
+        provider.fetch = AsyncMock(return_value=fresh_result)
 
         result = _fetch_result(provider, WindowPeriod.DAY_7, cache=cache)
-        assert result.metrics.remaining == 80.0
-        provider.fetch.assert_not_called()
 
-    def test_fetch_result_falls_back_to_last_good_on_error(self, tmp_path: Path) -> None:
+        provider.fetch.assert_awaited_once_with(WindowPeriod.DAY_7)
+        assert result.metrics.remaining == 55.0
+
+    def test_fetch_result_no_last_good_fallback_for_claude_errors(
+        self,
+        tmp_path: Path,
+    ) -> None:
         """
-        @brief Verify _fetch_result falls back to last-good cached data on provider error.
+        @brief Verify Claude fetch errors are returned directly without last-good cache fallback.
         """
         from aibar.cli import _fetch_result
 
         cache = ResultCache(cache_dir=tmp_path)
-        good_result = _make_good_result(WindowPeriod.DAY_7)
-        cache._save_to_disk(good_result)
-        cache._memory_cache.clear()
+        cache._save_to_disk(_make_good_result(WindowPeriod.DAY_7))
 
         error_result = ProviderResult(
             provider=ProviderName.CLAUDE,
@@ -205,19 +210,22 @@ class TestCLICacheIntegration:
         ):
             result = _fetch_result(provider, WindowPeriod.DAY_7, cache=cache)
 
-        assert not result.is_error
-        assert result.metrics.remaining == 80.0
+        assert result.is_error
+        assert "Rate limited" in result.error
 
 
-class TestRateLimitCooldown:
+class TestClaudeCooldownBypass:
     """
-    @brief Verify rate-limit cooldown prevents API hammering across CLI invocations.
+    @brief Verify ResultCache cooldown markers are disabled for Claude.
     @satisfies CTN-004
     """
 
-    def test_cache_set_activates_cooldown_on_429(self, tmp_path: Path) -> None:
+    def test_cache_set_does_not_activate_cooldown_on_429_for_claude(
+        self,
+        tmp_path: Path,
+    ) -> None:
         """
-        @brief Verify cache.set() writes rate-limit cooldown marker on 429 error result.
+        @brief Verify cache.set does not enable Claude cooldown on 429 payload.
         """
         cache = ResultCache(cache_dir=tmp_path)
         error_result = ProviderResult(
@@ -227,53 +235,16 @@ class TestRateLimitCooldown:
             error="Rate limited. Try again later.",
             raw={"status_code": 429},
         )
+
         cache.set(error_result)
-        assert cache.is_rate_limited(ProviderName.CLAUDE)
-
-    def test_successful_fetch_clears_cooldown(self, tmp_path: Path) -> None:
-        """
-        @brief Verify successful result clears rate-limit cooldown marker.
-        """
-        cache = ResultCache(cache_dir=tmp_path)
-        cache.set_rate_limited(ProviderName.CLAUDE)
-        assert cache.is_rate_limited(ProviderName.CLAUDE)
-
-        good_result = _make_good_result(WindowPeriod.DAY_7)
-        cache.set(good_result)
-        assert not cache.is_rate_limited(ProviderName.CLAUDE)
-
-    def test_fetch_result_returns_last_good_during_cooldown(self, tmp_path: Path) -> None:
-        """
-        @brief Verify _fetch_result returns last-good cached data when rate-limited.
-        """
-        from aibar.cli import _fetch_result
-
-        cache = ResultCache(cache_dir=tmp_path)
-        good_result = _make_good_result(WindowPeriod.DAY_7)
-        cache._save_to_disk(good_result)
-        cache.set_rate_limited(ProviderName.CLAUDE)
-
-        provider = ClaudeOAuthProvider(token="sk-ant-test-token")
-
-        with patch.object(
-            ClaudeOAuthProvider,
-            "fetch",
-            new_callable=AsyncMock,
-        ) as mock_fetch:
-            result = _fetch_result(provider, WindowPeriod.DAY_7, cache=cache)
-
-        mock_fetch.assert_not_called()
-        assert not result.is_error
-        assert result.metrics.remaining == 80.0
-
-    def test_cooldown_expired_allows_api_call(self, tmp_path: Path) -> None:
-        """
-        @brief Verify expired cooldown does not block API calls.
-        """
-        cache = ResultCache(cache_dir=tmp_path)
-        cooldown_path = cache._cooldown_path(ProviderName.CLAUDE)
-        expired_ts = datetime.now(timezone.utc).timestamp() - cache.RATE_LIMIT_COOLDOWN - 1
-        with open(cooldown_path, "w") as f:
-            f.write(str(expired_ts))
 
         assert not cache.is_rate_limited(ProviderName.CLAUDE)
+
+    def test_get_last_good_returns_none_for_claude(self, tmp_path: Path) -> None:
+        """
+        @brief Verify get_last_good ignores Claude disk payloads.
+        """
+        cache = ResultCache(cache_dir=tmp_path)
+        cache._save_to_disk(_make_good_result(WindowPeriod.DAY_7))
+
+        assert cache.get_last_good(ProviderName.CLAUDE, WindowPeriod.DAY_7) is None

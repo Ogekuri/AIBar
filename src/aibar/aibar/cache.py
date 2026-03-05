@@ -1,7 +1,7 @@
 """
 @file
 @brief Provider result caching primitives.
-@details Implements in-memory and disk cache entries, TTL invalidation, and raw-payload sanitization for provider metrics.
+@details Implements in-memory and disk cache entries, TTL invalidation, and raw-payload sanitization for non-Claude provider metrics.
 """
 
 import json
@@ -39,12 +39,11 @@ class CacheEntry(BaseModel):
 class ResultCache:
     """
     @brief Define result cache component.
-    @details Encapsulates result cache state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
+    @details Encapsulates result cache state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces. Caching behavior is disabled for Claude provider results.
     """
 
     DEFAULT_TTL = 120  # 2 minutes
     PROVIDER_TTLS = {
-        ProviderName.CLAUDE: 60,  # 1 minute - quota changes quickly
         ProviderName.OPENAI: 180,  # 3 minutes - usage data is historical
         ProviderName.OPENROUTER: 180,  # 3 minutes - credits update periodically
         ProviderName.COPILOT: 300,  # 5 minutes - reports are slow to update
@@ -100,6 +99,16 @@ class ResultCache:
         """
         return self._cache_dir / f"{provider.value}_{window.value}.json"
 
+    def _is_cacheable_provider(self, provider: ProviderName) -> bool:
+        """
+        @brief Check whether result-cache read/write logic is enabled for a provider.
+        @details Returns False for Claude to enforce fresh API reads without memory/disk reuse and rate-limit cooldown markers. Returns True for all other providers.
+        @param provider {ProviderName} Provider identifier to classify.
+        @return {bool} True when provider caching is enabled.
+        @satisfies CTN-004
+        """
+        return provider != ProviderName.CLAUDE
+
     def get(self, provider: ProviderName, window: WindowPeriod) -> ProviderResult | None:
         """
         @brief Execute get.
@@ -108,6 +117,9 @@ class ResultCache:
         @param window {WindowPeriod} Input parameter `window`.
         @return {ProviderResult | None} Function return value.
         """
+        if not self._is_cacheable_provider(provider):
+            return None
+
         key = self._cache_key(provider, window)
 
         # Check memory cache first
@@ -126,6 +138,16 @@ class ResultCache:
         @param result {ProviderResult} Input parameter `result`.
         @return {None} Function return value.
         """
+        if not self._is_cacheable_provider(result.provider):
+            self.invalidate(provider=result.provider, window=result.window)
+            self.clear_rate_limit(result.provider)
+            path = self._disk_path(result.provider, result.window)
+            try:
+                path.unlink(missing_ok=True)
+            except (OSError, IOError):
+                pass
+            return
+
         key = self._cache_key(result.provider, result.window)
         ttl = self.PROVIDER_TTLS.get(result.provider, self.DEFAULT_TTL)
 
@@ -151,6 +173,9 @@ class ResultCache:
         @param window {WindowPeriod} Input parameter `window`.
         @return {ProviderResult | None} Function return value.
         """
+        if not self._is_cacheable_provider(provider):
+            return None
+
         return self._load_from_disk(provider, window, ignore_ttl=True)
 
     def invalidate(
@@ -195,6 +220,9 @@ class ResultCache:
         @param provider {ProviderName} Provider to mark as rate-limited.
         @return {None} No return value.
         """
+        if not self._is_cacheable_provider(provider):
+            return
+
         path = self._cooldown_path(provider)
         try:
             with open(path, "w") as f:
@@ -210,6 +238,9 @@ class ResultCache:
         @param provider {ProviderName} Provider to check cooldown for.
         @return {bool} True if provider is within cooldown period.
         """
+        if not self._is_cacheable_provider(provider):
+            return False
+
         path = self._cooldown_path(provider)
         if not path.exists():
             return False
