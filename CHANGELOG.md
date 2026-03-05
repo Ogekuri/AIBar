@@ -1,7 +1,19 @@
 # Changelog
 
-## [0.0.1](https://github.com/Ogekuri/AIBar/releases/tag/v0.0.1) - 2026-03-04
+## [0.1.0](https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0) - 2026-03-05
 ### ⛰️  Features
+- Add extension build.
+- add GNOME extension installer script with colored output [useReq] *(install-gnome-extension)*
+  - Add scripts/install-gnome-extension.sh: resolves git project root, validates
+  - prerequisites (git, source dir, metadata.json), creates target directory
+  - ~/.local/share/gnome-shell/extensions/aibar@aibar.panel/, copies all extension
+  - files preserving attributes via cp -a, produces ANSI-colored terminal output.
+  - Add requirements PRJ-008, REQ-025..REQ-030, TST-009.
+  - Add tests/test_install_gnome_extension.py with atomic and composed test levels.
+  - Update docs/WORKFLOW.md with PROC:install-ext execution unit.
+  - Regenerate docs/REFERENCES.md.
+- Update models.json file.
+- Add LICENSE_GnomeCodexBar file.
 - add colored panel usage percentages [useReq] *(gnome-extension)*
   - append REQ-021/REQ-022 and TST-007 in docs/REQUIREMENTS.md
   - render ordered Claude/Copilot/Codex percentages in panel status area
@@ -14,12 +26,96 @@
 - Initial commit.
 
 ### 🐛  Bug Fixes
+- reapply progress bar fill widths on popup open [useReq] *(extension-popup)*
+  - Root cause: GLib.idle_add callback in _populateProviderCard reads
+  - barBg.get_width() which returns 0 when popup is closed. Data arriving
+  - while popup is closed results in zero-width fill bars.
+  - Fix: connect menu open-state-changed signal to new _applyBarWidths()
+  - method that re-applies cached _barData fill widths via GLib.idle_add
+  - when popup opens, ensuring bars render correctly on first open.
+  - Adds test_popup_open_triggers_bar_width_reapply regression test.
+- Add new install scripts.
+- handle displayed-zero fallback for pending reset text [useReq] *(extension-reset)*
+  - treat near-zero percentages that render as 0.0% as zero for reset-pending fallback
+  - apply same displayed-zero semantics in CLI and GNOME extension
+  - extend regression tests and refresh WORKFLOW/REFERENCES
+- show pending reset hint at 0% usage [useReq] *(claude-reset)*
+  - print fallback 'Resets in' text in CLI for Claude when usage is 0 and reset_at is unavailable
+  - render GNOME window-bar fallback reset text when usage is 0 and reset timestamp is unavailable
+  - add reproducer tests for CLI and extension
+  - update WORKFLOW and regenerate REFERENCES
+- project next reset boundary from stale cache resets_at to restore 'Resets in:' display [useReq] *(cli)*
+  - Root cause: _parse_response correctly sets reset_at=None for past resets_at timestamps;
+  - _fetch_claude_dual did not project forward, so 'Resets in:' was silently suppressed
+  - for stale cached results on both the cooldown pre-check and post-fetch 429 paths.
+  - Add _WINDOW_PERIOD_TIMEDELTA mapping, _project_next_reset (math.ceil multi-cycle
+  - advance), and _apply_reset_projection (model_copy with projected reset_at).
+  - Apply _apply_reset_projection to every last-good and cross-window re-parse result
+  - in _fetch_claude_dual on all affected code paths.
+  - Add 3 guideline-compliant reproducer tests in test_claude_dual_stale_reset_projection.py.
+  - Update docs/WORKFLOW.md and docs/REFERENCES.md.
+- discard past reset_at timestamps to fix asymmetric Resets-in display [useReq] *(claude_oauth._parse_response)*
+  - Root cause: _parse_response stored any parsed resets_at datetime including
+  - past timestamps; _print_result suppressed 'Resets in:' when reset_at was
+  - None OR delta<=0, causing 5h window (stale cache) to silently suppress the
+  - field while 7d window (future reset) showed it (REQ-002 symmetry defect).
+  - Fix: added past-timestamp guard in _parse_response; sets reset_at=None when
+  - parsed datetime <= datetime.now(UTC), so stale cached timestamps never reach
+  - the display layer.
+  - Added 6 reproducer/regression tests in test_claude_parse_response_reset_at.py
+  - Updated docs/WORKFLOW.md and docs/REFERENCES.md with accurate symbol metadata.
+- extend post-fetch 429 cross-window re-parse to restore 5h symmetry [useReq] *(cli)*
+- derive missing Claude window from sibling raw payload during rate-limit cooldown [useReq] *(cli)*
+- improve 429 retry backoff and add cross-process rate-limit cooldown [useReq] *(claude_oauth)*
+  - Increase MAX_RETRIES from 2 to 3 and RETRY_BACKOFF_BASE from 1.0 to 2.0
+  - with random jitter to prevent thundering-herd synchronization.
+  - Add rate-limit cooldown mechanism in ResultCache: on 429 error, write
+  - cooldown marker to disk; subsequent CLI invocations within 30s return
+  - last-good cached data instead of hammering the API.
+  - Add cooldown check in _fetch_result and _fetch_claude_dual before API calls.
+  - Add 4 new tests for cooldown activation, clearing, expiry, and CLI integration.
+  - Update WORKFLOW.md call-traces for changed symbols.
+- add 429 retry, CLI cache integration, single-call dual-window [useReq] *(claude_oauth)*
+  - Add _request_usage with retry-after-aware retry (max 2) for HTTP 429.
+  - Add fetch_all_windows for single-API-call dual-window parsing (5h+7d).
+  - Integrate ResultCache in CLI show path (CTN-004 compliance).
+  - Add _fetch_claude_dual for cache-aware single-call dual-window fetch.
+  - Add _fetch_result cache lookup, store, and last-good fallback on error.
+  - Add reproducer tests for retry, single-call, cache, and fallback.
+  - Update WORKFLOW.md and REFERENCES.md.
+- Remove unused scripts.
 - Fix version numer.
 - Include .req directory to support worktree.
 - Rename aibar script.
 - Rename extension folder.
 
 ### 🚜  Changes
+- BREAKING CHANGE: remove subcommand, execute nested shell directly [useReq] *(test-gnome-extension)*
+  - test-gnome-extension.sh no longer requires any parameter; runs
+  - install + nested shell launch directly on invocation
+  - Removed case/esac dispatch; script body calls update_extension
+  - then launches MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800 nested shell
+  - PRJ-004, REQ-031, REQ-033, TST-004 updated to reflect no-argument
+  - invocation
+  - Requirements updated to v0.3.7
+- BREAKING CHANGE: installer enables extension, test script keeps only start [useReq] *(scripts)*
+  - install-gnome-extension.sh now runs gnome-extensions enable after
+  - file copy (REQ-032), with graceful fallback when CLI unavailable
+  - test-gnome-extension.sh stripped to start-only subcommand (REQ-033);
+  - enable/disable/reload/logs removed
+  - REQ-031 narrowed to start command only
+  - Requirements updated to v0.3.6 with REQ-032, REQ-033
+  - Tests updated: removed enable/reload assertions, added start-only
+  - and enable-presence tests
+- invoke install before start/enable/reload commands [useReq] *(test-gnome-extension)*
+  - Modify scripts/test-gnome-extension.sh to call install-gnome-extension.sh
+  - before start, enable, and reload commands (REQ-031).
+  - Update PRJ-004 reference from dev.sh to scripts/test-gnome-extension.sh.
+  - Add REQ-031: MUST invoke installer before start/enable/reload.
+  - Update tests/test_extension_dev_script.py: fix path from dev.sh to
+  - scripts/test-gnome-extension.sh, add 4 new tests for install invocation.
+  - Update docs/WORKFLOW.md with PROC:test-ext unit and EDGE-004.
+  - Regenerate docs/REFERENCES.md.
 - add pyproject.toml uv/uvx packaging and README install section [useReq] *(core)*
 - add 7d panel percentages and primary bold labels [useReq] *(extension)*
   - modify REQ-021/REQ-022 and TST-007 for five-label panel order
@@ -75,6 +171,8 @@
   - regenerate WORKFLOW.md and REFERENCES.md from current repository state
 
 ### 📚  Documentation
+- Update README.md.
+- Add screenshots.
 - Update README.md document.
 - regenerate runtime model for CLI and GNOME flow [useReq] *(workflow)*
   - rewrite docs/WORKFLOW.md with required schema\n- use declaration file paths only\n- refresh call traces and communication edges
@@ -91,6 +189,6 @@
 
 # History
 
-- \[0.0.1\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.0.1
+- \[0.1.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 
-[0.0.1]: https://github.com/Ogekuri/AIBar/releases/tag/v0.0.1
+[0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
