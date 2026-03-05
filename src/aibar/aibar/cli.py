@@ -6,7 +6,9 @@
 
 import asyncio
 import json
+import math
 import sys
+from datetime import datetime, timedelta, timezone
 
 import click
 from click.core import ParameterSource
@@ -27,6 +29,80 @@ from aibar.providers.base import (
     ProviderResult,
     WindowPeriod,
 )
+
+
+_WINDOW_PERIOD_TIMEDELTA: dict[WindowPeriod, timedelta] = {
+    WindowPeriod.HOUR_5: timedelta(hours=5),
+    WindowPeriod.DAY_7: timedelta(days=7),
+    WindowPeriod.DAY_30: timedelta(days=30),
+}
+
+
+def _project_next_reset(resets_at_str: str, window: WindowPeriod) -> datetime | None:
+    """
+    @brief Compute the next reset boundary after a stale resets_at timestamp.
+    @details Advances `resets_at_str` by multiples of the window period until the
+    result is strictly greater than current UTC time. Returns None if `resets_at_str`
+    is unparseable or the window period is not in `_WINDOW_PERIOD_TIMEDELTA`.
+    @param resets_at_str {str} ISO 8601 timestamp string of the last known reset boundary.
+        May have a Z suffix (converted to +00:00) or an explicit timezone offset.
+    @param window {WindowPeriod} Window period whose duration drives the projection step.
+    @return {datetime | None} Projected future reset datetime in UTC, or None on parse error.
+    @note Uses `math.ceil` to determine the minimum number of full cycles to advance.
+    @satisfies REQ-002
+    """
+    period = _WINDOW_PERIOD_TIMEDELTA.get(window)
+    if period is None:
+        return None
+    try:
+        last = datetime.fromisoformat(resets_at_str.replace("Z", "+00:00"))
+        if last.tzinfo is None:
+            last = last.replace(tzinfo=timezone.utc)
+    except (ValueError, AttributeError):
+        return None
+    now = datetime.now(timezone.utc)
+    elapsed_seconds = (now - last).total_seconds()
+    if elapsed_seconds <= 0:
+        # resets_at is already in the future; no projection needed
+        return last
+    period_seconds = period.total_seconds()
+    cycles = math.ceil(elapsed_seconds / period_seconds)
+    return last + timedelta(seconds=cycles * period_seconds)
+
+
+def _apply_reset_projection(result: ProviderResult) -> ProviderResult:
+    """
+    @brief Return a copy of `result` with `metrics.reset_at` set to the projected next
+    reset boundary when it is currently None but the raw payload contains a parseable
+    past `resets_at` string for the result's window.
+    @details When a ProviderResult is obtained from stale disk cache (last-good path) or
+    from a cross-window raw re-parse, `_parse_response` correctly sets `reset_at=None`
+    for past timestamps. This function recovers the display information by projecting
+    the next future reset boundary from the raw payload's `resets_at` field, ensuring
+    the 'Resets in:' countdown is shown even when the cached timestamp has already elapsed.
+    If `reset_at` is already non-None, or the raw payload has no parseable `resets_at`
+    for the window, or projection fails, the original result is returned unchanged.
+    @param result {ProviderResult} Candidate result whose reset_at may require projection.
+    @return {ProviderResult} Original result unchanged if no projection is needed;
+        otherwise a new ProviderResult with metrics.reset_at set to the projected datetime.
+    @satisfies REQ-002
+    @see _project_next_reset
+    """
+    if result.is_error or result.metrics.reset_at is not None:
+        return result
+
+    window_key = "seven_day" if result.window == WindowPeriod.DAY_7 else "five_hour"
+    window_data = result.raw.get(window_key, {})
+    resets_at_str = window_data.get("resets_at") if window_data else None
+    if not resets_at_str:
+        return result
+
+    projected = _project_next_reset(resets_at_str, result.window)
+    if projected is None or projected <= datetime.now(timezone.utc):
+        return result
+
+    updated_metrics = result.metrics.model_copy(update={"reset_at": projected})
+    return result.model_copy(update={"metrics": updated_metrics})
 
 
 def get_providers() -> dict[ProviderName, BaseProvider]:
@@ -139,10 +215,15 @@ def _fetch_claude_dual(
     This ensures symmetric behavior for both 5h and 7d regardless of which window
     was historically cached first, covering both the cooldown pre-check path and
     the post-fetch 429 path.
+    After all last-good and cross-window re-parse fallbacks, applies
+    `_apply_reset_projection` to every non-error result so that stale-cache entries
+    whose resets_at timestamp is already in the past still carry a projected future
+    reset_at, enabling the 'Resets in:' countdown to display correctly.
     @param provider {ClaudeOAuthProvider} Claude provider instance.
     @param cache {ResultCache} Cache instance for TTL-based result reuse.
     @return {tuple[ProviderResult, ProviderResult]} (5h_result, 7d_result).
     @satisfies REQ-002, CTN-004
+    @see _apply_reset_projection
     """
     windows = [WindowPeriod.HOUR_5, WindowPeriod.DAY_7]
     cached_results = {}
@@ -158,11 +239,12 @@ def _fetch_claude_dual(
         return cached_results[WindowPeriod.HOUR_5], cached_results[WindowPeriod.DAY_7]
 
     if cache.is_rate_limited(provider.name):
-        # Collect last-good results for all missing windows.
+        # Collect last-good results for all missing windows; apply reset projection
+        # so that stale cached resets_at values still produce a 'Resets in:' display.
         for w in missing_windows:
             last_good = cache.get_last_good(provider.name, w)
             if last_good is not None:
-                cached_results[w] = last_good
+                cached_results[w] = _apply_reset_projection(last_good)
 
         # For windows still missing a last-good, attempt cross-window raw re-parse.
         # The Claude API response contains all window periods in a single payload,
@@ -176,7 +258,8 @@ def _fetch_claude_dual(
         for w in missing_windows:
             if w not in cached_results:
                 if sibling_raw:
-                    cached_results[w] = provider._parse_response(sibling_raw, w)
+                    parsed = provider._parse_response(sibling_raw, w)
+                    cached_results[w] = _apply_reset_projection(parsed)
                 else:
                     cached_results[w] = provider._make_error_result(
                         window=w,
@@ -202,7 +285,7 @@ def _fetch_claude_dual(
         if result.is_error:
             last_good = cache.get_last_good(provider.name, w)
             if last_good is not None:
-                fetched[w] = last_good
+                fetched[w] = _apply_reset_projection(last_good)
 
     # For windows still in error after last-good lookup, attempt cross-window
     # raw re-parse.  The Claude API returns all window periods in a single
@@ -219,7 +302,8 @@ def _fetch_claude_dual(
 
     for w in windows:
         if all_results[w].is_error and sibling_raw:
-            all_results[w] = provider._parse_response(sibling_raw, w)
+            parsed = provider._parse_response(sibling_raw, w)
+            all_results[w] = _apply_reset_projection(parsed)
 
     return all_results[WindowPeriod.HOUR_5], all_results[WindowPeriod.DAY_7]
 
