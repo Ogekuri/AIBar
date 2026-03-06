@@ -124,6 +124,33 @@ def test_codex_parser_ignores_reset_only_json_candidates() -> None:
     assert payload["windows"]["7d"]["reset_at"] is None
 
 
+def test_codex_parser_extracts_metrics_from_escaped_script_fixture() -> None:
+    """
+    @brief Verify Codex parser extracts quotas from escaped script key/value payload.
+    @satisfies TST-015
+    @satisfies REQ-041
+    """
+    payload = _run_parser("parseCodexUsageHtml", "codex_usage_escaped_script.html")
+    assert payload["provider"] == "codex"
+    assert payload["windows"]["5h"]["usage_percent"] == 45
+    assert payload["windows"]["5h"]["limit"] == 40
+    assert payload["windows"]["5h"]["remaining"] == 22
+    assert payload["windows"]["7d"]["usage_percent"] == 35
+    assert payload["windows"]["7d"]["limit"] == 400
+    assert payload["windows"]["7d"]["remaining"] == 260
+
+
+def test_signal_diagnostics_reports_metric_key_matches_for_escaped_script() -> None:
+    """
+    @brief Verify signal diagnostics include matched metric-key evidence.
+    @satisfies TST-021
+    @satisfies REQ-048
+    """
+    diagnostics = _run_parser("extractSignalDiagnostics", "codex_usage_escaped_script.html")
+    assert diagnostics["signal_counts"]["metric_key_matches"] >= 2
+    assert diagnostics["signal_samples"]["metric_key_matches"]
+
+
 def test_copilot_merge_combines_features_and_premium_sources() -> None:
     """
     @brief Verify Copilot merge output consolidates both source pages.
@@ -150,4 +177,5 @@ def test_parser_module_uses_semantic_markers_instead_of_language_labels() -> Non
     assert "role\\s*=\\s*(?:\"progressbar\"|\'progressbar\')" in source
     assert "datetime\\s*=\\s*(?:\"([^\"]+)\"|'([^']+)')" in source
     assert "_extractEmbeddedJsonObjects" in source
+    assert "_extractEscapedScriptMetricCandidates" in source
     assert "Usage:" not in source

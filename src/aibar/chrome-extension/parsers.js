@@ -11,10 +11,13 @@
  */
 
 /** @brief Parser semantic version for debug payloads. */
-export const PARSER_VERSION = "2026.03.06.1";
+export const PARSER_VERSION = "2026.03.06.2";
 
 /** @brief Token regex for window hints. */
 const WINDOW_HINT_REGEX = /\b(5h|7d|30d)\b/i;
+
+/** @brief Global token regex for iterating over window hints in text streams. */
+const WINDOW_HINT_GLOBAL_REGEX = /\b(5h|7d|30d)\b/ig;
 
 /** @brief Token regex for numeric fractions. */
 const FRACTION_REGEX = /([0-9][0-9\s.,]*)\s*\/\s*([0-9][0-9\s.,]*)/g;
@@ -33,6 +36,47 @@ const JSON_BOOTSTRAP_KEYS = [
   "__INITIAL_STATE__",
   "INITIAL_STATE",
   "__APOLLO_STATE__",
+];
+
+/** @brief Key fragments used to infer remaining quota values. */
+const REMAINING_KEY_FRAGMENTS = [
+  "remain",
+  "available",
+  "left",
+  "balance",
+  "unused",
+  "unspent",
+];
+
+/** @brief Key fragments used to infer limit quota values. */
+const LIMIT_KEY_FRAGMENTS = [
+  "limit",
+  "quota",
+  "allowance",
+  "total",
+  "max",
+  "cap",
+  "budget",
+];
+
+/** @brief Key fragments used to infer used/consumed values. */
+const USED_KEY_FRAGMENTS = [
+  "used",
+  "consumed",
+  "count",
+  "current",
+  "spent",
+  "requests",
+];
+
+/** @brief Key fragments used to infer usage percentage values. */
+const USAGE_PERCENT_KEY_FRAGMENTS = [
+  "percent",
+  "percentage",
+  "utilization",
+  "progress",
+  "ratio",
+  "pct",
 ];
 
 /**
@@ -310,6 +354,199 @@ function _dedupeByKey(values, keySelector) {
 }
 
 /**
+ * @brief Escape regex-reserved characters in token for literal pattern use.
+ * @param {string} token Raw token.
+ * @returns {string} Escaped token.
+ */
+function _escapeRegexToken(token) {
+  return token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * @brief Extract numeric key-value matches from one text fragment.
+ * @param {string} text Source text.
+ * @param {Array<string>} keyFragments Key-name fragments.
+ * @returns {Array<Record<string, number | string>>} Ordered key matches.
+ */
+function _extractNumericKeyMatches(text, keyFragments) {
+  const matches = [];
+  for (const fragment of keyFragments) {
+    const escaped = _escapeRegexToken(fragment);
+    const regex = new RegExp(
+      String.raw`(?:\\?["'])([^"']*${escaped}[^"']*)(?:\\?["'])\s*:\s*(?:\\?["'])?(-?[0-9][0-9\s.,]*)(?:\\?["'])?`,
+      "ig"
+    );
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+      const parsed = parseLocalizedNumber(match[2]);
+      if (parsed === null) {
+        continue;
+      }
+      matches.push({
+        key: String(match[1] ?? "").toLowerCase(),
+        value: parsed,
+        index: match.index,
+      });
+    }
+  }
+  return matches;
+}
+
+/**
+ * @brief Select one representative value from matched key-value records.
+ * @param {Array<Record<string, number | string>>} keyMatches Numeric key matches.
+ * @param {number} anchorIndex Anchor position used to select nearest value.
+ * @param {boolean} preferBeforeAnchor Whether to prioritize key matches before anchor.
+ * @returns {{value: number | null, key: string | null}} Selected value/key pair.
+ */
+function _selectNumericFromMatches(keyMatches, anchorIndex, preferBeforeAnchor) {
+  if (!Array.isArray(keyMatches) || keyMatches.length === 0) {
+    return {
+      value: null,
+      key: null,
+    };
+  }
+  const prior = preferBeforeAnchor
+    ? keyMatches.filter((entry) => Number(entry.index ?? -1) <= anchorIndex)
+    : [];
+  const selectionPool = prior.length > 0 ? prior : keyMatches;
+  const sorted = [...selectionPool].sort(
+    (left, right) =>
+      Math.abs(Number(left.index ?? 0) - anchorIndex) - Math.abs(Number(right.index ?? 0) - anchorIndex)
+  );
+  return {
+    value: parseLocalizedNumber(sorted[0].value),
+    key: typeof sorted[0].key === "string" ? sorted[0].key : null,
+  };
+}
+
+/**
+ * @brief Build script-context metric candidate around a target token index.
+ * @param {string} scriptText Script text stream.
+ * @param {number} centerIndex Center index for context extraction.
+ * @param {string | null} resetAt Optional reset timestamp.
+ * @param {boolean} preferBeforeAnchor Whether to prioritize matches before center.
+ * @returns {Record<string, unknown> | null} Candidate payload or null.
+ */
+function _buildScriptContextCandidate(scriptText, centerIndex, resetAt, preferBeforeAnchor) {
+  const enclosed = _extractEnclosingJsonObjectContext(scriptText, centerIndex);
+  const contextRadius = 140;
+  const contextStart = enclosed
+    ? enclosed.context_start
+    : Math.max(0, centerIndex - contextRadius);
+  const contextEnd = enclosed
+    ? enclosed.context_end
+    : Math.min(scriptText.length, centerIndex + contextRadius);
+  const context = scriptText.slice(contextStart, contextEnd);
+  const anchorIndex = centerIndex - contextStart;
+
+  const remainingMatches = _extractNumericKeyMatches(context, REMAINING_KEY_FRAGMENTS);
+  const limitMatches = _extractNumericKeyMatches(context, LIMIT_KEY_FRAGMENTS);
+  const usedMatches = _extractNumericKeyMatches(context, USED_KEY_FRAGMENTS);
+  const usagePercentMatches = _extractNumericKeyMatches(context, USAGE_PERCENT_KEY_FRAGMENTS);
+
+  const remaining = _selectNumericFromMatches(remainingMatches, anchorIndex, preferBeforeAnchor);
+  const limit = _selectNumericFromMatches(limitMatches, anchorIndex, preferBeforeAnchor);
+  const used = _selectNumericFromMatches(usedMatches, anchorIndex, preferBeforeAnchor);
+  const usagePercent = _selectNumericFromMatches(
+    usagePercentMatches,
+    anchorIndex,
+    preferBeforeAnchor
+  );
+
+  if (
+    remaining.value === null &&
+    limit.value === null &&
+    used.value === null &&
+    usagePercent.value === null
+  ) {
+    return null;
+  }
+
+  return {
+    window_hint: _extractWindowHint(context),
+    remaining: remaining.value,
+    limit: limit.value,
+    used: used.value,
+    usage_percent: usagePercent.value,
+    reset_at: resetAt,
+    matched_keys: _dedupeByKey(
+      [
+        ...remainingMatches.map((entry) => ({ family: "remaining", key: entry.key })),
+        ...limitMatches.map((entry) => ({ family: "limit", key: entry.key })),
+        ...usedMatches.map((entry) => ({ family: "used", key: entry.key })),
+        ...usagePercentMatches.map((entry) => ({ family: "usage_percent", key: entry.key })),
+      ],
+      (entry) => `${entry.family}:${entry.key}`
+    ),
+  };
+}
+
+/**
+ * @brief Extract metric candidates from escaped script key-value artifacts.
+ * @details Targets script contexts around datetime and window tokens to recover
+ * quota/progress values when app-shell HTML contains no visible usage rows.
+ * @param {string} html Raw HTML.
+ * @returns {Array<Record<string, unknown>>} Ordered script-derived candidates.
+ */
+function _extractEscapedScriptMetricCandidates(html) {
+  const scriptText = _extractScriptText(html);
+  if (!scriptText) {
+    return [];
+  }
+
+  const candidates = [];
+
+  ISO_DATETIME_REGEX.lastIndex = 0;
+  let datetimeMatch;
+  while ((datetimeMatch = ISO_DATETIME_REGEX.exec(scriptText)) !== null) {
+    const parsed = new Date(datetimeMatch[0]);
+    if (Number.isNaN(parsed.getTime())) {
+      continue;
+    }
+    const candidate = _buildScriptContextCandidate(
+      scriptText,
+      datetimeMatch.index,
+      parsed.toISOString(),
+      true
+    );
+    if (candidate) {
+      candidates.push(candidate);
+    }
+  }
+
+  WINDOW_HINT_GLOBAL_REGEX.lastIndex = 0;
+  let windowMatch;
+  while ((windowMatch = WINDOW_HINT_GLOBAL_REGEX.exec(scriptText)) !== null) {
+    const candidate = _buildScriptContextCandidate(scriptText, windowMatch.index, null, false);
+    if (candidate) {
+      candidates.push({
+        ...candidate,
+        window_hint: String(windowMatch[1]).toLowerCase(),
+      });
+    }
+  }
+
+  return _dedupeByKey(
+    candidates,
+    (entry) => {
+      const keys = Array.isArray(entry.matched_keys)
+        ? entry.matched_keys.map((item) => `${item.family}:${item.key}`).join("|")
+        : "";
+      return [
+        entry.window_hint ?? "",
+        entry.remaining ?? "",
+        entry.limit ?? "",
+        entry.used ?? "",
+        entry.usage_percent ?? "",
+        entry.reset_at ?? "",
+        keys,
+      ].join(":");
+    }
+  );
+}
+
+/**
  * @brief Extract numeric fraction candidates from visible and script text streams.
  * @param {string} html Raw HTML.
  * @returns {Array<Record<string, number>>} Ordered fraction records.
@@ -405,6 +642,34 @@ function _extractBalancedJsonSlice(source, startIndex) {
     }
   }
 
+  return null;
+}
+
+/**
+ * @brief Resolve smallest enclosing JSON-object slice around one center index.
+ * @param {string} source Source text.
+ * @param {number} centerIndex Center index.
+ * @returns {{context_start: number, context_end: number} | null} Context bounds.
+ */
+function _extractEnclosingJsonObjectContext(source, centerIndex) {
+  const scanStart = Math.max(0, centerIndex - 1500);
+  for (let index = centerIndex; index >= scanStart; index -= 1) {
+    if (source[index] !== "{") {
+      continue;
+    }
+    const candidate = _extractBalancedJsonSlice(source, index);
+    if (!candidate) {
+      continue;
+    }
+    const endIndex = index + candidate.length;
+    if (endIndex < centerIndex || candidate.length > 1400) {
+      continue;
+    }
+    return {
+      context_start: index,
+      context_end: endIndex,
+    };
+  }
   return null;
 }
 
@@ -635,6 +900,7 @@ function _candidateScore(candidate, windowKey) {
   const hasRemaining = parseLocalizedNumber(candidate?.remaining) !== null;
   const hasUsed = parseLocalizedNumber(candidate?.used) !== null;
   const hasReset = typeof candidate?.reset_at === "string";
+  const hasMatchedKeys = Array.isArray(candidate?.matched_keys) && candidate.matched_keys.length > 0;
 
   if (candidate?.window_hint === windowKey) {
     score += 4;
@@ -649,6 +915,9 @@ function _candidateScore(candidate, windowKey) {
     score += 2;
   }
   if (hasReset) {
+    score += 1;
+  }
+  if (hasMatchedKeys) {
     score += 1;
   }
   if (!hasUsage && !hasLimit && !hasRemaining && !hasUsed) {
@@ -813,12 +1082,28 @@ function _buildWindows(
 function _extractSignals(html) {
   const embeddedJson = _extractEmbeddedJsonObjects(html);
   const jsonCandidates = embeddedJson.flatMap((entry) => _extractJsonMetricCandidates(entry));
+  const escapedScriptCandidates = _extractEscapedScriptMetricCandidates(html);
+  const hasStructuredMetricCandidates = jsonCandidates.some((candidate) => {
+    const remaining = parseLocalizedNumber(candidate?.remaining);
+    const limit = parseLocalizedNumber(candidate?.limit);
+    const used = parseLocalizedNumber(candidate?.used);
+    const usagePercent = parseLocalizedNumber(candidate?.usage_percent);
+    return remaining !== null || limit !== null || used !== null || usagePercent !== null;
+  });
+  const mergedJsonCandidates = hasStructuredMetricCandidates
+    ? jsonCandidates
+    : [...jsonCandidates, ...escapedScriptCandidates];
+  const metricKeyMatches = _dedupeByKey(
+    escapedScriptCandidates.flatMap((candidate) => candidate.matched_keys ?? []),
+    (entry) => `${entry.family}:${entry.key}`
+  );
   return {
     progress: _extractProgressMetrics(html),
     fractions: _extractFractionCandidates(html),
     percentages: _extractPercentCandidates(html),
     datetimes: _extractDatetimeCandidates(html),
-    json_candidates: jsonCandidates,
+    json_candidates: mergedJsonCandidates,
+    metric_key_matches: metricKeyMatches,
   };
 }
 
@@ -844,6 +1129,9 @@ function _buildProviderPayload(provider, windows, signals, sourcePages) {
         percentages: Array.isArray(signals.percentages) ? signals.percentages.length : 0,
         datetimes: Array.isArray(signals.datetimes) ? signals.datetimes.length : 0,
         json_candidates: Array.isArray(signals.json_candidates) ? signals.json_candidates.length : 0,
+        metric_key_matches: Array.isArray(signals.metric_key_matches)
+          ? signals.metric_key_matches.length
+          : 0,
       },
     },
   };
@@ -895,6 +1183,7 @@ export function extractSignalDiagnostics(html) {
       percentages: signals.percentages.length,
       datetimes: signals.datetimes.length,
       json_candidates: signals.json_candidates.length,
+      metric_key_matches: signals.metric_key_matches.length,
     },
     signal_samples: {
       progress: _sample(signals.progress, 3),
@@ -905,6 +1194,18 @@ export function extractSignalDiagnostics(html) {
         signals.json_candidates.map((candidate) => candidate.window_hint ?? null),
         5
       ),
+      json_candidates: _sample(
+        signals.json_candidates.map((candidate) => ({
+          window_hint: candidate.window_hint ?? null,
+          remaining: parseLocalizedNumber(candidate.remaining),
+          limit: parseLocalizedNumber(candidate.limit),
+          used: parseLocalizedNumber(candidate.used),
+          usage_percent: parseLocalizedNumber(candidate.usage_percent),
+          reset_at: typeof candidate.reset_at === "string" ? candidate.reset_at : null,
+        })),
+        5
+      ),
+      metric_key_matches: _sample(signals.metric_key_matches, 12),
     },
   };
 }
@@ -1039,8 +1340,10 @@ export function mergeCopilotPayloads(featuresPayload, premiumPayload) {
         fractions: (featuresSignals.fractions ?? 0) + (premiumSignals.fractions ?? 0),
         percentages: (featuresSignals.percentages ?? 0) + (premiumSignals.percentages ?? 0),
         datetimes: (featuresSignals.datetimes ?? 0) + (premiumSignals.datetimes ?? 0),
-        json_candidates:
-          (featuresSignals.json_candidates ?? 0) + (premiumSignals.json_candidates ?? 0),
+      json_candidates:
+        (featuresSignals.json_candidates ?? 0) + (premiumSignals.json_candidates ?? 0),
+      metric_key_matches:
+        (featuresSignals.metric_key_matches ?? 0) + (premiumSignals.metric_key_matches ?? 0),
       },
     },
   };

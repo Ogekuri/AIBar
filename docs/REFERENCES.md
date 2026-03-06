@@ -2103,7 +2103,7 @@ when no records are available.
 
 ---
 
-# parsers.js | JavaScript | 1047L | 43 symbols | 0 imports | 48 comments
+# parsers.js | JavaScript | 1350L | 54 symbols | 0 imports | 59 comments
 > Path: `src/aibar/chrome-extension/parsers.js`
 - @brief Localization-independent HTML parser primitives for AIBar Chrome extension.
 - @details Extracts quota and progress metrics from provider usage pages by using
@@ -2116,124 +2116,173 @@ plus script bootstrap payload extraction, instead of localized visible labels.
 
 ## Definitions
 
-- const `export const PARSER_VERSION = "2026.03.06.1";` (L14)
+- const `export const PARSER_VERSION = "2026.03.06.2";` (L14)
 - @brief Parser semantic version for debug payloads. */
 - const `const WINDOW_HINT_REGEX = /\b(5h|7d|30d)\b/i;` (L17)
 - @brief Token regex for window hints. */
-- const `const FRACTION_REGEX = /([0-9][0-9\s.,]*)\s*\/\s*([0-9][0-9\s.,]*)/g;` (L20)
+- const `const WINDOW_HINT_GLOBAL_REGEX = /\b(5h|7d|30d)\b/ig;` (L20)
+- @brief Global token regex for iterating over window hints in text streams. */
+- const `const FRACTION_REGEX = /([0-9][0-9\s.,]*)\s*\/\s*([0-9][0-9\s.,]*)/g;` (L23)
 - @brief Token regex for numeric fractions. */
-- const `const PERCENT_REGEX = /([0-9][0-9\s.,]*)\s*%/g;` (L23)
+- const `const PERCENT_REGEX = /([0-9][0-9\s.,]*)\s*%/g;` (L26)
 - @brief Token regex for percentage values. */
-- const `const ISO_DATETIME_REGEX = /\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})\b/g;` (L26)
+- const `const ISO_DATETIME_REGEX = /\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})\b/g;` (L29)
 - @brief ISO datetime token regex for inline/script extraction. */
-- const `const JSON_BOOTSTRAP_KEYS = [` (L29)
+- const `const JSON_BOOTSTRAP_KEYS = [` (L32)
 - @brief Bootstrap variable names that frequently carry usage payloads. */
-### fn `export function parseLocalizedNumber(token)` (L45-83)
+- const `const REMAINING_KEY_FRAGMENTS = [` (L42)
+- @brief Key fragments used to infer remaining quota values. */
+- const `const LIMIT_KEY_FRAGMENTS = [` (L52)
+- @brief Key fragments used to infer limit quota values. */
+- const `const USED_KEY_FRAGMENTS = [` (L63)
+- @brief Key fragments used to infer used/consumed values. */
+- const `const USAGE_PERCENT_KEY_FRAGMENTS = [` (L73)
+- @brief Key fragments used to infer usage percentage values. */
+### fn `export function parseLocalizedNumber(token)` (L89-127)
 - @brief Parse localized numeric token into a finite number.
 - @details Supports comma/dot decimal formats and thousands separators by
 deterministic normalization rules; rejects non-finite values.
 - @param {string | number | null | undefined} token Candidate numeric token.
 - @return s {number | null} Parsed finite number or null when invalid.
 
-### fn `function _clamp(value, min, max)` (L92-97)
+### fn `function _clamp(value, min, max)` (L136-141)
 - @brief Clamp value into inclusive min/max interval.
 - @param {number | null} value Candidate number.
 - @param {number} min Inclusive minimum.
 - @param {number} max Inclusive maximum.
 - @return s {number | null} Clamped value or null.
 
-### fn `function _extractAttribute(tagHtml, attributeName)` (L106-113)
+### fn `function _extractAttribute(tagHtml, attributeName)` (L150-157)
 - @brief Parse one HTML tag attribute value.
 - @details Parses quoted/unquoted HTML attributes using regex extraction.
 - @param {string} tagHtml Full tag HTML.
 - @param {string} attributeName Attribute name to extract.
 - @return s {string | null} Attribute value or null.
 
-### fn `function _extractWindowHint(context)` (L120-136)
+### fn `function _extractWindowHint(context)` (L164-180)
 - @brief Infer usage window token from local HTML context.
 - @param {string} context Text context around parsed metric element.
 - @return s {string | null} Window hint token (`5h`, `7d`, `30d`) or null.
 
-### fn `function _extractPlainText(html)` (L144-153)
+### fn `function _extractPlainText(html)` (L188-197)
 - @brief Strip script/style blocks and tags from HTML.
 - @details Produces compact text stream used for fraction/percent extraction.
 - @param {string} html Raw HTML.
 - @return s {string} Plain text approximation.
 
-### fn `function _extractScriptEntries(html)` (L160-172)
+### fn `function _extractScriptEntries(html)` (L204-216)
 - @brief Extract script-tag entries with full tag and body slices.
 - @param {string} html Raw HTML.
 - @return s {Array<Record<string, string>>} Script entries.
 
-### fn `function _extractScriptText(html)` (L179-184)
+### fn `function _extractScriptText(html)` (L223-228)
 - @brief Join all script bodies into one diagnostic text stream.
 - @param {string} html Raw HTML.
 - @return s {string} Concatenated script text.
 
-### fn `function _extractProgressMetrics(html)` (L193-229)
+### fn `function _extractProgressMetrics(html)` (L237-273)
 - @brief Extract progress-bar metrics from semantic HTML attributes.
 - @details Supports both generic tags with `role=progressbar` and `<progress>`
 elements using `aria-valuenow/max` or `value/max` attributes.
 - @param {string} html Raw HTML.
 - @return s {Array<Record<string, number | string | null>>} Ordered progress-bar records.
 
-### fn `function _extractFractionCandidatesFromText(text)` (L238-253)
+### fn `function _extractFractionCandidatesFromText(text)` (L282-297)
 - @brief Extract numeric fraction candidates from one generic text stream.
 - @details Captures raw numeric pairs (`A/B`) that may encode used/limit or
 remaining/limit values independent from natural-language labels.
 - @param {string} text Generic text stream.
 - @return s {Array<Record<string, number>>} Ordered fraction records.
 
-### fn `function _extractPercentCandidatesFromText(text)` (L260-271)
+### fn `function _extractPercentCandidatesFromText(text)` (L304-315)
 - @brief Extract percentage literals from one generic text stream.
 - @param {string} text Generic text stream.
 - @return s {Array<number>} Ordered percentage numbers.
 
-### fn `function _extractDatetimeCandidatesFromText(text)` (L278-289)
+### fn `function _extractDatetimeCandidatesFromText(text)` (L322-333)
 - @brief Extract ISO-like datetime tokens from one generic text stream.
 - @param {string} text Generic text stream.
 - @return s {Array<string>} Ordered datetime candidates in ISO format.
 
-### fn `function _dedupeByKey(values, keySelector)` (L298-310)
+### fn `function _dedupeByKey(values, keySelector)` (L342-354)
 - @brief Deduplicate array values while preserving original ordering.
 @template T
 - @param {Array<T>} values Candidate values.
 - @param {(entry: T) => string} keySelector Unique-key selector.
 - @return s {Array<T>} Deduplicated values.
 
-### fn `function _extractFractionCandidates(html)` (L317-321)
+### fn `function _escapeRegexToken(token)` (L361-363)
+- @brief Escape regex-reserved characters in token for literal pattern use.
+- @param {string} token Raw token.
+- @return s {string} Escaped token.
+
+### fn `function _extractNumericKeyMatches(text, keyFragments)` (L371-393)
+- @brief Extract numeric key-value matches from one text fragment.
+- @param {string} text Source text.
+- @param {Array<string>} keyFragments Key-name fragments.
+- @return s {Array<Record<string, number | string>>} Ordered key matches.
+
+### fn `function _selectNumericFromMatches(keyMatches, anchorIndex, preferBeforeAnchor)` (L402-421)
+- @brief Select one representative value from matched key-value records.
+- @param {Array<Record<string, number | string>>} keyMatches Numeric key matches.
+- @param {number} anchorIndex Anchor position used to select nearest value.
+- @param {boolean} preferBeforeAnchor Whether to prioritize key matches before anchor.
+- @return s {{value: number | null, key: string | null}} Selected value/key pair.
+
+### fn `function _buildScriptContextCandidate(scriptText, centerIndex, resetAt, preferBeforeAnchor)` (L431-483)
+- @brief Build script-context metric candidate around a target token index.
+- @param {string} scriptText Script text stream.
+- @param {number} centerIndex Center index for context extraction.
+- @param {string | null} resetAt Optional reset timestamp.
+- @param {boolean} preferBeforeAnchor Whether to prioritize matches before center.
+- @return s {Record<string, unknown> | null} Candidate payload or null.
+
+### fn `function _extractEscapedScriptMetricCandidates(html)` (L492-547)
+- @brief Extract metric candidates from escaped script key-value artifacts.
+- @details Targets script contexts around datetime and window tokens to recover
+quota/progress values when app-shell HTML contains no visible usage rows.
+- @param {string} html Raw HTML.
+- @return s {Array<Record<string, unknown>>} Ordered script-derived candidates.
+
+### fn `function _extractFractionCandidates(html)` (L554-558)
 - @brief Extract numeric fraction candidates from visible and script text streams.
 - @param {string} html Raw HTML.
 - @return s {Array<Record<string, number>>} Ordered fraction records.
 
-### fn `function _extractPercentCandidates(html)` (L328-332)
+### fn `function _extractPercentCandidates(html)` (L565-569)
 - @brief Extract percentage literals from visible and script text streams.
 - @param {string} html Raw HTML.
 - @return s {Array<number>} Ordered percentage numbers.
 
-### fn `function _extractDatetimeCandidates(html)` (L340-353)
+### fn `function _extractDatetimeCandidates(html)` (L577-590)
 - @brief Extract ISO-like datetime tokens from markup and script content.
 - @details Reads `datetime="..."` attributes and optional ISO literals in script.
 - @param {string} html Raw HTML.
 - @return s {Array<string>} Ordered datetime candidates in ISO format when parseable.
 
-### fn `function _extractBalancedJsonSlice(source, startIndex)` (L361-409)
+### fn `function _extractBalancedJsonSlice(source, startIndex)` (L598-646)
 - @brief Extract balanced JSON slice starting at object/array token.
 - @param {string} source Source text.
 - @param {number} startIndex Start index for `{` or `[` token.
 - @return s {string | null} Balanced JSON slice or null.
 
-### fn `function _decodeQuotedJsonPayload(quotedToken)` (L416-715)
+### fn `function _extractEnclosingJsonObjectContext(source, centerIndex)` (L654-953)
+- @brief Resolve smallest enclosing JSON-object slice around one center index.
+- @param {string} source Source text.
+- @param {number} centerIndex Center index.
+- @return s {{context_start: number, context_end: number} | null} Context bounds.
+
+### fn `function _decodeQuotedJsonPayload(quotedToken)` (L681-980)
 - @brief Decode quoted JSON payload and parse into object when possible.
 - @param {string} quotedToken Quoted JS/JSON token.
 - @return s {unknown | null} Parsed payload or null.
 
-### fn `function _extractBootstrapJsonFromScriptBody(scriptBody)` (L436-735)
+### fn `function _extractBootstrapJsonFromScriptBody(scriptBody)` (L701-1000)
 - @brief Extract bootstrap JSON objects from script assignment statements.
 - @param {string} scriptBody Script body text.
 - @return s {Array<unknown>} Parsed JSON roots.
 
-### fn `function _extractEmbeddedJsonObjects(html)` (L485-507)
+### fn `function _extractEmbeddedJsonObjects(html)` (L750-772)
 - @brief Collect embedded JSON payloads from script tags.
 - @details Parses `application/json`, `application/ld+json`, and `__NEXT_DATA__`
 scripts plus bootstrap assignment payloads into objects for language-agnostic
@@ -2241,44 +2290,44 @@ metric extraction.
 - @param {string} html Raw HTML.
 - @return s {Array<unknown>} Parsed JSON roots.
 
-### fn `function _pickNumericByKey(obj, keyRegexes)` (L515-526)
+### fn `function _pickNumericByKey(obj, keyRegexes)` (L780-791)
 - @brief Resolve first numeric value from object keys matching regex list.
 - @param {Record<string, unknown>} obj Object candidate.
 - @param {Array<RegExp>} keyRegexes Key regex matchers.
 - @return s {number | null} First parsed numeric value.
 
-### fn `function _pickDatetimeByKey(obj, keyRegexes)` (L534-548)
+### fn `function _pickDatetimeByKey(obj, keyRegexes)` (L799-813)
 - @brief Resolve first datetime-like value from object keys matching regex list.
 - @param {Record<string, unknown>} obj Object candidate.
 - @param {Array<RegExp>} keyRegexes Key regex matchers.
 - @return s {string | null} ISO timestamp or null.
 
-### fn `function _extractJsonMetricCandidates(root)` (L557-623)
+### fn `function _extractJsonMetricCandidates(root)` (L822-888)
 - @brief Recursively extract metric candidates from parsed JSON roots.
 - @details Uses provider-agnostic key families for quota/usage/reset values and
 window hints; traversal is bounded by visited-object set.
 - @param {unknown} root Parsed JSON root.
 - @return s {Array<Record<string, number | string | null>>} Candidate metrics.
 
-### fn `function walk(node)` (L566-619)
+### fn `function walk(node)` (L831-884)
 - @brief Depth-first traversal over JSON object graph.
 - @param {unknown} node Current node.
 - @return s {void}
 
-### fn `function _candidateScore(candidate, windowKey)` (L631-659)
+### fn `function _candidateScore(candidate, windowKey)` (L896-928)
 - @brief Compute normalized candidate score for window assignment.
 - @param {Record<string, unknown>} candidate Candidate payload.
 - @param {string} windowKey Target window key.
 - @return s {number} Descending score; negative values indicate poor fit.
 
-### fn `function _pickCandidate(candidates, windowKey, index)` (L668-682)
+### fn `function _pickCandidate(candidates, windowKey, index)` (L937-951)
 - @brief Select one best-matching candidate by score and index proximity.
 - @param {Array<Record<string, unknown>>} candidates Candidate list.
 - @param {string} windowKey Target window key.
 - @param {number} index Ordered fallback index.
 - @return s {Record<string, unknown> | null} Selected candidate.
 
-### fn `function _inferQuotaFromFraction(fraction, usagePercent)` (L692-722)
+### fn `function _inferQuotaFromFraction(fraction, usagePercent)` (L961-991)
 - @brief Infer remaining/limit from fraction candidate and usage percentage.
 - @details Chooses interpretation (`used/limit` vs `remaining/limit`) minimizing
 percentage-distance from known usage value when available.
@@ -2286,7 +2335,7 @@ percentage-distance from known usage value when available.
 - @param {number | null} usagePercent Known usage percentage.
 - @return s {{remaining: number | null, limit: number | null}} Inferred values.
 
-### fn `function _buildWindows(` (L734-806)
+### fn `function _buildWindows(` (L1003-1075)
 - @brief Build one normalized window metrics record.
 - @param {Array<string>} windowKeys Ordered window keys.
 - @param {Array<Record<string, number | string | null>>} progressCandidates Progress candidates.
@@ -2296,12 +2345,12 @@ percentage-distance from known usage value when available.
 - @param {Array<Record<string, number | string | null>>} jsonCandidates JSON-derived candidates.
 - @return s {Record<string, Record<string, number | string | null>>} Window metrics map.
 
-### fn `function _extractSignals(html)` (L813-823)
+### fn `function _extractSignals(html)` (L1082-1108)
 - @brief Extract all parser signal families from one HTML payload.
 - @param {string} html Raw HTML page source.
 - @return s {Record<string, unknown>} Signal bundle.
 
-### fn `function _buildProviderPayload(provider, windows, signals, sourcePages)` (L833-850)
+### fn `function _buildProviderPayload(provider, windows, signals, sourcePages)` (L1118-1138)
 - @brief Build normalized provider payload with parser diagnostics.
 - @param {string} provider Provider key.
 - @param {Record<string, Record<string, number | string | null>>} windows Window map.
@@ -2309,49 +2358,49 @@ percentage-distance from known usage value when available.
 - @param {Array<string>} sourcePages Source page URLs.
 - @return s {Record<string, unknown>} Provider payload.
 
-### fn `export function providerPayloadHasUsableMetrics(payload)` (L859-871)
+### fn `export function providerPayloadHasUsableMetrics(payload)` (L1147-1159)
 - @brief Determine whether payload contains usable quota/usage metrics.
 - @details Rejects payloads that contain only reset timestamps without
 quota/progress numbers to avoid false-positive parser success states.
 - @param {Record<string, unknown> | null | undefined} payload Parsed payload.
 - @return s {boolean} True when at least one window has quota or usage metrics.
 
-### fn `function _sample(values, maxItems)` (L879-881)
+### fn `function _sample(values, maxItems)` (L1167-1169)
 - @brief Build compact signal sample payload for debug API responses.
 - @param {Array<unknown>} values Candidate values.
 - @param {number} maxItems Maximum number of sample entries.
 - @return s {Array<unknown>} Bounded sample array.
 
-### fn `export function extractSignalDiagnostics(html)` (L888-910)
+### fn `export function extractSignalDiagnostics(html)` (L1176-1211)
 - @brief Extract parser signal counts and bounded samples for diagnostics.
 - @param {string} html Raw HTML page source.
 - @return s {Record<string, unknown>} Signal diagnostics.
 
-### fn `export function parseClaudeUsageHtml(html)` (L919-930)
+### fn `export function parseClaudeUsageHtml(html)` (L1220-1231)
 - @brief Parse Claude usage HTML into normalized window metrics.
 - @details Targets windows `5h` and `7d` using ordered semantic extraction.
 - @param {string} html Claude usage page HTML.
 - @return s {Record<string, unknown>} Normalized Claude payload.
 - @satisfies REQ-040
 
-### fn `export function parseCodexUsageHtml(html)` (L939-950)
+### fn `export function parseCodexUsageHtml(html)` (L1240-1251)
 - @brief Parse Codex usage HTML into normalized window metrics.
 - @details Targets windows `5h` and `7d` using ordered semantic extraction.
 - @param {string} html Codex usage page HTML.
 - @return s {Record<string, unknown>} Normalized Codex payload.
 - @satisfies REQ-041
 
-### fn `export function parseCopilotFeaturesHtml(html)` (L957-973)
+### fn `export function parseCopilotFeaturesHtml(html)` (L1258-1274)
 - @brief Parse Copilot features-page HTML into normalized window metrics.
 - @param {string} html Copilot features page HTML.
 - @return s {Record<string, unknown>} Normalized features payload.
 
-### fn `export function parseCopilotPremiumHtml(html)` (L980-996)
+### fn `export function parseCopilotPremiumHtml(html)` (L1281-1297)
 - @brief Parse Copilot premium-requests HTML into normalized window metrics.
 - @param {string} html Copilot premium page HTML.
 - @return s {Record<string, unknown>} Normalized premium payload.
 
-### fn `export function mergeCopilotPayloads(featuresPayload, premiumPayload)` (L1007-1047)
+### fn `export function mergeCopilotPayloads(featuresPayload, premiumPayload)` (L1308-1350)
 - @brief Merge Copilot feature and premium payloads into one consumer payload.
 - @details Selects the richest `30d` window metrics and aggregates source-page and
 parser signal counters for traceable diagnostics.
@@ -2365,47 +2414,58 @@ parser signal counters for traceable diagnostics.
 |---|---|---|---|---|
 |`PARSER_VERSION`|const||14||
 |`WINDOW_HINT_REGEX`|const||17||
-|`FRACTION_REGEX`|const||20||
-|`PERCENT_REGEX`|const||23||
-|`ISO_DATETIME_REGEX`|const||26||
-|`JSON_BOOTSTRAP_KEYS`|const||29||
-|`parseLocalizedNumber`|fn||45-83|export function parseLocalizedNumber(token)|
-|`_clamp`|fn||92-97|function _clamp(value, min, max)|
-|`_extractAttribute`|fn||106-113|function _extractAttribute(tagHtml, attributeName)|
-|`_extractWindowHint`|fn||120-136|function _extractWindowHint(context)|
-|`_extractPlainText`|fn||144-153|function _extractPlainText(html)|
-|`_extractScriptEntries`|fn||160-172|function _extractScriptEntries(html)|
-|`_extractScriptText`|fn||179-184|function _extractScriptText(html)|
-|`_extractProgressMetrics`|fn||193-229|function _extractProgressMetrics(html)|
-|`_extractFractionCandidatesFromText`|fn||238-253|function _extractFractionCandidatesFromText(text)|
-|`_extractPercentCandidatesFromText`|fn||260-271|function _extractPercentCandidatesFromText(text)|
-|`_extractDatetimeCandidatesFromText`|fn||278-289|function _extractDatetimeCandidatesFromText(text)|
-|`_dedupeByKey`|fn||298-310|function _dedupeByKey(values, keySelector)|
-|`_extractFractionCandidates`|fn||317-321|function _extractFractionCandidates(html)|
-|`_extractPercentCandidates`|fn||328-332|function _extractPercentCandidates(html)|
-|`_extractDatetimeCandidates`|fn||340-353|function _extractDatetimeCandidates(html)|
-|`_extractBalancedJsonSlice`|fn||361-409|function _extractBalancedJsonSlice(source, startIndex)|
-|`_decodeQuotedJsonPayload`|fn||416-715|function _decodeQuotedJsonPayload(quotedToken)|
-|`_extractBootstrapJsonFromScriptBody`|fn||436-735|function _extractBootstrapJsonFromScriptBody(scriptBody)|
-|`_extractEmbeddedJsonObjects`|fn||485-507|function _extractEmbeddedJsonObjects(html)|
-|`_pickNumericByKey`|fn||515-526|function _pickNumericByKey(obj, keyRegexes)|
-|`_pickDatetimeByKey`|fn||534-548|function _pickDatetimeByKey(obj, keyRegexes)|
-|`_extractJsonMetricCandidates`|fn||557-623|function _extractJsonMetricCandidates(root)|
-|`walk`|fn||566-619|function walk(node)|
-|`_candidateScore`|fn||631-659|function _candidateScore(candidate, windowKey)|
-|`_pickCandidate`|fn||668-682|function _pickCandidate(candidates, windowKey, index)|
-|`_inferQuotaFromFraction`|fn||692-722|function _inferQuotaFromFraction(fraction, usagePercent)|
-|`_buildWindows`|fn||734-806|function _buildWindows(|
-|`_extractSignals`|fn||813-823|function _extractSignals(html)|
-|`_buildProviderPayload`|fn||833-850|function _buildProviderPayload(provider, windows, signals...|
-|`providerPayloadHasUsableMetrics`|fn||859-871|export function providerPayloadHasUsableMetrics(payload)|
-|`_sample`|fn||879-881|function _sample(values, maxItems)|
-|`extractSignalDiagnostics`|fn||888-910|export function extractSignalDiagnostics(html)|
-|`parseClaudeUsageHtml`|fn||919-930|export function parseClaudeUsageHtml(html)|
-|`parseCodexUsageHtml`|fn||939-950|export function parseCodexUsageHtml(html)|
-|`parseCopilotFeaturesHtml`|fn||957-973|export function parseCopilotFeaturesHtml(html)|
-|`parseCopilotPremiumHtml`|fn||980-996|export function parseCopilotPremiumHtml(html)|
-|`mergeCopilotPayloads`|fn||1007-1047|export function mergeCopilotPayloads(featuresPayload, pre...|
+|`WINDOW_HINT_GLOBAL_REGEX`|const||20||
+|`FRACTION_REGEX`|const||23||
+|`PERCENT_REGEX`|const||26||
+|`ISO_DATETIME_REGEX`|const||29||
+|`JSON_BOOTSTRAP_KEYS`|const||32||
+|`REMAINING_KEY_FRAGMENTS`|const||42||
+|`LIMIT_KEY_FRAGMENTS`|const||52||
+|`USED_KEY_FRAGMENTS`|const||63||
+|`USAGE_PERCENT_KEY_FRAGMENTS`|const||73||
+|`parseLocalizedNumber`|fn||89-127|export function parseLocalizedNumber(token)|
+|`_clamp`|fn||136-141|function _clamp(value, min, max)|
+|`_extractAttribute`|fn||150-157|function _extractAttribute(tagHtml, attributeName)|
+|`_extractWindowHint`|fn||164-180|function _extractWindowHint(context)|
+|`_extractPlainText`|fn||188-197|function _extractPlainText(html)|
+|`_extractScriptEntries`|fn||204-216|function _extractScriptEntries(html)|
+|`_extractScriptText`|fn||223-228|function _extractScriptText(html)|
+|`_extractProgressMetrics`|fn||237-273|function _extractProgressMetrics(html)|
+|`_extractFractionCandidatesFromText`|fn||282-297|function _extractFractionCandidatesFromText(text)|
+|`_extractPercentCandidatesFromText`|fn||304-315|function _extractPercentCandidatesFromText(text)|
+|`_extractDatetimeCandidatesFromText`|fn||322-333|function _extractDatetimeCandidatesFromText(text)|
+|`_dedupeByKey`|fn||342-354|function _dedupeByKey(values, keySelector)|
+|`_escapeRegexToken`|fn||361-363|function _escapeRegexToken(token)|
+|`_extractNumericKeyMatches`|fn||371-393|function _extractNumericKeyMatches(text, keyFragments)|
+|`_selectNumericFromMatches`|fn||402-421|function _selectNumericFromMatches(keyMatches, anchorInde...|
+|`_buildScriptContextCandidate`|fn||431-483|function _buildScriptContextCandidate(scriptText, centerI...|
+|`_extractEscapedScriptMetricCandidates`|fn||492-547|function _extractEscapedScriptMetricCandidates(html)|
+|`_extractFractionCandidates`|fn||554-558|function _extractFractionCandidates(html)|
+|`_extractPercentCandidates`|fn||565-569|function _extractPercentCandidates(html)|
+|`_extractDatetimeCandidates`|fn||577-590|function _extractDatetimeCandidates(html)|
+|`_extractBalancedJsonSlice`|fn||598-646|function _extractBalancedJsonSlice(source, startIndex)|
+|`_extractEnclosingJsonObjectContext`|fn||654-953|function _extractEnclosingJsonObjectContext(source, cente...|
+|`_decodeQuotedJsonPayload`|fn||681-980|function _decodeQuotedJsonPayload(quotedToken)|
+|`_extractBootstrapJsonFromScriptBody`|fn||701-1000|function _extractBootstrapJsonFromScriptBody(scriptBody)|
+|`_extractEmbeddedJsonObjects`|fn||750-772|function _extractEmbeddedJsonObjects(html)|
+|`_pickNumericByKey`|fn||780-791|function _pickNumericByKey(obj, keyRegexes)|
+|`_pickDatetimeByKey`|fn||799-813|function _pickDatetimeByKey(obj, keyRegexes)|
+|`_extractJsonMetricCandidates`|fn||822-888|function _extractJsonMetricCandidates(root)|
+|`walk`|fn||831-884|function walk(node)|
+|`_candidateScore`|fn||896-928|function _candidateScore(candidate, windowKey)|
+|`_pickCandidate`|fn||937-951|function _pickCandidate(candidates, windowKey, index)|
+|`_inferQuotaFromFraction`|fn||961-991|function _inferQuotaFromFraction(fraction, usagePercent)|
+|`_buildWindows`|fn||1003-1075|function _buildWindows(|
+|`_extractSignals`|fn||1082-1108|function _extractSignals(html)|
+|`_buildProviderPayload`|fn||1118-1138|function _buildProviderPayload(provider, windows, signals...|
+|`providerPayloadHasUsableMetrics`|fn||1147-1159|export function providerPayloadHasUsableMetrics(payload)|
+|`_sample`|fn||1167-1169|function _sample(values, maxItems)|
+|`extractSignalDiagnostics`|fn||1176-1211|export function extractSignalDiagnostics(html)|
+|`parseClaudeUsageHtml`|fn||1220-1231|export function parseClaudeUsageHtml(html)|
+|`parseCodexUsageHtml`|fn||1240-1251|export function parseCodexUsageHtml(html)|
+|`parseCopilotFeaturesHtml`|fn||1258-1274|export function parseCopilotFeaturesHtml(html)|
+|`parseCopilotPremiumHtml`|fn||1281-1297|export function parseCopilotPremiumHtml(html)|
+|`mergeCopilotPayloads`|fn||1308-1350|export function mergeCopilotPayloads(featuresPayload, pre...|
 
 
 ---
