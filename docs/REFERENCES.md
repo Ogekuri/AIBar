@@ -24,9 +24,6 @@
         │   │   ├── openai_usage.py
         │   │   └── openrouter.py
         │   └── ui.py
-        ├── extension
-        │   └── aibar@aibar.panel
-        │       └── extension.js
         └── gnome-extension
             └── aibar@aibar.panel
                 └── extension.js

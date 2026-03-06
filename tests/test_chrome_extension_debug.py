@@ -1,0 +1,41 @@
+"""
+@file
+@brief Chrome debug instrumentation wiring assertions.
+@details Verifies persisted debug logs, popup export controls, and clear-log path
+for field diagnostics.
+@satisfies TST-017
+@satisfies REQ-044
+"""
+
+from pathlib import Path
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEBUG_PATH = PROJECT_ROOT / "src" / "aibar" / "chrome-extension" / "debug.mjs"
+POPUP_HTML_PATH = PROJECT_ROOT / "src" / "aibar" / "chrome-extension" / "popup.html"
+POPUP_SCRIPT_PATH = PROJECT_ROOT / "src" / "aibar" / "chrome-extension" / "popup.mjs"
+
+
+def test_debug_module_declares_storage_ring_buffer_and_bundle_export() -> None:
+    """
+    @brief Verify debug module stores logs in storage and supports bundle export.
+    @satisfies TST-017
+    @satisfies REQ-044
+    """
+    source = DEBUG_PATH.read_text(encoding="utf-8")
+    assert 'export const DEBUG_LOG_STORAGE_KEY = "aibar.debug.logs";' in source
+    assert "export async function appendDebugRecord" in source
+    assert "export async function buildDebugBundle" in source
+
+
+def test_popup_exposes_export_and_clear_debug_controls() -> None:
+    """
+    @brief Verify popup exposes debug export and clear-log actions.
+    @satisfies REQ-044
+    """
+    html_source = POPUP_HTML_PATH.read_text(encoding="utf-8")
+    script_source = POPUP_SCRIPT_PATH.read_text(encoding="utf-8")
+    assert 'id="exportButton"' in html_source
+    assert 'id="clearLogsButton"' in html_source
+    assert 'type: "debug.export_bundle"' in script_source
+    assert 'type: "debug.clear_logs"' in script_source

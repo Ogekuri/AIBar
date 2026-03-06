@@ -1,0 +1,64 @@
+<!doctype html>
+<!--
+  @file popup.html
+  @brief Toolbar popup view for AIBar Chrome extension.
+  @details Hosts provider tabs, progress cards, debug actions, and runtime status labels.
+  @satisfies REQ-038
+  @satisfies REQ-039
+  @satisfies REQ-044
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AIBar</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="aibar-root">
+      <header class="aibar-header">
+        <img class="aibar-header-icon" src="icons/icon32.png" alt="AIBar" />
+        <span class="aibar-header-label">AIBar</span>
+      </header>
+
+      <section class="aibar-controls">
+        <button id="refreshButton" class="aibar-btn" type="button">Refresh now</button>
+        <button id="exportButton" class="aibar-btn" type="button">Export debug</button>
+        <button id="clearLogsButton" class="aibar-btn" type="button">Clear logs</button>
+        <input
+          id="intervalInput"
+          class="aibar-input"
+          type="number"
+          min="60"
+          step="1"
+          value="180"
+          aria-label="Refresh interval seconds"
+        />
+        <button id="setIntervalButton" class="aibar-btn" type="button">Set sec</button>
+      </section>
+
+      <nav class="aibar-tab-bar" aria-label="Providers">
+        <button class="aibar-tab-active aibar-tab-active-claude" data-provider="claude" type="button">
+          <span class="aibar-tab-label aibar-tab-label-claude">Claude</span>
+        </button>
+        <button class="aibar-tab" data-provider="copilot" type="button">
+          <span class="aibar-tab-label aibar-tab-label-copilot">Copilot</span>
+        </button>
+        <button class="aibar-tab" data-provider="codex" type="button">
+          <span class="aibar-tab-label aibar-tab-label-codex">Codex</span>
+        </button>
+      </nav>
+
+      <section id="card-claude" class="aibar-card aibar-provider-claude aibar-card-visible"></section>
+      <section id="card-copilot" class="aibar-card aibar-provider-copilot"></section>
+      <section id="card-codex" class="aibar-card aibar-provider-codex"></section>
+
+      <footer class="aibar-footer">
+        <span id="updatedLabel">Updated: n/a</span>
+        <span id="statusLabel" class="aibar-badge">idle</span>
+      </footer>
+    </main>
+
+    <script type="module" src="popup.mjs"></script>
+  </body>
+</html>

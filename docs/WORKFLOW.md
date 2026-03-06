@@ -32,6 +32,28 @@
   - `defining_files: scripts/test-gnome-extension.sh`
   - `thread_model: no explicit threads detected`
 
+- `id: PROC:chrome-ext`
+  - `type: Process`
+  - `parent_process: null`
+  - `role: Chrome extension runtime process for popup rendering and autonomous provider refresh`
+  - `entrypoint_symbols: _initializeRuntime(...), _handleMessage(...)`
+  - `defining_files: src/aibar/chrome-extension/background.mjs, src/aibar/chrome-extension/popup.mjs, src/aibar/chrome-extension/parsers.mjs, src/aibar/chrome-extension/debug.mjs`
+  - `thread_model: explicit threads detected (THR:chrome-ext#refresh-alarm, THR:chrome-ext#popup-ui)`
+
+- `id: THR:chrome-ext#refresh-alarm`
+  - `type: Thread`
+  - `parent_process: PROC:chrome-ext`
+  - `role: periodic alarm-triggered background refresh worker`
+  - `entrypoint_symbols: chrome.alarms.onAlarm callback`
+  - `defining_files: src/aibar/chrome-extension/background.mjs`
+
+- `id: THR:chrome-ext#popup-ui`
+  - `type: Thread`
+  - `parent_process: PROC:chrome-ext`
+  - `role: popup UI render/event thread for provider cards and debug actions`
+  - `entrypoint_symbols: _wireUiEvents(...), _requestState(...)`
+  - `defining_files: src/aibar/chrome-extension/popup.mjs`
+
 ## Execution Units
 
 ### PROC:install-ext
@@ -72,6 +94,86 @@
       - External boundary: `dbus-run-session -- gnome-shell --nested --wayland`.
 - `External Boundaries`
   - `dbus-run-session` and `gnome-shell` for nested shell.
+
+### PROC:chrome-ext
+- `Entrypoints`
+  - `_initializeRuntime(...)`: service-worker startup bootstrap [`src/aibar/chrome-extension/background.mjs`]
+  - `_handleMessage(...)`: popup/background RPC dispatcher [`src/aibar/chrome-extension/background.mjs`]
+- `Lifecycle/Trigger`
+  - Starts when the Chrome extension service worker is loaded.
+  - Registers recurring alarm scheduling, processes provider refresh cycles, persists normalized state, and serves popup RPC requests.
+- `Internal Call-Trace Tree`
+  - `_initializeRuntime(...)`: startup orchestrator [`src/aibar/chrome-extension/background.mjs`]
+    - `_loadPersistedState(...)`: restore last successful payloads from storage [`src/aibar/chrome-extension/background.mjs`]
+    - `_scheduleRefreshAlarm(...)`: configure periodic scheduler [`src/aibar/chrome-extension/background.mjs`]
+      - `_getRefreshIntervalSeconds(...)`: resolve default/override interval [`src/aibar/chrome-extension/background.mjs`]
+    - `_refreshAllProviders(...)`: ordered provider refresh execution [`src/aibar/chrome-extension/background.mjs`]
+      - `_fetchHtml(...)`: authenticated HTML download [`src/aibar/chrome-extension/background.mjs`]
+      - `parseClaudeUsageHtml(...)`: Claude metric extraction [`src/aibar/chrome-extension/parsers.mjs`]
+      - `parseCodexUsageHtml(...)`: Codex metric extraction [`src/aibar/chrome-extension/parsers.mjs`]
+      - `parseCopilotFeaturesHtml(...)`: Copilot-features extraction [`src/aibar/chrome-extension/parsers.mjs`]
+      - `parseCopilotPremiumHtml(...)`: Copilot-premium extraction [`src/aibar/chrome-extension/parsers.mjs`]
+      - `mergeCopilotPayloads(...)`: Copilot source merge [`src/aibar/chrome-extension/parsers.mjs`]
+      - `_applyProviderSuccess(...)`: state update on success [`src/aibar/chrome-extension/background.mjs`]
+      - `_applyProviderFailure(...)`: error update preserving latest successful payload [`src/aibar/chrome-extension/background.mjs`]
+      - `_persistState(...)`: storage persistence [`src/aibar/chrome-extension/background.mjs`]
+  - `_handleMessage(...)`: popup RPC route [`src/aibar/chrome-extension/background.mjs`]
+    - `_refreshAllProviders(...)`: manual refresh route [`src/aibar/chrome-extension/background.mjs`]
+    - `readDebugRecords(...)`: debug log retrieval [`src/aibar/chrome-extension/debug.mjs`]
+    - `clearDebugRecords(...)`: debug log reset [`src/aibar/chrome-extension/debug.mjs`]
+    - `buildDebugBundle(...)`: debug export payload generation [`src/aibar/chrome-extension/debug.mjs`]
+    - `_scheduleRefreshAlarm(...)`: interval override reconfiguration [`src/aibar/chrome-extension/background.mjs`]
+- `External Boundaries`
+  - Chrome extension runtime APIs (`chrome.runtime`, `chrome.alarms`, `chrome.storage.local`).
+  - HTTPS page downloads for Claude, ChatGPT Codex, and GitHub Copilot settings pages.
+  - Browser console output for runtime diagnostics.
+
+### THR:chrome-ext#refresh-alarm
+- `Entrypoints`
+  - `chrome.alarms.onAlarm` callback: periodic refresh trigger [`src/aibar/chrome-extension/background.mjs`]
+- `Lifecycle/Trigger`
+  - Activated whenever alarm `aibar-refresh` fires.
+  - Invokes one ordered provider refresh cycle and publishes updated state.
+- `Internal Call-Trace Tree`
+  - alarm callback: periodic trigger [`src/aibar/chrome-extension/background.mjs`]
+    - `_refreshAllProviders(...)`: ordered download + parse + persist pipeline [`src/aibar/chrome-extension/background.mjs`]
+      - `_fetchHtml(...)`: page download [`src/aibar/chrome-extension/background.mjs`]
+      - `parseClaudeUsageHtml(...)`: parser execution [`src/aibar/chrome-extension/parsers.mjs`]
+      - `parseCodexUsageHtml(...)`: parser execution [`src/aibar/chrome-extension/parsers.mjs`]
+      - `parseCopilotFeaturesHtml(...)`: parser execution [`src/aibar/chrome-extension/parsers.mjs`]
+      - `parseCopilotPremiumHtml(...)`: parser execution [`src/aibar/chrome-extension/parsers.mjs`]
+      - `mergeCopilotPayloads(...)`: parser merge execution [`src/aibar/chrome-extension/parsers.mjs`]
+      - `_persistState(...)`: storage synchronization [`src/aibar/chrome-extension/background.mjs`]
+- `External Boundaries`
+  - Chrome alarm scheduler.
+  - Provider websites over HTTPS.
+
+### THR:chrome-ext#popup-ui
+- `Entrypoints`
+  - popup bootstrap script body: initial state load + event wiring [`src/aibar/chrome-extension/popup.mjs`]
+  - `chrome.runtime.onMessage` callback: push update route [`src/aibar/chrome-extension/popup.mjs`]
+- `Lifecycle/Trigger`
+  - Starts when user clicks browser-action icon and opens popup.
+  - Renders tab cards and handles manual refresh/debug actions.
+- `Internal Call-Trace Tree`
+  - popup bootstrap: initialization [`src/aibar/chrome-extension/popup.mjs`]
+    - `_wireUiEvents(...)`: bind tab/control handlers [`src/aibar/chrome-extension/popup.mjs`]
+    - `_setActiveProvider(...)`: initial tab activation [`src/aibar/chrome-extension/popup.mjs`]
+    - `_requestState(...)`: initial state fetch [`src/aibar/chrome-extension/popup.mjs`]
+      - `_renderState(...)`: full popup render [`src/aibar/chrome-extension/popup.mjs`]
+        - `_renderProviderCard(...)`: provider card render [`src/aibar/chrome-extension/popup.mjs`]
+          - `_buildWindowRow(...)`: progress bar + reset/quota line render [`src/aibar/chrome-extension/popup.mjs`]
+    - control callbacks
+      - `_refreshNow(...)`: manual refresh RPC [`src/aibar/chrome-extension/popup.mjs`]
+      - `_exportDebugBundle(...)`: debug JSON export action [`src/aibar/chrome-extension/popup.mjs`]
+      - `_clearLogs(...)`: log clear action [`src/aibar/chrome-extension/popup.mjs`]
+      - `_setIntervalOverride(...)`: scheduler override action [`src/aibar/chrome-extension/popup.mjs`]
+  - `chrome.runtime.onMessage` callback: update push handler [`src/aibar/chrome-extension/popup.mjs`]
+    - `_renderState(...)`: view update [`src/aibar/chrome-extension/popup.mjs`]
+- `External Boundaries`
+  - Browser DOM APIs for popup rendering.
+  - Blob URL download for debug export file.
+  - Chrome runtime messaging APIs.
 
 ### PROC:main
 - `Entrypoints`
@@ -316,3 +418,21 @@
   - `endpoint_or_channel: inherited child process environment`
   - `payload_data_shape: string key/value map loaded from ~/.config/aibar/env`
   - `declaration_files: src/aibar/gnome-extension/aibar@aibar.panel/extension.js, src/aibar/aibar/config.py`
+
+- `id: EDGE-005`
+  - `source: THR:chrome-ext#popup-ui`
+  - `destination: PROC:chrome-ext`
+  - `direction: request-response`
+  - `mechanism: chrome.runtime.sendMessage RPC`
+  - `endpoint_or_channel: message types usage.get_state, usage.refresh_now, debug.export_bundle, debug.clear_logs, debug.set_refresh_interval`
+  - `payload_data_shape: JSON object with message type discriminator and optional interval/debug parameters`
+  - `declaration_files: src/aibar/chrome-extension/popup.mjs, src/aibar/chrome-extension/background.mjs`
+
+- `id: EDGE-006`
+  - `source: PROC:chrome-ext`
+  - `destination: THR:chrome-ext#popup-ui`
+  - `direction: push-notification`
+  - `mechanism: chrome.runtime.sendMessage event broadcast`
+  - `endpoint_or_channel: message type usage.updated`
+  - `payload_data_shape: normalized provider state object with providers, windows, timestamps, cycle status, and errors`
+  - `declaration_files: src/aibar/chrome-extension/background.mjs, src/aibar/chrome-extension/popup.mjs`

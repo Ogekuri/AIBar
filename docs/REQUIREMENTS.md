@@ -1,9 +1,9 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.3.7"
-date: "2026-03-05"
-author: "req-create"
+version: "0.3.8"
+date: "2026-03-06"
+author: "req-new"
 scope:
   paths:
     - "src/**/*.py"
@@ -91,6 +91,8 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **PRJ-006**: MUST provide a PEP 621-compliant `pyproject.toml` at repository root enabling installation via `uv pip install` and live execution via `uvx --from git+https://github.com/Ogekuri/AIBar.git aibar <command>`.
 - **PRJ-007**: MUST document in `README.md` a dedicated section covering `uv`-based installation, removal, and `uvx` live execution instructions.
 - **PRJ-008**: MUST provide `scripts/install-gnome-extension.sh` that copies GNOME extension files from `src/aibar/gnome-extension/aibar@aibar.panel/` to `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/` and enables the extension via `gnome-extensions enable`.
+- **PRJ-009**: MUST provide a Chrome extension in `src/aibar/chrome-extension` exposing an AIBar toolbar popup with `claude`, `copilot`, and `codex` provider tabs.
+- **PRJ-010**: MUST collect Chrome extension provider metrics through autonomous website download/parsing flows without invoking the `aibar` executable.
 
 ### 2.2 Project Constraints
 - **CTN-001**: MUST resolve provider credentials with precedence: environment variable, then `~/.config/aibar/env`, then provider-specific local credential stores.
@@ -100,6 +102,10 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **CTN-005**: MAY depend on unofficial/internal endpoints when official usage APIs are unavailable for Claude, Copilot, or Codex integrations.
 - **CTN-006**: MUST keep `docs/REFERENCES.md` synchronized with symbols defined under `src/` and `.github/workflows/`.
 - **CTN-007**: MUST declare `hatchling` as `[build-system]` backend in `pyproject.toml` with `[project]` metadata including `name`, `version`, `requires-python`, `dependencies`, and `[project.scripts]` console entry point.
+- **CTN-008**: MUST execute Chrome extension provider updates every 180 seconds by default through a hardcoded interval constant that remains configurable in source.
+- **CTN-009**: MUST process Chrome extension source pages in fixed order: Claude usage, Codex usage, Copilot features usage, Copilot premium usage.
+- **CTN-010**: MUST extract Chrome extension usage values using localization-independent DOM semantics and MUST NOT rely on visible-language label strings.
+- **CTN-011**: MUST expose Chrome extension runtime debugging through structured console logs and optional persisted extension-local log records.
 
 ## 3. Requirements
 
@@ -110,6 +116,10 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **DES-004**: MUST sanitize sensitive keys (`token`, `key`, `secret`, `password`, `authorization`) from cached raw payloads before disk writes.
 - **DES-005**: MUST parse env-file assignments with optional `export`, quoted values, and inline comments in GNOME extension env loading.
 - **DES-006**: MUST auto-refresh GNOME extension data every 300 seconds and also support manual refresh from the popup menu.
+- **DES-007**: MUST reuse GNOME extension icon assets for Chrome extension toolbar icons and popup branding assets.
+- **DES-008**: MUST implement Chrome extension popup tabs with GNOME-parity card layout semantics while restricting visible providers to `claude`, `copilot`, and `codex`.
+- **DES-009**: MUST run Chrome extension refresh scheduling in a dedicated background execution unit that updates shared provider state for popup rendering.
+- **DES-010**: MUST remove repository directory `src/aibar/chrome-extension/temp/` after parser extraction logic is implemented and validated.
 
 ### 3.2 Functions
 - **REQ-001**: MUST skip unconfigured providers in `show` output and print missing environment-variable hints when text mode is used.
@@ -149,6 +159,14 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **REQ-035**: MUST print `Remaining credits: <remaining> / <limit>` for Claude, Codex, and Copilot when both values exist in CLI text output.
 - **REQ-036**: MUST render Claude HTTP 429 as partial-window output: 5h shows `Error: Rate limited. Try again later.` and `Usage: ... 100.0%`; 5h reset and all 7d usage/reset values MUST use persisted Claude payload when available.
 - **REQ-037**: MUST use synthetic Claude partial-window fallback values when persisted Claude payload is unavailable during HTTP 429 rendering.
+- **REQ-038**: MUST open the Chrome extension popup panel on toolbar icon click and render tab navigation with exactly `claude`, `copilot`, and `codex` entries.
+- **REQ-039**: MUST render Chrome popup tab visual hierarchy, progress bars, and metric card structure equivalent to GNOME extension semantics for corresponding providers.
+- **REQ-040**: MUST download and parse Claude usage data from `https://claude.ai/settings/usage` for progress and quota values shown in the `claude` tab.
+- **REQ-041**: MUST download and parse Codex usage data from `https://chatgpt.com/codex/settings/usage` for progress and quota values shown in the `codex` tab.
+- **REQ-042**: MUST download and parse Copilot usage data by combining `https://github.com/settings/copilot/features` and `https://github.com/settings/billing/premium_requests_usage`.
+- **REQ-043**: MUST run recurring provider updates in the background execution unit every configured interval and publish fresh normalized tab state to popup consumers.
+- **REQ-044**: MUST support manual debug dump export containing raw extraction traces, normalized provider payloads, and timestamped refresh diagnostics.
+- **REQ-045**: MUST continue rendering the latest successful provider state when a refresh cycle fails and MUST surface failure diagnostics through debug instrumentation.
 
 ## 4. Test Requirements
 
@@ -166,6 +184,12 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 - **TST-010**: MUST verify `Remaining credits: <remaining> / <limit>` appears for Claude, Codex, and Copilot when both quota values exist.
 - **TST-011**: MUST verify Claude dual-window text output on HTTP 429 prints rate-limit error only in 5h, keeps 5h usage at `100.0%`, and renders 7d usage/reset values from persisted Claude payload.
 - **TST-012**: MUST verify Textual provider cards suppress `Error: Rate limited. Try again later.` and append `⚠️ Limit reached!` after `Resets in:` when displayed usage is `100.0%`.
+- **TST-013**: MUST verify Chrome extension manifest wiring opens popup UI with only `claude`, `copilot`, and `codex` tabs and toolbar icon assets resolved from GNOME icon sources.
+- **TST-014**: MUST verify Chrome background scheduler executes provider refresh in required source-page order with default `180`-second interval and configurable constant override path.
+- **TST-015**: MUST verify provider parsers extract required quota/progress fields from localized fixture variants without dependence on translated display strings.
+- **TST-016**: MUST verify Copilot parser merges features and premium pages into one normalized payload consumed by popup `copilot` tab rendering.
+- **TST-017**: MUST verify refresh failures preserve last successful tab payloads and emit structured debug records to console and persisted log storage.
+- **TST-018**: MUST verify repository no longer contains `src/aibar/chrome-extension/temp/` after implementation changes are completed.
 
 ## 5. Evidence
 
@@ -241,3 +265,27 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | REQ-032 | `scripts/install-gnome-extension.sh` + `gnome-extensions enable aibar@aibar.panel` after file copy with colored status output. |
 | REQ-033 | `scripts/test-gnome-extension.sh` + no subcommand parameter; executes nested-shell launch directly on invocation. |
 | TST-009 | `tests/test_install_gnome_extension.py` + executable check, syntax check, git root resolution, source validation, and missing-source exit code assertions. |
+| PRJ-009 | `src/aibar/chrome-extension/manifest.json` + popup/action wiring and `src/aibar/chrome-extension/popup.html` + provider-tab set `claude`, `copilot`, `codex`. |
+| PRJ-010 | `src/aibar/chrome-extension/background.mjs` + `_fetchHtml` website downloads and parser pipeline without subprocess `aibar` invocation. |
+| CTN-008 | `src/aibar/chrome-extension/background.mjs` + `REFRESH_INTERVAL_SECONDS = 180` and `_scheduleRefreshAlarm` interval configuration path. |
+| CTN-009 | `src/aibar/chrome-extension/background.mjs` + `PROVIDER_FETCH_SEQUENCE` and ordered fetch execution in `_refreshAllProviders`. |
+| CTN-010 | `src/aibar/chrome-extension/parsers.mjs` + `_extractProgressMetrics`, `_extractDatetimeCandidates`, and `_extractEmbeddedJsonObjects` semantic extraction path. |
+| CTN-011 | `src/aibar/chrome-extension/debug.mjs` + storage-backed structured logs and `src/aibar/chrome-extension/popup.mjs` + debug export/clear actions. |
+| DES-007 | `src/aibar/chrome-extension/icons/icon16.png`, `icon32.png`, `icon48.png`, `icon128.png` referenced by `manifest.json` icon entries. |
+| DES-008 | `src/aibar/chrome-extension/popup.html` + tab/card skeleton and `src/aibar/chrome-extension/popup.css` + GNOME-parity class taxonomy. |
+| DES-009 | `src/aibar/chrome-extension/background.mjs` + service-worker execution unit with alarm-triggered periodic refresh and state publish. |
+| DES-010 | `tests/test_chrome_extension_temp_removed.py` + asserts repository absence of `src/aibar/chrome-extension/temp/`. |
+| REQ-038 | `src/aibar/chrome-extension/popup.html` + toolbar popup layout with exact `claude`, `copilot`, `codex` tab entries. |
+| REQ-039 | `src/aibar/chrome-extension/popup.mjs` + `_buildWindowRow/_renderProviderCard` progress-card rendering and `popup.css` provider color semantics. |
+| REQ-040 | `src/aibar/chrome-extension/background.mjs` + Claude URL fetch and `src/aibar/chrome-extension/parsers.mjs` + `parseClaudeUsageHtml`. |
+| REQ-041 | `src/aibar/chrome-extension/background.mjs` + Codex URL fetch and `src/aibar/chrome-extension/parsers.mjs` + `parseCodexUsageHtml`. |
+| REQ-042 | `src/aibar/chrome-extension/background.mjs` + dual Copilot page fetch and `src/aibar/chrome-extension/parsers.mjs` + `mergeCopilotPayloads`. |
+| REQ-043 | `src/aibar/chrome-extension/background.mjs` + alarm scheduler and popup publish message `usage.updated` after recurring refresh cycles. |
+| REQ-044 | `src/aibar/chrome-extension/debug.mjs` + `buildDebugBundle` and `src/aibar/chrome-extension/popup.mjs` + `_exportDebugBundle` JSON dump flow. |
+| REQ-045 | `src/aibar/chrome-extension/background.mjs` + `_applyProviderFailure` preserving previous payload while recording failure diagnostics. |
+| TST-013 | `tests/test_chrome_extension_manifest.py` + manifest/popup tab/icon assertions for Chrome extension wiring. |
+| TST-014 | `tests/test_chrome_extension_background.py` + refresh interval default and provider-order assertions. |
+| TST-015 | `tests/test_chrome_extension_parser.py` + Node-driven localized fixture parser verification. |
+| TST-016 | `tests/test_chrome_extension_parser.py` + Copilot features+premium merge assertion for normalized `30d` payload. |
+| TST-017 | `tests/test_chrome_extension_background.py` and `tests/test_chrome_extension_debug.py` + fallback state and debug instrumentation assertions. |
+| TST-018 | `tests/test_chrome_extension_temp_removed.py` + temp-directory absence assertion. |
