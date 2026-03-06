@@ -15,7 +15,7 @@ import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = PROJECT_ROOT / "scripts" / "install-gnome-extension.sh"
-EXT_SRC_DIR = PROJECT_ROOT / "src" / "aibar" / "extension" / "aibar@aibar.panel"
+EXT_SRC_DIR = PROJECT_ROOT / "src" / "aibar" / "gnome-extension" / "aibar@aibar.panel"
 
 
 class TestInstallGnomeExtensionAtomic:

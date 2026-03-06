@@ -14,7 +14,7 @@ from aibar.providers.base import ProviderName, ProviderResult, UsageMetrics, Win
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-EXTENSION_PATH = PROJECT_ROOT / "src" / "aibar" / "extension" / "aibar@aibar.panel" / "extension.js"
+EXTENSION_PATH = PROJECT_ROOT / "src" / "aibar" / "gnome-extension" / "aibar@aibar.panel" / "extension.js"
 _RESET_PENDING_TEXT = "Starts when the first message is sent"
 
 

@@ -24,7 +24,10 @@
         │   │   ├── openai_usage.py
         │   │   └── openrouter.py
         │   └── ui.py
-        └── extension
+        ├── extension
+        │   └── aibar@aibar.panel
+        │       └── extension.js
+        └── gnome-extension
             └── aibar@aibar.panel
                 └── extension.js
 ```
@@ -129,7 +132,7 @@ source ${VENVDIR}/bin/activate
 - @param $1 {string} Step number.
 - @param $2 {string} Step description.
 - var `readonly EXT_UUID="aibar@aibar.panel"` (L70)
-- var `readonly EXT_SRC_REL="src/aibar/extension/${EXT_UUID}"` (L71)
+- var `readonly EXT_SRC_REL="src/aibar/gnome-extension/${EXT_UUID}"` (L71)
 - var `readonly EXT_TARGET_DIR="${HOME}/.local/share/gnome-shell/extensions/${EXT_UUID}"` (L72)
 - fn `main() {` (L81)
 - @brief Main installation function.
@@ -1754,7 +1757,7 @@ from aibar.providers.base import (
 ---
 
 # extension.js | JavaScript | 1173L | 17 symbols | 8 imports | 27 comments
-> Path: `src/aibar/extension/aibar@aibar.panel/extension.js`
+> Path: `src/aibar/gnome-extension/aibar@aibar.panel/extension.js`
 - @brief GNOME Shell panel extension for aibar metrics.
 - @details Collects usage JSON from the aibar CLI and renders provider-specific quota/cost cards in the GNOME panel popup.
 

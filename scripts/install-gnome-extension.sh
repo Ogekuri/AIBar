@@ -2,7 +2,7 @@
 # @file install-gnome-extension.sh
 # @brief Installs AIBar GNOME Shell extension to the user's local extensions directory.
 # @details Resolves git project root via `git rev-parse --show-toplevel` to locate
-# extension source files under `src/aibar/extension/aibar@aibar.panel/`. Copies all
+# extension source files under `src/aibar/gnome-extension/aibar@aibar.panel/`. Copies all
 # files preserving attributes to `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/`.
 # Validates prerequisites (git, project root, source directory, metadata.json) and exits
 # non-zero with descriptive error on failure. Produces colored ANSI terminal output.
@@ -68,7 +68,7 @@ step() {
 
 # --- Constants ---
 readonly EXT_UUID="aibar@aibar.panel"
-readonly EXT_SRC_REL="src/aibar/extension/${EXT_UUID}"
+readonly EXT_SRC_REL="src/aibar/gnome-extension/${EXT_UUID}"
 readonly EXT_TARGET_DIR="${HOME}/.local/share/gnome-shell/extensions/${EXT_UUID}"
 
 # --- Main ---

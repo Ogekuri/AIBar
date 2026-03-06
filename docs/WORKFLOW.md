@@ -13,7 +13,7 @@
   - `parent_process: null`
   - `role: GNOME Shell extension host process for panel metrics`
   - `entrypoint_symbols: AIBarExtension.enable(...), AIBarExtension.disable(...)`
-  - `defining_files: src/aibar/extension/aibar@aibar.panel/extension.js`
+  - `defining_files: src/aibar/gnome-extension/aibar@aibar.panel/extension.js`
   - `thread_model: no explicit threads detected`
 
 - `id: PROC:install-ext`
@@ -242,38 +242,38 @@
 
 ### PROC:gnome-shell
 - `Entrypoints`
-  - `AIBarExtension.enable(...)`: extension activation [`src/aibar/extension/aibar@aibar.panel/extension.js`]
-  - `AIBarExtension.disable(...)`: extension deactivation [`src/aibar/extension/aibar@aibar.panel/extension.js`]
+  - `AIBarExtension.enable(...)`: extension activation [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+  - `AIBarExtension.disable(...)`: extension deactivation [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
 - `Lifecycle/Trigger`
   - Starts in GNOME Shell extension host process.
   - On enable, constructs panel indicator, performs immediate refresh, and schedules periodic refresh timer.
   - On disable, destroys indicator and removes timer source.
 - `Internal Call-Trace Tree`
-  - `AIBarExtension.enable(...)`: extension enable adapter [`src/aibar/extension/aibar@aibar.panel/extension.js`]
-    - `AIBarIndicator._init(...)`: indicator runtime bootstrap [`src/aibar/extension/aibar@aibar.panel/extension.js`]
-      - `AIBarIndicator._buildPanelButton(...)`: panel icon/percentage/summary-label setup with five ordered percentage labels (Claude 5h, Claude 7d, Copilot, Codex 5h, Codex 7d) and primary/secondary style classes [`src/aibar/extension/aibar@aibar.panel/extension.js`]
-      - `AIBarIndicator._buildPopupMenu(...)`: popup structure and actions setup [`src/aibar/extension/aibar@aibar.panel/extension.js`]
-        - `AIBarIndicator._refreshData(...)`: refresh action handler [`src/aibar/extension/aibar@aibar.panel/extension.js`]
-        - `AIBarIndicator._openTerminalWithCommand(...)`: UI-launch action handler [`src/aibar/extension/aibar@aibar.panel/extension.js`]
-        - menu `open-state-changed` callback -> `AIBarIndicator._applyBarWidths(...)`: re-apply progress bar fill widths on popup open using cached `_barData` [`src/aibar/extension/aibar@aibar.panel/extension.js`]
-      - `AIBarIndicator._refreshData(...)`: subprocess-based JSON refresh [`src/aibar/extension/aibar@aibar.panel/extension.js`]
-        - `_loadEnvFromFile(...)`: extension env map parse [`src/aibar/extension/aibar@aibar.panel/extension.js`]
-        - `_getAiBarPath(...)`: executable path resolution [`src/aibar/extension/aibar@aibar.panel/extension.js`]
+  - `AIBarExtension.enable(...)`: extension enable adapter [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+    - `AIBarIndicator._init(...)`: indicator runtime bootstrap [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+      - `AIBarIndicator._buildPanelButton(...)`: panel icon/percentage/summary-label setup with five ordered percentage labels (Claude 5h, Claude 7d, Copilot, Codex 5h, Codex 7d) and primary/secondary style classes [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+      - `AIBarIndicator._buildPopupMenu(...)`: popup structure and actions setup [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+        - `AIBarIndicator._refreshData(...)`: refresh action handler [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+        - `AIBarIndicator._openTerminalWithCommand(...)`: UI-launch action handler [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+        - menu `open-state-changed` callback -> `AIBarIndicator._applyBarWidths(...)`: re-apply progress bar fill widths on popup open using cached `_barData` [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+      - `AIBarIndicator._refreshData(...)`: subprocess-based JSON refresh [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+        - `_loadEnvFromFile(...)`: extension env map parse [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+        - `_getAiBarPath(...)`: executable path resolution [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
         - callback chain
-          - `AIBarIndicator._parseOutput(...)`: JSON decode + state update [`src/aibar/extension/aibar@aibar.panel/extension.js`]
-          - `AIBarIndicator._updateUI(...)`: provider tab/card rendering update plus ordered panel percentage-label projection (`claude5h`, `claude7d`, `copilot`, `codex5h`, `codex7d`) with hidden-label fallback for missing metrics [`src/aibar/extension/aibar@aibar.panel/extension.js`]
-            - `AIBarIndicator._createTab(...)`: provider tab creation [`src/aibar/extension/aibar@aibar.panel/extension.js`]
-            - `AIBarIndicator._updateProviderCard(...)`: card lifecycle update [`src/aibar/extension/aibar@aibar.panel/extension.js`]
-              - `AIBarIndicator._createProviderCard(...)`: card widget graph creation [`src/aibar/extension/aibar@aibar.panel/extension.js`]
-              - `AIBarIndicator._populateProviderCard(...)`: metrics-to-widget projection with quota label `Remaining credits: <remaining>/<limit>` (bold remaining value), `Reset in:` prefix formatting, suppression of `Rate limited. Try again later.` quota-card error banners, `⚠️ Limit reached!` suffix at displayed `100.0%` for Claude/Codex/Copilot bars, and zero-usage reset-pending fallback text when reset timestamp is unavailable [`src/aibar/extension/aibar@aibar.panel/extension.js`]
-                - `_isDisplayedZeroPercent(...)`: normalize near-zero percentages to displayed `0.0%` semantics for fallback eligibility [`src/aibar/extension/aibar@aibar.panel/extension.js`]
-                - `_getProgressClass(...)`: usage-threshold class mapping [`src/aibar/extension/aibar@aibar.panel/extension.js`]
-            - `AIBarIndicator._switchToProvider(...)`: active provider switch [`src/aibar/extension/aibar@aibar.panel/extension.js`]
-          - `AIBarIndicator._handleError(...)`: error-state update with panel percentage-label reset [`src/aibar/extension/aibar@aibar.panel/extension.js`]
-      - `AIBarIndicator._startAutoRefresh(...)`: periodic refresh timer registration [`src/aibar/extension/aibar@aibar.panel/extension.js`]
-        - timer callback -> `AIBarIndicator._refreshData(...)`: recurring fetch trigger [`src/aibar/extension/aibar@aibar.panel/extension.js`]
-  - `AIBarExtension.disable(...)`: extension disable adapter [`src/aibar/extension/aibar@aibar.panel/extension.js`]
-    - `AIBarIndicator.destroy(...)`: timer teardown + parent destroy [`src/aibar/extension/aibar@aibar.panel/extension.js`]
+          - `AIBarIndicator._parseOutput(...)`: JSON decode + state update [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+          - `AIBarIndicator._updateUI(...)`: provider tab/card rendering update plus ordered panel percentage-label projection (`claude5h`, `claude7d`, `copilot`, `codex5h`, `codex7d`) with hidden-label fallback for missing metrics [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+            - `AIBarIndicator._createTab(...)`: provider tab creation [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+            - `AIBarIndicator._updateProviderCard(...)`: card lifecycle update [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+              - `AIBarIndicator._createProviderCard(...)`: card widget graph creation [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+              - `AIBarIndicator._populateProviderCard(...)`: metrics-to-widget projection with quota label `Remaining credits: <remaining>/<limit>` (bold remaining value), `Reset in:` prefix formatting, suppression of `Rate limited. Try again later.` quota-card error banners, `⚠️ Limit reached!` suffix at displayed `100.0%` for Claude/Codex/Copilot bars, and zero-usage reset-pending fallback text when reset timestamp is unavailable [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+                - `_isDisplayedZeroPercent(...)`: normalize near-zero percentages to displayed `0.0%` semantics for fallback eligibility [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+                - `_getProgressClass(...)`: usage-threshold class mapping [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+            - `AIBarIndicator._switchToProvider(...)`: active provider switch [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+          - `AIBarIndicator._handleError(...)`: error-state update with panel percentage-label reset [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+      - `AIBarIndicator._startAutoRefresh(...)`: periodic refresh timer registration [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+        - timer callback -> `AIBarIndicator._refreshData(...)`: recurring fetch trigger [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+  - `AIBarExtension.disable(...)`: extension disable adapter [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+    - `AIBarIndicator.destroy(...)`: timer teardown + parent destroy [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
 - `External Boundaries`
   - GNOME Shell UI/runtime APIs (`Main`, `PanelMenu`, `PopupMenu`, `St`, `GLib`, `Gio`, `Clutter`, `GObject`).
   - Subprocess creation and asynchronous stdio communication.
@@ -297,7 +297,7 @@
   - `mechanism: subprocess spawn + async stdio`
   - `endpoint_or_channel: argv [aibar, show, --json] + child stdout`
   - `payload_data_shape: JSON object keyed by provider name to ProviderResult JSON payload`
-  - `declaration_files: src/aibar/extension/aibar@aibar.panel/extension.js, src/aibar/aibar/cli.py, src/aibar/aibar/providers/base.py`
+  - `declaration_files: src/aibar/gnome-extension/aibar@aibar.panel/extension.js, src/aibar/aibar/cli.py, src/aibar/aibar/providers/base.py`
 
 - `id: EDGE-002`
   - `source: PROC:gnome-shell`
@@ -306,7 +306,7 @@
   - `mechanism: terminal subprocess spawn`
   - `endpoint_or_channel: shell command string passed to gnome-terminal bash -c`
   - `payload_data_shape: UTF-8 command text (no structured return payload to source unit)`
-  - `declaration_files: src/aibar/extension/aibar@aibar.panel/extension.js, src/aibar/aibar/cli.py, src/aibar/aibar/ui.py`
+  - `declaration_files: src/aibar/gnome-extension/aibar@aibar.panel/extension.js, src/aibar/aibar/cli.py, src/aibar/aibar/ui.py`
 
 - `id: EDGE-003`
   - `source: PROC:gnome-shell`
@@ -315,4 +315,4 @@
   - `mechanism: env-file parse + launcher.setenv(...) before spawn`
   - `endpoint_or_channel: inherited child process environment`
   - `payload_data_shape: string key/value map loaded from ~/.config/aibar/env`
-  - `declaration_files: src/aibar/extension/aibar@aibar.panel/extension.js, src/aibar/aibar/config.py`
+  - `declaration_files: src/aibar/gnome-extension/aibar@aibar.panel/extension.js, src/aibar/aibar/config.py`
