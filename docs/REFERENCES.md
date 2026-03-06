@@ -1758,7 +1758,7 @@ from aibar.providers.base import (
 
 ---
 
-# background.js | JavaScript | 1118L | 40 symbols | 2 imports | 45 comments
+# background.js | JavaScript | 1295L | 46 symbols | 2 imports | 52 comments
 > Path: `src/aibar/chrome-extension/background.js`
 - @brief Chrome extension service-worker runtime for autonomous provider refresh.
 - @details Executes ordered provider page downloads, parser normalization, state
@@ -1769,12 +1769,16 @@ persistence, and debug instrumentation on a recurring alarm interval.
 - @satisfies CTN-009
 - @satisfies CTN-012
 - @satisfies CTN-013
+- @satisfies CTN-014
 - @satisfies REQ-043
+- @satisfies REQ-044
 - @satisfies REQ-046
 - @satisfies REQ-047
 - @satisfies REQ-048
 - @satisfies REQ-049
 - @satisfies REQ-050
+- @satisfies REQ-051
+- @satisfies REQ-052
 - @satisfies REQ-045
 
 ## Imports
@@ -1785,68 +1789,104 @@ import {
 
 ## Definitions
 
-- const `export const REFRESH_INTERVAL_SECONDS = 180;` (L39)
+- const `export const REFRESH_INTERVAL_SECONDS = 180;` (L43)
 - @brief Default hardcoded refresh interval in seconds. */
-- const `const STATE_STORAGE_KEY = "aibar.chrome.state";` (L42)
+- const `const STATE_STORAGE_KEY = "aibar.chrome.state";` (L46)
 - @brief Storage key for normalized runtime state. */
-- const `const INTERVAL_OVERRIDE_STORAGE_KEY = "aibar.chrome.refresh_interval_seconds";` (L45)
+- const `const INTERVAL_OVERRIDE_STORAGE_KEY = "aibar.chrome.refresh_interval_seconds";` (L49)
 - @brief Storage key for optional refresh interval override. */
-- const `const REFRESH_ALARM_NAME = "aibar-refresh";` (L48)
+- const `const REFRESH_ALARM_NAME = "aibar-refresh";` (L52)
 - @brief Alarm name used by service-worker scheduler. */
-- const `const PROVIDER_FETCH_SEQUENCE = [` (L51)
+- const `const PROVIDER_FETCH_SEQUENCE = [` (L55)
 - @brief Fixed provider download sequence required by requirements. */
-- const `const DEBUG_API_SUPPORTED_COMMANDS = [` (L59)
+- const `const MAIN_API_TAB_ORDER = ["claude", "copilot", "codex"];` (L63)
+- @brief Canonical popup tab order represented by the primary API snapshot. */
+- const `const MAIN_API_PROVIDER_WINDOWS = {` (L66)
+- @brief Canonical window order by provider for popup progress-bar rendering. */
+- const `const DEBUG_API_SUPPORTED_COMMANDS = [` (L73)
 - @brief Debug API command identifiers exposed by runtime messaging. */
-- const `const DEBUG_API_ALLOWED_HOSTS = new Set(["claude.ai", "chatgpt.com", "github.com"]);` (L73)
+- const `const DEBUG_API_ALLOWED_HOSTS = new Set(["claude.ai", "chatgpt.com", "github.com"]);` (L87)
 - @brief Allowed hostnames for debug HTTP retrieval command. */
-- const `const DEBUG_API_DEFAULT_MAX_CHARS = 16000;` (L76)
+- const `const DEBUG_API_DEFAULT_MAX_CHARS = 16000;` (L90)
 - @brief Default debug-body preview cap in characters. */
-- const `const DEBUG_API_MAX_CHARS = 120000;` (L79)
+- const `const DEBUG_API_MAX_CHARS = 120000;` (L93)
 - @brief Absolute debug-body preview cap in characters. */
-- const `const DEBUG_API_PROVIDER_DEFAULT_URLS = {` (L82)
+- const `const DEBUG_API_DISABLED_ERROR = "Debug API disabled: enable it in popup configuration for this runtime session.";` (L96)
+- @brief Deterministic debug-disabled error returned by all debug API routes. */
+- const `const DEBUG_API_PROVIDER_DEFAULT_URLS = {` (L99)
 - @brief Provider default URLs used by debug parser command. */
-- const `const DEBUG_API_DEFAULT_PROVIDER_DIAGNOSE_SET = ["claude", "codex", "copilot_merged"];` (L90)
+- const `const DEBUG_API_DEFAULT_PROVIDER_DIAGNOSE_SET = ["claude", "codex", "copilot_merged"];` (L107)
 - @brief Default provider set used by aggregate diagnose command. */
-### fn `function _emptyProviderState(provider)` (L100-111)
+### fn `function _emptyProviderState(provider)` (L117-128)
 - @brief Build empty provider state object.
 - @param {string} provider Provider identifier.
 - @return s {Record<string, unknown>} Empty provider state.
 
-### fn `function _emptyState()` (L117-131)
+### fn `function _emptyState()` (L134-148)
 - @brief Build empty extension runtime state.
 - @return s {Record<string, unknown>} Empty state snapshot.
 
-### fn `function _cloneState()` (L143-145)
+### fn `function _cloneState()` (L163-165)
 - @brief Deep clone state into message-safe payload.
 - @return s {Record<string, unknown>} Cloned state snapshot.
 
-### fn `async function _loadPersistedState()` (L153-177)
+### fn `function _normalizeMainApiWindow(windowData)` (L177-188)
+- @brief Normalize one window metric payload for primary API transport.
+- @details Restricts window payload shape to popup-rendered progress and quota
+fields so API consumers can rebuild tab cards deterministically.
+Time complexity: O(1).
+Space complexity: O(1).
+- @param {Record<string, unknown> | null | undefined} windowData Candidate window payload.
+- @return s {{usage_percent: number | null, remaining: number | null, limit: number | null, reset_at: string | null}} Normalized window metrics.
+- @satisfies REQ-046
+
+### fn `function _buildMainApiSnapshot()` (L199-233)
+- @brief Build machine-readable primary API snapshot payload.
+- @details Returns one-call popup/UI model with tab order plus per-provider
+progress/quota windows, preserving runtime error and scheduler fields.
+Time complexity: O(P*W), where P=provider count and W=window count.
+Space complexity: O(P*W).
+- @return s {Record<string, unknown>} Primary API snapshot payload.
+- @satisfies REQ-046
+
+### fn `function _ensureDebugAccessEnabled()` (L246-253)
+- @brief Enforce runtime debug-access gate before serving debug routes.
+- @details Uses non-persistent in-memory flag and throws deterministic error to
+ensure all debug message routes fail uniformly when disabled.
+Time complexity: O(1).
+Space complexity: O(1).
+- @return s {void}
+- @throws {Error} If debug access is disabled.
+- @satisfies CTN-014
+- @satisfies REQ-051
+
+### fn `async function _loadPersistedState()` (L261-285)
 - @brief Merge persisted state into in-memory runtime state.
 - @details Preserves last successful provider payloads across service-worker restarts
 to satisfy failure fallback requirements.
 - @return s {Promise<void>} Completion promise.
 
-### fn `async function _persistState()` (L183-185)
+### fn `async function _persistState()` (L291-293)
 - @brief Persist current runtime state to extension storage.
 - @return s {Promise<void>} Completion promise.
 
-### fn `async function _getRefreshIntervalSeconds()` (L193-200)
+### fn `async function _getRefreshIntervalSeconds()` (L301-308)
 - @brief Read configured refresh interval with override support.
 - @details Uses hardcoded default REFRESH_INTERVAL_SECONDS and allows optional
 storage override to support field debugging with shorter/longer cycles.
 - @return s {Promise<number>} Effective interval in seconds.
 
-### fn `async function _scheduleRefreshAlarm()` (L206-219)
+### fn `async function _scheduleRefreshAlarm()` (L314-327)
 - @brief Configure periodic refresh alarm.
 - @return s {Promise<void>} Completion promise.
 
-### fn `async function _fetchHtml(url)` (L227-239)
+### fn `async function _fetchHtml(url)` (L335-347)
 - @brief Download one provider page using authenticated extension fetch.
 - @param {string} url Target page URL.
 - @return s {Promise<string>} Downloaded HTML content.
 - @throws {Error} When HTTP status is not OK.
 
-### fn `function _normalizeDebugMaxChars(token)` (L251-257)
+### fn `function _normalizeDebugMaxChars(token)` (L359-365)
 - @brief Normalize debug-body preview length with hard bounds.
 - @details Converts caller-provided `max_chars` tokens into bounded integers to
 avoid oversized responses in debug API payloads.
@@ -1856,7 +1896,7 @@ Space complexity: O(1).
 - @return s {number} Bounded preview length.
 - @satisfies CTN-013
 
-### fn `function _normalizeDebugUrl(token)` (L270-291)
+### fn `function _normalizeDebugUrl(token)` (L378-399)
 - @brief Normalize and validate debug URL token.
 - @details Enforces `https` scheme and allowlisted hosts for debug retrieval
 commands to reduce abuse surface.
@@ -1867,47 +1907,47 @@ Space complexity: O(1).
 - @throws {Error} If URL is invalid, non-HTTPS, or host is not allowed.
 - @satisfies CTN-012
 
-### fn `function _serializeHeaders(headers)` (L299-310)
+### fn `function _serializeHeaders(headers)` (L407-418)
 - @brief Convert response headers into bounded JSON-safe object.
 - @details Serializes at most 30 headers to constrain debug response footprint.
 - @param {Headers} headers Response headers object.
 - @return s {Record<string, string>} Serialized headers map.
 
-### fn `function _buildHtmlProbe(html)` (L317-331)
+### fn `function _buildHtmlProbe(html)` (L425-439)
 - @brief Build deterministic HTML probe metadata for parser diagnostics.
 - @param {string} html Raw HTML text.
 - @return s {Record<string, unknown>} Probe metadata object.
 
-### fn `async function _sha256Hex(text)` (L338-344)
+### fn `async function _sha256Hex(text)` (L446-452)
 - @brief Compute SHA-256 hash for deterministic body identity checks.
 - @param {string} text Input text payload.
 - @return s {Promise<string>} Hex-encoded digest.
 
-### fn `function _buildPayloadQuality(payload)` (L351-381)
+### fn `function _buildPayloadQuality(payload)` (L459-489)
 - @brief Build payload-quality summary for parsed provider windows.
 - @param {Record<string, unknown>} payload Parsed provider payload.
 - @return s {Record<string, unknown>} Quality summary object.
 
-### fn `function _assertProviderPayloadUsable(provider, payload)` (L390-398)
+### fn `function _assertProviderPayloadUsable(provider, payload)` (L498-506)
 - @brief Build parser failure error when payload has no usable metrics.
 - @param {string} provider Provider key.
 - @param {Record<string, unknown>} payload Parsed payload.
 - @return s {void}
 - @throws {Error} If payload is missing quota/progress metrics.
 
-### fn `async function _downloadDebugUrl(urlToken)` (L406-424)
+### fn `async function _downloadDebugUrl(urlToken)` (L514-532)
 - @brief Download one debug URL and capture response metadata.
 - @param {string} urlToken Debug URL token.
 - @return s {Promise<Record<string, unknown>>} Download result with full body.
 - @satisfies REQ-047
 
-### fn `async function _buildDebugHttpResponse(download, maxChars)` (L432-449)
+### fn `async function _buildDebugHttpResponse(download, maxChars)` (L540-557)
 - @brief Build debug HTTP response payload with bounded preview and hash metadata.
 - @param {Record<string, unknown>} download Raw download payload.
 - @param {number} maxChars Bounded preview size.
 - @return s {Promise<Record<string, unknown>>} HTTP response payload.
 
-### fn `function _buildPayloadAssertion(provider, payload)` (L459-472)
+### fn `function _buildPayloadAssertion(provider, payload)` (L567-580)
 - @brief Build payload-usability assertion status for diagnostics commands.
 - @details Reuses runtime parser-usability gate and returns structured pass/fail
 metadata without throwing to simplify field-debug report consumption.
@@ -1915,7 +1955,7 @@ metadata without throwing to simplify field-debug report consumption.
 - @param {Record<string, unknown>} payload Parsed payload.
 - @return s {{ok: boolean, error: string | null}} Assertion status payload.
 
-### fn `function _buildWindowAssignmentDiagnostics(html, provider)` (L482-491)
+### fn `function _buildWindowAssignmentDiagnostics(html, provider)` (L590-599)
 - @brief Build window-assignment diagnostics for one parser HTML source.
 - @details Wraps parser trace extraction in non-throwing envelope to keep debug
 API responses stable even when trace generation fails.
@@ -1923,7 +1963,7 @@ API responses stable even when trace generation fails.
 - @param {string} provider Provider token for window-key selection.
 - @return s {Record<string, unknown>} Window-trace payload or structured error.
 
-### fn `async function _executeProviderDiagnoseCommand(provider, args, maxChars)` (L502-567)
+### fn `async function _executeProviderDiagnoseCommand(provider, args, maxChars)` (L610-675)
 - @brief Execute provider-level diagnose routine for one provider token.
 - @details Downloads provider pages, executes parser flows, and returns combined
 response probes, parser payloads, usability checks, and window traces.
@@ -1932,24 +1972,24 @@ response probes, parser payloads, usability checks, and window traces.
 - @param {number} maxChars Bounded response preview size.
 - @return s {Promise<Record<string, unknown>>} Diagnose payload.
 
-### fn `function _resolveDebugParser(provider)` (L575-588)
+### fn `function _resolveDebugParser(provider)` (L683-696)
 - @brief Resolve parser function by debug provider key.
 - @param {string} provider Provider key token.
 - @return s {(html: string) => Record<string, unknown>} Parser function.
 - @throws {Error} If provider key is unsupported.
 
-### fn `function _summarizeDebugArgs(args)` (L596-611)
+### fn `function _summarizeDebugArgs(args)` (L704-719)
 - @brief Build summary-safe command args for debug logging.
 - @details Redacts large inline HTML fields by replacing them with length metadata.
 - @param {Record<string, unknown>} args Debug command args.
 - @return s {Record<string, unknown>} Sanitized argument summary.
 
-### fn `function _describeDebugApi()` (L618-636)
+### fn `function _describeDebugApi()` (L726-744)
 - @brief Build debug API command catalog payload.
 - @return s {Record<string, unknown>} Supported command catalog.
 - @satisfies REQ-046
 
-### fn `async function _executeDebugApiCommand(command, args)` (L650-818)
+### fn `async function _executeDebugApiCommand(command, args)` (L758-926)
 - @brief Execute one debug API command.
 - @details Dispatches debug commands for HTTP retrieval, parser execution, and
 standard runtime operations with deterministic structured responses.
@@ -1961,30 +2001,30 @@ standard runtime operations with deterministic structured responses.
 - @satisfies REQ-048
 - @satisfies REQ-049
 
-### fn `function _applyProviderSuccess(provider, payload)` (L826-833)
+### fn `function _applyProviderSuccess(provider, payload)` (L934-941)
 - @brief Apply successful provider refresh payload.
 - @param {string} provider Provider key.
 - @param {Record<string, unknown>} payload Parsed provider payload.
 - @return s {void}
 
-### fn `function _applyProviderFailure(provider, error)` (L841-847)
+### fn `function _applyProviderFailure(provider, error)` (L949-955)
 - @brief Apply provider refresh failure while preserving last successful windows.
 - @param {string} provider Provider key.
 - @param {Error} error Failure object.
 - @return s {void}
 
-### fn `async function _refreshAllProviders(trigger)` (L855-962)
+### fn `async function _refreshAllProviders(trigger)` (L963-1070)
 - @brief Execute one ordered refresh cycle across all provider pages.
 - @details Preserves successful state on errors and emits debug logs for each step.
 - @param {string} trigger Refresh trigger source.
 - @return s {Promise<void>} Completion promise.
 
-### fn `async function _initializeRuntime(trigger)` (L969-973)
+### fn `async function _initializeRuntime(trigger)` (L1077-1082)
 - @brief Initialize scheduler and persisted state for service-worker lifecycle.
 - @param {string} trigger Initialization trigger label.
 - @return s {Promise<void>} Completion promise.
 
-### fn `async function _handleMessage(message, sendResponse)` (L983-1082)
+### fn `async function _handleMessage(message, sendResponse)` (L1092-1259)
 - @brief Handle incoming runtime messages from popup/UI contexts.
 - @details Supports state retrieval, manual refresh, debug log operations, and
 refresh-interval override updates.
@@ -1995,46 +2035,52 @@ refresh-interval override updates.
 ## Symbol Index
 |Symbol|Kind|Vis|Lines|Sig|
 |---|---|---|---|---|
-|`REFRESH_INTERVAL_SECONDS`|const||39||
-|`STATE_STORAGE_KEY`|const||42||
-|`INTERVAL_OVERRIDE_STORAGE_KEY`|const||45||
-|`REFRESH_ALARM_NAME`|const||48||
-|`PROVIDER_FETCH_SEQUENCE`|const||51||
-|`DEBUG_API_SUPPORTED_COMMANDS`|const||59||
-|`DEBUG_API_ALLOWED_HOSTS`|const||73||
-|`DEBUG_API_DEFAULT_MAX_CHARS`|const||76||
-|`DEBUG_API_MAX_CHARS`|const||79||
-|`DEBUG_API_PROVIDER_DEFAULT_URLS`|const||82||
-|`DEBUG_API_DEFAULT_PROVIDER_DIAGNOSE_SET`|const||90||
-|`_emptyProviderState`|fn||100-111|function _emptyProviderState(provider)|
-|`_emptyState`|fn||117-131|function _emptyState()|
-|`_cloneState`|fn||143-145|function _cloneState()|
-|`_loadPersistedState`|fn||153-177|async function _loadPersistedState()|
-|`_persistState`|fn||183-185|async function _persistState()|
-|`_getRefreshIntervalSeconds`|fn||193-200|async function _getRefreshIntervalSeconds()|
-|`_scheduleRefreshAlarm`|fn||206-219|async function _scheduleRefreshAlarm()|
-|`_fetchHtml`|fn||227-239|async function _fetchHtml(url)|
-|`_normalizeDebugMaxChars`|fn||251-257|function _normalizeDebugMaxChars(token)|
-|`_normalizeDebugUrl`|fn||270-291|function _normalizeDebugUrl(token)|
-|`_serializeHeaders`|fn||299-310|function _serializeHeaders(headers)|
-|`_buildHtmlProbe`|fn||317-331|function _buildHtmlProbe(html)|
-|`_sha256Hex`|fn||338-344|async function _sha256Hex(text)|
-|`_buildPayloadQuality`|fn||351-381|function _buildPayloadQuality(payload)|
-|`_assertProviderPayloadUsable`|fn||390-398|function _assertProviderPayloadUsable(provider, payload)|
-|`_downloadDebugUrl`|fn||406-424|async function _downloadDebugUrl(urlToken)|
-|`_buildDebugHttpResponse`|fn||432-449|async function _buildDebugHttpResponse(download, maxChars)|
-|`_buildPayloadAssertion`|fn||459-472|function _buildPayloadAssertion(provider, payload)|
-|`_buildWindowAssignmentDiagnostics`|fn||482-491|function _buildWindowAssignmentDiagnostics(html, provider)|
-|`_executeProviderDiagnoseCommand`|fn||502-567|async function _executeProviderDiagnoseCommand(provider, ...|
-|`_resolveDebugParser`|fn||575-588|function _resolveDebugParser(provider)|
-|`_summarizeDebugArgs`|fn||596-611|function _summarizeDebugArgs(args)|
-|`_describeDebugApi`|fn||618-636|function _describeDebugApi()|
-|`_executeDebugApiCommand`|fn||650-818|async function _executeDebugApiCommand(command, args)|
-|`_applyProviderSuccess`|fn||826-833|function _applyProviderSuccess(provider, payload)|
-|`_applyProviderFailure`|fn||841-847|function _applyProviderFailure(provider, error)|
-|`_refreshAllProviders`|fn||855-962|async function _refreshAllProviders(trigger)|
-|`_initializeRuntime`|fn||969-973|async function _initializeRuntime(trigger)|
-|`_handleMessage`|fn||983-1082|async function _handleMessage(message, sendResponse)|
+|`REFRESH_INTERVAL_SECONDS`|const||43||
+|`STATE_STORAGE_KEY`|const||46||
+|`INTERVAL_OVERRIDE_STORAGE_KEY`|const||49||
+|`REFRESH_ALARM_NAME`|const||52||
+|`PROVIDER_FETCH_SEQUENCE`|const||55||
+|`MAIN_API_TAB_ORDER`|const||63||
+|`MAIN_API_PROVIDER_WINDOWS`|const||66||
+|`DEBUG_API_SUPPORTED_COMMANDS`|const||73||
+|`DEBUG_API_ALLOWED_HOSTS`|const||87||
+|`DEBUG_API_DEFAULT_MAX_CHARS`|const||90||
+|`DEBUG_API_MAX_CHARS`|const||93||
+|`DEBUG_API_DISABLED_ERROR`|const||96||
+|`DEBUG_API_PROVIDER_DEFAULT_URLS`|const||99||
+|`DEBUG_API_DEFAULT_PROVIDER_DIAGNOSE_SET`|const||107||
+|`_emptyProviderState`|fn||117-128|function _emptyProviderState(provider)|
+|`_emptyState`|fn||134-148|function _emptyState()|
+|`_cloneState`|fn||163-165|function _cloneState()|
+|`_normalizeMainApiWindow`|fn||177-188|function _normalizeMainApiWindow(windowData)|
+|`_buildMainApiSnapshot`|fn||199-233|function _buildMainApiSnapshot()|
+|`_ensureDebugAccessEnabled`|fn||246-253|function _ensureDebugAccessEnabled()|
+|`_loadPersistedState`|fn||261-285|async function _loadPersistedState()|
+|`_persistState`|fn||291-293|async function _persistState()|
+|`_getRefreshIntervalSeconds`|fn||301-308|async function _getRefreshIntervalSeconds()|
+|`_scheduleRefreshAlarm`|fn||314-327|async function _scheduleRefreshAlarm()|
+|`_fetchHtml`|fn||335-347|async function _fetchHtml(url)|
+|`_normalizeDebugMaxChars`|fn||359-365|function _normalizeDebugMaxChars(token)|
+|`_normalizeDebugUrl`|fn||378-399|function _normalizeDebugUrl(token)|
+|`_serializeHeaders`|fn||407-418|function _serializeHeaders(headers)|
+|`_buildHtmlProbe`|fn||425-439|function _buildHtmlProbe(html)|
+|`_sha256Hex`|fn||446-452|async function _sha256Hex(text)|
+|`_buildPayloadQuality`|fn||459-489|function _buildPayloadQuality(payload)|
+|`_assertProviderPayloadUsable`|fn||498-506|function _assertProviderPayloadUsable(provider, payload)|
+|`_downloadDebugUrl`|fn||514-532|async function _downloadDebugUrl(urlToken)|
+|`_buildDebugHttpResponse`|fn||540-557|async function _buildDebugHttpResponse(download, maxChars)|
+|`_buildPayloadAssertion`|fn||567-580|function _buildPayloadAssertion(provider, payload)|
+|`_buildWindowAssignmentDiagnostics`|fn||590-599|function _buildWindowAssignmentDiagnostics(html, provider)|
+|`_executeProviderDiagnoseCommand`|fn||610-675|async function _executeProviderDiagnoseCommand(provider, ...|
+|`_resolveDebugParser`|fn||683-696|function _resolveDebugParser(provider)|
+|`_summarizeDebugArgs`|fn||704-719|function _summarizeDebugArgs(args)|
+|`_describeDebugApi`|fn||726-744|function _describeDebugApi()|
+|`_executeDebugApiCommand`|fn||758-926|async function _executeDebugApiCommand(command, args)|
+|`_applyProviderSuccess`|fn||934-941|function _applyProviderSuccess(provider, payload)|
+|`_applyProviderFailure`|fn||949-955|function _applyProviderFailure(provider, error)|
+|`_refreshAllProviders`|fn||963-1070|async function _refreshAllProviders(trigger)|
+|`_initializeRuntime`|fn||1077-1082|async function _initializeRuntime(trigger)|
+|`_handleMessage`|fn||1092-1259|async function _handleMessage(message, sendResponse)|
 
 
 ---
@@ -2530,7 +2576,7 @@ parser signal counters for traceable diagnostics.
 
 ---
 
-# popup.js | JavaScript | 382L | 16 symbols | 1 imports | 21 comments
+# popup.js | JavaScript | 449L | 19 symbols | 1 imports | 25 comments
 > Path: `src/aibar/chrome-extension/popup.js`
 - @brief Popup controller for rendering provider tabs and debug actions.
 - @details Consumes normalized state emitted by background service-worker and renders
@@ -2538,6 +2584,7 @@ GNOME-parity card/progress visuals for Claude, Copilot, and Codex providers.
 - @satisfies REQ-038
 - @satisfies REQ-039
 - @satisfies REQ-044
+- @satisfies REQ-053
 
 ## Imports
 ```
@@ -2546,93 +2593,117 @@ import { createLogger } from "./debug.js";
 
 ## Definitions
 
-- const `const PROVIDER_TABS = ["claude", "copilot", "codex"];` (L17)
+- const `const PROVIDER_TABS = ["claude", "copilot", "codex"];` (L18)
 - @brief Supported provider tab order. */
-- const `const PROVIDER_WINDOWS = {` (L20)
+- const `const PROVIDER_WINDOWS = {` (L21)
 - @brief Window render ordering by provider. */
-### fn `function _progressClass(usagePercent)` (L54-65)
+### fn `function _applyDebugAccessState(enabled)` (L63-71)
+- @brief Apply debug-access status to popup control interactivity.
+- @details Ensures UI mirrors runtime debug guard by disabling debug-only actions
+whenever the non-persistent debug flag is not enabled.
+- @param {boolean} enabled Runtime debug-access state.
+- @return s {void}
+- @satisfies REQ-053
+
+### fn `function _progressClass(usagePercent)` (L78-89)
 - @brief Resolve CSS class for progress severity by percentage.
 - @param {number | null} usagePercent Usage percentage value.
 - @return s {string} CSS class name.
 
-### fn `function _formatPercent(value)` (L72-77)
+### fn `function _formatPercent(value)` (L96-101)
 - @brief Format percentage for UI display.
 - @param {number | null} value Percentage value.
 - @return s {string} UI label.
 
-### fn `function _formatMetric(value)` (L84-89)
+### fn `function _formatMetric(value)` (L108-113)
 - @brief Format numeric metric for UI display.
 - @param {number | null} value Numeric metric.
 - @return s {string} UI label.
 
-### fn `function _formatReset(resetAt)` (L96-119)
+### fn `function _formatReset(resetAt)` (L120-143)
 - @brief Format reset timestamp into compact relative text.
 - @param {string | null | undefined} resetAt ISO timestamp.
 - @return s {string} Relative-time display label.
 
-### fn `function _buildWindowRow(windowKey, windowData)` (L127-171)
+### fn `function _buildWindowRow(windowKey, windowData)` (L151-195)
 - @brief Build one window progress-bar row element.
 - @param {string} windowKey Window key (`5h`, `7d`, `30d`).
 - @param {Record<string, number | string | null> | null} windowData Window data object.
 - @return s {HTMLElement} Rendered row container.
 
-### fn `function _renderProviderCard(provider)` (L178-210)
+### fn `function _renderProviderCard(provider)` (L202-234)
 - @brief Render one provider card from current state.
 - @param {string} provider Provider key.
 - @return s {void}
 
-### fn `function _renderState()` (L216-231)
+### fn `function _renderState()` (L240-255)
 - @brief Render popup-wide status/footer labels and all provider cards.
 - @return s {void}
 
-### fn `function _setActiveProvider(provider)` (L238-254)
+### fn `function _setActiveProvider(provider)` (L262-278)
 - @brief Apply active tab classes and card visibility state.
 - @param {string} provider Target provider.
 - @return s {void}
 
-### fn `async function _requestState()` (L260-267)
+### fn `async function _requestState()` (L284-291)
 - @brief Request latest state from background service worker.
 - @return s {Promise<void>} Completion promise.
 
-### fn `async function _refreshNow()` (L273-280)
+### fn `async function _refreshNow()` (L297-304)
 - @brief Trigger manual refresh request.
 - @return s {Promise<void>} Completion promise.
 
-### fn `async function _exportDebugBundle()` (L286-302)
+### fn `async function _requestDebugAccessState()` (L312-318)
+- @brief Fetch runtime debug-access configuration.
+- @return s {Promise<void>} Completion promise.
+- @satisfies REQ-052
+- @satisfies REQ-053
+
+### fn `async function _setDebugAccessState(enabled)` (L327-336)
+- @brief Set runtime debug-access configuration.
+- @param {boolean} enabled Desired debug-access state.
+- @return s {Promise<void>} Completion promise.
+- @satisfies REQ-052
+- @satisfies REQ-053
+
+### fn `async function _exportDebugBundle()` (L342-358)
 - @brief Export debug bundle as downloadable JSON file.
 - @return s {Promise<void>} Completion promise.
 
-### fn `async function _clearLogs()` (L308-313)
+### fn `async function _clearLogs()` (L364-369)
 - @brief Clear persisted debug logs.
 - @return s {Promise<void>} Completion promise.
 
-### fn `async function _setIntervalOverride()` (L319-329)
+### fn `async function _setIntervalOverride()` (L375-385)
 - @brief Apply refresh interval override from popup input.
 - @return s {Promise<void>} Completion promise.
 
-### fn `function _wireUiEvents()` (L335-368)
+### fn `function _wireUiEvents()` (L391-431)
 - @brief Register popup event handlers.
 - @return s {void}
 
 ## Symbol Index
 |Symbol|Kind|Vis|Lines|Sig|
 |---|---|---|---|---|
-|`PROVIDER_TABS`|const||17||
-|`PROVIDER_WINDOWS`|const||20||
-|`_progressClass`|fn||54-65|function _progressClass(usagePercent)|
-|`_formatPercent`|fn||72-77|function _formatPercent(value)|
-|`_formatMetric`|fn||84-89|function _formatMetric(value)|
-|`_formatReset`|fn||96-119|function _formatReset(resetAt)|
-|`_buildWindowRow`|fn||127-171|function _buildWindowRow(windowKey, windowData)|
-|`_renderProviderCard`|fn||178-210|function _renderProviderCard(provider)|
-|`_renderState`|fn||216-231|function _renderState()|
-|`_setActiveProvider`|fn||238-254|function _setActiveProvider(provider)|
-|`_requestState`|fn||260-267|async function _requestState()|
-|`_refreshNow`|fn||273-280|async function _refreshNow()|
-|`_exportDebugBundle`|fn||286-302|async function _exportDebugBundle()|
-|`_clearLogs`|fn||308-313|async function _clearLogs()|
-|`_setIntervalOverride`|fn||319-329|async function _setIntervalOverride()|
-|`_wireUiEvents`|fn||335-368|function _wireUiEvents()|
+|`PROVIDER_TABS`|const||18||
+|`PROVIDER_WINDOWS`|const||21||
+|`_applyDebugAccessState`|fn||63-71|function _applyDebugAccessState(enabled)|
+|`_progressClass`|fn||78-89|function _progressClass(usagePercent)|
+|`_formatPercent`|fn||96-101|function _formatPercent(value)|
+|`_formatMetric`|fn||108-113|function _formatMetric(value)|
+|`_formatReset`|fn||120-143|function _formatReset(resetAt)|
+|`_buildWindowRow`|fn||151-195|function _buildWindowRow(windowKey, windowData)|
+|`_renderProviderCard`|fn||202-234|function _renderProviderCard(provider)|
+|`_renderState`|fn||240-255|function _renderState()|
+|`_setActiveProvider`|fn||262-278|function _setActiveProvider(provider)|
+|`_requestState`|fn||284-291|async function _requestState()|
+|`_refreshNow`|fn||297-304|async function _refreshNow()|
+|`_requestDebugAccessState`|fn||312-318|async function _requestDebugAccessState()|
+|`_setDebugAccessState`|fn||327-336|async function _setDebugAccessState(enabled)|
+|`_exportDebugBundle`|fn||342-358|async function _exportDebugBundle()|
+|`_clearLogs`|fn||364-369|async function _clearLogs()|
+|`_setIntervalOverride`|fn||375-385|async function _setIntervalOverride()|
+|`_wireUiEvents`|fn||391-431|function _wireUiEvents()|
 
 
 ---

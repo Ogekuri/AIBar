@@ -93,7 +93,8 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **PRJ-008**: MUST provide `scripts/install-gnome-extension.sh` that copies GNOME extension files from `src/aibar/gnome-extension/aibar@aibar.panel/` to `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/` and enables the extension via `gnome-extensions enable`.
 - **PRJ-009**: MUST provide a Chrome extension in `src/aibar/chrome-extension` exposing an AIBar toolbar popup with `claude`, `copilot`, and `codex` provider tabs.
 - **PRJ-010**: MUST collect Chrome extension provider metrics through autonomous website download/parsing flows without invoking the `aibar` executable.
-- **PRJ-011**: MUST expose a Chrome-extension debug command API over runtime messages for deterministic field diagnostics without code edits.
+- **PRJ-011**: MUST expose Chrome-extension runtime message APIs with one primary snapshot endpoint and one debug-command surface for deterministic field diagnostics without source-code edits.
+- **PRJ-012**: MUST maintain `guidelines/Google_Extension_API_Reference.md` as a machine-readable Chrome-extension API contract synchronized to current implementation and sufficient for complete client-side API integration.
 
 ### 2.2 Project Constraints
 - **CTN-001**: MUST resolve provider credentials with precedence: environment variable, then `~/.config/aibar/env`, then provider-specific local credential stores.
@@ -109,6 +110,7 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **CTN-011**: MUST expose Chrome extension runtime debugging through console-safe structured logs, optional persisted extension-local log records, and API-retrievable parser/window diagnostic traces for fetched provider pages.
 - **CTN-012**: MUST restrict debug HTTP retrieval commands to `https` URLs and allowed hosts `claude.ai`, `chatgpt.com`, and `github.com`.
 - **CTN-013**: MUST cap debug HTTP response body previews through bounded `max_chars` truncation to prevent unbounded payload growth.
+- **CTN-014**: MUST keep debug API enablement as a non-persistent in-memory flag defaulting to disabled on runtime startup, and MUST NOT persist debug enablement in extension storage.
 
 ## 3. Requirements
 
@@ -123,7 +125,8 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **DES-008**: MUST implement Chrome extension popup tabs with GNOME-parity card layout semantics while restricting visible providers to `claude`, `copilot`, and `codex`.
 - **DES-009**: MUST run Chrome extension refresh scheduling in a dedicated background execution unit that updates shared provider state for popup rendering.
 - **DES-010**: MUST remove repository directory `src/aibar/chrome-extension/temp/` after parser extraction logic is implemented and validated.
-- **DES-011**: MUST implement a background debug-command dispatcher with `debug.api.describe` and `debug.api.execute` routes using structured request/response envelopes.
+- **DES-011**: MUST implement a background API dispatcher with `api.main.snapshot`, `debug.api.describe`, and `debug.api.execute` routes and a centralized debug-access guard controlled by runtime configuration state.
+- **DES-012**: MUST expose popup configuration controls to read and update the runtime debug-access flag through message-based configuration routes without storage persistence.
 
 ### 3.2 Functions
 - **REQ-001**: MUST skip unconfigured providers in `show` output and print missing environment-variable hints when text mode is used.
@@ -169,13 +172,17 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **REQ-041**: MUST download and parse Codex usage data from `https://chatgpt.com/codex/settings/usage` using HTML semantics, bootstrap-script extraction, and escaped script key-value heuristics, and MUST fail refresh when usable quota/progress metrics are absent.
 - **REQ-042**: MUST download and parse Copilot usage data by combining `https://github.com/settings/copilot/features` and `https://github.com/settings/billing/premium_requests_usage`.
 - **REQ-043**: MUST run recurring provider updates in the background execution unit every configured interval and publish fresh normalized tab state to popup consumers.
-- **REQ-044**: MUST support manual debug dump export containing raw extraction traces, normalized provider payloads, and timestamped refresh diagnostics.
+- **REQ-044**: MUST support manual debug dump export containing raw extraction traces, normalized provider payloads, and timestamped refresh diagnostics when debug access is enabled.
 - **REQ-045**: MUST continue rendering the latest successful provider state when network fetch or parser-usable-metric validation fails and MUST surface failure diagnostics through debug instrumentation.
-- **REQ-046**: MUST return a machine-readable debug command catalog when runtime message type `debug.api.describe` is requested.
-- **REQ-047**: MUST execute debug command `http.get` by downloading the requested URL and returning HTTP metadata, bounded head/tail response-body previews, deterministic body hash, and HTML probe markers.
-- **REQ-048**: MUST execute debug parser diagnostics commands (`parser.run`, `provider.diagnose`, `providers.diagnose`) that fetch or accept HTML input, run provider-specific parsers, and return parser payloads, HTML probes, signal diagnostics, window-assignment traces, payload-usability summaries, and matched metric-key evidence.
-- **REQ-049**: MUST execute debug standard commands `state.get`, `refresh.run`, `logs.get`, `logs.clear`, `interval.get`, and `interval.set`.
-- **REQ-050**: MUST emit structured debug log records for debug API command start and completion including command identifier, duration, and success/failure status, and MUST use console-invocation-safe logging wrappers that do not throw.
+- **REQ-046**: MUST return a machine-readable primary snapshot when runtime message type `api.main.snapshot` is requested, including tab order and provider window metrics/errors used by Claude, Copilot, and Codex popup rendering.
+- **REQ-047**: MUST execute debug command `http.get` when debug access is enabled by downloading requested URL and returning HTTP metadata, bounded head/tail previews, deterministic body hash, and HTML probe markers.
+- **REQ-048**: MUST execute debug parser diagnostics commands (`parser.run`, `provider.diagnose`, `providers.diagnose`) when debug access is enabled and return parser payloads, HTML probes, signal diagnostics, window-assignment traces, payload-usability summaries, and metric-key evidence.
+- **REQ-049**: MUST execute debug standard commands `state.get`, `refresh.run`, `logs.get`, `logs.clear`, `interval.get`, and `interval.set` only when debug access is enabled.
+- **REQ-050**: MUST emit structured debug log records for debug API command start/completion including command identifier, duration, and success/failure status, and MUST use console-invocation-safe logging wrappers that do not throw.
+- **REQ-051**: MUST return deterministic error responses for all runtime message types prefixed with `debug.` when debug access is disabled, while non-debug APIs continue to operate.
+- **REQ-052**: MUST expose runtime configuration messages `config.debug_api.get` and `config.debug_api.set` to read and mutate debug-access enablement in memory.
+- **REQ-053**: MUST expose popup configuration UI for debug-access enablement and MUST keep debug action controls disabled when debug access is off.
+- **REQ-054**: MUST keep `guidelines/Google_Extension_API_Reference.md` updated on every Chrome-extension API change and include complete request/response schemas for `api.main.snapshot`, `debug.api.describe`, and `debug.api.execute`.
 
 ## 4. Test Requirements
 
@@ -199,10 +206,12 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 - **TST-016**: MUST verify Copilot parser merges features and premium pages into one normalized payload consumed by popup `copilot` tab rendering.
 - **TST-017**: MUST verify refresh failures preserve last successful tab payloads and emit structured debug records to console and persisted log storage.
 - **TST-018**: MUST verify repository no longer contains `src/aibar/chrome-extension/temp/` after implementation changes are completed.
-- **TST-019**: MUST verify `debug.api.describe` returns a deterministic command list including HTTP retrieval, parser commands, and standard runtime commands.
-- **TST-020**: MUST verify `debug.api.execute` command `http.get` enforces `https`+host allowlist validation and returns bounded head/tail previews, deterministic body hash, and HTML probe metadata.
-- **TST-021**: MUST verify debug parser-diagnostics command dispatch maps provider keys to parser functions and returns HTML probes, signal diagnostics, parser payloads, window-assignment traces, payload-usability summaries, and matched metric-key evidence, including aggregate `providers.diagnose` output.
-- **TST-022**: MUST verify standard debug commands route to state/refresh/log/interval handlers with interval update constraints and verify debug logger console invocation uses bound-safe methods.
+- **TST-019**: MUST verify runtime message handler exposes `api.main.snapshot`, `debug.api.describe`, and `debug.api.execute`, and MUST verify the primary snapshot payload contains tab-order and per-window fields required by popup progress rendering.
+- **TST-020**: MUST verify `debug.api.execute` command `http.get` enforces `https`+host allowlist validation and returns bounded head/tail previews, deterministic body hash, and HTML probe metadata when debug access is enabled.
+- **TST-021**: MUST verify debug parser-diagnostics command dispatch maps provider keys to parser functions and returns HTML probes, signal diagnostics, parser payloads, window-assignment traces, payload-usability summaries, and metric-key evidence when debug access is enabled.
+- **TST-022**: MUST verify debug standard commands route to state/refresh/log/interval handlers with interval constraints and verify debug logger console invocation uses bound-safe methods when debug access is enabled.
+- **TST-023**: MUST verify all `debug.*` runtime message calls return errors while debug access is disabled, and verify `config.debug_api.set` enables debug access without storage persistence.
+- **TST-024**: MUST verify `guidelines/Google_Extension_API_Reference.md` documents `api.main.snapshot`, `debug.api.describe`, `debug.api.execute`, configuration routes, and disabled-debug error semantics.
 
 ## 5. Evidence
 
@@ -302,16 +311,25 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | TST-016 | `tests/test_chrome_extension_parser.py` + Copilot features+premium merge assertion for normalized `30d` payload. |
 | TST-017 | `tests/test_chrome_extension_background.py` and `tests/test_chrome_extension_debug.py` + fallback state and debug instrumentation assertions. |
 | TST-018 | `tests/test_chrome_extension_temp_removed.py` + temp-directory absence assertion. |
-| PRJ-011 | `src/aibar/chrome-extension/background.js` + `_handleMessage` route for `debug.api.describe` and `debug.api.execute` command API. |
+| PRJ-011 | `src/aibar/chrome-extension/background.js` + `_handleMessage` routes for `api.main.snapshot`, `debug.api.describe`, and `debug.api.execute` APIs. |
+| PRJ-012 | `guidelines/Google_Extension_API_Reference.md` + API contract sections for primary/debug endpoints and configuration routes kept synchronized with implementation. |
 | CTN-012 | `src/aibar/chrome-extension/background.js` + `_normalizeDebugUrl` enforces `https` protocol and host allowlist set (`claude.ai`, `chatgpt.com`, `github.com`). |
 | CTN-013 | `src/aibar/chrome-extension/background.js` + `_normalizeDebugMaxChars` with bounded preview caps and `http.get` truncation metadata. |
-| DES-011 | `src/aibar/chrome-extension/background.js` + `_describeDebugApi`, `_executeDebugApiCommand`, and dispatcher envelope in `_handleMessage`. |
-| REQ-046 | `src/aibar/chrome-extension/background.js` + `debug.api.describe` response with endpoint/commands/default schema payload. |
-| REQ-047 | `src/aibar/chrome-extension/background.js` + `http.get` command route returning `body_preview`, `body_preview_tail`, `body_sha256`, and `html_probe` metadata. |
-| REQ-048 | `src/aibar/chrome-extension/background.js` + `parser.run`/`provider.diagnose`/`providers.diagnose` dispatch with signal diagnostics, window-assignment traces, and payload assertions; `src/aibar/chrome-extension/parsers.js` + `extractSignalDiagnostics` and `extractWindowAssignmentDiagnostics`. |
-| REQ-049 | `src/aibar/chrome-extension/background.js` + standard command routes `state.get`, `refresh.run`, `logs.get`, `logs.clear`, `interval.get`, `interval.set`. |
+| CTN-014 | `src/aibar/chrome-extension/background.js` + in-memory `debugApiEnabled` flag defaulting to `false` and no storage writes for debug enablement state. |
+| DES-011 | `src/aibar/chrome-extension/background.js` + `_buildMainApiSnapshot`, `_describeDebugApi`, `_executeDebugApiCommand`, and centralized debug guard in `_handleMessage`. |
+| DES-012 | `src/aibar/chrome-extension/popup.html` + debug-enable checkbox controls and `src/aibar/chrome-extension/popup.js` + config route wiring for runtime debug flag updates. |
+| REQ-046 | `src/aibar/chrome-extension/background.js` + `api.main.snapshot` response returning tab order and provider window metrics/errors consumed by popup rendering. |
+| REQ-047 | `src/aibar/chrome-extension/background.js` + `http.get` command route returning bounded previews, hash, and HTML probe metadata when debug access is enabled. |
+| REQ-048 | `src/aibar/chrome-extension/background.js` + `parser.run`/`provider.diagnose`/`providers.diagnose` command dispatch with parser diagnostics and payload assertions behind debug-access guard. |
+| REQ-049 | `src/aibar/chrome-extension/background.js` + debug standard command routes `state.get`, `refresh.run`, `logs.get`, `logs.clear`, `interval.get`, and `interval.set` behind debug-access guard. |
 | REQ-050 | `src/aibar/chrome-extension/background.js` + `debug-api-command-start/success/failure` structured logger events with `duration_ms`, and `src/aibar/chrome-extension/debug.js` + bound console-method invocation wrapper in `createLogger`. |
-| TST-019 | `tests/test_chrome_extension_debug_api.py` + command API route + command catalog assertions. |
-| TST-020 | `tests/test_chrome_extension_debug_api.py` + HTTPS allowlist + head/tail preview, hash, and probe metadata assertions for `http.get`. |
-| TST-021 | `tests/test_chrome_extension_debug_api.py` + parser/provider/providers-diagnose dispatch assertions, and `tests/test_chrome_extension_parser.py` + signal-diagnostics metric-key evidence plus window-assignment trace assertions. |
-| TST-022 | `tests/test_chrome_extension_debug_api.py` + standard command list and lifecycle logging assertions, and `tests/test_chrome_extension_debug.py` + bound-safe console invocation assertions. |
+| REQ-051 | `src/aibar/chrome-extension/background.js` + `_ensureDebugAccessEnabled` deterministic rejection path for all `debug.*` message types when debug access is disabled. |
+| REQ-052 | `src/aibar/chrome-extension/background.js` + `config.debug_api.get`/`config.debug_api.set` handlers for runtime debug-enable state mutation without persistence. |
+| REQ-053 | `src/aibar/chrome-extension/popup.html` + debug-enable UI control and `src/aibar/chrome-extension/popup.js` + debug-control disablement when runtime flag is off. |
+| REQ-054 | `guidelines/Google_Extension_API_Reference.md` + complete request/response schemas and disabled-debug error semantics for primary/debug extension APIs. |
+| TST-019 | `tests/test_chrome_extension_debug_api.py` + route assertions for `api.main.snapshot` and debug endpoints plus primary snapshot schema checks. |
+| TST-020 | `tests/test_chrome_extension_debug_api.py` + HTTPS allowlist + head/tail preview, hash, and probe metadata assertions for `http.get` with debug enabled. |
+| TST-021 | `tests/test_chrome_extension_debug_api.py` + parser/provider/providers-diagnose dispatch assertions gated by debug enablement, plus parser diagnostic payload checks. |
+| TST-022 | `tests/test_chrome_extension_debug_api.py` + debug standard-command + lifecycle logging assertions with explicit debug-enable path, and `tests/test_chrome_extension_debug.py` console-binding checks. |
+| TST-023 | `tests/test_chrome_extension_debug_api.py` + disabled-debug rejection assertions and `config.debug_api.set` runtime enablement assertions. |
+| TST-024 | `tests/test_chrome_extension_api_reference.py` + API-reference coverage assertions for primary/debug/configuration contract sections and disabled-debug error semantics. |

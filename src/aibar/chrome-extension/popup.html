@@ -23,8 +23,8 @@
 
       <section class="aibar-controls">
         <button id="refreshButton" class="aibar-btn" type="button">Refresh now</button>
-        <button id="exportButton" class="aibar-btn" type="button">Export debug</button>
-        <button id="clearLogsButton" class="aibar-btn" type="button">Clear logs</button>
+        <button id="exportButton" class="aibar-btn" type="button" disabled>Export debug</button>
+        <button id="clearLogsButton" class="aibar-btn" type="button" disabled>Clear logs</button>
         <input
           id="intervalInput"
           class="aibar-input"
@@ -33,8 +33,14 @@
           step="1"
           value="180"
           aria-label="Refresh interval seconds"
+          disabled
         />
-        <button id="setIntervalButton" class="aibar-btn" type="button">Set sec</button>
+        <button id="setIntervalButton" class="aibar-btn" type="button" disabled>Set sec</button>
+        <label class="aibar-checkbox" for="debugEnableCheckbox">
+          <input id="debugEnableCheckbox" type="checkbox" />
+          Enable debug API (session only)
+        </label>
+        <span id="debugStatusLabel" class="aibar-badge">debug off</span>
       </section>
 
       <nav class="aibar-tab-bar" aria-label="Providers">

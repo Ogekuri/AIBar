@@ -104,6 +104,7 @@
   - Registers recurring alarm scheduling, processes provider refresh cycles, persists normalized state, and serves popup RPC requests.
 - `Internal Call-Trace Tree`
   - `_initializeRuntime(...)`: startup orchestrator [`src/aibar/chrome-extension/background.js`]
+    - `debugApiEnabled = false`: reset non-persistent debug-access flag on runtime initialization [`src/aibar/chrome-extension/background.js`]
     - `_loadPersistedState(...)`: restore last successful payloads from storage [`src/aibar/chrome-extension/background.js`]
     - `_scheduleRefreshAlarm(...)`: configure periodic scheduler [`src/aibar/chrome-extension/background.js`]
       - `_getRefreshIntervalSeconds(...)`: resolve default/override interval [`src/aibar/chrome-extension/background.js`]
@@ -123,8 +124,15 @@
       - `_applyProviderSuccess(...)`: state update on success [`src/aibar/chrome-extension/background.js`]
       - `_applyProviderFailure(...)`: error update preserving latest successful payload [`src/aibar/chrome-extension/background.js`]
       - `_persistState(...)`: storage persistence [`src/aibar/chrome-extension/background.js`]
+      - `_buildMainApiSnapshot(...)`: normalized popup-facing snapshot assembly [`src/aibar/chrome-extension/background.js`]
+        - `_normalizeMainApiWindow(...)`: provider-window metric normalization [`src/aibar/chrome-extension/background.js`]
   - `_handleMessage(...)`: popup RPC route [`src/aibar/chrome-extension/background.js`]
+    - `_buildMainApiSnapshot(...)`: primary API response for popup rendering model [`src/aibar/chrome-extension/background.js`]
+      - `_normalizeMainApiWindow(...)`: provider-window metric normalization [`src/aibar/chrome-extension/background.js`]
+    - `debugApiEnabled` read/write path: runtime configuration get/set routes without storage persistence [`src/aibar/chrome-extension/background.js`]
+    - `_ensureDebugAccessEnabled(...)`: deterministic guard for all `debug.*` message types [`src/aibar/chrome-extension/background.js`]
     - `_refreshAllProviders(...)`: manual refresh route [`src/aibar/chrome-extension/background.js`]
+      - `_buildMainApiSnapshot(...)`: refresh response payload normalization [`src/aibar/chrome-extension/background.js`]
     - `readDebugRecords(...)`: debug log retrieval [`src/aibar/chrome-extension/debug.js`]
     - `clearDebugRecords(...)`: debug log reset [`src/aibar/chrome-extension/debug.js`]
     - `buildDebugBundle(...)`: debug export payload generation [`src/aibar/chrome-extension/debug.js`]
@@ -175,19 +183,22 @@
 - `Entrypoints`
   - popup bootstrap script body: initial state load + event wiring [`src/aibar/chrome-extension/popup.js`]
   - `chrome.runtime.onMessage` callback: push update route [`src/aibar/chrome-extension/popup.js`]
-- `Lifecycle/Trigger`
+  - `Lifecycle/Trigger`
   - Starts when user clicks browser-action icon and opens popup.
-  - Renders tab cards and handles manual refresh/debug actions.
-- `Internal Call-Trace Tree`
+  - Renders tab cards, synchronizes runtime debug-access configuration, and handles manual refresh/debug actions.
+  - `Internal Call-Trace Tree`
   - popup bootstrap: initialization [`src/aibar/chrome-extension/popup.js`]
     - `_wireUiEvents(...)`: bind tab/control handlers [`src/aibar/chrome-extension/popup.js`]
     - `_setActiveProvider(...)`: initial tab activation [`src/aibar/chrome-extension/popup.js`]
+    - `_applyDebugAccessState(...)`: initialize debug-control disabled/enabled UI state [`src/aibar/chrome-extension/popup.js`]
+    - `_requestDebugAccessState(...)`: fetch runtime debug-access flag from background configuration API [`src/aibar/chrome-extension/popup.js`]
     - `_requestState(...)`: initial state fetch [`src/aibar/chrome-extension/popup.js`]
       - `_renderState(...)`: full popup render [`src/aibar/chrome-extension/popup.js`]
         - `_renderProviderCard(...)`: provider card render [`src/aibar/chrome-extension/popup.js`]
           - `_buildWindowRow(...)`: progress bar + reset/quota line render [`src/aibar/chrome-extension/popup.js`]
     - control callbacks
       - `_refreshNow(...)`: manual refresh RPC [`src/aibar/chrome-extension/popup.js`]
+      - `_setDebugAccessState(...)`: runtime debug-access toggle RPC [`src/aibar/chrome-extension/popup.js`]
       - `_exportDebugBundle(...)`: debug JSON export action [`src/aibar/chrome-extension/popup.js`]
       - `_clearLogs(...)`: log clear action [`src/aibar/chrome-extension/popup.js`]
       - `_setIntervalOverride(...)`: scheduler override action [`src/aibar/chrome-extension/popup.js`]
@@ -447,8 +458,8 @@
   - `destination: PROC:chrome-ext`
   - `direction: request-response`
   - `mechanism: chrome.runtime.sendMessage RPC`
-  - `endpoint_or_channel: message types usage.get_state, usage.refresh_now, debug.export_bundle, debug.clear_logs, debug.set_refresh_interval, debug.api.describe, debug.api.execute`
-  - `payload_data_shape: JSON object with message type discriminator and optional command+args envelope for debug API command execution`
+  - `endpoint_or_channel: message types api.main.snapshot, usage.get_state, usage.refresh_now, config.debug_api.get, config.debug_api.set, debug.export_bundle, debug.clear_logs, debug.set_refresh_interval, debug.api.describe, debug.api.execute`
+  - `payload_data_shape: JSON request objects with type discriminators; debug command execution uses command+args envelope and returns deterministic DEBUG_API_DISABLED failures when runtime debug flag is off`
   - `declaration_files: src/aibar/chrome-extension/popup.js, src/aibar/chrome-extension/background.js`
 
 - `id: EDGE-006`
@@ -457,5 +468,5 @@
   - `direction: push-notification`
   - `mechanism: chrome.runtime.sendMessage event broadcast`
   - `endpoint_or_channel: message type usage.updated`
-  - `payload_data_shape: normalized provider state object with providers, windows, timestamps, cycle status, and errors`
+  - `payload_data_shape: primary API snapshot object containing tab_order, tab_windows, provider windows/metrics/errors, timestamps, cycle status, and scheduler metadata`
   - `declaration_files: src/aibar/chrome-extension/background.js, src/aibar/chrome-extension/popup.js`

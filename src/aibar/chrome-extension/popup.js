@@ -6,6 +6,7 @@
  * @satisfies REQ-038
  * @satisfies REQ-039
  * @satisfies REQ-044
+ * @satisfies REQ-053
  */
 
 import { createLogger } from "./debug.js";
@@ -36,6 +37,8 @@ const dom = {
   clearLogsButton: document.getElementById("clearLogsButton"),
   intervalInput: document.getElementById("intervalInput"),
   setIntervalButton: document.getElementById("setIntervalButton"),
+  debugEnableCheckbox: document.getElementById("debugEnableCheckbox"),
+  debugStatusLabel: document.getElementById("debugStatusLabel"),
   updatedLabel: document.getElementById("updatedLabel"),
   statusLabel: document.getElementById("statusLabel"),
   tabButtons: Array.from(document.querySelectorAll("[data-provider]")),
@@ -45,6 +48,27 @@ const dom = {
     codex: document.getElementById("card-codex"),
   },
 };
+
+/** @brief Last known runtime debug-access status. */
+let debugApiEnabled = false;
+
+/**
+ * @brief Apply debug-access status to popup control interactivity.
+ * @details Ensures UI mirrors runtime debug guard by disabling debug-only actions
+ * whenever the non-persistent debug flag is not enabled.
+ * @param {boolean} enabled Runtime debug-access state.
+ * @returns {void}
+ * @satisfies REQ-053
+ */
+function _applyDebugAccessState(enabled) {
+  debugApiEnabled = enabled;
+  dom.debugEnableCheckbox.checked = enabled;
+  dom.exportButton.disabled = !enabled;
+  dom.clearLogsButton.disabled = !enabled;
+  dom.intervalInput.disabled = !enabled;
+  dom.setIntervalButton.disabled = !enabled;
+  dom.debugStatusLabel.textContent = enabled ? "debug on" : "debug off";
+}
 
 /**
  * @brief Resolve CSS class for progress severity by percentage.
@@ -258,11 +282,11 @@ function _setActiveProvider(provider) {
  * @returns {Promise<void>} Completion promise.
  */
 async function _requestState() {
-  const response = await chrome.runtime.sendMessage({ type: "usage.get_state" });
+  const response = await chrome.runtime.sendMessage({ type: "api.main.snapshot" });
   if (!response?.ok) {
-    throw new Error(response?.error ?? "usage.get_state failed");
+    throw new Error(response?.error ?? "api.main.snapshot failed");
   }
-  currentState = response.state;
+  currentState = response.snapshot;
   _renderState();
 }
 
@@ -275,8 +299,40 @@ async function _refreshNow() {
   if (!response?.ok) {
     throw new Error(response?.error ?? "usage.refresh_now failed");
   }
-  currentState = response.state;
+  currentState = response.snapshot ?? response.state ?? currentState;
   _renderState();
+}
+
+/**
+ * @brief Fetch runtime debug-access configuration.
+ * @returns {Promise<void>} Completion promise.
+ * @satisfies REQ-052
+ * @satisfies REQ-053
+ */
+async function _requestDebugAccessState() {
+  const response = await chrome.runtime.sendMessage({ type: "config.debug_api.get" });
+  if (!response?.ok) {
+    throw new Error(response?.error ?? "config.debug_api.get failed");
+  }
+  _applyDebugAccessState(Boolean(response.debug_api_enabled));
+}
+
+/**
+ * @brief Set runtime debug-access configuration.
+ * @param {boolean} enabled Desired debug-access state.
+ * @returns {Promise<void>} Completion promise.
+ * @satisfies REQ-052
+ * @satisfies REQ-053
+ */
+async function _setDebugAccessState(enabled) {
+  const response = await chrome.runtime.sendMessage({
+    type: "config.debug_api.set",
+    enabled,
+  });
+  if (!response?.ok) {
+    throw new Error(response?.error ?? "config.debug_api.set failed");
+  }
+  _applyDebugAccessState(Boolean(response.debug_api_enabled));
 }
 
 /**
@@ -357,6 +413,13 @@ function _wireUiEvents() {
     });
   });
 
+  dom.debugEnableCheckbox.addEventListener("change", () => {
+    void _setDebugAccessState(Boolean(dom.debugEnableCheckbox.checked)).catch((error) => {
+      logger.error("set-debug-access-failure", { error: String(error) });
+      _applyDebugAccessState(debugApiEnabled);
+    });
+  });
+
   for (const button of dom.tabButtons) {
     button.addEventListener("click", () => {
       const provider = button.dataset.provider;
@@ -371,12 +434,16 @@ chrome.runtime.onMessage.addListener((message) => {
   if (message?.type !== "usage.updated") {
     return;
   }
-  currentState = message.state;
+  currentState = message.snapshot ?? message.state ?? currentState;
   _renderState();
 });
 
 _wireUiEvents();
 _setActiveProvider(activeProvider);
+_applyDebugAccessState(false);
+void _requestDebugAccessState().catch((error) => {
+  logger.error("debug-access-load-failure", { error: String(error) });
+});
 void _requestState().catch((error) => {
   logger.error("initial-state-load-failure", { error: String(error) });
 });

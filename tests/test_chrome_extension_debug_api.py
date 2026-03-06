@@ -2,12 +2,13 @@
 @file
 @brief Chrome debug API command-interface assertions.
 @details Verifies runtime debug API describe/execute routes, supported command
-catalog, HTTP safety constraints, parser command dispatch, and structured
-command lifecycle logging.
+catalog, primary API snapshot schema, debug-access gating, parser command
+dispatch, and structured command lifecycle logging.
 @satisfies TST-019
 @satisfies TST-020
 @satisfies TST-021
 @satisfies TST-022
+@satisfies TST-023
 """
 
 from pathlib import Path
@@ -17,14 +18,34 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 BACKGROUND_PATH = PROJECT_ROOT / "src" / "aibar" / "chrome-extension" / "background.js"
 
 
-def test_debug_api_routes_are_exposed_in_message_handler() -> None:
+def test_primary_and_debug_api_routes_are_exposed_in_message_handler() -> None:
     """
-    @brief Verify background message handler exposes debug API routes.
+    @brief Verify message handler exposes primary, debug, and config API routes.
     @satisfies TST-019
+    @satisfies REQ-046
+    @satisfies REQ-052
     """
     source = BACKGROUND_PATH.read_text(encoding="utf-8")
+    assert 'message.type === "api.main.snapshot"' in source
     assert 'message.type === "debug.api.describe"' in source
     assert 'message.type === "debug.api.execute"' in source
+    assert 'message.type === "config.debug_api.get"' in source
+    assert 'message.type === "config.debug_api.set"' in source
+
+
+def test_primary_snapshot_contract_contains_tab_and_progress_window_schema() -> None:
+    """
+    @brief Verify primary snapshot route returns tab/progress schema for popup rendering.
+    @satisfies TST-019
+    @satisfies REQ-046
+    """
+    source = BACKGROUND_PATH.read_text(encoding="utf-8")
+    assert "function _buildMainApiSnapshot()" in source
+    assert 'endpoint: "api.main.snapshot"' in source
+    assert "tab_order:" in source
+    assert "tab_windows:" in source
+    assert "MAIN_API_PROVIDER_WINDOWS" in source
+    assert "providers," in source
 
 
 def test_debug_api_command_catalog_includes_http_parser_and_standard_commands() -> None:
@@ -45,6 +66,35 @@ def test_debug_api_command_catalog_includes_http_parser_and_standard_commands() 
     assert '"logs.clear"' in source
     assert '"interval.get"' in source
     assert '"interval.set"' in source
+
+
+def test_debug_api_calls_are_rejected_when_runtime_debug_access_is_disabled() -> None:
+    """
+    @brief Verify debug message routes fail with deterministic error when flag is off.
+    @satisfies TST-023
+    @satisfies REQ-051
+    @satisfies CTN-014
+    """
+    source = BACKGROUND_PATH.read_text(encoding="utf-8")
+    assert "let debugApiEnabled = false;" in source
+    assert "function _ensureDebugAccessEnabled()" in source
+    assert 'if (typeof message.type === "string" && message.type.startsWith("debug.")) {' in source
+    assert 'code: "DEBUG_API_DISABLED"' in source
+    assert "Debug API disabled: enable it in popup configuration for this runtime session." in source
+
+
+def test_config_routes_toggle_debug_access_without_storage_persistence() -> None:
+    """
+    @brief Verify config routes mutate in-memory debug flag and report non-persistence.
+    @satisfies TST-023
+    @satisfies REQ-052
+    @satisfies CTN-014
+    """
+    source = BACKGROUND_PATH.read_text(encoding="utf-8")
+    assert 'message.type === "config.debug_api.get"' in source
+    assert 'message.type === "config.debug_api.set"' in source
+    assert "debugApiEnabled = message.enabled;" in source
+    assert "persisted: false" in source
 
 
 def test_debug_http_command_enforces_https_and_allowlisted_hosts() -> None:
@@ -103,9 +153,9 @@ def test_debug_provider_diagnose_command_is_exposed_with_source_diagnostics() ->
     @satisfies TST-021
     """
     source = BACKGROUND_PATH.read_text(encoding="utf-8")
-    assert "case \"provider.diagnose\":" in source
+    assert 'case "provider.diagnose":' in source
     assert "provider.diagnose requires provider argument" in source
-    assert "command: \"provider.diagnose\"" in source
+    assert 'command: "provider.diagnose"' in source
     assert "sources:" in source
     assert "payload_usable" in source
     assert "providers.diagnose" in source
@@ -118,7 +168,7 @@ def test_debug_providers_diagnose_command_returns_aggregate_diagnostics() -> Non
     @satisfies TST-021
     """
     source = BACKGROUND_PATH.read_text(encoding="utf-8")
-    assert "case \"providers.diagnose\":" in source
+    assert 'case "providers.diagnose":' in source
     assert "providers.diagnose requires at least one provider token" in source
     assert "provider_fetch_sequence" in source
     assert "DEBUG_API_DEFAULT_PROVIDER_DIAGNOSE_SET" in source

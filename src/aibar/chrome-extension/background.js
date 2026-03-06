@@ -9,12 +9,16 @@
  * @satisfies CTN-009
  * @satisfies CTN-012
  * @satisfies CTN-013
+ * @satisfies CTN-014
  * @satisfies REQ-043
+ * @satisfies REQ-044
  * @satisfies REQ-046
  * @satisfies REQ-047
  * @satisfies REQ-048
  * @satisfies REQ-049
  * @satisfies REQ-050
+ * @satisfies REQ-051
+ * @satisfies REQ-052
  * @satisfies REQ-045
  */
 
@@ -55,6 +59,16 @@ const PROVIDER_FETCH_SEQUENCE = [
   "https://github.com/settings/billing/premium_requests_usage",
 ];
 
+/** @brief Canonical popup tab order represented by the primary API snapshot. */
+const MAIN_API_TAB_ORDER = ["claude", "copilot", "codex"];
+
+/** @brief Canonical window order by provider for popup progress-bar rendering. */
+const MAIN_API_PROVIDER_WINDOWS = {
+  claude: ["5h", "7d"],
+  copilot: ["30d"],
+  codex: ["5h", "7d"],
+};
+
 /** @brief Debug API command identifiers exposed by runtime messaging. */
 const DEBUG_API_SUPPORTED_COMMANDS = [
   "http.get",
@@ -77,6 +91,9 @@ const DEBUG_API_DEFAULT_MAX_CHARS = 16000;
 
 /** @brief Absolute debug-body preview cap in characters. */
 const DEBUG_API_MAX_CHARS = 120000;
+
+/** @brief Deterministic debug-disabled error returned by all debug API routes. */
+const DEBUG_API_DISABLED_ERROR = "Debug API disabled: enable it in popup configuration for this runtime session.";
 
 /** @brief Provider default URLs used by debug parser command. */
 const DEBUG_API_PROVIDER_DEFAULT_URLS = {
@@ -136,12 +153,103 @@ const runtimeState = _emptyState();
 /** @brief Promise lock for concurrent refresh suppression. */
 let refreshInFlight = null;
 
+/** @brief In-memory non-persistent debug-access toggle. */
+let debugApiEnabled = false;
+
 /**
  * @brief Deep clone state into message-safe payload.
  * @returns {Record<string, unknown>} Cloned state snapshot.
  */
 function _cloneState() {
   return JSON.parse(JSON.stringify(runtimeState));
+}
+
+/**
+ * @brief Normalize one window metric payload for primary API transport.
+ * @details Restricts window payload shape to popup-rendered progress and quota
+ * fields so API consumers can rebuild tab cards deterministically.
+ * Time complexity: O(1).
+ * Space complexity: O(1).
+ * @param {Record<string, unknown> | null | undefined} windowData Candidate window payload.
+ * @returns {{usage_percent: number | null, remaining: number | null, limit: number | null, reset_at: string | null}} Normalized window metrics.
+ * @satisfies REQ-046
+ */
+function _normalizeMainApiWindow(windowData) {
+  const usagePercent = Number(windowData?.usage_percent);
+  const remaining = Number(windowData?.remaining);
+  const limit = Number(windowData?.limit);
+  const resetAt = typeof windowData?.reset_at === "string" ? windowData.reset_at : null;
+  return {
+    usage_percent: Number.isFinite(usagePercent) ? usagePercent : null,
+    remaining: Number.isFinite(remaining) ? remaining : null,
+    limit: Number.isFinite(limit) ? limit : null,
+    reset_at: resetAt,
+  };
+}
+
+/**
+ * @brief Build machine-readable primary API snapshot payload.
+ * @details Returns one-call popup/UI model with tab order plus per-provider
+ * progress/quota windows, preserving runtime error and scheduler fields.
+ * Time complexity: O(P*W), where P=provider count and W=window count.
+ * Space complexity: O(P*W).
+ * @returns {Record<string, unknown>} Primary API snapshot payload.
+ * @satisfies REQ-046
+ */
+function _buildMainApiSnapshot() {
+  const snapshot = _cloneState();
+  const providers = {};
+
+  for (const provider of MAIN_API_TAB_ORDER) {
+    const providerState = snapshot.providers?.[provider] ?? _emptyProviderState(provider);
+    const orderedWindows = {};
+    for (const windowKey of MAIN_API_PROVIDER_WINDOWS[provider]) {
+      orderedWindows[windowKey] = _normalizeMainApiWindow(providerState.windows?.[windowKey]);
+    }
+    providers[provider] = {
+      provider,
+      windows: orderedWindows,
+      error: providerState?.error ?? null,
+      parser: providerState?.parser ?? null,
+      source_pages: Array.isArray(providerState?.source_pages) ? [...providerState.source_pages] : [],
+      extracted_at: providerState?.extracted_at ?? null,
+      last_success_at: providerState?.last_success_at ?? null,
+      last_failure_at: providerState?.last_failure_at ?? null,
+    };
+  }
+
+  return {
+    endpoint: "api.main.snapshot",
+    tab_order: [...MAIN_API_TAB_ORDER],
+    tab_windows: JSON.parse(JSON.stringify(MAIN_API_PROVIDER_WINDOWS)),
+    refresh_interval_seconds: snapshot.refresh_interval_seconds,
+    last_cycle_status: snapshot.last_cycle_status,
+    updated_at: snapshot.updated_at,
+    cycle_counter: snapshot.cycle_counter,
+    last_error: snapshot.last_error,
+    provider_fetch_sequence: [...PROVIDER_FETCH_SEQUENCE],
+    providers,
+  };
+}
+
+/**
+ * @brief Enforce runtime debug-access gate before serving debug routes.
+ * @details Uses non-persistent in-memory flag and throws deterministic error to
+ * ensure all debug message routes fail uniformly when disabled.
+ * Time complexity: O(1).
+ * Space complexity: O(1).
+ * @returns {void}
+ * @throws {Error} If debug access is disabled.
+ * @satisfies CTN-014
+ * @satisfies REQ-051
+ */
+function _ensureDebugAccessEnabled() {
+  if (debugApiEnabled) {
+    return;
+  }
+  const error = new Error(DEBUG_API_DISABLED_ERROR);
+  error.code = "DEBUG_API_DISABLED";
+  throw error;
 }
 
 /**
@@ -948,7 +1056,7 @@ async function _refreshAllProviders(trigger) {
 
     await chrome.runtime.sendMessage({
       type: "usage.updated",
-      state: _cloneState(),
+      snapshot: _buildMainApiSnapshot(),
     }).catch(() => {
       // No popup listeners available.
     });
@@ -967,6 +1075,7 @@ async function _refreshAllProviders(trigger) {
  * @returns {Promise<void>} Completion promise.
  */
 async function _initializeRuntime(trigger) {
+  debugApiEnabled = false;
   await _loadPersistedState();
   await _scheduleRefreshAlarm();
   await _refreshAllProviders(trigger);
@@ -986,19 +1095,82 @@ async function _handleMessage(message, sendResponse) {
     return;
   }
 
+  if (message.type === "api.main.snapshot") {
+    sendResponse({
+      ok: true,
+      snapshot: _buildMainApiSnapshot(),
+    });
+    return;
+  }
+
   if (message.type === "usage.get_state") {
-    sendResponse({ ok: true, state: _cloneState() });
+    sendResponse({
+      ok: true,
+      state: _cloneState(),
+      snapshot: _buildMainApiSnapshot(),
+    });
     return;
   }
 
   if (message.type === "usage.refresh_now") {
     await _refreshAllProviders("manual");
-    sendResponse({ ok: true, state: _cloneState() });
+    sendResponse({
+      ok: true,
+      state: _cloneState(),
+      snapshot: _buildMainApiSnapshot(),
+    });
     return;
   }
 
+  if (message.type === "config.debug_api.get") {
+    sendResponse({
+      ok: true,
+      debug_api_enabled: debugApiEnabled,
+      persisted: false,
+    });
+    return;
+  }
+
+  if (message.type === "config.debug_api.set") {
+    if (typeof message.enabled !== "boolean") {
+      sendResponse({
+        ok: false,
+        error: "config.debug_api.set requires boolean enabled",
+      });
+      return;
+    }
+    debugApiEnabled = message.enabled;
+    logger.info("debug-access-updated", {
+      enabled: debugApiEnabled,
+      persisted: false,
+    });
+    sendResponse({
+      ok: true,
+      debug_api_enabled: debugApiEnabled,
+      persisted: false,
+    });
+    return;
+  }
+
+  if (typeof message.type === "string" && message.type.startsWith("debug.")) {
+    try {
+      _ensureDebugAccessEnabled();
+    } catch (error) {
+      sendResponse({
+        ok: false,
+        code: "DEBUG_API_DISABLED",
+        error: String(error?.message ?? error),
+      });
+      return;
+    }
+  }
+
   if (message.type === "debug.api.describe") {
-    sendResponse({ ok: true, api: _describeDebugApi() });
+    sendResponse({
+      ok: true,
+      debug_api_enabled: debugApiEnabled,
+      api: _describeDebugApi(),
+    });
     return;
   }
 
@@ -1027,6 +1199,7 @@ async function _handleMessage(message, sendResponse) {
       sendResponse({
         ok: true,
         command,
+        debug_api_enabled: debugApiEnabled,
         duration_ms: durationMs,
         result,
       });
@@ -1041,6 +1214,7 @@ async function _handleMessage(message, sendResponse) {
       sendResponse({
         ok: false,
         command,
+        debug_api_enabled: debugApiEnabled,
         duration_ms: durationMs,
         error: messageText,
       });
@@ -1074,7 +1248,10 @@ async function _handleMessage(message, sendResponse) {
     }
     await chrome.storage.local.set({ [INTERVAL_OVERRIDE_STORAGE_KEY]: Math.round(value) });
     await _scheduleRefreshAlarm();
-    sendResponse({ ok: true, refresh_interval_seconds: runtimeState.refresh_interval_seconds });
+    sendResponse({
+      ok: true,
+      refresh_interval_seconds: runtimeState.refresh_interval_seconds,
+    });
     return;
   }
 
