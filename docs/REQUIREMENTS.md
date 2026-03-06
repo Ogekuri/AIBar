@@ -1,7 +1,7 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.3.8"
+version: "0.3.9"
 date: "2026-03-06"
 author: "req-new"
 scope:
@@ -93,6 +93,7 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **PRJ-008**: MUST provide `scripts/install-gnome-extension.sh` that copies GNOME extension files from `src/aibar/gnome-extension/aibar@aibar.panel/` to `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/` and enables the extension via `gnome-extensions enable`.
 - **PRJ-009**: MUST provide a Chrome extension in `src/aibar/chrome-extension` exposing an AIBar toolbar popup with `claude`, `copilot`, and `codex` provider tabs.
 - **PRJ-010**: MUST collect Chrome extension provider metrics through autonomous website download/parsing flows without invoking the `aibar` executable.
+- **PRJ-011**: MUST expose a Chrome-extension debug command API over runtime messages for deterministic field diagnostics without code edits.
 
 ### 2.2 Project Constraints
 - **CTN-001**: MUST resolve provider credentials with precedence: environment variable, then `~/.config/aibar/env`, then provider-specific local credential stores.
@@ -106,6 +107,8 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **CTN-009**: MUST process Chrome extension source pages in fixed order: Claude usage, Codex usage, Copilot features usage, Copilot premium usage.
 - **CTN-010**: MUST extract Chrome extension usage values using localization-independent DOM semantics and MUST NOT rely on visible-language label strings.
 - **CTN-011**: MUST expose Chrome extension runtime debugging through structured console logs and optional persisted extension-local log records.
+- **CTN-012**: MUST restrict debug HTTP retrieval commands to `https` URLs and allowed hosts `claude.ai`, `chatgpt.com`, and `github.com`.
+- **CTN-013**: MUST cap debug HTTP response body previews through bounded `max_chars` truncation to prevent unbounded payload growth.
 
 ## 3. Requirements
 
@@ -120,6 +123,7 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **DES-008**: MUST implement Chrome extension popup tabs with GNOME-parity card layout semantics while restricting visible providers to `claude`, `copilot`, and `codex`.
 - **DES-009**: MUST run Chrome extension refresh scheduling in a dedicated background execution unit that updates shared provider state for popup rendering.
 - **DES-010**: MUST remove repository directory `src/aibar/chrome-extension/temp/` after parser extraction logic is implemented and validated.
+- **DES-011**: MUST implement a background debug-command dispatcher with `debug.api.describe` and `debug.api.execute` routes using structured request/response envelopes.
 
 ### 3.2 Functions
 - **REQ-001**: MUST skip unconfigured providers in `show` output and print missing environment-variable hints when text mode is used.
@@ -167,6 +171,11 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **REQ-043**: MUST run recurring provider updates in the background execution unit every configured interval and publish fresh normalized tab state to popup consumers.
 - **REQ-044**: MUST support manual debug dump export containing raw extraction traces, normalized provider payloads, and timestamped refresh diagnostics.
 - **REQ-045**: MUST continue rendering the latest successful provider state when a refresh cycle fails and MUST surface failure diagnostics through debug instrumentation.
+- **REQ-046**: MUST return a machine-readable debug command catalog when runtime message type `debug.api.describe` is requested.
+- **REQ-047**: MUST execute debug command `http.get` by downloading the requested URL and returning HTTP metadata plus bounded response-body preview text.
+- **REQ-048**: MUST execute debug parser commands that fetch or accept HTML input, run provider-specific parsers, and return parser output with HTML probe metadata.
+- **REQ-049**: MUST execute debug standard commands `state.get`, `refresh.run`, `logs.get`, `logs.clear`, `interval.get`, and `interval.set`.
+- **REQ-050**: MUST emit structured debug log records for debug API command start and completion including command identifier, duration, and success/failure status.
 
 ## 4. Test Requirements
 
@@ -190,6 +199,10 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 - **TST-016**: MUST verify Copilot parser merges features and premium pages into one normalized payload consumed by popup `copilot` tab rendering.
 - **TST-017**: MUST verify refresh failures preserve last successful tab payloads and emit structured debug records to console and persisted log storage.
 - **TST-018**: MUST verify repository no longer contains `src/aibar/chrome-extension/temp/` after implementation changes are completed.
+- **TST-019**: MUST verify `debug.api.describe` returns a deterministic command list including HTTP retrieval, parser commands, and standard runtime commands.
+- **TST-020**: MUST verify `debug.api.execute` command `http.get` enforces `https`+host allowlist validation and returns bounded body preview metadata.
+- **TST-021**: MUST verify debug parser command dispatch maps provider keys to parser functions and returns HTML probe diagnostics with parser payload.
+- **TST-022**: MUST verify standard debug commands route to state/refresh/log/interval handlers with interval update constraints.
 
 ## 5. Evidence
 
@@ -289,3 +302,16 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | TST-016 | `tests/test_chrome_extension_parser.py` + Copilot features+premium merge assertion for normalized `30d` payload. |
 | TST-017 | `tests/test_chrome_extension_background.py` and `tests/test_chrome_extension_debug.py` + fallback state and debug instrumentation assertions. |
 | TST-018 | `tests/test_chrome_extension_temp_removed.py` + temp-directory absence assertion. |
+| PRJ-011 | `src/aibar/chrome-extension/background.js` + `_handleMessage` route for `debug.api.describe` and `debug.api.execute` command API. |
+| CTN-012 | `src/aibar/chrome-extension/background.js` + `_normalizeDebugUrl` enforces `https` protocol and host allowlist set (`claude.ai`, `chatgpt.com`, `github.com`). |
+| CTN-013 | `src/aibar/chrome-extension/background.js` + `_normalizeDebugMaxChars` with bounded preview caps and `http.get` truncation metadata. |
+| DES-011 | `src/aibar/chrome-extension/background.js` + `_describeDebugApi`, `_executeDebugApiCommand`, and dispatcher envelope in `_handleMessage`. |
+| REQ-046 | `src/aibar/chrome-extension/background.js` + `debug.api.describe` response with endpoint/commands/default schema payload. |
+| REQ-047 | `src/aibar/chrome-extension/background.js` + `http.get` command route returning status, headers, `body_preview`, `body_length`, and truncation flag. |
+| REQ-048 | `src/aibar/chrome-extension/background.js` + `parser.run` command dispatch for provider parsers with `html_probe` diagnostics and parser payload output. |
+| REQ-049 | `src/aibar/chrome-extension/background.js` + standard command routes `state.get`, `refresh.run`, `logs.get`, `logs.clear`, `interval.get`, `interval.set`. |
+| REQ-050 | `src/aibar/chrome-extension/background.js` + `debug-api-command-start/success/failure` structured logger events with `duration_ms`. |
+| TST-019 | `tests/test_chrome_extension_debug_api.py` + command API route + command catalog assertions. |
+| TST-020 | `tests/test_chrome_extension_debug_api.py` + HTTPS allowlist + body preview metadata assertions for `http.get`. |
+| TST-021 | `tests/test_chrome_extension_debug_api.py` + provider parser dispatch and `html_probe` assertion coverage. |
+| TST-022 | `tests/test_chrome_extension_debug_api.py` + standard command list and lifecycle logging assertions. |

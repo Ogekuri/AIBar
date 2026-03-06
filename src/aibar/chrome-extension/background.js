@@ -7,7 +7,14 @@
  * @satisfies PRJ-010
  * @satisfies CTN-008
  * @satisfies CTN-009
+ * @satisfies CTN-012
+ * @satisfies CTN-013
  * @satisfies REQ-043
+ * @satisfies REQ-046
+ * @satisfies REQ-047
+ * @satisfies REQ-048
+ * @satisfies REQ-049
+ * @satisfies REQ-050
  * @satisfies REQ-045
  */
 
@@ -44,6 +51,35 @@ const PROVIDER_FETCH_SEQUENCE = [
   "https://github.com/settings/copilot/features",
   "https://github.com/settings/billing/premium_requests_usage",
 ];
+
+/** @brief Debug API command identifiers exposed by runtime messaging. */
+const DEBUG_API_SUPPORTED_COMMANDS = [
+  "http.get",
+  "parser.run",
+  "state.get",
+  "refresh.run",
+  "logs.get",
+  "logs.clear",
+  "interval.get",
+  "interval.set",
+];
+
+/** @brief Allowed hostnames for debug HTTP retrieval command. */
+const DEBUG_API_ALLOWED_HOSTS = new Set(["claude.ai", "chatgpt.com", "github.com"]);
+
+/** @brief Default debug-body preview cap in characters. */
+const DEBUG_API_DEFAULT_MAX_CHARS = 16000;
+
+/** @brief Absolute debug-body preview cap in characters. */
+const DEBUG_API_MAX_CHARS = 120000;
+
+/** @brief Provider default URLs used by debug parser command. */
+const DEBUG_API_PROVIDER_DEFAULT_URLS = {
+  claude: "https://claude.ai/settings/usage",
+  codex: "https://chatgpt.com/codex/settings/usage",
+  copilot_features: "https://github.com/settings/copilot/features",
+  copilot_premium: "https://github.com/settings/billing/premium_requests_usage",
+};
 
 /** @brief Dedicated logger for background runtime events. */
 const logger = createLogger("background");
@@ -192,6 +228,298 @@ async function _fetchHtml(url) {
   }
 
   return response.text();
+}
+
+/**
+ * @brief Normalize debug-body preview length with hard bounds.
+ * @details Converts caller-provided `max_chars` tokens into bounded integers to
+ * avoid oversized responses in debug API payloads.
+ * Time complexity: O(1).
+ * Space complexity: O(1).
+ * @param {unknown} token Requested max preview characters.
+ * @returns {number} Bounded preview length.
+ * @satisfies CTN-013
+ */
+function _normalizeDebugMaxChars(token) {
+  const parsed = Number(token);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return DEBUG_API_DEFAULT_MAX_CHARS;
+  }
+  return Math.min(DEBUG_API_MAX_CHARS, Math.round(parsed));
+}
+
+/**
+ * @brief Normalize and validate debug URL token.
+ * @details Enforces `https` scheme and allowlisted hosts for debug retrieval
+ * commands to reduce abuse surface.
+ * Time complexity: O(1).
+ * Space complexity: O(1).
+ * @param {unknown} token Candidate URL.
+ * @returns {string} Normalized URL string.
+ * @throws {Error} If URL is invalid, non-HTTPS, or host is not allowed.
+ * @satisfies CTN-012
+ */
+function _normalizeDebugUrl(token) {
+  if (typeof token !== "string" || !token.trim()) {
+    throw new Error("URL must be a non-empty string");
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(token);
+  } catch (_error) {
+    throw new Error("URL is not valid");
+  }
+
+  if (parsed.protocol !== "https:") {
+    throw new Error("URL must use https protocol for debug command");
+  }
+
+  if (!DEBUG_API_ALLOWED_HOSTS.has(parsed.hostname)) {
+    throw new Error(`URL host not allowed for debug command: ${parsed.hostname}`);
+  }
+
+  return parsed.toString();
+}
+
+/**
+ * @brief Convert response headers into bounded JSON-safe object.
+ * @details Serializes at most 30 headers to constrain debug response footprint.
+ * @param {Headers} headers Response headers object.
+ * @returns {Record<string, string>} Serialized headers map.
+ */
+function _serializeHeaders(headers) {
+  const output = {};
+  let count = 0;
+  for (const [key, value] of headers.entries()) {
+    output[key] = value;
+    count += 1;
+    if (count >= 30) {
+      break;
+    }
+  }
+  return output;
+}
+
+/**
+ * @brief Build deterministic HTML probe metadata for parser diagnostics.
+ * @param {string} html Raw HTML text.
+ * @returns {Record<string, unknown>} Probe metadata object.
+ */
+function _buildHtmlProbe(html) {
+  return {
+    html_length: html.length,
+    has_progressbar_role: html.includes("progressbar"),
+    has_next_data: html.includes("__NEXT_DATA__"),
+    script_tag_count: (html.match(/<script\b/gi) || []).length,
+  };
+}
+
+/**
+ * @brief Download one debug URL and capture response metadata.
+ * @param {string} urlToken Debug URL token.
+ * @returns {Promise<Record<string, unknown>>} Download result with full body.
+ * @satisfies REQ-047
+ */
+async function _downloadDebugUrl(urlToken) {
+  const normalizedUrl = _normalizeDebugUrl(urlToken);
+  const response = await fetch(normalizedUrl, {
+    credentials: "include",
+    cache: "no-store",
+    redirect: "follow",
+  });
+  const bodyText = await response.text();
+  return {
+    requested_url: normalizedUrl,
+    final_url: response.url,
+    status: response.status,
+    ok: response.ok,
+    redirected: response.redirected,
+    content_type: response.headers.get("content-type"),
+    headers: _serializeHeaders(response.headers),
+    body_text: bodyText,
+  };
+}
+
+/**
+ * @brief Resolve parser function by debug provider key.
+ * @param {string} provider Provider key token.
+ * @returns {(html: string) => Record<string, unknown>} Parser function.
+ * @throws {Error} If provider key is unsupported.
+ */
+function _resolveDebugParser(provider) {
+  switch (provider) {
+    case "claude":
+      return parseClaudeUsageHtml;
+    case "codex":
+      return parseCodexUsageHtml;
+    case "copilot_features":
+      return parseCopilotFeaturesHtml;
+    case "copilot_premium":
+      return parseCopilotPremiumHtml;
+    default:
+      throw new Error(`Unsupported parser provider: ${provider}`);
+  }
+}
+
+/**
+ * @brief Build summary-safe command args for debug logging.
+ * @details Redacts large inline HTML fields by replacing them with length metadata.
+ * @param {Record<string, unknown>} args Debug command args.
+ * @returns {Record<string, unknown>} Sanitized argument summary.
+ */
+function _summarizeDebugArgs(args) {
+  const summary = { ...args };
+  if (typeof summary.html === "string") {
+    summary.html_chars = summary.html.length;
+    delete summary.html;
+  }
+  if (typeof summary.html_features === "string") {
+    summary.html_features_chars = summary.html_features.length;
+    delete summary.html_features;
+  }
+  if (typeof summary.html_premium === "string") {
+    summary.html_premium_chars = summary.html_premium.length;
+    delete summary.html_premium;
+  }
+  return summary;
+}
+
+/**
+ * @brief Build debug API command catalog payload.
+ * @returns {Record<string, unknown>} Supported command catalog.
+ * @satisfies REQ-046
+ */
+function _describeDebugApi() {
+  return {
+    endpoint: "debug.api.execute",
+    commands: [...DEBUG_API_SUPPORTED_COMMANDS],
+    defaults: {
+      http_get_max_chars: DEBUG_API_DEFAULT_MAX_CHARS,
+      max_allowed_chars: DEBUG_API_MAX_CHARS,
+      parser_default_urls: { ...DEBUG_API_PROVIDER_DEFAULT_URLS },
+    },
+  };
+}
+
+/**
+ * @brief Execute one debug API command.
+ * @details Dispatches debug commands for HTTP retrieval, parser execution, and
+ * standard runtime operations with deterministic structured responses.
+ * @param {string} command Debug command identifier.
+ * @param {Record<string, unknown>} args Debug command arguments.
+ * @returns {Promise<Record<string, unknown>>} Command execution payload.
+ * @throws {Error} If command or arguments are invalid.
+ * @satisfies REQ-047
+ * @satisfies REQ-048
+ * @satisfies REQ-049
+ */
+async function _executeDebugApiCommand(command, args) {
+  switch (command) {
+    case "http.get": {
+      const maxChars = _normalizeDebugMaxChars(args?.max_chars);
+      const download = await _downloadDebugUrl(args?.url);
+      const bodyPreview = download.body_text.slice(0, maxChars);
+      return {
+        command: "http.get",
+        request: {
+          url: download.requested_url,
+          max_chars: maxChars,
+        },
+        response: {
+          final_url: download.final_url,
+          status: download.status,
+          ok: download.ok,
+          redirected: download.redirected,
+          content_type: download.content_type,
+          headers: download.headers,
+          body_length: download.body_text.length,
+          body_preview: bodyPreview,
+          body_truncated: download.body_text.length > bodyPreview.length,
+        },
+      };
+    }
+    case "parser.run": {
+      const provider = String(args?.provider ?? "").trim();
+      if (!provider) {
+        throw new Error("parser.run requires provider argument");
+      }
+
+      if (provider === "copilot_merged") {
+        const featuresHtml = typeof args?.html_features === "string"
+          ? args.html_features
+          : (await _downloadDebugUrl(args?.url_features ?? DEBUG_API_PROVIDER_DEFAULT_URLS.copilot_features)).body_text;
+        const premiumHtml = typeof args?.html_premium === "string"
+          ? args.html_premium
+          : (await _downloadDebugUrl(args?.url_premium ?? DEBUG_API_PROVIDER_DEFAULT_URLS.copilot_premium)).body_text;
+        const mergedPayload = mergeCopilotPayloads(
+          parseCopilotFeaturesHtml(featuresHtml),
+          parseCopilotPremiumHtml(premiumHtml)
+        );
+        return {
+          command: "parser.run",
+          provider: "copilot_merged",
+          html_probe: {
+            features: _buildHtmlProbe(featuresHtml),
+            premium: _buildHtmlProbe(premiumHtml),
+          },
+          parser_payload: mergedPayload,
+        };
+      }
+
+      const parser = _resolveDebugParser(provider);
+      const html = typeof args?.html === "string"
+        ? args.html
+        : (await _downloadDebugUrl(args?.url ?? DEBUG_API_PROVIDER_DEFAULT_URLS[provider])).body_text;
+      return {
+        command: "parser.run",
+        provider,
+        html_probe: _buildHtmlProbe(html),
+        parser_payload: parser(html),
+      };
+    }
+    case "state.get":
+      return {
+        command: "state.get",
+        state: _cloneState(),
+      };
+    case "refresh.run":
+      await _refreshAllProviders("debug_api");
+      return {
+        command: "refresh.run",
+        state: _cloneState(),
+      };
+    case "logs.get":
+      return {
+        command: "logs.get",
+        logs: await readDebugRecords(),
+      };
+    case "logs.clear":
+      await clearDebugRecords();
+      return {
+        command: "logs.clear",
+        cleared: true,
+      };
+    case "interval.get":
+      return {
+        command: "interval.get",
+        refresh_interval_seconds: runtimeState.refresh_interval_seconds,
+      };
+    case "interval.set": {
+      const seconds = Number(args?.seconds);
+      if (!Number.isFinite(seconds) || seconds < 60) {
+        throw new Error("interval.set requires seconds >= 60");
+      }
+      await chrome.storage.local.set({ [INTERVAL_OVERRIDE_STORAGE_KEY]: Math.round(seconds) });
+      await _scheduleRefreshAlarm();
+      return {
+        command: "interval.set",
+        refresh_interval_seconds: runtimeState.refresh_interval_seconds,
+      };
+    }
+    default:
+      throw new Error(`Unsupported debug command: ${command}`);
+  }
 }
 
 /**
@@ -368,6 +696,57 @@ async function _handleMessage(message, sendResponse) {
   if (message.type === "usage.refresh_now") {
     await _refreshAllProviders("manual");
     sendResponse({ ok: true, state: _cloneState() });
+    return;
+  }
+
+  if (message.type === "debug.api.describe") {
+    sendResponse({ ok: true, api: _describeDebugApi() });
+    return;
+  }
+
+  if (message.type === "debug.api.execute") {
+    const command = typeof message.command === "string" ? message.command.trim() : "";
+    if (!command) {
+      sendResponse({ ok: false, error: "debug.api.execute requires command string" });
+      return;
+    }
+
+    const args = message.args && typeof message.args === "object" ? message.args : {};
+    const startedAt = Date.now();
+
+    logger.info("debug-api-command-start", {
+      command,
+      args: _summarizeDebugArgs(args),
+    });
+
+    try {
+      const result = await _executeDebugApiCommand(command, args);
+      const durationMs = Date.now() - startedAt;
+      logger.info("debug-api-command-success", {
+        command,
+        duration_ms: durationMs,
+      });
+      sendResponse({
+        ok: true,
+        command,
+        duration_ms: durationMs,
+        result,
+      });
+    } catch (error) {
+      const durationMs = Date.now() - startedAt;
+      const messageText = String(error?.message ?? error);
+      logger.error("debug-api-command-failure", {
+        command,
+        duration_ms: durationMs,
+        error: messageText,
+      });
+      sendResponse({
+        ok: false,
+        command,
+        duration_ms: durationMs,
+        error: messageText,
+      });
+    }
     return;
   }
 

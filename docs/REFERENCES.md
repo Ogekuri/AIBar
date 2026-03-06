@@ -1758,7 +1758,7 @@ from aibar.providers.base import (
 
 ---
 
-# background.js | JavaScript | 441L | 18 symbols | 2 imports | 23 comments
+# background.js | JavaScript | 820L | 32 symbols | 2 imports | 37 comments
 > Path: `src/aibar/chrome-extension/background.js`
 - @brief Chrome extension service-worker runtime for autonomous provider refresh.
 - @details Executes ordered provider page downloads, parser normalization, state
@@ -1767,7 +1767,14 @@ persistence, and debug instrumentation on a recurring alarm interval.
 - @satisfies PRJ-010
 - @satisfies CTN-008
 - @satisfies CTN-009
+- @satisfies CTN-012
+- @satisfies CTN-013
 - @satisfies REQ-043
+- @satisfies REQ-046
+- @satisfies REQ-047
+- @satisfies REQ-048
+- @satisfies REQ-049
+- @satisfies REQ-050
 - @satisfies REQ-045
 
 ## Imports
@@ -1778,79 +1785,156 @@ import {
 
 ## Definitions
 
-- const `export const REFRESH_INTERVAL_SECONDS = 180;` (L29)
+- const `export const REFRESH_INTERVAL_SECONDS = 180;` (L36)
 - @brief Default hardcoded refresh interval in seconds. */
-- const `const STATE_STORAGE_KEY = "aibar.chrome.state";` (L32)
+- const `const STATE_STORAGE_KEY = "aibar.chrome.state";` (L39)
 - @brief Storage key for normalized runtime state. */
-- const `const INTERVAL_OVERRIDE_STORAGE_KEY = "aibar.chrome.refresh_interval_seconds";` (L35)
+- const `const INTERVAL_OVERRIDE_STORAGE_KEY = "aibar.chrome.refresh_interval_seconds";` (L42)
 - @brief Storage key for optional refresh interval override. */
-- const `const REFRESH_ALARM_NAME = "aibar-refresh";` (L38)
+- const `const REFRESH_ALARM_NAME = "aibar-refresh";` (L45)
 - @brief Alarm name used by service-worker scheduler. */
-- const `const PROVIDER_FETCH_SEQUENCE = [` (L41)
+- const `const PROVIDER_FETCH_SEQUENCE = [` (L48)
 - @brief Fixed provider download sequence required by requirements. */
-### fn `function _emptyProviderState(provider)` (L56-67)
+- const `const DEBUG_API_SUPPORTED_COMMANDS = [` (L56)
+- @brief Debug API command identifiers exposed by runtime messaging. */
+- const `const DEBUG_API_ALLOWED_HOSTS = new Set(["claude.ai", "chatgpt.com", "github.com"]);` (L68)
+- @brief Allowed hostnames for debug HTTP retrieval command. */
+- const `const DEBUG_API_DEFAULT_MAX_CHARS = 16000;` (L71)
+- @brief Default debug-body preview cap in characters. */
+- const `const DEBUG_API_MAX_CHARS = 120000;` (L74)
+- @brief Absolute debug-body preview cap in characters. */
+- const `const DEBUG_API_PROVIDER_DEFAULT_URLS = {` (L77)
+- @brief Provider default URLs used by debug parser command. */
+### fn `function _emptyProviderState(provider)` (L92-103)
 - @brief Build empty provider state object.
 - @param {string} provider Provider identifier.
 - @return s {Record<string, unknown>} Empty provider state.
 
-### fn `function _emptyState()` (L73-87)
+### fn `function _emptyState()` (L109-123)
 - @brief Build empty extension runtime state.
 - @return s {Record<string, unknown>} Empty state snapshot.
 
-### fn `function _cloneState()` (L99-101)
+### fn `function _cloneState()` (L135-137)
 - @brief Deep clone state into message-safe payload.
 - @return s {Record<string, unknown>} Cloned state snapshot.
 
-### fn `async function _loadPersistedState()` (L109-133)
+### fn `async function _loadPersistedState()` (L145-169)
 - @brief Merge persisted state into in-memory runtime state.
 - @details Preserves last successful provider payloads across service-worker restarts
 to satisfy failure fallback requirements.
 - @return s {Promise<void>} Completion promise.
 
-### fn `async function _persistState()` (L139-141)
+### fn `async function _persistState()` (L175-177)
 - @brief Persist current runtime state to extension storage.
 - @return s {Promise<void>} Completion promise.
 
-### fn `async function _getRefreshIntervalSeconds()` (L149-156)
+### fn `async function _getRefreshIntervalSeconds()` (L185-192)
 - @brief Read configured refresh interval with override support.
 - @details Uses hardcoded default REFRESH_INTERVAL_SECONDS and allows optional
 storage override to support field debugging with shorter/longer cycles.
 - @return s {Promise<number>} Effective interval in seconds.
 
-### fn `async function _scheduleRefreshAlarm()` (L162-175)
+### fn `async function _scheduleRefreshAlarm()` (L198-211)
 - @brief Configure periodic refresh alarm.
 - @return s {Promise<void>} Completion promise.
 
-### fn `async function _fetchHtml(url)` (L183-195)
+### fn `async function _fetchHtml(url)` (L219-231)
 - @brief Download one provider page using authenticated extension fetch.
 - @param {string} url Target page URL.
 - @return s {Promise<string>} Downloaded HTML content.
 - @throws {Error} When HTTP status is not OK.
 
-### fn `function _applyProviderSuccess(provider, payload)` (L203-210)
+### fn `function _normalizeDebugMaxChars(token)` (L243-249)
+- @brief Normalize debug-body preview length with hard bounds.
+- @details Converts caller-provided `max_chars` tokens into bounded integers to
+avoid oversized responses in debug API payloads.
+Time complexity: O(1).
+Space complexity: O(1).
+- @param {unknown} token Requested max preview characters.
+- @return s {number} Bounded preview length.
+- @satisfies CTN-013
+
+### fn `function _normalizeDebugUrl(token)` (L262-283)
+- @brief Normalize and validate debug URL token.
+- @details Enforces `https` scheme and allowlisted hosts for debug retrieval
+commands to reduce abuse surface.
+Time complexity: O(1).
+Space complexity: O(1).
+- @param {unknown} token Candidate URL.
+- @return s {string} Normalized URL string.
+- @throws {Error} If URL is invalid, non-HTTPS, or host is not allowed.
+- @satisfies CTN-012
+
+### fn `function _serializeHeaders(headers)` (L291-302)
+- @brief Convert response headers into bounded JSON-safe object.
+- @details Serializes at most 30 headers to constrain debug response footprint.
+- @param {Headers} headers Response headers object.
+- @return s {Record<string, string>} Serialized headers map.
+
+### fn `function _buildHtmlProbe(html)` (L309-316)
+- @brief Build deterministic HTML probe metadata for parser diagnostics.
+- @param {string} html Raw HTML text.
+- @return s {Record<string, unknown>} Probe metadata object.
+
+### fn `async function _downloadDebugUrl(urlToken)` (L324-342)
+- @brief Download one debug URL and capture response metadata.
+- @param {string} urlToken Debug URL token.
+- @return s {Promise<Record<string, unknown>>} Download result with full body.
+- @satisfies REQ-047
+
+### fn `function _resolveDebugParser(provider)` (L350-363)
+- @brief Resolve parser function by debug provider key.
+- @param {string} provider Provider key token.
+- @return s {(html: string) => Record<string, unknown>} Parser function.
+- @throws {Error} If provider key is unsupported.
+
+### fn `function _summarizeDebugArgs(args)` (L371-386)
+- @brief Build summary-safe command args for debug logging.
+- @details Redacts large inline HTML fields by replacing them with length metadata.
+- @param {Record<string, unknown>} args Debug command args.
+- @return s {Record<string, unknown>} Sanitized argument summary.
+
+### fn `function _describeDebugApi()` (L393-403)
+- @brief Build debug API command catalog payload.
+- @return s {Record<string, unknown>} Supported command catalog.
+- @satisfies REQ-046
+
+### fn `async function _executeDebugApiCommand(command, args)` (L417-523)
+- @brief Execute one debug API command.
+- @details Dispatches debug commands for HTTP retrieval, parser execution, and
+standard runtime operations with deterministic structured responses.
+- @param {string} command Debug command identifier.
+- @param {Record<string, unknown>} args Debug command arguments.
+- @return s {Promise<Record<string, unknown>>} Command execution payload.
+- @throws {Error} If command or arguments are invalid.
+- @satisfies REQ-047
+- @satisfies REQ-048
+- @satisfies REQ-049
+
+### fn `function _applyProviderSuccess(provider, payload)` (L531-538)
 - @brief Apply successful provider refresh payload.
 - @param {string} provider Provider key.
 - @param {Record<string, unknown>} payload Parsed provider payload.
 - @return s {void}
 
-### fn `function _applyProviderFailure(provider, error)` (L218-224)
+### fn `function _applyProviderFailure(provider, error)` (L546-552)
 - @brief Apply provider refresh failure while preserving last successful windows.
 - @param {string} provider Provider key.
 - @param {Error} error Failure object.
 - @return s {void}
 
-### fn `async function _refreshAllProviders(trigger)` (L232-336)
+### fn `async function _refreshAllProviders(trigger)` (L560-664)
 - @brief Execute one ordered refresh cycle across all provider pages.
 - @details Preserves successful state on errors and emits debug logs for each step.
 - @param {string} trigger Refresh trigger source.
 - @return s {Promise<void>} Completion promise.
 
-### fn `async function _initializeRuntime(trigger)` (L343-347)
+### fn `async function _initializeRuntime(trigger)` (L671-675)
 - @brief Initialize scheduler and persisted state for service-worker lifecycle.
 - @param {string} trigger Initialization trigger label.
 - @return s {Promise<void>} Completion promise.
 
-### fn `async function _handleMessage(message, sendResponse)` (L357-405)
+### fn `async function _handleMessage(message, sendResponse)` (L685-784)
 - @brief Handle incoming runtime messages from popup/UI contexts.
 - @details Supports state retrieval, manual refresh, debug log operations, and
 refresh-interval override updates.
@@ -1861,24 +1945,38 @@ refresh-interval override updates.
 ## Symbol Index
 |Symbol|Kind|Vis|Lines|Sig|
 |---|---|---|---|---|
-|`REFRESH_INTERVAL_SECONDS`|const||29||
-|`STATE_STORAGE_KEY`|const||32||
-|`INTERVAL_OVERRIDE_STORAGE_KEY`|const||35||
-|`REFRESH_ALARM_NAME`|const||38||
-|`PROVIDER_FETCH_SEQUENCE`|const||41||
-|`_emptyProviderState`|fn||56-67|function _emptyProviderState(provider)|
-|`_emptyState`|fn||73-87|function _emptyState()|
-|`_cloneState`|fn||99-101|function _cloneState()|
-|`_loadPersistedState`|fn||109-133|async function _loadPersistedState()|
-|`_persistState`|fn||139-141|async function _persistState()|
-|`_getRefreshIntervalSeconds`|fn||149-156|async function _getRefreshIntervalSeconds()|
-|`_scheduleRefreshAlarm`|fn||162-175|async function _scheduleRefreshAlarm()|
-|`_fetchHtml`|fn||183-195|async function _fetchHtml(url)|
-|`_applyProviderSuccess`|fn||203-210|function _applyProviderSuccess(provider, payload)|
-|`_applyProviderFailure`|fn||218-224|function _applyProviderFailure(provider, error)|
-|`_refreshAllProviders`|fn||232-336|async function _refreshAllProviders(trigger)|
-|`_initializeRuntime`|fn||343-347|async function _initializeRuntime(trigger)|
-|`_handleMessage`|fn||357-405|async function _handleMessage(message, sendResponse)|
+|`REFRESH_INTERVAL_SECONDS`|const||36||
+|`STATE_STORAGE_KEY`|const||39||
+|`INTERVAL_OVERRIDE_STORAGE_KEY`|const||42||
+|`REFRESH_ALARM_NAME`|const||45||
+|`PROVIDER_FETCH_SEQUENCE`|const||48||
+|`DEBUG_API_SUPPORTED_COMMANDS`|const||56||
+|`DEBUG_API_ALLOWED_HOSTS`|const||68||
+|`DEBUG_API_DEFAULT_MAX_CHARS`|const||71||
+|`DEBUG_API_MAX_CHARS`|const||74||
+|`DEBUG_API_PROVIDER_DEFAULT_URLS`|const||77||
+|`_emptyProviderState`|fn||92-103|function _emptyProviderState(provider)|
+|`_emptyState`|fn||109-123|function _emptyState()|
+|`_cloneState`|fn||135-137|function _cloneState()|
+|`_loadPersistedState`|fn||145-169|async function _loadPersistedState()|
+|`_persistState`|fn||175-177|async function _persistState()|
+|`_getRefreshIntervalSeconds`|fn||185-192|async function _getRefreshIntervalSeconds()|
+|`_scheduleRefreshAlarm`|fn||198-211|async function _scheduleRefreshAlarm()|
+|`_fetchHtml`|fn||219-231|async function _fetchHtml(url)|
+|`_normalizeDebugMaxChars`|fn||243-249|function _normalizeDebugMaxChars(token)|
+|`_normalizeDebugUrl`|fn||262-283|function _normalizeDebugUrl(token)|
+|`_serializeHeaders`|fn||291-302|function _serializeHeaders(headers)|
+|`_buildHtmlProbe`|fn||309-316|function _buildHtmlProbe(html)|
+|`_downloadDebugUrl`|fn||324-342|async function _downloadDebugUrl(urlToken)|
+|`_resolveDebugParser`|fn||350-363|function _resolveDebugParser(provider)|
+|`_summarizeDebugArgs`|fn||371-386|function _summarizeDebugArgs(args)|
+|`_describeDebugApi`|fn||393-403|function _describeDebugApi()|
+|`_executeDebugApiCommand`|fn||417-523|async function _executeDebugApiCommand(command, args)|
+|`_applyProviderSuccess`|fn||531-538|function _applyProviderSuccess(provider, payload)|
+|`_applyProviderFailure`|fn||546-552|function _applyProviderFailure(provider, error)|
+|`_refreshAllProviders`|fn||560-664|async function _refreshAllProviders(trigger)|
+|`_initializeRuntime`|fn||671-675|async function _initializeRuntime(trigger)|
+|`_handleMessage`|fn||685-784|async function _handleMessage(message, sendResponse)|
 
 
 ---

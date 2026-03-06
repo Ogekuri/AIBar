@@ -123,6 +123,15 @@
     - `clearDebugRecords(...)`: debug log reset [`src/aibar/chrome-extension/debug.js`]
     - `buildDebugBundle(...)`: debug export payload generation [`src/aibar/chrome-extension/debug.js`]
     - `_scheduleRefreshAlarm(...)`: interval override reconfiguration [`src/aibar/chrome-extension/background.js`]
+    - `_describeDebugApi(...)`: debug command catalog response [`src/aibar/chrome-extension/background.js`]
+    - `_executeDebugApiCommand(...)`: debug command dispatcher [`src/aibar/chrome-extension/background.js`]
+      - `_normalizeDebugMaxChars(...)`: debug payload-size normalization [`src/aibar/chrome-extension/background.js`]
+      - `_downloadDebugUrl(...)`: validated HTTPS retrieval for debug command [`src/aibar/chrome-extension/background.js`]
+        - `_normalizeDebugUrl(...)`: host/scheme allowlist validation [`src/aibar/chrome-extension/background.js`]
+        - `_serializeHeaders(...)`: response-header projection [`src/aibar/chrome-extension/background.js`]
+      - `_resolveDebugParser(...)`: parser lookup by provider token [`src/aibar/chrome-extension/background.js`]
+      - `_buildHtmlProbe(...)`: HTML probe diagnostics builder [`src/aibar/chrome-extension/background.js`]
+      - `_summarizeDebugArgs(...)`: command-argument logging sanitizer [`src/aibar/chrome-extension/background.js`]
 - `External Boundaries`
   - Chrome extension runtime APIs (`chrome.runtime`, `chrome.alarms`, `chrome.storage.local`).
   - HTTPS page downloads for Claude, ChatGPT Codex, and GitHub Copilot settings pages.
@@ -424,8 +433,8 @@
   - `destination: PROC:chrome-ext`
   - `direction: request-response`
   - `mechanism: chrome.runtime.sendMessage RPC`
-  - `endpoint_or_channel: message types usage.get_state, usage.refresh_now, debug.export_bundle, debug.clear_logs, debug.set_refresh_interval`
-  - `payload_data_shape: JSON object with message type discriminator and optional interval/debug parameters`
+  - `endpoint_or_channel: message types usage.get_state, usage.refresh_now, debug.export_bundle, debug.clear_logs, debug.set_refresh_interval, debug.api.describe, debug.api.execute`
+  - `payload_data_shape: JSON object with message type discriminator and optional command+args envelope for debug API command execution`
   - `declaration_files: src/aibar/chrome-extension/popup.js, src/aibar/chrome-extension/background.js`
 
 - `id: EDGE-006`
