@@ -3,7 +3,7 @@
  * @brief Localization-independent HTML parser primitives for AIBar Chrome extension.
  * @details Extracts quota and progress metrics from provider usage pages by using
  * DOM semantics (`role=progressbar`, numeric attributes, `datetime`, embedded JSON)
- * instead of localized visible labels.
+ * plus script bootstrap payload extraction, instead of localized visible labels.
  * @satisfies CTN-010
  * @satisfies REQ-040
  * @satisfies REQ-041
@@ -11,7 +11,7 @@
  */
 
 /** @brief Parser semantic version for debug payloads. */
-export const PARSER_VERSION = "2026.03.06";
+export const PARSER_VERSION = "2026.03.06.1";
 
 /** @brief Token regex for window hints. */
 const WINDOW_HINT_REGEX = /\b(5h|7d|30d)\b/i;
@@ -21,6 +21,19 @@ const FRACTION_REGEX = /([0-9][0-9\s.,]*)\s*\/\s*([0-9][0-9\s.,]*)/g;
 
 /** @brief Token regex for percentage values. */
 const PERCENT_REGEX = /([0-9][0-9\s.,]*)\s*%/g;
+
+/** @brief ISO datetime token regex for inline/script extraction. */
+const ISO_DATETIME_REGEX = /\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})\b/g;
+
+/** @brief Bootstrap variable names that frequently carry usage payloads. */
+const JSON_BOOTSTRAP_KEYS = [
+  "__NEXT_DATA__",
+  "__remixContext",
+  "__NUXT__",
+  "__INITIAL_STATE__",
+  "INITIAL_STATE",
+  "__APOLLO_STATE__",
+];
 
 /**
  * @brief Parse localized numeric token into a finite number.
@@ -105,8 +118,21 @@ function _extractAttribute(tagHtml, attributeName) {
  * @returns {string | null} Window hint token (`5h`, `7d`, `30d`) or null.
  */
 function _extractWindowHint(context) {
-  const match = context.match(WINDOW_HINT_REGEX);
-  return match ? match[1].toLowerCase() : null;
+  const source = String(context ?? "");
+  const compactMatch = source.match(WINDOW_HINT_REGEX);
+  if (compactMatch) {
+    return compactMatch[1].toLowerCase();
+  }
+  if (/\b(?:5\s*(?:h|hr|hour|hours)|hourly)\b/i.test(source)) {
+    return "5h";
+  }
+  if (/\b(?:7\s*(?:d|day|days)|weekly|week)\b/i.test(source)) {
+    return "7d";
+  }
+  if (/\b(?:30\s*(?:d|day|days)|monthly|month)\b/i.test(source)) {
+    return "30d";
+  }
+  return null;
 }
 
 /**
@@ -124,6 +150,37 @@ function _extractPlainText(html) {
     .replace(/&amp;/g, "&")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/**
+ * @brief Extract script-tag entries with full tag and body slices.
+ * @param {string} html Raw HTML.
+ * @returns {Array<Record<string, string>>} Script entries.
+ */
+function _extractScriptEntries(html) {
+  const entries = [];
+  const scriptRegex = /<script([^>]*)>([\s\S]*?)<\/script>/gi;
+  let match;
+  while ((match = scriptRegex.exec(html)) !== null) {
+    entries.push({
+      tag_attributes: match[1] ?? "",
+      body: (match[2] ?? "").trim(),
+      full_tag: match[0] ?? "",
+    });
+  }
+  return entries;
+}
+
+/**
+ * @brief Join all script bodies into one diagnostic text stream.
+ * @param {string} html Raw HTML.
+ * @returns {string} Concatenated script text.
+ */
+function _extractScriptText(html) {
+  return _extractScriptEntries(html)
+    .map((entry) => entry.body)
+    .filter((entry) => Boolean(entry))
+    .join(" ");
 }
 
 /**
@@ -172,17 +229,17 @@ function _extractProgressMetrics(html) {
 }
 
 /**
- * @brief Extract numeric fraction candidates from visible text stream.
+ * @brief Extract numeric fraction candidates from one generic text stream.
  * @details Captures raw numeric pairs (`A/B`) that may encode used/limit or
  * remaining/limit values independent from natural-language labels.
- * @param {string} html Raw HTML.
+ * @param {string} text Generic text stream.
  * @returns {Array<Record<string, number>>} Ordered fraction records.
  */
-function _extractFractionCandidates(html) {
-  const plainText = _extractPlainText(html);
+function _extractFractionCandidatesFromText(text) {
   const fractions = [];
+  FRACTION_REGEX.lastIndex = 0;
   let match;
-  while ((match = FRACTION_REGEX.exec(plainText)) !== null) {
+  while ((match = FRACTION_REGEX.exec(text)) !== null) {
     const first = parseLocalizedNumber(match[1]);
     const second = parseLocalizedNumber(match[2]);
     if (first !== null && second !== null && second > 0) {
@@ -196,15 +253,15 @@ function _extractFractionCandidates(html) {
 }
 
 /**
- * @brief Extract percentage literals from visible text stream.
- * @param {string} html Raw HTML.
+ * @brief Extract percentage literals from one generic text stream.
+ * @param {string} text Generic text stream.
  * @returns {Array<number>} Ordered percentage numbers.
  */
-function _extractPercentCandidates(html) {
-  const plainText = _extractPlainText(html);
+function _extractPercentCandidatesFromText(text) {
   const percentages = [];
+  PERCENT_REGEX.lastIndex = 0;
   let match;
-  while ((match = PERCENT_REGEX.exec(plainText)) !== null) {
+  while ((match = PERCENT_REGEX.exec(text)) !== null) {
     const value = parseLocalizedNumber(match[1]);
     if (value !== null) {
       percentages.push(_clamp(value, 0, 100));
@@ -214,8 +271,69 @@ function _extractPercentCandidates(html) {
 }
 
 /**
- * @brief Extract ISO-like datetime tokens from markup.
- * @details Reads `datetime="..."` attributes and optional ISO literals in text.
+ * @brief Extract ISO-like datetime tokens from one generic text stream.
+ * @param {string} text Generic text stream.
+ * @returns {Array<string>} Ordered datetime candidates in ISO format.
+ */
+function _extractDatetimeCandidatesFromText(text) {
+  const datetimes = [];
+  ISO_DATETIME_REGEX.lastIndex = 0;
+  let match;
+  while ((match = ISO_DATETIME_REGEX.exec(text)) !== null) {
+    const parsed = new Date(match[0]);
+    if (!Number.isNaN(parsed.getTime())) {
+      datetimes.push(parsed.toISOString());
+    }
+  }
+  return datetimes;
+}
+
+/**
+ * @brief Deduplicate array values while preserving original ordering.
+ * @template T
+ * @param {Array<T>} values Candidate values.
+ * @param {(entry: T) => string} keySelector Unique-key selector.
+ * @returns {Array<T>} Deduplicated values.
+ */
+function _dedupeByKey(values, keySelector) {
+  const output = [];
+  const seen = new Set();
+  for (const value of values) {
+    const key = keySelector(value);
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    output.push(value);
+  }
+  return output;
+}
+
+/**
+ * @brief Extract numeric fraction candidates from visible and script text streams.
+ * @param {string} html Raw HTML.
+ * @returns {Array<Record<string, number>>} Ordered fraction records.
+ */
+function _extractFractionCandidates(html) {
+  const visible = _extractFractionCandidatesFromText(_extractPlainText(html));
+  const script = _extractFractionCandidatesFromText(_extractScriptText(html));
+  return _dedupeByKey([...visible, ...script], (entry) => `${entry.first}|${entry.second}`);
+}
+
+/**
+ * @brief Extract percentage literals from visible and script text streams.
+ * @param {string} html Raw HTML.
+ * @returns {Array<number>} Ordered percentage numbers.
+ */
+function _extractPercentCandidates(html) {
+  const visible = _extractPercentCandidatesFromText(_extractPlainText(html));
+  const script = _extractPercentCandidatesFromText(_extractScriptText(html));
+  return _dedupeByKey([...visible, ...script], (entry) => String(entry));
+}
+
+/**
+ * @brief Extract ISO-like datetime tokens from markup and script content.
+ * @details Reads `datetime="..."` attributes and optional ISO literals in script.
  * @param {string} html Raw HTML.
  * @returns {Array<string>} Ordered datetime candidates in ISO format when parseable.
  */
@@ -230,38 +348,160 @@ function _extractDatetimeCandidates(html) {
       datetimes.push(parsed.toISOString());
     }
   }
-  return datetimes;
+  const scriptDatetimes = _extractDatetimeCandidatesFromText(_extractScriptText(html));
+  return _dedupeByKey([...datetimes, ...scriptDatetimes], (entry) => entry);
+}
+
+/**
+ * @brief Extract balanced JSON slice starting at object/array token.
+ * @param {string} source Source text.
+ * @param {number} startIndex Start index for `{` or `[` token.
+ * @returns {string | null} Balanced JSON slice or null.
+ */
+function _extractBalancedJsonSlice(source, startIndex) {
+  const opener = source[startIndex];
+  const closer = opener === "{" ? "}" : opener === "[" ? "]" : null;
+  if (!closer) {
+    return null;
+  }
+
+  let depth = 0;
+  let inString = false;
+  let quote = "";
+  let escaped = false;
+
+  for (let index = startIndex; index < source.length; index += 1) {
+    const token = source[index];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (token === "\\") {
+        escaped = true;
+        continue;
+      }
+      if (token === quote) {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (token === "\"" || token === "'") {
+      inString = true;
+      quote = token;
+      continue;
+    }
+
+    if (token === opener) {
+      depth += 1;
+      continue;
+    }
+    if (token === closer) {
+      depth -= 1;
+      if (depth === 0) {
+        return source.slice(startIndex, index + 1);
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * @brief Decode quoted JSON payload and parse into object when possible.
+ * @param {string} quotedToken Quoted JS/JSON token.
+ * @returns {unknown | null} Parsed payload or null.
+ */
+function _decodeQuotedJsonPayload(quotedToken) {
+  try {
+    const decoded = JSON.parse(quotedToken);
+    if (typeof decoded === "string") {
+      const compact = decoded.trim();
+      if (compact.startsWith("{") || compact.startsWith("[")) {
+        return JSON.parse(compact);
+      }
+    }
+  } catch (_error) {
+    // Ignore malformed quoted payloads.
+  }
+  return null;
+}
+
+/**
+ * @brief Extract bootstrap JSON objects from script assignment statements.
+ * @param {string} scriptBody Script body text.
+ * @returns {Array<unknown>} Parsed JSON roots.
+ */
+function _extractBootstrapJsonFromScriptBody(scriptBody) {
+  const objects = [];
+  const assignmentRegex = new RegExp(
+    `(?:window\\.)?(?:${JSON_BOOTSTRAP_KEYS.join("|")})\\s*=`,
+    "gi"
+  );
+  let match;
+  while ((match = assignmentRegex.exec(scriptBody)) !== null) {
+    const tokenStart = assignmentRegex.lastIndex;
+    const trailing = scriptBody.slice(tokenStart).trimStart();
+
+    const parseMatch = trailing.match(/^JSON\.parse\(\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')\s*\)/);
+    if (parseMatch) {
+      const parsed = _decodeQuotedJsonPayload(parseMatch[1]);
+      if (parsed !== null) {
+        objects.push(parsed);
+      }
+      continue;
+    }
+
+    const firstObjectIndex = scriptBody.indexOf("{", tokenStart);
+    const firstArrayIndex = scriptBody.indexOf("[", tokenStart);
+    const candidates = [firstObjectIndex, firstArrayIndex].filter((value) => value >= 0);
+    const jsonStart = candidates.length > 0 ? Math.min(...candidates) : -1;
+    if (jsonStart < 0) {
+      continue;
+    }
+    const jsonSlice = _extractBalancedJsonSlice(scriptBody, jsonStart);
+    if (!jsonSlice) {
+      continue;
+    }
+    try {
+      objects.push(JSON.parse(jsonSlice));
+    } catch (_error) {
+      // Ignore malformed bootstrap objects.
+    }
+  }
+
+  return objects;
 }
 
 /**
  * @brief Collect embedded JSON payloads from script tags.
  * @details Parses `application/json`, `application/ld+json`, and `__NEXT_DATA__`
- * scripts into objects for language-agnostic metric extraction.
+ * scripts plus bootstrap assignment payloads into objects for language-agnostic
+ * metric extraction.
  * @param {string} html Raw HTML.
  * @returns {Array<unknown>} Parsed JSON roots.
  */
 function _extractEmbeddedJsonObjects(html) {
   const objects = [];
-  const scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
-  let match;
-  while ((match = scriptRegex.exec(html)) !== null) {
-    const scriptTag = match[0];
-    const scriptBody = (match[1] ?? "").trim();
+  for (const scriptEntry of _extractScriptEntries(html)) {
+    const scriptTag = scriptEntry.full_tag;
+    const scriptBody = scriptEntry.body;
     if (!scriptBody) {
       continue;
     }
 
     const isJsonType = /type\s*=\s*(?:"application\/(?:ld\+)?json"|'application\/(?:ld\+)?json')/i.test(scriptTag);
     const isNextData = /id\s*=\s*(?:"__NEXT_DATA__"|'__NEXT_DATA__')/i.test(scriptTag);
-    if (!isJsonType && !isNextData) {
-      continue;
+    if (isJsonType || isNextData) {
+      try {
+        objects.push(JSON.parse(scriptBody));
+      } catch (_error) {
+        // Skip malformed script payloads.
+      }
     }
 
-    try {
-      objects.push(JSON.parse(scriptBody));
-    } catch (_error) {
-      // Skip malformed script payloads.
-    }
+    objects.push(..._extractBootstrapJsonFromScriptBody(scriptBody));
   }
   return objects;
 }
@@ -348,15 +588,12 @@ function _extractJsonMetricCandidates(root) {
     const resetAt = _pickDatetimeByKey(obj, [/reset/i, /renew/i, /window_end/i, /expires/i]);
 
     let windowHint = null;
-    for (const value of Object.values(obj)) {
-      if (typeof value !== "string") {
-        continue;
-      }
-      const hinted = _extractWindowHint(value);
-      if (hinted) {
-        windowHint = hinted;
-        break;
-      }
+    const windowHintCandidateText = Object.entries(obj)
+      .flatMap(([key, value]) => [key, typeof value === "string" ? value : ""])
+      .join(" ");
+    const hinted = _extractWindowHint(windowHintCandidateText);
+    if (hinted) {
+      windowHint = hinted;
     }
 
     if (
@@ -386,18 +623,62 @@ function _extractJsonMetricCandidates(root) {
 }
 
 /**
- * @brief Select one best-matching candidate by window hint or ordered fallback.
+ * @brief Compute normalized candidate score for window assignment.
+ * @param {Record<string, unknown>} candidate Candidate payload.
+ * @param {string} windowKey Target window key.
+ * @returns {number} Descending score; negative values indicate poor fit.
+ */
+function _candidateScore(candidate, windowKey) {
+  let score = 0;
+  const hasUsage = parseLocalizedNumber(candidate?.usage_percent) !== null;
+  const hasLimit = parseLocalizedNumber(candidate?.limit) !== null;
+  const hasRemaining = parseLocalizedNumber(candidate?.remaining) !== null;
+  const hasUsed = parseLocalizedNumber(candidate?.used) !== null;
+  const hasReset = typeof candidate?.reset_at === "string";
+
+  if (candidate?.window_hint === windowKey) {
+    score += 4;
+  }
+  if (hasUsage) {
+    score += 3;
+  }
+  if (hasLimit) {
+    score += 2;
+  }
+  if (hasRemaining || hasUsed) {
+    score += 2;
+  }
+  if (hasReset) {
+    score += 1;
+  }
+  if (!hasUsage && !hasLimit && !hasRemaining && !hasUsed) {
+    score -= 5;
+  }
+
+  return score;
+}
+
+/**
+ * @brief Select one best-matching candidate by score and index proximity.
  * @param {Array<Record<string, unknown>>} candidates Candidate list.
  * @param {string} windowKey Target window key.
  * @param {number} index Ordered fallback index.
  * @returns {Record<string, unknown> | null} Selected candidate.
  */
 function _pickCandidate(candidates, windowKey, index) {
-  const hinted = candidates.find((item) => item.window_hint === windowKey);
-  if (hinted) {
-    return hinted;
+  const ranked = candidates
+    .map((item, itemIndex) => ({
+      item,
+      score: _candidateScore(item, windowKey),
+      distance: Math.abs(itemIndex - index),
+    }))
+    .sort((left, right) => right.score - left.score || left.distance - right.distance);
+
+  const best = ranked[0];
+  if (!best || best.score < 2) {
+    return null;
   }
-  return candidates[index] ?? null;
+  return best.item;
 }
 
 /**
@@ -463,8 +744,7 @@ function _buildWindows(
   windowKeys.forEach((windowKey, index) => {
     const jsonCandidate = _pickCandidate(jsonCandidates, windowKey, index);
     const progressCandidate = _pickCandidate(progressCandidates, windowKey, index);
-
-    const usagePercent = _clamp(
+    const usagePercentFromSignals = _clamp(
       parseLocalizedNumber(jsonCandidate?.usage_percent) ??
         parseLocalizedNumber(progressCandidate?.usage_percent) ??
         parseLocalizedNumber(percentCandidates[index] ?? null),
@@ -473,26 +753,46 @@ function _buildWindows(
     );
 
     const quotaFromFraction = fractionCandidates[index]
-      ? _inferQuotaFromFraction(fractionCandidates[index], usagePercent)
+      ? _inferQuotaFromFraction(fractionCandidates[index], usagePercentFromSignals)
       : { remaining: null, limit: null };
 
-    const limit =
-      _clamp(parseLocalizedNumber(jsonCandidate?.limit), 0, Number.MAX_SAFE_INTEGER) ??
-      quotaFromFraction.limit;
-
-    let remaining =
-      _clamp(parseLocalizedNumber(jsonCandidate?.remaining), 0, Number.MAX_SAFE_INTEGER) ??
-      quotaFromFraction.remaining;
+    const limit = _clamp(
+      parseLocalizedNumber(jsonCandidate?.limit) ?? quotaFromFraction.limit,
+      0,
+      Number.MAX_SAFE_INTEGER
+    );
 
     const used = _clamp(parseLocalizedNumber(jsonCandidate?.used), 0, Number.MAX_SAFE_INTEGER);
+
+    let remaining = _clamp(
+      parseLocalizedNumber(jsonCandidate?.remaining) ?? quotaFromFraction.remaining,
+      0,
+      Number.MAX_SAFE_INTEGER
+    );
     if (remaining === null && limit !== null && used !== null) {
       remaining = _clamp(limit - used, 0, limit);
     }
 
+    let usagePercent = usagePercentFromSignals;
+    if (usagePercent === null && limit !== null && used !== null && limit > 0) {
+      usagePercent = _clamp((used / limit) * 100, 0, 100);
+    }
+    if (usagePercent === null && limit !== null && remaining !== null && limit > 0) {
+      usagePercent = _clamp(((limit - remaining) / limit) * 100, 0, 100);
+    }
+
+    if (remaining === null && limit !== null && usagePercent !== null) {
+      remaining = _clamp(limit * (1 - usagePercent / 100), 0, limit);
+    }
+
+    const hasQuotaOrUsageSignal =
+      usagePercent !== null || limit !== null || remaining !== null || used !== null;
+
+    const resetAtCandidate =
+      typeof jsonCandidate?.reset_at === "string" ? jsonCandidate.reset_at : null;
     const resetAt =
-      (typeof jsonCandidate?.reset_at === "string" ? jsonCandidate.reset_at : null) ??
-      datetimeCandidates[index] ??
-      null;
+      resetAtCandidate ??
+      (hasQuotaOrUsageSignal ? datetimeCandidates[index] ?? null : null);
 
     windows[windowKey] = {
       usage_percent: usagePercent,
@@ -545,6 +845,66 @@ function _buildProviderPayload(provider, windows, signals, sourcePages) {
         datetimes: Array.isArray(signals.datetimes) ? signals.datetimes.length : 0,
         json_candidates: Array.isArray(signals.json_candidates) ? signals.json_candidates.length : 0,
       },
+    },
+  };
+}
+
+/**
+ * @brief Determine whether payload contains usable quota/usage metrics.
+ * @details Rejects payloads that contain only reset timestamps without
+ * quota/progress numbers to avoid false-positive parser success states.
+ * @param {Record<string, unknown> | null | undefined} payload Parsed payload.
+ * @returns {boolean} True when at least one window has quota or usage metrics.
+ */
+export function providerPayloadHasUsableMetrics(payload) {
+  const windows = payload?.windows;
+  if (!windows || typeof windows !== "object") {
+    return false;
+  }
+
+  return Object.values(windows).some((windowData) => {
+    const usage = parseLocalizedNumber(windowData?.usage_percent);
+    const remaining = parseLocalizedNumber(windowData?.remaining);
+    const limit = parseLocalizedNumber(windowData?.limit);
+    return usage !== null || remaining !== null || limit !== null;
+  });
+}
+
+/**
+ * @brief Build compact signal sample payload for debug API responses.
+ * @param {Array<unknown>} values Candidate values.
+ * @param {number} maxItems Maximum number of sample entries.
+ * @returns {Array<unknown>} Bounded sample array.
+ */
+function _sample(values, maxItems) {
+  return values.slice(0, maxItems);
+}
+
+/**
+ * @brief Extract parser signal counts and bounded samples for diagnostics.
+ * @param {string} html Raw HTML page source.
+ * @returns {Record<string, unknown>} Signal diagnostics.
+ */
+export function extractSignalDiagnostics(html) {
+  const signals = _extractSignals(html);
+  return {
+    parser_version: PARSER_VERSION,
+    signal_counts: {
+      progress: signals.progress.length,
+      fractions: signals.fractions.length,
+      percentages: signals.percentages.length,
+      datetimes: signals.datetimes.length,
+      json_candidates: signals.json_candidates.length,
+    },
+    signal_samples: {
+      progress: _sample(signals.progress, 3),
+      fractions: _sample(signals.fractions, 3),
+      percentages: _sample(signals.percentages, 5),
+      datetimes: _sample(signals.datetimes, 3),
+      json_candidate_window_hints: _sample(
+        signals.json_candidates.map((candidate) => candidate.window_hint ?? null),
+        5
+      ),
     },
   };
 }

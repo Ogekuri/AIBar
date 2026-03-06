@@ -49,3 +49,16 @@ def test_background_failure_path_keeps_previous_windows_data() -> None:
     spread_idx = source.index("...runtimeState.providers[provider]", apply_failure_idx)
     error_idx = source.index("error: String(error?.message ?? error)", apply_failure_idx)
     assert spread_idx < error_idx
+
+
+def test_background_marks_parser_empty_payload_as_refresh_failure() -> None:
+    """
+    @brief Verify parser-empty payloads are treated as failures, not successes.
+    @satisfies REQ-045
+    @satisfies TST-017
+    """
+    source = BACKGROUND_PATH.read_text(encoding="utf-8")
+    assert "function _assertProviderPayloadUsable(provider, payload)" in source
+    assert "Parser produced no usable" in source
+    assert "_assertProviderPayloadUsable(\"claude\", claudePayload);" in source
+    assert "_assertProviderPayloadUsable(\"codex\", codexPayload);" in source

@@ -37,6 +37,7 @@ def test_debug_api_command_catalog_includes_http_parser_and_standard_commands() 
     assert "const DEBUG_API_SUPPORTED_COMMANDS = [" in source
     assert '"http.get"' in source
     assert '"parser.run"' in source
+    assert '"provider.diagnose"' in source
     assert '"state.get"' in source
     assert '"refresh.run"' in source
     assert '"logs.get"' in source
@@ -67,8 +68,11 @@ def test_debug_http_command_returns_bounded_body_preview_metadata() -> None:
     assert "const DEBUG_API_DEFAULT_MAX_CHARS =" in source
     assert "const DEBUG_API_MAX_CHARS =" in source
     assert "body_preview" in source
+    assert "body_preview_tail" in source
+    assert "body_sha256" in source
     assert "body_truncated" in source
     assert "body_length" in source
+    assert "html_probe" in source
 
 
 def test_debug_parser_command_dispatch_maps_provider_parsers() -> None:
@@ -84,7 +88,23 @@ def test_debug_parser_command_dispatch_maps_provider_parsers() -> None:
     assert "case \"copilot_premium\":" in source
     assert "provider === \"copilot_merged\"" in source
     assert "html_probe" in source
+    assert "parser_signal_diagnostics" in source
     assert "parser_payload" in source
+    assert "payload_quality" in source
+
+
+def test_debug_provider_diagnose_command_is_exposed_with_source_diagnostics() -> None:
+    """
+    @brief Verify provider.diagnose command returns fetch+parser diagnostics.
+    @satisfies REQ-048
+    @satisfies TST-021
+    """
+    source = BACKGROUND_PATH.read_text(encoding="utf-8")
+    assert "case \"provider.diagnose\":" in source
+    assert "provider.diagnose requires provider argument" in source
+    assert "command: \"provider.diagnose\"" in source
+    assert "sources:" in source
+    assert "payload_usable" in source
 
 
 def test_debug_api_logs_command_lifecycle_events() -> None:

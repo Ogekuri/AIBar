@@ -25,11 +25,13 @@ import {
   readDebugRecords,
 } from "./debug.js";
 import {
+  extractSignalDiagnostics,
   mergeCopilotPayloads,
   parseClaudeUsageHtml,
   parseCodexUsageHtml,
   parseCopilotFeaturesHtml,
   parseCopilotPremiumHtml,
+  providerPayloadHasUsableMetrics,
 } from "./parsers.js";
 
 /** @brief Default hardcoded refresh interval in seconds. */
@@ -56,6 +58,7 @@ const PROVIDER_FETCH_SEQUENCE = [
 const DEBUG_API_SUPPORTED_COMMANDS = [
   "http.get",
   "parser.run",
+  "provider.diagnose",
   "state.get",
   "refresh.run",
   "logs.get",
@@ -307,12 +310,86 @@ function _serializeHeaders(headers) {
  * @returns {Record<string, unknown>} Probe metadata object.
  */
 function _buildHtmlProbe(html) {
+  const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  const title = titleMatch ? titleMatch[1].replace(/\s+/g, " ").trim() : null;
+  const compactHtml = html.toLowerCase();
   return {
     html_length: html.length,
+    title,
     has_progressbar_role: html.includes("progressbar"),
     has_next_data: html.includes("__NEXT_DATA__"),
+    has_window_tokens: /\b(?:5h|7d|30d)\b/i.test(html),
+    has_cloudflare_challenge: /just a moment|cf_chl|challenge-platform|cf-mitigated/i.test(compactHtml),
+    has_login_marker: /sign in|log in|login|enable javascript and cookies to continue/i.test(compactHtml),
     script_tag_count: (html.match(/<script\b/gi) || []).length,
   };
+}
+
+/**
+ * @brief Compute SHA-256 hash for deterministic body identity checks.
+ * @param {string} text Input text payload.
+ * @returns {Promise<string>} Hex-encoded digest.
+ */
+async function _sha256Hex(text) {
+  const bytes = new TextEncoder().encode(text);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+/**
+ * @brief Build payload-quality summary for parsed provider windows.
+ * @param {Record<string, unknown>} payload Parsed provider payload.
+ * @returns {Record<string, unknown>} Quality summary object.
+ */
+function _buildPayloadQuality(payload) {
+  const quality = {
+    payload_usable: providerPayloadHasUsableMetrics(payload),
+    usable_windows: 0,
+    windows: {},
+  };
+  const windows = payload?.windows && typeof payload.windows === "object" ? payload.windows : {};
+  for (const [windowKey, windowData] of Object.entries(windows)) {
+    const usage = Number(windowData?.usage_percent);
+    const remaining = Number(windowData?.remaining);
+    const limit = Number(windowData?.limit);
+    const hasUsage = Number.isFinite(usage);
+    const hasRemaining = Number.isFinite(remaining);
+    const hasLimit = Number.isFinite(limit);
+    const hasQuota = hasRemaining || hasLimit;
+    const usable = hasUsage || hasQuota;
+    if (usable) {
+      quality.usable_windows += 1;
+    }
+    quality.windows[windowKey] = {
+      has_usage_percent: hasUsage,
+      has_quota: hasQuota,
+      usage_percent: hasUsage ? usage : null,
+      remaining: hasRemaining ? remaining : null,
+      limit: hasLimit ? limit : null,
+      reset_at: typeof windowData?.reset_at === "string" ? windowData.reset_at : null,
+      usable,
+    };
+  }
+  return quality;
+}
+
+/**
+ * @brief Build parser failure error when payload has no usable metrics.
+ * @param {string} provider Provider key.
+ * @param {Record<string, unknown>} payload Parsed payload.
+ * @returns {void}
+ * @throws {Error} If payload is missing quota/progress metrics.
+ */
+function _assertProviderPayloadUsable(provider, payload) {
+  if (providerPayloadHasUsableMetrics(payload)) {
+    return;
+  }
+  const signalCounts = payload?.parser?.signal_counts ?? {};
+  throw new Error(
+    `Parser produced no usable ${provider} metrics (signals=${JSON.stringify(signalCounts)})`
+  );
 }
 
 /**
@@ -338,6 +415,31 @@ async function _downloadDebugUrl(urlToken) {
     content_type: response.headers.get("content-type"),
     headers: _serializeHeaders(response.headers),
     body_text: bodyText,
+  };
+}
+
+/**
+ * @brief Build debug HTTP response payload with bounded preview and hash metadata.
+ * @param {Record<string, unknown>} download Raw download payload.
+ * @param {number} maxChars Bounded preview size.
+ * @returns {Promise<Record<string, unknown>>} HTTP response payload.
+ */
+async function _buildDebugHttpResponse(download, maxChars) {
+  const bodyPreview = download.body_text.slice(0, maxChars);
+  const tailPreview = download.body_text.slice(Math.max(0, download.body_text.length - maxChars));
+  return {
+    final_url: download.final_url,
+    status: download.status,
+    ok: download.ok,
+    redirected: download.redirected,
+    content_type: download.content_type,
+    headers: download.headers,
+    body_length: download.body_text.length,
+    body_sha256: await _sha256Hex(download.body_text),
+    body_preview: bodyPreview,
+    body_preview_tail: tailPreview,
+    body_truncated: download.body_text.length > bodyPreview.length,
+    html_probe: _buildHtmlProbe(download.body_text),
   };
 }
 
@@ -398,6 +500,13 @@ function _describeDebugApi() {
       http_get_max_chars: DEBUG_API_DEFAULT_MAX_CHARS,
       max_allowed_chars: DEBUG_API_MAX_CHARS,
       parser_default_urls: { ...DEBUG_API_PROVIDER_DEFAULT_URLS },
+      provider_diagnose_supported: [
+        "claude",
+        "codex",
+        "copilot_features",
+        "copilot_premium",
+        "copilot_merged",
+      ],
     },
   };
 }
@@ -419,24 +528,13 @@ async function _executeDebugApiCommand(command, args) {
     case "http.get": {
       const maxChars = _normalizeDebugMaxChars(args?.max_chars);
       const download = await _downloadDebugUrl(args?.url);
-      const bodyPreview = download.body_text.slice(0, maxChars);
       return {
         command: "http.get",
         request: {
           url: download.requested_url,
           max_chars: maxChars,
         },
-        response: {
-          final_url: download.final_url,
-          status: download.status,
-          ok: download.ok,
-          redirected: download.redirected,
-          content_type: download.content_type,
-          headers: download.headers,
-          body_length: download.body_text.length,
-          body_preview: bodyPreview,
-          body_truncated: download.body_text.length > bodyPreview.length,
-        },
+        response: await _buildDebugHttpResponse(download, maxChars),
       };
     }
     case "parser.run": {
@@ -456,6 +554,7 @@ async function _executeDebugApiCommand(command, args) {
           parseCopilotFeaturesHtml(featuresHtml),
           parseCopilotPremiumHtml(premiumHtml)
         );
+        const payloadQuality = _buildPayloadQuality(mergedPayload);
         return {
           command: "parser.run",
           provider: "copilot_merged",
@@ -463,7 +562,13 @@ async function _executeDebugApiCommand(command, args) {
             features: _buildHtmlProbe(featuresHtml),
             premium: _buildHtmlProbe(premiumHtml),
           },
+          parser_signal_diagnostics: {
+            features: extractSignalDiagnostics(featuresHtml),
+            premium: extractSignalDiagnostics(premiumHtml),
+          },
           parser_payload: mergedPayload,
+          payload_quality: payloadQuality,
+          payload_usable: payloadQuality.payload_usable,
         };
       }
 
@@ -471,11 +576,78 @@ async function _executeDebugApiCommand(command, args) {
       const html = typeof args?.html === "string"
         ? args.html
         : (await _downloadDebugUrl(args?.url ?? DEBUG_API_PROVIDER_DEFAULT_URLS[provider])).body_text;
+      const parserPayload = parser(html);
+      const payloadQuality = _buildPayloadQuality(parserPayload);
       return {
         command: "parser.run",
         provider,
         html_probe: _buildHtmlProbe(html),
-        parser_payload: parser(html),
+        parser_signal_diagnostics: extractSignalDiagnostics(html),
+        parser_payload: parserPayload,
+        payload_quality: payloadQuality,
+        payload_usable: payloadQuality.payload_usable,
+      };
+    }
+    case "provider.diagnose": {
+      const provider = String(args?.provider ?? "").trim();
+      if (!provider) {
+        throw new Error("provider.diagnose requires provider argument");
+      }
+      const maxChars = _normalizeDebugMaxChars(args?.max_chars);
+
+      if (provider === "copilot_merged") {
+        const featuresDownload = await _downloadDebugUrl(
+          args?.url_features ?? DEBUG_API_PROVIDER_DEFAULT_URLS.copilot_features
+        );
+        const premiumDownload = await _downloadDebugUrl(
+          args?.url_premium ?? DEBUG_API_PROVIDER_DEFAULT_URLS.copilot_premium
+        );
+        const featuresPayload = parseCopilotFeaturesHtml(featuresDownload.body_text);
+        const premiumPayload = parseCopilotPremiumHtml(premiumDownload.body_text);
+        const mergedPayload = mergeCopilotPayloads(featuresPayload, premiumPayload);
+        const mergedQuality = _buildPayloadQuality(mergedPayload);
+
+        return {
+          command: "provider.diagnose",
+          provider: "copilot_merged",
+          sources: {
+            features: {
+              request_url: featuresDownload.requested_url,
+              response: await _buildDebugHttpResponse(featuresDownload, maxChars),
+              parser_signal_diagnostics: extractSignalDiagnostics(featuresDownload.body_text),
+              parser_payload: featuresPayload,
+              payload_quality: _buildPayloadQuality(featuresPayload),
+            },
+            premium: {
+              request_url: premiumDownload.requested_url,
+              response: await _buildDebugHttpResponse(premiumDownload, maxChars),
+              parser_signal_diagnostics: extractSignalDiagnostics(premiumDownload.body_text),
+              parser_payload: premiumPayload,
+              payload_quality: _buildPayloadQuality(premiumPayload),
+            },
+          },
+          parser_payload: mergedPayload,
+          payload_quality: mergedQuality,
+          payload_usable: mergedQuality.payload_usable,
+        };
+      }
+
+      const parser = _resolveDebugParser(provider);
+      const download = await _downloadDebugUrl(args?.url ?? DEBUG_API_PROVIDER_DEFAULT_URLS[provider]);
+      const parserPayload = parser(download.body_text);
+      const payloadQuality = _buildPayloadQuality(parserPayload);
+      return {
+        command: "provider.diagnose",
+        provider,
+        request: {
+          url: download.requested_url,
+          max_chars: maxChars,
+        },
+        response: await _buildDebugHttpResponse(download, maxChars),
+        parser_signal_diagnostics: extractSignalDiagnostics(download.body_text),
+        parser_payload: parserPayload,
+        payload_quality: payloadQuality,
+        payload_usable: payloadQuality.payload_usable,
       };
     }
     case "state.get":
@@ -576,6 +748,7 @@ async function _refreshAllProviders(trigger) {
     try {
       const claudeHtml = await _fetchHtml(PROVIDER_FETCH_SEQUENCE[0]);
       const claudePayload = parseClaudeUsageHtml(claudeHtml);
+      _assertProviderPayloadUsable("claude", claudePayload);
       _applyProviderSuccess("claude", claudePayload);
       logger.debug("provider-refresh-success", {
         provider: "claude",
@@ -592,6 +765,7 @@ async function _refreshAllProviders(trigger) {
     try {
       const codexHtml = await _fetchHtml(PROVIDER_FETCH_SEQUENCE[1]);
       const codexPayload = parseCodexUsageHtml(codexHtml);
+      _assertProviderPayloadUsable("codex", codexPayload);
       _applyProviderSuccess("codex", codexPayload);
       logger.debug("provider-refresh-success", {
         provider: "codex",
@@ -611,6 +785,7 @@ async function _refreshAllProviders(trigger) {
       const copilotFeaturesPayload = parseCopilotFeaturesHtml(copilotFeaturesHtml);
       const copilotPremiumPayload = parseCopilotPremiumHtml(copilotPremiumHtml);
       const mergedCopilotPayload = mergeCopilotPayloads(copilotFeaturesPayload, copilotPremiumPayload);
+      _assertProviderPayloadUsable("copilot", mergedCopilotPayload);
       _applyProviderSuccess("copilot", mergedCopilotPayload);
       logger.debug("provider-refresh-success", {
         provider: "copilot",

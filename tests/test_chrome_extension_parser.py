@@ -90,6 +90,40 @@ def test_codex_parser_extracts_dual_window_metrics_from_localized_fixture() -> N
     assert payload["windows"]["7d"]["usage_percent"] == 71
 
 
+def test_claude_parser_extracts_metrics_from_bootstrap_script_fixture() -> None:
+    """
+    @brief Verify Claude parser extracts quotas from bootstrap script JSON.
+    @satisfies TST-015
+    @satisfies REQ-040
+    """
+    payload = _run_parser("parseClaudeUsageHtml", "claude_usage_bootstrap_script.html")
+    assert payload["provider"] == "claude"
+    assert payload["windows"]["5h"]["usage_percent"] == 42
+    assert payload["windows"]["5h"]["limit"] == 50
+    assert payload["windows"]["5h"]["remaining"] == 29
+    assert payload["windows"]["7d"]["usage_percent"] == 16
+    assert payload["windows"]["7d"]["limit"] == 500
+    assert payload["windows"]["7d"]["remaining"] == 420
+
+
+def test_codex_parser_ignores_reset_only_json_candidates() -> None:
+    """
+    @brief Verify Codex parser does not treat reset-only JSON as usable metrics.
+    @satisfies TST-015
+    @satisfies REQ-041
+    """
+    payload = _run_parser("parseCodexUsageHtml", "codex_usage_reset_only_json.html")
+    assert payload["provider"] == "codex"
+    assert payload["windows"]["5h"]["usage_percent"] is None
+    assert payload["windows"]["5h"]["remaining"] is None
+    assert payload["windows"]["5h"]["limit"] is None
+    assert payload["windows"]["5h"]["reset_at"] is None
+    assert payload["windows"]["7d"]["usage_percent"] is None
+    assert payload["windows"]["7d"]["remaining"] is None
+    assert payload["windows"]["7d"]["limit"] is None
+    assert payload["windows"]["7d"]["reset_at"] is None
+
+
 def test_copilot_merge_combines_features_and_premium_sources() -> None:
     """
     @brief Verify Copilot merge output consolidates both source pages.
