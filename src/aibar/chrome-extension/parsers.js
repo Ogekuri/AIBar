@@ -11,7 +11,7 @@
  */
 
 /** @brief Parser semantic version for debug payloads. */
-export const PARSER_VERSION = "2026.03.06.2";
+export const PARSER_VERSION = "2026.03.06.3";
 
 /** @brief Token regex for window hints. */
 const WINDOW_HINT_REGEX = /\b(5h|7d|30d)\b/i;
@@ -21,6 +21,9 @@ const WINDOW_HINT_GLOBAL_REGEX = /\b(5h|7d|30d)\b/ig;
 
 /** @brief Token regex for numeric fractions. */
 const FRACTION_REGEX = /([0-9][0-9\s.,]*)\s*\/\s*([0-9][0-9\s.,]*)/g;
+
+/** @brief Token regex for textual fraction forms (`A of B`, `A de B`, `A su B`). */
+const FRACTION_OF_REGEX = /([0-9][0-9\s.,]*)\s*(?:of|out\s+of|de|su|von|sur)\s*([0-9][0-9\s.,]*)/gi;
 
 /** @brief Token regex for percentage values. */
 const PERCENT_REGEX = /([0-9][0-9\s.,]*)\s*%/g;
@@ -115,15 +118,132 @@ export function parseLocalizedNumber(token) {
       normalized = normalized.replace(/,/g, "");
     }
   } else if (hasComma) {
-    if (/,[0-9]{1,3}$/.test(normalized)) {
+    if (/^-?[0-9]{1,3}(?:,[0-9]{3})+$/.test(normalized)) {
+      normalized = normalized.replace(/,/g, "");
+    } else if (/^-?[0-9]+,[0-9]+$/.test(normalized)) {
       normalized = normalized.replace(",", ".");
     } else {
       normalized = normalized.replace(/,/g, "");
+    }
+  } else if (hasDot) {
+    if (/^-?[0-9]{1,3}(?:\.[0-9]{3})+$/.test(normalized)) {
+      normalized = normalized.replace(/\./g, "");
     }
   }
 
   const value = Number(normalized);
   return Number.isFinite(value) ? value : null;
+}
+
+/**
+ * @brief Validate one raw numeric token extracted from fraction regex matches.
+ * @details Rejects ambiguous mixed-number fragments (for example `6 8`) while
+ * accepting locale thousands grouping (for example `1 500`).
+ * @param {string} rawToken Raw regex capture token.
+ * @returns {boolean} True when token shape is numerically plausible.
+ */
+function _isPlausibleFractionToken(rawToken) {
+  const token = String(rawToken ?? "").trim();
+  if (!token) {
+    return false;
+  }
+  if (!/\s/.test(token)) {
+    return true;
+  }
+  return /^-?[0-9]{1,3}(?:\s[0-9]{3})+(?:[.,][0-9]+)?$/.test(token);
+}
+
+/** @brief Locale-agnostic month token lookup for natural-language datetime parsing. */
+const MONTH_TOKEN_TO_INDEX = {
+  jan: 1,
+  january: 1,
+  janvier: 1,
+  gennaio: 1,
+  enero: 1,
+  februar: 2,
+  feb: 2,
+  february: 2,
+  fevrier: 2,
+  febbraio: 2,
+  febrero: 2,
+  mar: 3,
+  march: 3,
+  mars: 3,
+  marzo: 3,
+  apr: 4,
+  april: 4,
+  avril: 4,
+  aprile: 4,
+  mayo: 5,
+  may: 5,
+  mai: 5,
+  maggio: 5,
+  jun: 6,
+  june: 6,
+  juin: 6,
+  giugno: 6,
+  julio: 7,
+  jul: 7,
+  july: 7,
+  juillet: 7,
+  luglio: 7,
+  aug: 8,
+  august: 8,
+  aout: 8,
+  agosto: 8,
+  sep: 9,
+  sept: 9,
+  september: 9,
+  septembre: 9,
+  settembre: 9,
+  octubre: 10,
+  oct: 10,
+  october: 10,
+  octobre: 10,
+  ottobre: 10,
+  nov: 11,
+  november: 11,
+  novembre: 11,
+  dec: 12,
+  december: 12,
+  dicembre: 12,
+  diciembre: 12,
+};
+
+/**
+ * @brief Resolve month index from locale-dependent month token.
+ * @param {string} token Month token.
+ * @returns {number | null} Month index in range [1, 12] or null.
+ */
+function _resolveMonthIndex(token) {
+  const normalized = String(token ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  return MONTH_TOKEN_TO_INDEX[normalized] ?? null;
+}
+
+/**
+ * @brief Build deterministic ISO timestamp from parsed date/time components.
+ * @param {number} year Full year.
+ * @param {number} monthIndex Month index in range [1, 12].
+ * @param {number} day Day of month.
+ * @param {number | null} hour Hour component.
+ * @param {number | null} minute Minute component.
+ * @returns {string | null} ISO timestamp or null.
+ */
+function _buildIsoFromDateParts(year, monthIndex, day, hour, minute) {
+  if (!Number.isFinite(year) || !Number.isFinite(monthIndex) || !Number.isFinite(day)) {
+    return null;
+  }
+  if (monthIndex < 1 || monthIndex > 12 || day < 1 || day > 31) {
+    return null;
+  }
+  const hours = Number.isFinite(hour) ? Math.max(0, Math.min(23, Number(hour))) : 0;
+  const minutes = Number.isFinite(minute) ? Math.max(0, Math.min(59, Number(minute))) : 0;
+  const utcDate = new Date(Date.UTC(Number(year), monthIndex - 1, Number(day), hours, minutes, 0, 0));
+  return Number.isNaN(utcDate.getTime()) ? null : utcDate.toISOString();
 }
 
 /**
@@ -167,13 +287,13 @@ function _extractWindowHint(context) {
   if (compactMatch) {
     return compactMatch[1].toLowerCase();
   }
-  if (/\b(?:5\s*(?:h|hr|hour|hours)|hourly)\b/i.test(source)) {
+  if (/\b(?:5\s*(?:h|hr|hour|hours|ore|oras|heures|stunden?)|hourly)\b/i.test(source)) {
     return "5h";
   }
-  if (/\b(?:7\s*(?:d|day|days)|weekly|week)\b/i.test(source)) {
+  if (/\b(?:7\s*(?:d|day|days|giorni|dias|jours|tage)|weekly|week|settiman\w*|semanal\w*)\b/i.test(source)) {
     return "7d";
   }
-  if (/\b(?:30\s*(?:d|day|days)|monthly|month)\b/i.test(source)) {
+  if (/\b(?:30\s*(?:d|day|days|giorni|dias|jours|tage)|monthly|month|mensil\w*|mensuel\w*)\b/i.test(source)) {
     return "30d";
   }
   return null;
@@ -241,7 +361,7 @@ function _extractProgressMetrics(html) {
   let match;
   while ((match = progressbarRegex.exec(html)) !== null) {
     const tag = match[0];
-    const context = html.slice(Math.max(0, match.index - 120), Math.min(html.length, match.index + 220));
+    const context = html.slice(Math.max(0, match.index - 120), Math.min(html.length, match.index + 140));
     const now = parseLocalizedNumber(_extractAttribute(tag, "aria-valuenow"));
     const min = parseLocalizedNumber(_extractAttribute(tag, "aria-valuemin")) ?? 0;
     const max = parseLocalizedNumber(_extractAttribute(tag, "aria-valuemax")) ?? 100;
@@ -257,7 +377,7 @@ function _extractProgressMetrics(html) {
   const htmlProgressRegex = /<progress\b[^>]*>/gi;
   while ((match = htmlProgressRegex.exec(html)) !== null) {
     const tag = match[0];
-    const context = html.slice(Math.max(0, match.index - 120), Math.min(html.length, match.index + 220));
+    const context = html.slice(Math.max(0, match.index - 120), Math.min(html.length, match.index + 140));
     const value = parseLocalizedNumber(_extractAttribute(tag, "value"));
     const max = parseLocalizedNumber(_extractAttribute(tag, "max")) ?? 100;
     const pct = value !== null && max > 0 ? _clamp((value / max) * 100.0, 0, 100) : null;
@@ -284,15 +404,34 @@ function _extractFractionCandidatesFromText(text) {
   FRACTION_REGEX.lastIndex = 0;
   let match;
   while ((match = FRACTION_REGEX.exec(text)) !== null) {
+    if (!_isPlausibleFractionToken(match[1]) || !_isPlausibleFractionToken(match[2])) {
+      continue;
+    }
     const first = parseLocalizedNumber(match[1]);
     const second = parseLocalizedNumber(match[2]);
-    if (first !== null && second !== null && second > 0) {
+    if (first !== null && second !== null && second > 0 && first >= 0 && first <= second) {
       fractions.push({
         first,
         second,
       });
     }
   }
+
+  FRACTION_OF_REGEX.lastIndex = 0;
+  while ((match = FRACTION_OF_REGEX.exec(text)) !== null) {
+    if (!_isPlausibleFractionToken(match[1]) || !_isPlausibleFractionToken(match[2])) {
+      continue;
+    }
+    const first = parseLocalizedNumber(match[1]);
+    const second = parseLocalizedNumber(match[2]);
+    if (first !== null && second !== null && second > 0 && first >= 0 && first <= second) {
+      fractions.push({
+        first,
+        second,
+      });
+    }
+  }
+
   return fractions;
 }
 
@@ -317,7 +456,7 @@ function _extractPercentCandidatesFromText(text) {
 /**
  * @brief Extract ISO-like datetime tokens from one generic text stream.
  * @param {string} text Generic text stream.
- * @returns {Array<string>} Ordered datetime candidates in ISO format.
+ * @returns {Array<{value: string, window_hint: string | null}>} Ordered datetime candidates.
  */
 function _extractDatetimeCandidatesFromText(text) {
   const datetimes = [];
@@ -326,9 +465,50 @@ function _extractDatetimeCandidatesFromText(text) {
   while ((match = ISO_DATETIME_REGEX.exec(text)) !== null) {
     const parsed = new Date(match[0]);
     if (!Number.isNaN(parsed.getTime())) {
-      datetimes.push(parsed.toISOString());
+      const context = text.slice(Math.max(0, match.index - 80), Math.min(text.length, match.index + 140));
+      datetimes.push({
+        value: parsed.toISOString(),
+        window_hint: _extractWindowHint(context),
+      });
     }
   }
+
+  const monthDayRegex =
+    /\b([A-Za-zÀ-ÿ]{3,12})\s+([0-9]{1,2}),?\s+([0-9]{4})(?:\s+(?:at\s+)?([0-9]{1,2}):([0-9]{2}))?\b/gi;
+  while ((match = monthDayRegex.exec(text)) !== null) {
+    const monthIndex = _resolveMonthIndex(match[1]);
+    const day = Number(match[2]);
+    const year = Number(match[3]);
+    const hour = match[4] !== undefined ? Number(match[4]) : null;
+    const minute = match[5] !== undefined ? Number(match[5]) : null;
+    const iso = _buildIsoFromDateParts(year, monthIndex, day, hour, minute);
+    if (iso) {
+      const context = text.slice(Math.max(0, match.index - 80), Math.min(text.length, match.index + 140));
+      datetimes.push({
+        value: iso,
+        window_hint: _extractWindowHint(context),
+      });
+    }
+  }
+
+  const dayMonthRegex =
+    /\b([0-9]{1,2})\s+([A-Za-zÀ-ÿ]{3,12})\s+([0-9]{4})(?:\s+(?:alle\s+ore\s+|at\s+)?([0-9]{1,2}):([0-9]{2}))?\b/gi;
+  while ((match = dayMonthRegex.exec(text)) !== null) {
+    const day = Number(match[1]);
+    const monthIndex = _resolveMonthIndex(match[2]);
+    const year = Number(match[3]);
+    const hour = match[4] !== undefined ? Number(match[4]) : null;
+    const minute = match[5] !== undefined ? Number(match[5]) : null;
+    const iso = _buildIsoFromDateParts(year, monthIndex, day, hour, minute);
+    if (iso) {
+      const context = text.slice(Math.max(0, match.index - 80), Math.min(text.length, match.index + 140));
+      datetimes.push({
+        value: iso,
+        window_hint: _extractWindowHint(context),
+      });
+    }
+  }
+
   return datetimes;
 }
 
@@ -445,11 +625,24 @@ function _buildScriptContextCandidate(scriptText, centerIndex, resetAt, preferBe
   const usedMatches = _extractNumericKeyMatches(context, USED_KEY_FRAGMENTS);
   const usagePercentMatches = _extractNumericKeyMatches(context, USAGE_PERCENT_KEY_FRAGMENTS);
 
+  const remainingPercentMatches = usagePercentMatches.filter((entry) =>
+    REMAINING_KEY_FRAGMENTS.some((fragment) => String(entry.key ?? "").includes(fragment))
+  );
+  const usagePercentOnlyMatches = usagePercentMatches.filter(
+    (entry) =>
+      !REMAINING_KEY_FRAGMENTS.some((fragment) => String(entry.key ?? "").includes(fragment))
+  );
+
   const remaining = _selectNumericFromMatches(remainingMatches, anchorIndex, preferBeforeAnchor);
   const limit = _selectNumericFromMatches(limitMatches, anchorIndex, preferBeforeAnchor);
   const used = _selectNumericFromMatches(usedMatches, anchorIndex, preferBeforeAnchor);
   const usagePercent = _selectNumericFromMatches(
-    usagePercentMatches,
+    usagePercentOnlyMatches,
+    anchorIndex,
+    preferBeforeAnchor
+  );
+  const remainingPercent = _selectNumericFromMatches(
+    remainingPercentMatches,
     anchorIndex,
     preferBeforeAnchor
   );
@@ -458,7 +651,8 @@ function _buildScriptContextCandidate(scriptText, centerIndex, resetAt, preferBe
     remaining.value === null &&
     limit.value === null &&
     used.value === null &&
-    usagePercent.value === null
+    usagePercent.value === null &&
+    remainingPercent.value === null
   ) {
     return null;
   }
@@ -469,13 +663,15 @@ function _buildScriptContextCandidate(scriptText, centerIndex, resetAt, preferBe
     limit: limit.value,
     used: used.value,
     usage_percent: usagePercent.value,
+    remaining_percent: remainingPercent.value,
     reset_at: resetAt,
     matched_keys: _dedupeByKey(
       [
         ...remainingMatches.map((entry) => ({ family: "remaining", key: entry.key })),
         ...limitMatches.map((entry) => ({ family: "limit", key: entry.key })),
         ...usedMatches.map((entry) => ({ family: "used", key: entry.key })),
-        ...usagePercentMatches.map((entry) => ({ family: "usage_percent", key: entry.key })),
+        ...usagePercentOnlyMatches.map((entry) => ({ family: "usage_percent", key: entry.key })),
+        ...remainingPercentMatches.map((entry) => ({ family: "remaining_percent", key: entry.key })),
       ],
       (entry) => `${entry.family}:${entry.key}`
     ),
@@ -527,6 +723,23 @@ function _extractEscapedScriptMetricCandidates(html) {
     }
   }
 
+  const metricAnchorRegex = new RegExp(
+    String.raw`(?:\\?["'])([^"']*(?:${[
+      ...REMAINING_KEY_FRAGMENTS,
+      ...LIMIT_KEY_FRAGMENTS,
+      ...USED_KEY_FRAGMENTS,
+      ...USAGE_PERCENT_KEY_FRAGMENTS,
+    ].join("|")})[^"']*)(?:\\?["'])\s*:`,
+    "ig"
+  );
+  let metricAnchorMatch;
+  while ((metricAnchorMatch = metricAnchorRegex.exec(scriptText)) !== null) {
+    const candidate = _buildScriptContextCandidate(scriptText, metricAnchorMatch.index, null, false);
+    if (candidate) {
+      candidates.push(candidate);
+    }
+  }
+
   return _dedupeByKey(
     candidates,
     (entry) => {
@@ -539,6 +752,7 @@ function _extractEscapedScriptMetricCandidates(html) {
         entry.limit ?? "",
         entry.used ?? "",
         entry.usage_percent ?? "",
+        entry.remaining_percent ?? "",
         entry.reset_at ?? "",
         keys,
       ].join(":");
@@ -572,7 +786,7 @@ function _extractPercentCandidates(html) {
  * @brief Extract ISO-like datetime tokens from markup and script content.
  * @details Reads `datetime="..."` attributes and optional ISO literals in script.
  * @param {string} html Raw HTML.
- * @returns {Array<string>} Ordered datetime candidates in ISO format when parseable.
+ * @returns {Array<{value: string, window_hint: string | null}>} Ordered datetime candidates.
  */
 function _extractDatetimeCandidates(html) {
   const datetimes = [];
@@ -582,11 +796,83 @@ function _extractDatetimeCandidates(html) {
     const token = match[1] ?? match[2] ?? "";
     const parsed = new Date(token);
     if (!Number.isNaN(parsed.getTime())) {
-      datetimes.push(parsed.toISOString());
+      const context = html.slice(Math.max(0, match.index - 320), Math.min(html.length, match.index + 320));
+      datetimes.push({
+        value: parsed.toISOString(),
+        window_hint: _extractWindowHint(context),
+      });
     }
   }
+  const visibleDatetimes = _extractDatetimeCandidatesFromText(_extractPlainText(html));
   const scriptDatetimes = _extractDatetimeCandidatesFromText(_extractScriptText(html));
-  return _dedupeByKey([...datetimes, ...scriptDatetimes], (entry) => entry);
+  return _dedupeByKey(
+    [...datetimes, ...visibleDatetimes, ...scriptDatetimes],
+    (entry) => `${entry.value}|${entry.window_hint ?? ""}`
+  );
+}
+
+/**
+ * @brief Normalize one datetime candidate into deterministic value/hint tuple.
+ * @param {unknown} entry Datetime candidate entry.
+ * @returns {{value: string, window_hint: string | null} | null} Normalized candidate.
+ */
+function _normalizeDatetimeCandidate(entry) {
+  if (typeof entry === "string") {
+    return {
+      value: entry,
+      window_hint: null,
+    };
+  }
+  if (!entry || typeof entry !== "object") {
+    return null;
+  }
+  const value = typeof entry.value === "string" ? entry.value : null;
+  if (!value) {
+    return null;
+  }
+  const hint = typeof entry.window_hint === "string" ? entry.window_hint : null;
+  return {
+    value,
+    window_hint: hint,
+  };
+}
+
+/**
+ * @brief Select best datetime candidate for target window by hint + index fallback.
+ * @param {Array<string | {value: string, window_hint: string | null}>} datetimeCandidates Datetime candidates.
+ * @param {string} windowKey Target window key.
+ * @param {number} index Ordered fallback index.
+ * @returns {string | null} Selected datetime ISO value.
+ */
+function _pickDatetimeCandidate(datetimeCandidates, windowKey, index) {
+  const normalizedCandidates = datetimeCandidates
+    .map((entry, entryIndex) => {
+      const normalized = _normalizeDatetimeCandidate(entry);
+      if (!normalized) {
+        return null;
+      }
+      return {
+        entry_index: entryIndex,
+        value: normalized.value,
+        window_hint: normalized.window_hint,
+        distance: Math.abs(entryIndex - index),
+      };
+    })
+    .filter((entry) => entry !== null);
+
+  const hinted = normalizedCandidates.filter((entry) => typeof entry.window_hint === "string");
+  const hintedMatch = hinted
+    .filter((entry) => entry.window_hint === windowKey)
+    .sort((left, right) => left.distance - right.distance);
+  if (hintedMatch.length > 0) {
+    return hintedMatch[0].value;
+  }
+  if (hinted.length > 0) {
+    return null;
+  }
+
+  const exactFallback = normalizedCandidates.find((entry) => entry.entry_index === index);
+  return exactFallback?.value ?? null;
 }
 
 /**
@@ -772,22 +1058,32 @@ function _extractEmbeddedJsonObjects(html) {
 }
 
 /**
- * @brief Resolve first numeric value from object keys matching regex list.
+ * @brief Resolve first numeric entry from object keys matching regex list.
  * @param {Record<string, unknown>} obj Object candidate.
  * @param {Array<RegExp>} keyRegexes Key regex matchers.
- * @returns {number | null} First parsed numeric value.
+ * @param {Array<RegExp>} excludeKeyRegexes Key regexes excluded from selection.
+ * @returns {{key: string | null, value: number | null}} First parsed numeric entry.
  */
-function _pickNumericByKey(obj, keyRegexes) {
+function _pickNumericEntryByKey(obj, keyRegexes, excludeKeyRegexes = []) {
   for (const [key, value] of Object.entries(obj)) {
     if (!keyRegexes.some((pattern) => pattern.test(key))) {
       continue;
     }
+    if (excludeKeyRegexes.some((pattern) => pattern.test(key))) {
+      continue;
+    }
     const parsed = parseLocalizedNumber(value);
     if (parsed !== null) {
-      return parsed;
+      return {
+        key: String(key),
+        value: parsed,
+      };
     }
   }
-  return null;
+  return {
+    key: null,
+    value: null,
+  };
 }
 
 /**
@@ -846,10 +1142,28 @@ function _extractJsonMetricCandidates(root) {
 
     const obj = /** @type {Record<string, unknown>} */ (node);
 
-    const remaining = _pickNumericByKey(obj, [/remain/i, /available/i, /left/i, /balance/i]);
-    const limit = _pickNumericByKey(obj, [/limit/i, /quota/i, /allowance/i, /total/i, /max/i]);
-    const used = _pickNumericByKey(obj, [/used/i, /consumed/i, /^usage$/i, /count/i]);
-    const usagePercent = _pickNumericByKey(obj, [/percent/i, /percentage/i, /utilization/i]);
+    const remainingEntry = _pickNumericEntryByKey(obj, [/remain/i, /available/i, /left/i, /balance/i]);
+    const limitEntry = _pickNumericEntryByKey(obj, [/limit/i, /quota/i, /allowance/i, /total/i, /max/i]);
+    const usedEntry = _pickNumericEntryByKey(obj, [/used/i, /consumed/i, /^usage$/i, /count/i]);
+    const remainingPercentEntry = _pickNumericEntryByKey(
+      obj,
+      [
+        /(?:remain|available|left|balance|unused).*(?:percent|percentage|pct|ratio)/i,
+        /(?:percent|percentage|pct|ratio).*(?:remain|available|left|balance|unused)/i,
+      ],
+      []
+    );
+    const usagePercentEntry = _pickNumericEntryByKey(
+      obj,
+      [/percent/i, /percentage/i, /utilization/i, /pct/i, /ratio/i],
+      [/(?:remain|available|left|balance|unused)/i]
+    );
+
+    const remaining = remainingEntry.value;
+    const limit = limitEntry.value;
+    const used = usedEntry.value;
+    const usagePercent = usagePercentEntry.value;
+    const remainingPercent = remainingPercentEntry.value;
     const resetAt = _pickDatetimeByKey(obj, [/reset/i, /renew/i, /window_end/i, /expires/i]);
 
     let windowHint = null;
@@ -866,6 +1180,7 @@ function _extractJsonMetricCandidates(root) {
       limit !== null ||
       used !== null ||
       usagePercent !== null ||
+      remainingPercent !== null ||
       resetAt !== null
     ) {
       results.push({
@@ -874,6 +1189,7 @@ function _extractJsonMetricCandidates(root) {
         limit,
         used,
         usage_percent: usagePercent,
+        remaining_percent: remainingPercent,
         reset_at: resetAt,
       });
     }
@@ -896,6 +1212,7 @@ function _extractJsonMetricCandidates(root) {
 function _candidateScore(candidate, windowKey) {
   let score = 0;
   const hasUsage = parseLocalizedNumber(candidate?.usage_percent) !== null;
+  const hasRemainingPercent = parseLocalizedNumber(candidate?.remaining_percent) !== null;
   const hasLimit = parseLocalizedNumber(candidate?.limit) !== null;
   const hasRemaining = parseLocalizedNumber(candidate?.remaining) !== null;
   const hasUsed = parseLocalizedNumber(candidate?.used) !== null;
@@ -907,6 +1224,9 @@ function _candidateScore(candidate, windowKey) {
   }
   if (hasUsage) {
     score += 3;
+  }
+  if (hasRemainingPercent) {
+    score += 2;
   }
   if (hasLimit) {
     score += 2;
@@ -920,7 +1240,7 @@ function _candidateScore(candidate, windowKey) {
   if (hasMatchedKeys) {
     score += 1;
   }
-  if (!hasUsage && !hasLimit && !hasRemaining && !hasUsed) {
+  if (!hasUsage && !hasRemainingPercent && !hasLimit && !hasRemaining && !hasUsed) {
     score -= 5;
   }
 
@@ -958,6 +1278,7 @@ function _traceCandidate(candidate) {
   return {
     window_hint: candidate.window_hint ?? null,
     usage_percent: parseLocalizedNumber(candidate.usage_percent),
+    remaining_percent: parseLocalizedNumber(candidate.remaining_percent),
     remaining: parseLocalizedNumber(candidate.remaining),
     limit: parseLocalizedNumber(candidate.limit),
     used: parseLocalizedNumber(candidate.used),
@@ -1029,7 +1350,7 @@ function _inferQuotaFromFraction(fraction, usagePercent) {
  * @param {Array<Record<string, number | string | null>>} progressCandidates Progress candidates.
  * @param {Array<Record<string, number>>} fractionCandidates Fraction candidates.
  * @param {Array<number | null>} percentCandidates Percent candidates.
- * @param {Array<string>} datetimeCandidates Datetime candidates.
+ * @param {Array<string | {value: string, window_hint: string | null}>} datetimeCandidates Datetime candidates.
  * @param {Array<Record<string, number | string | null>>} jsonCandidates JSON-derived candidates.
  * @param {Record<string, unknown> | null} traceOutput Mutable trace object populated when requested.
  * @returns {Record<string, Record<string, number | string | null>>} Window metrics map.
@@ -1052,14 +1373,22 @@ function _buildWindows(
     const progressCandidate = rankedProgressCandidates[0]?.score >= 2 ? rankedProgressCandidates[0].item : null;
     const percentCandidate = parseLocalizedNumber(percentCandidates[index] ?? null);
     const fractionCandidate = fractionCandidates[index] ?? null;
-    const datetimeCandidate = datetimeCandidates[index] ?? null;
-    const usagePercentFromSignals = _clamp(
+    const datetimeCandidate = _pickDatetimeCandidate(datetimeCandidates, windowKey, index);
+    const remainingPercentSignal = _clamp(
+      parseLocalizedNumber(jsonCandidate?.remaining_percent),
+      0,
+      100
+    );
+    let usagePercentFromSignals = _clamp(
       parseLocalizedNumber(jsonCandidate?.usage_percent) ??
         parseLocalizedNumber(progressCandidate?.usage_percent) ??
         percentCandidate,
       0,
       100
     );
+    if (usagePercentFromSignals === null && remainingPercentSignal !== null) {
+      usagePercentFromSignals = _clamp(100 - remainingPercentSignal, 0, 100);
+    }
 
     const quotaFromFraction = fractionCandidate
       ? _inferQuotaFromFraction(fractionCandidate, usagePercentFromSignals)
@@ -1078,6 +1407,22 @@ function _buildWindows(
       0,
       Number.MAX_SAFE_INTEGER
     );
+    if (limit === null && used === null && remainingPercentSignal !== null) {
+      remaining = null;
+    }
+
+    const hasAmbiguousRemainingPercent =
+      limit === null &&
+      used === null &&
+      remaining !== null &&
+      usagePercentFromSignals !== null &&
+      Math.abs(remaining - usagePercentFromSignals) < 0.0001 &&
+      remaining <= 100;
+    if (hasAmbiguousRemainingPercent) {
+      usagePercentFromSignals = _clamp(100 - remaining, 0, 100);
+      remaining = null;
+    }
+
     if (remaining === null && limit !== null && used !== null) {
       remaining = _clamp(limit - used, 0, limit);
     }
@@ -1138,6 +1483,7 @@ function _buildWindows(
         },
         derived_window: {
           usage_percent_from_signals: usagePercentFromSignals,
+          remaining_percent_signal: remainingPercentSignal,
           usage_percent: usagePercent,
           remaining,
           limit,
@@ -1265,7 +1611,7 @@ export function extractSignalDiagnostics(html) {
       progress: _sample(signals.progress, 3),
       fractions: _sample(signals.fractions, 3),
       percentages: _sample(signals.percentages, 5),
-      datetimes: _sample(signals.datetimes, 3),
+      datetimes: _sample(signals.datetimes, 3).map((entry) => _normalizeDatetimeCandidate(entry)),
       json_candidate_window_hints: _sample(
         signals.json_candidates.map((candidate) => candidate.window_hint ?? null),
         5
@@ -1274,6 +1620,7 @@ export function extractSignalDiagnostics(html) {
         signals.json_candidates.map((candidate) => ({
           window_hint: candidate.window_hint ?? null,
           remaining: parseLocalizedNumber(candidate.remaining),
+          remaining_percent: parseLocalizedNumber(candidate.remaining_percent),
           limit: parseLocalizedNumber(candidate.limit),
           used: parseLocalizedNumber(candidate.used),
           usage_percent: parseLocalizedNumber(candidate.usage_percent),
@@ -1442,7 +1789,7 @@ export function mergeCopilotPayloads(featuresPayload, premiumPayload) {
   const featuresWindow = featuresPayload?.windows?.["30d"] ?? null;
   const premiumWindow = premiumPayload?.windows?.["30d"] ?? null;
   const mergedWindow = {
-    usage_percent: premiumWindow?.usage_percent ?? featuresWindow?.usage_percent ?? null,
+    usage_percent: featuresWindow?.usage_percent ?? premiumWindow?.usage_percent ?? null,
     remaining: premiumWindow?.remaining ?? featuresWindow?.remaining ?? null,
     limit: premiumWindow?.limit ?? featuresWindow?.limit ?? null,
     reset_at: premiumWindow?.reset_at ?? featuresWindow?.reset_at ?? null,
@@ -1473,10 +1820,10 @@ export function mergeCopilotPayloads(featuresPayload, premiumPayload) {
         fractions: (featuresSignals.fractions ?? 0) + (premiumSignals.fractions ?? 0),
         percentages: (featuresSignals.percentages ?? 0) + (premiumSignals.percentages ?? 0),
         datetimes: (featuresSignals.datetimes ?? 0) + (premiumSignals.datetimes ?? 0),
-      json_candidates:
-        (featuresSignals.json_candidates ?? 0) + (premiumSignals.json_candidates ?? 0),
-      metric_key_matches:
-        (featuresSignals.metric_key_matches ?? 0) + (premiumSignals.metric_key_matches ?? 0),
+        json_candidates:
+          (featuresSignals.json_candidates ?? 0) + (premiumSignals.json_candidates ?? 0),
+        metric_key_matches:
+          (featuresSignals.metric_key_matches ?? 0) + (premiumSignals.metric_key_matches ?? 0),
       },
     },
   };

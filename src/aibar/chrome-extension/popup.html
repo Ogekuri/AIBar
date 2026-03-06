@@ -36,11 +36,16 @@
           disabled
         />
         <button id="setIntervalButton" class="aibar-btn" type="button" disabled>Set sec</button>
+        <button id="providerPagesButton" class="aibar-btn" type="button" disabled>Fetch pages</button>
         <label class="aibar-checkbox" for="debugEnableCheckbox">
           <input id="debugEnableCheckbox" type="checkbox" />
           Enable debug API (session only)
         </label>
         <span id="debugStatusLabel" class="aibar-badge">debug off</span>
+      </section>
+
+      <section class="aibar-debug-output">
+        <pre id="debugOutput" class="aibar-debug-pre">Debug output unavailable.</pre>
       </section>
 
       <nav class="aibar-tab-bar" aria-label="Providers">

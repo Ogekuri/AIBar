@@ -22,6 +22,7 @@
 - `config.debug_api.set` (non-debug config API)
 - `debug.api.describe` (debug API)
 - `debug.api.execute` (debug API)
+  - `providers.pages.get` debug command available only via `debug.api.execute`
 - `debug.get_logs` (debug API)
 - `debug.clear_logs` (debug API)
 - `debug.export_bundle` (debug API)
@@ -188,7 +189,14 @@
         "copilot_premium",
         "copilot_merged"
       ],
-      "providers_diagnose_default": ["claude", "codex", "copilot_merged"]
+      "providers_diagnose_default": ["claude", "codex", "copilot_merged"],
+      "providers_pages_get_urls": [
+        "https://claude.ai/settings/usage",
+        "https://github.com/settings/copilot/features",
+        "https://github.com/settings/billing/premium_requests_usage",
+        "https://chatgpt.com/codex/settings/usage"
+      ],
+      "providers_pages_get_default_related_limit": 6
     }
   }
 }
@@ -238,6 +246,21 @@
 - `providers.diagnose`
   - `args`: optional `providers` array, optional `max_chars`
   - `result_fields`: `summary`, `providers` map with per-provider diagnostics
+- `providers.pages.get`
+  - `args`: optional `max_chars`, optional `max_related_resources`
+  - `result_fields`:
+    - `summary.total|ok|fail`
+    - `providers.<provider_key>.diagnostics.response` (HTTP metadata + hash + previews + probe)
+    - `providers.<provider_key>.diagnostics.parser_signal_diagnostics`
+    - `providers.<provider_key>.diagnostics.window_assignment_diagnostics`
+    - `providers.<provider_key>.diagnostics.parser_payload`
+    - `providers.<provider_key>.diagnostics.payload_analysis`
+    - `providers.<provider_key>.diagnostics.related_content.discovered_total|fetched_total|resources[]`
+  - `constraints`:
+    - primary URLs are fixed to the four provider settings pages.
+    - related resources are auto-discovered from `<script src>` / `<link href>` in fetched HTML.
+    - related resources are restricted to same-origin `https` URLs and host allowlist (`claude.ai`, `github.com`, `chatgpt.com`).
+    - `max_related_resources` is clamped to `[0, 20]`.
 - `state.get`
   - `result_fields`: cloned runtime state
 - `refresh.run`

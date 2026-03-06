@@ -46,6 +46,8 @@ def test_primary_snapshot_contract_contains_tab_and_progress_window_schema() -> 
     assert "tab_windows:" in source
     assert "MAIN_API_PROVIDER_WINDOWS" in source
     assert "providers," in source
+    assert "function _toFiniteMetricNumber(token)" in source
+    assert "token === null || token === undefined || token === \"\"" in source
 
 
 def test_debug_api_command_catalog_includes_http_parser_and_standard_commands() -> None:
@@ -60,6 +62,7 @@ def test_debug_api_command_catalog_includes_http_parser_and_standard_commands() 
     assert '"parser.run"' in source
     assert '"provider.diagnose"' in source
     assert '"providers.diagnose"' in source
+    assert '"providers.pages.get"' in source
     assert '"state.get"' in source
     assert '"refresh.run"' in source
     assert '"logs.get"' in source
@@ -172,6 +175,26 @@ def test_debug_providers_diagnose_command_returns_aggregate_diagnostics() -> Non
     assert "providers.diagnose requires at least one provider token" in source
     assert "provider_fetch_sequence" in source
     assert "DEBUG_API_DEFAULT_PROVIDER_DIAGNOSE_SET" in source
+
+
+def test_debug_providers_pages_get_command_returns_page_and_related_diagnostics() -> None:
+    """
+    @brief Verify providers.pages.get command downloads required provider pages and related resources.
+    @satisfies REQ-048
+    @satisfies TST-020
+    @satisfies TST-021
+    """
+    source = BACKGROUND_PATH.read_text(encoding="utf-8")
+    assert 'case "providers.pages.get":' in source
+    assert "const DEBUG_API_PROVIDER_PAGES = [" in source
+    assert '"https://claude.ai/settings/usage"' in source
+    assert '"https://github.com/settings/copilot/features"' in source
+    assert '"https://github.com/settings/billing/premium_requests_usage"' in source
+    assert '"https://chatgpt.com/codex/settings/usage"' in source
+    assert "related_content" in source
+    assert "parser_signal_diagnostics" in source
+    assert "window_assignment_diagnostics" in source
+    assert "payload_analysis" in source
 
 
 def test_debug_api_logs_command_lifecycle_events() -> None:

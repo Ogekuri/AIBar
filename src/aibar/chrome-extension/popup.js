@@ -37,8 +37,10 @@ const dom = {
   clearLogsButton: document.getElementById("clearLogsButton"),
   intervalInput: document.getElementById("intervalInput"),
   setIntervalButton: document.getElementById("setIntervalButton"),
+  providerPagesButton: document.getElementById("providerPagesButton"),
   debugEnableCheckbox: document.getElementById("debugEnableCheckbox"),
   debugStatusLabel: document.getElementById("debugStatusLabel"),
+  debugOutput: document.getElementById("debugOutput"),
   updatedLabel: document.getElementById("updatedLabel"),
   statusLabel: document.getElementById("statusLabel"),
   tabButtons: Array.from(document.querySelectorAll("[data-provider]")),
@@ -67,7 +69,22 @@ function _applyDebugAccessState(enabled) {
   dom.clearLogsButton.disabled = !enabled;
   dom.intervalInput.disabled = !enabled;
   dom.setIntervalButton.disabled = !enabled;
+  dom.providerPagesButton.disabled = !enabled;
   dom.debugStatusLabel.textContent = enabled ? "debug on" : "debug off";
+  if (!enabled) {
+    dom.debugOutput.textContent = "Debug output unavailable.";
+  }
+}
+
+/**
+ * @brief Write compact debug command output payload in popup panel.
+ * @param {unknown} payload Debug command payload.
+ * @returns {void}
+ * @satisfies REQ-053
+ */
+function _setDebugOutput(payload) {
+  const normalized = payload ?? { status: "empty" };
+  dom.debugOutput.textContent = JSON.stringify(normalized, null, 2);
 }
 
 /**
@@ -385,6 +402,26 @@ async function _setIntervalOverride() {
 }
 
 /**
+ * @brief Fetch required provider pages through debug API and render diagnostics.
+ * @returns {Promise<void>} Completion promise.
+ * @satisfies REQ-053
+ */
+async function _fetchProviderPagesDiagnostics() {
+  const response = await chrome.runtime.sendMessage({
+    type: "debug.api.execute",
+    command: "providers.pages.get",
+    args: {
+      max_chars: 12000,
+      max_related_resources: 4,
+    },
+  });
+  if (!response?.ok) {
+    throw new Error(response?.error ?? "providers.pages.get failed");
+  }
+  _setDebugOutput(response.result);
+}
+
+/**
  * @brief Register popup event handlers.
  * @returns {void}
  */
@@ -410,6 +447,14 @@ function _wireUiEvents() {
   dom.setIntervalButton.addEventListener("click", () => {
     void _setIntervalOverride().catch((error) => {
       logger.error("set-interval-failure", { error: String(error) });
+    });
+  });
+
+  dom.providerPagesButton.addEventListener("click", () => {
+    _setDebugOutput({ status: "running", command: "providers.pages.get" });
+    void _fetchProviderPagesDiagnostics().catch((error) => {
+      logger.error("providers-pages-fetch-failure", { error: String(error) });
+      _setDebugOutput({ status: "error", error: String(error) });
     });
   });
 

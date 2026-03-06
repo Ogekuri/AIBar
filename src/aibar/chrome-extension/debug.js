@@ -6,6 +6,7 @@
  * @satisfies CTN-011
  * @satisfies REQ-044
  * @satisfies REQ-045
+ * @satisfies REQ-050
  */
 
 /** @brief Storage key containing persisted debug records. */
@@ -62,6 +63,54 @@ function _cloneDebugValue(value, depth = 0) {
 }
 
 /**
+ * @brief Resolve one bound console sink method for safe invocation.
+ * @details Avoids illegal-invocation runtime errors by binding console methods
+ * and returning null when the requested sink is unavailable.
+ * Time complexity: O(1).
+ * Space complexity: O(1).
+ * @param {string} level Log sink identifier.
+ * @returns {((...args: Array<unknown>) => void) | null} Bound console method or null.
+ * @satisfies REQ-050
+ */
+function _resolveConsoleMethod(level) {
+  if (typeof console !== "object" || console === null) {
+    return null;
+  }
+  const candidate = console[level];
+  if (typeof candidate === "function") {
+    return candidate.bind(console);
+  }
+  if (typeof console.log === "function") {
+    return console.log.bind(console);
+  }
+  return null;
+}
+
+/**
+ * @brief Emit one console log entry while suppressing sink-level failures.
+ * @details Prevents logging-path exceptions from breaking caller execution by
+ * guarding bound console method invocation in a local try/catch block.
+ * Time complexity: O(1).
+ * Space complexity: O(1).
+ * @param {string} level Log level.
+ * @param {string} prefix Console prefix.
+ * @param {unknown} safeDetails Serialization-safe details payload.
+ * @returns {void}
+ * @satisfies REQ-050
+ */
+function _emitConsoleSafe(level, prefix, safeDetails) {
+  try {
+    const consoleMethod = _resolveConsoleMethod(level);
+    if (!consoleMethod) {
+      return;
+    }
+    consoleMethod(prefix, safeDetails);
+  } catch (_error) {
+    // Keep logger non-throwing even on console sink failures.
+  }
+}
+
+/**
  * @brief Persist one debug record into storage ring buffer.
  * @details Appends a single record under DEBUG_LOG_STORAGE_KEY and truncates
  * older records to DEBUG_LOG_MAX_RECORDS to keep bounded storage usage.
@@ -108,38 +157,34 @@ export function createLogger(scope) {
     };
 
     const prefix = `[AIBar:${scope}] ${event}`;
-    const consoleMethod = typeof console[level] === "function"
-      ? console[level].bind(console)
-      : console.log.bind(console);
-    consoleMethod(prefix, safeDetails);
-
-    await appendDebugRecord(record);
+    _emitConsoleSafe(level, prefix, safeDetails);
+    try {
+      await appendDebugRecord(record);
+    } catch (error) {
+      _emitConsoleSafe("error", "[AIBar:debug] appendDebugRecord failed", _cloneDebugValue({
+        scope,
+        event,
+        error: String(error?.message ?? error),
+      }));
+    }
   }
 
   return {
     /** @brief Emit DEBUG-level event. */
     debug(event, details = {}) {
-      void write("debug", event, details).catch((error) => {
-        console.error("[AIBar:debug] appendDebugRecord failed", error);
-      });
+      void write("debug", event, details);
     },
     /** @brief Emit INFO-level event. */
     info(event, details = {}) {
-      void write("info", event, details).catch((error) => {
-        console.error("[AIBar:debug] appendDebugRecord failed", error);
-      });
+      void write("info", event, details);
     },
     /** @brief Emit WARN-level event. */
     warn(event, details = {}) {
-      void write("warn", event, details).catch((error) => {
-        console.error("[AIBar:debug] appendDebugRecord failed", error);
-      });
+      void write("warn", event, details);
     },
     /** @brief Emit ERROR-level event. */
     error(event, details = {}) {
-      void write("error", event, details).catch((error) => {
-        console.error("[AIBar:debug] appendDebugRecord failed", error);
-      });
+      void write("error", event, details);
     },
   };
 }

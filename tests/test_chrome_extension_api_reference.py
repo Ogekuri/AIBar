@@ -26,6 +26,7 @@ def test_api_reference_file_exists_and_covers_required_routes() -> None:
     assert "api.main.snapshot" in source
     assert "debug.api.describe" in source
     assert "debug.api.execute" in source
+    assert "providers.pages.get" in source
     assert "config.debug_api.get" in source
     assert "config.debug_api.set" in source
 

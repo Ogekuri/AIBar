@@ -5,6 +5,7 @@
 derived from structural semantics instead of localized text labels.
 @satisfies TST-015
 @satisfies TST-016
+@satisfies TST-025
 """
 
 import json
@@ -144,6 +145,22 @@ def test_codex_parser_extracts_metrics_from_escaped_script_fixture() -> None:
     assert payload["windows"]["7d"]["remaining"] == 260
 
 
+def test_codex_parser_rejects_noise_only_fraction_artifacts() -> None:
+    """
+    @brief Verify Codex parser rejects non-quota fractions from challenge/noise payloads.
+    @satisfies REQ-041
+    @satisfies TST-025
+    """
+    payload = _run_parser("parseCodexUsageHtml", "codex_usage_noise_fractions.html")
+    assert payload["provider"] == "codex"
+    assert payload["windows"]["5h"]["usage_percent"] is None
+    assert payload["windows"]["5h"]["remaining"] is None
+    assert payload["windows"]["5h"]["limit"] is None
+    assert payload["windows"]["7d"]["usage_percent"] is None
+    assert payload["windows"]["7d"]["remaining"] is None
+    assert payload["windows"]["7d"]["limit"] is None
+
+
 def test_signal_diagnostics_reports_metric_key_matches_for_escaped_script() -> None:
     """
     @brief Verify signal diagnostics include matched metric-key evidence.
@@ -186,6 +203,50 @@ def test_copilot_merge_combines_features_and_premium_sources() -> None:
     assert payload["windows"]["30d"]["remaining"] == 820
     assert payload["windows"]["30d"]["limit"] == 1000
     assert payload["windows"]["30d"]["reset_at"] == "2026-03-31T00:00:00.000Z"
+
+
+def test_claude_parser_matches_current_usage_page_statistics_fixture() -> None:
+    """
+    @brief Verify Claude parser maps current session/weekly usage percentages.
+    @satisfies REQ-040
+    @satisfies TST-025
+    """
+    payload = _run_parser("parseClaudeUsageHtml", "claude_usage_current_signals.html")
+    assert payload["provider"] == "claude"
+    assert payload["windows"]["5h"]["usage_percent"] == 0
+    assert payload["windows"]["7d"]["usage_percent"] == 11
+    assert payload["windows"]["7d"]["reset_at"] == "2026-03-06T11:59:00.000Z"
+
+
+def test_codex_parser_converts_remaining_percentages_from_current_fixture() -> None:
+    """
+    @brief Verify Codex parser converts remaining percentages to usage percentages.
+    @satisfies REQ-041
+    @satisfies TST-025
+    """
+    payload = _run_parser("parseCodexUsageHtml", "codex_usage_current_signals.html")
+    assert payload["provider"] == "codex"
+    assert payload["windows"]["5h"]["usage_percent"] == 4
+    assert payload["windows"]["7d"]["usage_percent"] == 22
+    assert payload["windows"]["5h"]["reset_at"] == "2026-03-06T22:53:00.000Z"
+    assert payload["windows"]["7d"]["reset_at"] == "2026-03-12T12:16:00.000Z"
+
+
+def test_copilot_merge_matches_current_features_and_premium_fixture() -> None:
+    """
+    @brief Verify Copilot merge keeps features percentage and premium quota/reset fields.
+    @satisfies REQ-042
+    @satisfies TST-025
+    """
+    payload = _run_copilot_merge(
+        "copilot_features_current_signals.html",
+        "copilot_premium_current_signals.html",
+    )
+    assert payload["provider"] == "copilot"
+    assert payload["windows"]["30d"]["usage_percent"] == 17.9
+    assert payload["windows"]["30d"]["remaining"] == 1240
+    assert payload["windows"]["30d"]["limit"] == 1500
+    assert payload["windows"]["30d"]["reset_at"] == "2026-04-01T00:00:00.000Z"
 
 
 def test_parser_module_uses_semantic_markers_instead_of_language_labels() -> None:

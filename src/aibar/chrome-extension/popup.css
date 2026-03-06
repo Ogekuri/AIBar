@@ -100,6 +100,24 @@ body {
   color: #bdbdbd;
 }
 
+.aibar-debug-output {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.22);
+  padding: 6px;
+}
+
+.aibar-debug-pre {
+  margin: 0;
+  max-height: 120px;
+  overflow: auto;
+  font-size: 0.67rem;
+  line-height: 1.3;
+  color: #c8d0d8;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .aibar-tab-bar {
   display: flex;
   gap: 2px;

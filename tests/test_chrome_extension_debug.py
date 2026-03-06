@@ -39,12 +39,15 @@ def test_popup_exposes_export_clear_and_debug_toggle_controls() -> None:
     script_source = POPUP_SCRIPT_PATH.read_text(encoding="utf-8")
     assert 'id="exportButton"' in html_source
     assert 'id="clearLogsButton"' in html_source
+    assert 'id="providerPagesButton"' in html_source
     assert 'id="debugEnableCheckbox"' in html_source
     assert 'id="debugStatusLabel"' in html_source
+    assert 'id="debugOutput"' in html_source
     assert 'type: "config.debug_api.get"' in script_source
     assert 'type: "config.debug_api.set"' in script_source
     assert 'type: "debug.export_bundle"' in script_source
     assert 'type: "debug.clear_logs"' in script_source
+    assert 'command: "providers.pages.get"' in script_source
 
 
 def test_debug_logger_binds_console_methods_before_invocation() -> None:
@@ -54,5 +57,8 @@ def test_debug_logger_binds_console_methods_before_invocation() -> None:
     @satisfies TST-022
     """
     source = DEBUG_PATH.read_text(encoding="utf-8")
-    assert "console[level].bind(console)" in source
-    assert "console.log.bind(console)" in source
+    assert "function _resolveConsoleMethod(level)" in source
+    assert "function _emitConsoleSafe(level, prefix, safeDetails)" in source
+    assert "_emitConsoleSafe(level, prefix, safeDetails);" in source
+    assert "await appendDebugRecord(record);" in source
+    assert "_emitConsoleSafe(\"error\", \"[AIBar:debug] appendDebugRecord failed\"" in source

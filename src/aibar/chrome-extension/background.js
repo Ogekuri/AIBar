@@ -75,6 +75,7 @@ const DEBUG_API_SUPPORTED_COMMANDS = [
   "parser.run",
   "provider.diagnose",
   "providers.diagnose",
+  "providers.pages.get",
   "state.get",
   "refresh.run",
   "logs.get",
@@ -105,6 +106,21 @@ const DEBUG_API_PROVIDER_DEFAULT_URLS = {
 
 /** @brief Default provider set used by aggregate diagnose command. */
 const DEBUG_API_DEFAULT_PROVIDER_DIAGNOSE_SET = ["claude", "codex", "copilot_merged"];
+
+/** @brief Required provider pages for one-call debug download diagnostics. */
+const DEBUG_API_PROVIDER_PAGES = [
+  { key: "claude", url: "https://claude.ai/settings/usage", parser: "claude" },
+  { key: "copilot_features", url: "https://github.com/settings/copilot/features", parser: "copilot_features" },
+  {
+    key: "copilot_premium",
+    url: "https://github.com/settings/billing/premium_requests_usage",
+    parser: "copilot_premium",
+  },
+  { key: "codex", url: "https://chatgpt.com/codex/settings/usage", parser: "codex" },
+];
+
+/** @brief Default maximum same-origin related resources fetched per provider page. */
+const DEBUG_API_PROVIDER_PAGES_DEFAULT_RELATED_LIMIT = 6;
 
 /** @brief Dedicated logger for background runtime events. */
 const logger = createLogger("background");
@@ -165,6 +181,19 @@ function _cloneState() {
 }
 
 /**
+ * @brief Convert optional metric token into finite number without null coercion.
+ * @param {unknown} token Candidate token.
+ * @returns {number | null} Finite number or null when token is empty/invalid.
+ */
+function _toFiniteMetricNumber(token) {
+  if (token === null || token === undefined || token === "") {
+    return null;
+  }
+  const parsed = Number(token);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
  * @brief Normalize one window metric payload for primary API transport.
  * @details Restricts window payload shape to popup-rendered progress and quota
  * fields so API consumers can rebuild tab cards deterministically.
@@ -175,14 +204,14 @@ function _cloneState() {
  * @satisfies REQ-046
  */
 function _normalizeMainApiWindow(windowData) {
-  const usagePercent = Number(windowData?.usage_percent);
-  const remaining = Number(windowData?.remaining);
-  const limit = Number(windowData?.limit);
+  const usagePercent = _toFiniteMetricNumber(windowData?.usage_percent);
+  const remaining = _toFiniteMetricNumber(windowData?.remaining);
+  const limit = _toFiniteMetricNumber(windowData?.limit);
   const resetAt = typeof windowData?.reset_at === "string" ? windowData.reset_at : null;
   return {
-    usage_percent: Number.isFinite(usagePercent) ? usagePercent : null,
-    remaining: Number.isFinite(remaining) ? remaining : null,
-    limit: Number.isFinite(limit) ? limit : null,
+    usage_percent: usagePercent,
+    remaining,
+    limit,
     reset_at: resetAt,
   };
 }
@@ -464,12 +493,12 @@ function _buildPayloadQuality(payload) {
   };
   const windows = payload?.windows && typeof payload.windows === "object" ? payload.windows : {};
   for (const [windowKey, windowData] of Object.entries(windows)) {
-    const usage = Number(windowData?.usage_percent);
-    const remaining = Number(windowData?.remaining);
-    const limit = Number(windowData?.limit);
-    const hasUsage = Number.isFinite(usage);
-    const hasRemaining = Number.isFinite(remaining);
-    const hasLimit = Number.isFinite(limit);
+    const usage = _toFiniteMetricNumber(windowData?.usage_percent);
+    const remaining = _toFiniteMetricNumber(windowData?.remaining);
+    const limit = _toFiniteMetricNumber(windowData?.limit);
+    const hasUsage = usage !== null;
+    const hasRemaining = remaining !== null;
+    const hasLimit = limit !== null;
     const hasQuota = hasRemaining || hasLimit;
     const usable = hasUsage || hasQuota;
     if (usable) {
@@ -553,6 +582,202 @@ async function _buildDebugHttpResponse(download, maxChars) {
     body_preview_tail: tailPreview,
     body_truncated: download.body_text.length > bodyPreview.length,
     html_probe: _buildHtmlProbe(download.body_text),
+  };
+}
+
+/**
+ * @brief Normalize max related-resource downloads for providers.pages.get.
+ * @details Applies deterministic hard bounds to prevent unbounded secondary page
+ * downloads during debug diagnostics runs.
+ * Time complexity: O(1).
+ * Space complexity: O(1).
+ * @param {unknown} token Candidate limit value.
+ * @returns {number} Bounded related-resource limit.
+ * @satisfies REQ-048
+ */
+function _normalizeDebugRelatedLimit(token) {
+  const parsed = Number(token);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return DEBUG_API_PROVIDER_PAGES_DEFAULT_RELATED_LIMIT;
+  }
+  return Math.min(20, Math.max(0, Math.round(parsed)));
+}
+
+/**
+ * @brief Extract same-origin related resource URLs from one HTML page.
+ * @details Parses script/link resource attributes and keeps only `https`
+ * same-origin URLs so follow-up debug downloads remain within current host scope.
+ * Time complexity: O(N) on HTML length.
+ * Space complexity: O(M) on extracted URLs.
+ * @param {string} html Source HTML.
+ * @param {string} pageUrl Base page URL used for URL resolution.
+ * @returns {Array<string>} Ordered unique same-origin resource URLs.
+ * @satisfies REQ-048
+ */
+function _extractRelatedResourceUrls(html, pageUrl) {
+  let baseUrl;
+  try {
+    baseUrl = new URL(pageUrl);
+  } catch (_error) {
+    return [];
+  }
+
+  const matches = [];
+  const attrRegex = /<(?:script|link)\b[^>]*\b(?:src|href)\s*=\s*(?:"([^"]+)"|'([^']+)')/gi;
+  let attrMatch;
+  while ((attrMatch = attrRegex.exec(html)) !== null) {
+    const raw = attrMatch[1] ?? attrMatch[2] ?? "";
+    if (!raw || raw.startsWith("data:") || raw.startsWith("javascript:")) {
+      continue;
+    }
+    try {
+      const resolved = new URL(raw, baseUrl);
+      if (resolved.protocol !== "https:" || resolved.hostname !== baseUrl.hostname) {
+        continue;
+      }
+      matches.push(resolved.toString());
+    } catch (_error) {
+      // Ignore malformed related URLs.
+    }
+  }
+
+  return Array.from(new Set(matches));
+}
+
+/**
+ * @brief Build parser-centric quality summary for one provider payload.
+ * @param {string} provider Provider token.
+ * @param {Record<string, unknown>} payload Parsed payload.
+ * @returns {Record<string, unknown>} Structured quality summary.
+ * @satisfies REQ-048
+ */
+function _buildProviderPayloadAnalysis(provider, payload) {
+  const quality = _buildPayloadQuality(payload);
+  return {
+    provider,
+    payload_usable: quality.payload_usable,
+    usable_windows: quality.usable_windows,
+    windows: quality.windows,
+    payload_assertion: _buildPayloadAssertion(provider, payload),
+  };
+}
+
+/**
+ * @brief Download same-origin related resources for one provider page.
+ * @param {string} html Page HTML.
+ * @param {string} pageUrl Source page URL.
+ * @param {number} maxChars Preview size limit.
+ * @param {number} maxRelated Resource download limit.
+ * @returns {Promise<Record<string, unknown>>} Related-resource diagnostics payload.
+ * @satisfies REQ-048
+ */
+async function _downloadRelatedResources(html, pageUrl, maxChars, maxRelated) {
+  const candidates = _extractRelatedResourceUrls(html, pageUrl);
+  const selected = candidates.slice(0, maxRelated);
+  const resources = [];
+  for (const resourceUrl of selected) {
+    try {
+      const download = await _downloadDebugUrl(resourceUrl);
+      resources.push({
+        url: resourceUrl,
+        ok: true,
+        response: await _buildDebugHttpResponse(download, maxChars),
+      });
+    } catch (error) {
+      resources.push({
+        url: resourceUrl,
+        ok: false,
+        error: String(error?.message ?? error),
+      });
+    }
+  }
+
+  return {
+    discovered_total: candidates.length,
+    fetched_total: resources.length,
+    resources,
+  };
+}
+
+/**
+ * @brief Execute one provider-page download diagnostic entry.
+ * @param {{key: string, url: string, parser: string}} descriptor Provider page descriptor.
+ * @param {number} maxChars Preview-size limit.
+ * @param {number} maxRelated Related-resource download limit.
+ * @returns {Promise<Record<string, unknown>>} Page diagnostics payload.
+ * @satisfies REQ-048
+ */
+async function _executeProviderPageDownload(descriptor, maxChars, maxRelated) {
+  const download = await _downloadDebugUrl(descriptor.url);
+  const parser = _resolveDebugParser(descriptor.parser);
+  const parserPayload = parser(download.body_text);
+  const payloadAnalysis = _buildProviderPayloadAnalysis(descriptor.parser, parserPayload);
+  const related = await _downloadRelatedResources(
+    download.body_text,
+    descriptor.url,
+    Math.min(maxChars, 8000),
+    maxRelated
+  );
+
+  return {
+    key: descriptor.key,
+    provider: descriptor.parser,
+    request: {
+      url: download.requested_url,
+      max_chars: maxChars,
+      related_limit: maxRelated,
+    },
+    response: await _buildDebugHttpResponse(download, maxChars),
+    parser_signal_diagnostics: extractSignalDiagnostics(download.body_text),
+    window_assignment_diagnostics: _buildWindowAssignmentDiagnostics(download.body_text, descriptor.parser),
+    parser_payload: parserPayload,
+    payload_analysis: payloadAnalysis,
+    related_content: related,
+  };
+}
+
+/**
+ * @brief Execute providers.pages.get debug command.
+ * @details Downloads required provider pages and same-origin related resources,
+ * runs provider-specific parsers, and returns one aggregate diagnostics payload.
+ * @param {Record<string, unknown>} args Debug command arguments.
+ * @returns {Promise<Record<string, unknown>>} Aggregate page diagnostics payload.
+ * @satisfies REQ-048
+ */
+async function _executeProvidersPagesGetCommand(args) {
+  const maxChars = _normalizeDebugMaxChars(args?.max_chars);
+  const maxRelated = _normalizeDebugRelatedLimit(args?.max_related_resources);
+  const providers = {};
+
+  for (const descriptor of DEBUG_API_PROVIDER_PAGES) {
+    try {
+      providers[descriptor.key] = {
+        ok: true,
+        diagnostics: await _executeProviderPageDownload(descriptor, maxChars, maxRelated),
+      };
+    } catch (error) {
+      providers[descriptor.key] = {
+        ok: false,
+        error: String(error?.message ?? error),
+      };
+    }
+  }
+
+  const summary = {
+    total: DEBUG_API_PROVIDER_PAGES.length,
+    ok: Object.values(providers).filter((entry) => entry?.ok).length,
+  };
+  summary.fail = summary.total - summary.ok;
+
+  return {
+    command: "providers.pages.get",
+    request: {
+      urls: DEBUG_API_PROVIDER_PAGES.map((entry) => entry.url),
+      max_chars: maxChars,
+      max_related_resources: maxRelated,
+    },
+    summary,
+    providers,
   };
 }
 
@@ -739,6 +964,8 @@ function _describeDebugApi() {
         "copilot_merged",
       ],
       providers_diagnose_default: [...DEBUG_API_DEFAULT_PROVIDER_DIAGNOSE_SET],
+      providers_pages_get_urls: DEBUG_API_PROVIDER_PAGES.map((entry) => entry.url),
+      providers_pages_get_default_related_limit: DEBUG_API_PROVIDER_PAGES_DEFAULT_RELATED_LIMIT,
     },
   };
 }
@@ -881,6 +1108,8 @@ async function _executeDebugApiCommand(command, args) {
         providers,
       };
     }
+    case "providers.pages.get":
+      return await _executeProvidersPagesGetCommand(args);
     case "state.get":
       return {
         command: "state.get",
