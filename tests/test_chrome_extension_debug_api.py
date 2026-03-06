@@ -38,6 +38,7 @@ def test_debug_api_command_catalog_includes_http_parser_and_standard_commands() 
     assert '"http.get"' in source
     assert '"parser.run"' in source
     assert '"provider.diagnose"' in source
+    assert '"providers.diagnose"' in source
     assert '"state.get"' in source
     assert '"refresh.run"' in source
     assert '"logs.get"' in source
@@ -89,6 +90,8 @@ def test_debug_parser_command_dispatch_maps_provider_parsers() -> None:
     assert "provider === \"copilot_merged\"" in source
     assert "html_probe" in source
     assert "parser_signal_diagnostics" in source
+    assert "window_assignment_diagnostics" in source
+    assert "payload_assertion" in source
     assert "parser_payload" in source
     assert "payload_quality" in source
 
@@ -105,6 +108,20 @@ def test_debug_provider_diagnose_command_is_exposed_with_source_diagnostics() ->
     assert "command: \"provider.diagnose\"" in source
     assert "sources:" in source
     assert "payload_usable" in source
+    assert "providers.diagnose" in source
+
+
+def test_debug_providers_diagnose_command_returns_aggregate_diagnostics() -> None:
+    """
+    @brief Verify providers.diagnose command exposes aggregate multi-provider diagnostics.
+    @satisfies REQ-048
+    @satisfies TST-021
+    """
+    source = BACKGROUND_PATH.read_text(encoding="utf-8")
+    assert "case \"providers.diagnose\":" in source
+    assert "providers.diagnose requires at least one provider token" in source
+    assert "provider_fetch_sequence" in source
+    assert "DEBUG_API_DEFAULT_PROVIDER_DIAGNOSE_SET" in source
 
 
 def test_debug_api_logs_command_lifecycle_events() -> None:

@@ -19,7 +19,7 @@ NODE_MERGE_RUNNER = PROJECT_ROOT / "tests" / "helpers" / "chrome_merge_runner.mj
 PARSER_MODULE_PATH = PROJECT_ROOT / "src" / "aibar" / "chrome-extension" / "parsers.js"
 
 
-def _run_parser(function_name: str, fixture_name: str) -> dict:
+def _run_parser(function_name: str, fixture_name: str, second_payload: dict | None = None) -> dict:
     """
     @brief Execute one parser function through Node helper.
     @param function_name {str} Exported parser function name.
@@ -27,13 +27,17 @@ def _run_parser(function_name: str, fixture_name: str) -> dict:
     @return {dict} Parsed JSON payload.
     """
     fixture_path = FIXTURE_DIR / fixture_name
+    command = [
+        "node",
+        str(NODE_PARSER_RUNNER),
+        function_name,
+        str(fixture_path),
+    ]
+    if second_payload is not None:
+        command.append(json.dumps(second_payload))
+
     completed = subprocess.run(
-        [
-            "node",
-            str(NODE_PARSER_RUNNER),
-            function_name,
-            str(fixture_path),
-        ],
+        command,
         check=True,
         capture_output=True,
         text=True,
@@ -149,6 +153,23 @@ def test_signal_diagnostics_reports_metric_key_matches_for_escaped_script() -> N
     diagnostics = _run_parser("extractSignalDiagnostics", "codex_usage_escaped_script.html")
     assert diagnostics["signal_counts"]["metric_key_matches"] >= 2
     assert diagnostics["signal_samples"]["metric_key_matches"]
+
+
+def test_window_assignment_diagnostics_exposes_ranked_trace_payload() -> None:
+    """
+    @brief Verify window diagnostics returns candidate rankings and derived window values.
+    @satisfies REQ-048
+    @satisfies TST-021
+    """
+    diagnostics = _run_parser(
+        "extractWindowAssignmentDiagnostics",
+        "codex_usage_escaped_script.html",
+        {"provider": "codex"},
+    )
+    assert diagnostics["provider"] == "codex"
+    assert diagnostics["window_keys"] == ["5h", "7d"]
+    assert diagnostics["window_trace"]["5h"]["ranked_candidates"]["json"]
+    assert "derived_window" in diagnostics["window_trace"]["7d"]
 
 
 def test_copilot_merge_combines_features_and_premium_sources() -> None:

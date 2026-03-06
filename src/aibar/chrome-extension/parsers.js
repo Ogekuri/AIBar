@@ -928,6 +928,45 @@ function _candidateScore(candidate, windowKey) {
 }
 
 /**
+ * @brief Rank candidates by score and fallback distance for one window.
+ * @details Produces deterministic ranking tuples used both by runtime selection
+ * and by debug diagnostics so parser decisions remain explainable.
+ * @param {Array<Record<string, unknown>>} candidates Candidate list.
+ * @param {string} windowKey Target window key.
+ * @param {number} index Ordered fallback index.
+ * @returns {Array<Record<string, unknown>>} Ranked tuples with `item`, `score`, and `distance`.
+ */
+function _rankCandidates(candidates, windowKey, index) {
+  return candidates
+    .map((item, itemIndex) => ({
+      item,
+      score: _candidateScore(item, windowKey),
+      distance: Math.abs(itemIndex - index),
+    }))
+    .sort((left, right) => right.score - left.score || left.distance - right.distance);
+}
+
+/**
+ * @brief Normalize candidate payload into compact debug-trace shape.
+ * @param {Record<string, unknown> | null} candidate Candidate payload.
+ * @returns {Record<string, unknown> | null} Compact trace payload.
+ */
+function _traceCandidate(candidate) {
+  if (!candidate || typeof candidate !== "object") {
+    return null;
+  }
+  return {
+    window_hint: candidate.window_hint ?? null,
+    usage_percent: parseLocalizedNumber(candidate.usage_percent),
+    remaining: parseLocalizedNumber(candidate.remaining),
+    limit: parseLocalizedNumber(candidate.limit),
+    used: parseLocalizedNumber(candidate.used),
+    reset_at: typeof candidate.reset_at === "string" ? candidate.reset_at : null,
+    matched_keys: Array.isArray(candidate.matched_keys) ? candidate.matched_keys.slice(0, 8) : [],
+  };
+}
+
+/**
  * @brief Select one best-matching candidate by score and index proximity.
  * @param {Array<Record<string, unknown>>} candidates Candidate list.
  * @param {string} windowKey Target window key.
@@ -935,13 +974,7 @@ function _candidateScore(candidate, windowKey) {
  * @returns {Record<string, unknown> | null} Selected candidate.
  */
 function _pickCandidate(candidates, windowKey, index) {
-  const ranked = candidates
-    .map((item, itemIndex) => ({
-      item,
-      score: _candidateScore(item, windowKey),
-      distance: Math.abs(itemIndex - index),
-    }))
-    .sort((left, right) => right.score - left.score || left.distance - right.distance);
+  const ranked = _rankCandidates(candidates, windowKey, index);
 
   const best = ranked[0];
   if (!best || best.score < 2) {
@@ -998,6 +1031,7 @@ function _inferQuotaFromFraction(fraction, usagePercent) {
  * @param {Array<number | null>} percentCandidates Percent candidates.
  * @param {Array<string>} datetimeCandidates Datetime candidates.
  * @param {Array<Record<string, number | string | null>>} jsonCandidates JSON-derived candidates.
+ * @param {Record<string, unknown> | null} traceOutput Mutable trace object populated when requested.
  * @returns {Record<string, Record<string, number | string | null>>} Window metrics map.
  */
 function _buildWindows(
@@ -1006,23 +1040,29 @@ function _buildWindows(
   fractionCandidates,
   percentCandidates,
   datetimeCandidates,
-  jsonCandidates
+  jsonCandidates,
+  traceOutput = null
 ) {
   const windows = {};
 
   windowKeys.forEach((windowKey, index) => {
-    const jsonCandidate = _pickCandidate(jsonCandidates, windowKey, index);
-    const progressCandidate = _pickCandidate(progressCandidates, windowKey, index);
+    const rankedJsonCandidates = _rankCandidates(jsonCandidates, windowKey, index);
+    const rankedProgressCandidates = _rankCandidates(progressCandidates, windowKey, index);
+    const jsonCandidate = rankedJsonCandidates[0]?.score >= 2 ? rankedJsonCandidates[0].item : null;
+    const progressCandidate = rankedProgressCandidates[0]?.score >= 2 ? rankedProgressCandidates[0].item : null;
+    const percentCandidate = parseLocalizedNumber(percentCandidates[index] ?? null);
+    const fractionCandidate = fractionCandidates[index] ?? null;
+    const datetimeCandidate = datetimeCandidates[index] ?? null;
     const usagePercentFromSignals = _clamp(
       parseLocalizedNumber(jsonCandidate?.usage_percent) ??
         parseLocalizedNumber(progressCandidate?.usage_percent) ??
-        parseLocalizedNumber(percentCandidates[index] ?? null),
+        percentCandidate,
       0,
       100
     );
 
-    const quotaFromFraction = fractionCandidates[index]
-      ? _inferQuotaFromFraction(fractionCandidates[index], usagePercentFromSignals)
+    const quotaFromFraction = fractionCandidate
+      ? _inferQuotaFromFraction(fractionCandidate, usagePercentFromSignals)
       : { remaining: null, limit: null };
 
     const limit = _clamp(
@@ -1061,7 +1101,7 @@ function _buildWindows(
       typeof jsonCandidate?.reset_at === "string" ? jsonCandidate.reset_at : null;
     const resetAt =
       resetAtCandidate ??
-      (hasQuotaOrUsageSignal ? datetimeCandidates[index] ?? null : null);
+      (hasQuotaOrUsageSignal ? datetimeCandidate : null);
 
     windows[windowKey] = {
       usage_percent: usagePercent,
@@ -1069,6 +1109,42 @@ function _buildWindows(
       limit,
       reset_at: resetAt,
     };
+
+    if (traceOutput && typeof traceOutput === "object") {
+      traceOutput[windowKey] = {
+        selected_candidates: {
+          json: _traceCandidate(jsonCandidate),
+          progress: _traceCandidate(progressCandidate),
+          fraction: fractionCandidate
+            ? {
+                first: parseLocalizedNumber(fractionCandidate.first),
+                second: parseLocalizedNumber(fractionCandidate.second),
+              }
+            : null,
+          percentage_literal: percentCandidate,
+          datetime_literal: datetimeCandidate,
+        },
+        ranked_candidates: {
+          json: rankedJsonCandidates.slice(0, 4).map((entry) => ({
+            score: entry.score,
+            distance: entry.distance,
+            candidate: _traceCandidate(entry.item),
+          })),
+          progress: rankedProgressCandidates.slice(0, 4).map((entry) => ({
+            score: entry.score,
+            distance: entry.distance,
+            candidate: _traceCandidate(entry.item),
+          })),
+        },
+        derived_window: {
+          usage_percent_from_signals: usagePercentFromSignals,
+          usage_percent: usagePercent,
+          remaining,
+          limit,
+          reset_at: resetAt,
+        },
+      };
+    }
   });
 
   return windows;
@@ -1207,6 +1283,63 @@ export function extractSignalDiagnostics(html) {
       ),
       metric_key_matches: _sample(signals.metric_key_matches, 12),
     },
+  };
+}
+
+/**
+ * @brief Extract per-window candidate-selection trace for parser diagnostics.
+ * @details Replays window assembly using provider-specific window keys and emits
+ * deterministic candidate rankings plus derived output values for each window.
+ * Time complexity: O(N log N) over candidate counts due to per-window ranking.
+ * Space complexity: O(N) for trace snapshots.
+ * @param {string} html Raw HTML page source.
+ * @param {{provider?: string} | null | undefined} options Diagnostic options.
+ * @returns {Record<string, unknown>} Window-assignment diagnostic payload.
+ * @throws {Error} If provider token is unsupported.
+ */
+export function extractWindowAssignmentDiagnostics(html, options = {}) {
+  const provider = String(options?.provider ?? "").trim().toLowerCase();
+  const providerToken = provider || "claude";
+  let windowKeys;
+  switch (providerToken) {
+    case "claude":
+    case "codex":
+      windowKeys = ["5h", "7d"];
+      break;
+    case "copilot":
+    case "copilot_features":
+    case "copilot_premium":
+      windowKeys = ["30d"];
+      break;
+    default:
+      throw new Error(`Unsupported provider for window diagnostics: ${providerToken}`);
+  }
+
+  const signals = _extractSignals(html);
+  const windowTrace = {};
+  const windows = _buildWindows(
+    windowKeys,
+    signals.progress,
+    signals.fractions,
+    signals.percentages,
+    signals.datetimes,
+    signals.json_candidates,
+    windowTrace
+  );
+  return {
+    provider: providerToken,
+    parser_version: PARSER_VERSION,
+    window_keys: windowKeys,
+    signal_counts: {
+      progress: signals.progress.length,
+      fractions: signals.fractions.length,
+      percentages: signals.percentages.length,
+      datetimes: signals.datetimes.length,
+      json_candidates: signals.json_candidates.length,
+      metric_key_matches: signals.metric_key_matches.length,
+    },
+    windows,
+    window_trace: windowTrace,
   };
 }
 

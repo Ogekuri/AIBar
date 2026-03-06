@@ -106,7 +106,7 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **CTN-008**: MUST execute Chrome extension provider updates every 180 seconds by default through a hardcoded interval constant that remains configurable in source.
 - **CTN-009**: MUST process Chrome extension source pages in fixed order: Claude usage, Codex usage, Copilot features usage, Copilot premium usage.
 - **CTN-010**: MUST extract Chrome extension usage values from localization-independent DOM semantics, bootstrap-script payloads, and escaped script key-value artifacts, and MUST NOT rely on localized visible-label strings.
-- **CTN-011**: MUST expose Chrome extension runtime debugging through structured console logs and optional persisted extension-local log records.
+- **CTN-011**: MUST expose Chrome extension runtime debugging through console-safe structured logs, optional persisted extension-local log records, and API-retrievable parser/window diagnostic traces for fetched provider pages.
 - **CTN-012**: MUST restrict debug HTTP retrieval commands to `https` URLs and allowed hosts `claude.ai`, `chatgpt.com`, and `github.com`.
 - **CTN-013**: MUST cap debug HTTP response body previews through bounded `max_chars` truncation to prevent unbounded payload growth.
 
@@ -173,9 +173,9 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **REQ-045**: MUST continue rendering the latest successful provider state when network fetch or parser-usable-metric validation fails and MUST surface failure diagnostics through debug instrumentation.
 - **REQ-046**: MUST return a machine-readable debug command catalog when runtime message type `debug.api.describe` is requested.
 - **REQ-047**: MUST execute debug command `http.get` by downloading the requested URL and returning HTTP metadata, bounded head/tail response-body previews, deterministic body hash, and HTML probe markers.
-- **REQ-048**: MUST execute debug parser diagnostics commands (`parser.run`, `provider.diagnose`) that fetch or accept HTML input, run provider-specific parsers, and return parser output, HTML probes, signal diagnostics, payload-usability summaries, and matched metric-key evidence.
+- **REQ-048**: MUST execute debug parser diagnostics commands (`parser.run`, `provider.diagnose`, `providers.diagnose`) that fetch or accept HTML input, run provider-specific parsers, and return parser payloads, HTML probes, signal diagnostics, window-assignment traces, payload-usability summaries, and matched metric-key evidence.
 - **REQ-049**: MUST execute debug standard commands `state.get`, `refresh.run`, `logs.get`, `logs.clear`, `interval.get`, and `interval.set`.
-- **REQ-050**: MUST emit structured debug log records for debug API command start and completion including command identifier, duration, and success/failure status.
+- **REQ-050**: MUST emit structured debug log records for debug API command start and completion including command identifier, duration, and success/failure status, and MUST use console-invocation-safe logging wrappers that do not throw.
 
 ## 4. Test Requirements
 
@@ -201,8 +201,8 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 - **TST-018**: MUST verify repository no longer contains `src/aibar/chrome-extension/temp/` after implementation changes are completed.
 - **TST-019**: MUST verify `debug.api.describe` returns a deterministic command list including HTTP retrieval, parser commands, and standard runtime commands.
 - **TST-020**: MUST verify `debug.api.execute` command `http.get` enforces `https`+host allowlist validation and returns bounded head/tail previews, deterministic body hash, and HTML probe metadata.
-- **TST-021**: MUST verify debug parser-diagnostics command dispatch maps provider keys to parser functions and returns HTML probes, signal diagnostics, parser payloads, payload-usability summaries, and matched metric-key evidence.
-- **TST-022**: MUST verify standard debug commands route to state/refresh/log/interval handlers with interval update constraints.
+- **TST-021**: MUST verify debug parser-diagnostics command dispatch maps provider keys to parser functions and returns HTML probes, signal diagnostics, parser payloads, window-assignment traces, payload-usability summaries, and matched metric-key evidence, including aggregate `providers.diagnose` output.
+- **TST-022**: MUST verify standard debug commands route to state/refresh/log/interval handlers with interval update constraints and verify debug logger console invocation uses bound-safe methods.
 
 ## 5. Evidence
 
@@ -283,7 +283,7 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | CTN-008 | `src/aibar/chrome-extension/background.js` + `REFRESH_INTERVAL_SECONDS = 180` and `_scheduleRefreshAlarm` interval configuration path. |
 | CTN-009 | `src/aibar/chrome-extension/background.js` + `PROVIDER_FETCH_SEQUENCE` and ordered fetch execution in `_refreshAllProviders`. |
 | CTN-010 | `src/aibar/chrome-extension/parsers.js` + `_extractProgressMetrics`, `_extractEmbeddedJsonObjects`, `_extractBootstrapJsonFromScriptBody`, and `_extractEscapedScriptMetricCandidates` extraction path without localized UI labels. |
-| CTN-011 | `src/aibar/chrome-extension/debug.js` + storage-backed structured logs and `src/aibar/chrome-extension/popup.js` + debug export/clear actions. |
+| CTN-011 | `src/aibar/chrome-extension/debug.js` + bound-safe console logger + storage-backed records, `src/aibar/chrome-extension/background.js` + parser/window diagnostic command responses, and `src/aibar/chrome-extension/popup.js` + debug export/clear actions. |
 | DES-007 | `src/aibar/chrome-extension/icons/icon16.png`, `icon32.png`, `icon48.png`, `icon128.png` referenced by `manifest.json` icon entries. |
 | DES-008 | `src/aibar/chrome-extension/popup.html` + tab/card skeleton and `src/aibar/chrome-extension/popup.css` + GNOME-parity class taxonomy. |
 | DES-009 | `src/aibar/chrome-extension/background.js` + service-worker execution unit with alarm-triggered periodic refresh and state publish. |
@@ -308,10 +308,10 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | DES-011 | `src/aibar/chrome-extension/background.js` + `_describeDebugApi`, `_executeDebugApiCommand`, and dispatcher envelope in `_handleMessage`. |
 | REQ-046 | `src/aibar/chrome-extension/background.js` + `debug.api.describe` response with endpoint/commands/default schema payload. |
 | REQ-047 | `src/aibar/chrome-extension/background.js` + `http.get` command route returning `body_preview`, `body_preview_tail`, `body_sha256`, and `html_probe` metadata. |
-| REQ-048 | `src/aibar/chrome-extension/background.js` + `parser.run`/`provider.diagnose` dispatch with signal diagnostics and payload-quality summaries, and `src/aibar/chrome-extension/parsers.js` + `extractSignalDiagnostics` metric-key evidence samples. |
+| REQ-048 | `src/aibar/chrome-extension/background.js` + `parser.run`/`provider.diagnose`/`providers.diagnose` dispatch with signal diagnostics, window-assignment traces, and payload assertions; `src/aibar/chrome-extension/parsers.js` + `extractSignalDiagnostics` and `extractWindowAssignmentDiagnostics`. |
 | REQ-049 | `src/aibar/chrome-extension/background.js` + standard command routes `state.get`, `refresh.run`, `logs.get`, `logs.clear`, `interval.get`, `interval.set`. |
-| REQ-050 | `src/aibar/chrome-extension/background.js` + `debug-api-command-start/success/failure` structured logger events with `duration_ms`. |
+| REQ-050 | `src/aibar/chrome-extension/background.js` + `debug-api-command-start/success/failure` structured logger events with `duration_ms`, and `src/aibar/chrome-extension/debug.js` + bound console-method invocation wrapper in `createLogger`. |
 | TST-019 | `tests/test_chrome_extension_debug_api.py` + command API route + command catalog assertions. |
 | TST-020 | `tests/test_chrome_extension_debug_api.py` + HTTPS allowlist + head/tail preview, hash, and probe metadata assertions for `http.get`. |
-| TST-021 | `tests/test_chrome_extension_debug_api.py` + parser/provider-diagnose dispatch assertions and `tests/test_chrome_extension_parser.py` + signal-diagnostics metric-key evidence assertion coverage. |
-| TST-022 | `tests/test_chrome_extension_debug_api.py` + standard command list and lifecycle logging assertions. |
+| TST-021 | `tests/test_chrome_extension_debug_api.py` + parser/provider/providers-diagnose dispatch assertions, and `tests/test_chrome_extension_parser.py` + signal-diagnostics metric-key evidence plus window-assignment trace assertions. |
+| TST-022 | `tests/test_chrome_extension_debug_api.py` + standard command list and lifecycle logging assertions, and `tests/test_chrome_extension_debug.py` + bound-safe console invocation assertions. |

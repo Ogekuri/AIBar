@@ -108,7 +108,9 @@ export function createLogger(scope) {
     };
 
     const prefix = `[AIBar:${scope}] ${event}`;
-    const consoleMethod = console[level] || console.log;
+    const consoleMethod = typeof console[level] === "function"
+      ? console[level].bind(console)
+      : console.log.bind(console);
     consoleMethod(prefix, safeDetails);
 
     await appendDebugRecord(record);

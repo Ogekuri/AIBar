@@ -39,3 +39,14 @@ def test_popup_exposes_export_and_clear_debug_controls() -> None:
     assert 'id="clearLogsButton"' in html_source
     assert 'type: "debug.export_bundle"' in script_source
     assert 'type: "debug.clear_logs"' in script_source
+
+
+def test_debug_logger_binds_console_methods_before_invocation() -> None:
+    """
+    @brief Verify logger binds console methods to prevent illegal invocation errors.
+    @satisfies REQ-050
+    @satisfies TST-022
+    """
+    source = DEBUG_PATH.read_text(encoding="utf-8")
+    assert "console[level].bind(console)" in source
+    assert "console.log.bind(console)" in source

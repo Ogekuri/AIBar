@@ -26,6 +26,7 @@ import {
 } from "./debug.js";
 import {
   extractSignalDiagnostics,
+  extractWindowAssignmentDiagnostics,
   mergeCopilotPayloads,
   parseClaudeUsageHtml,
   parseCodexUsageHtml,
@@ -59,6 +60,7 @@ const DEBUG_API_SUPPORTED_COMMANDS = [
   "http.get",
   "parser.run",
   "provider.diagnose",
+  "providers.diagnose",
   "state.get",
   "refresh.run",
   "logs.get",
@@ -83,6 +85,9 @@ const DEBUG_API_PROVIDER_DEFAULT_URLS = {
   copilot_features: "https://github.com/settings/copilot/features",
   copilot_premium: "https://github.com/settings/billing/premium_requests_usage",
 };
+
+/** @brief Default provider set used by aggregate diagnose command. */
+const DEBUG_API_DEFAULT_PROVIDER_DIAGNOSE_SET = ["claude", "codex", "copilot_merged"];
 
 /** @brief Dedicated logger for background runtime events. */
 const logger = createLogger("background");
@@ -444,6 +449,124 @@ async function _buildDebugHttpResponse(download, maxChars) {
 }
 
 /**
+ * @brief Build payload-usability assertion status for diagnostics commands.
+ * @details Reuses runtime parser-usability gate and returns structured pass/fail
+ * metadata without throwing to simplify field-debug report consumption.
+ * @param {string} provider Provider key.
+ * @param {Record<string, unknown>} payload Parsed payload.
+ * @returns {{ok: boolean, error: string | null}} Assertion status payload.
+ */
+function _buildPayloadAssertion(provider, payload) {
+  try {
+    _assertProviderPayloadUsable(provider, payload);
+    return {
+      ok: true,
+      error: null,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: String(error?.message ?? error),
+    };
+  }
+}
+
+/**
+ * @brief Build window-assignment diagnostics for one parser HTML source.
+ * @details Wraps parser trace extraction in non-throwing envelope to keep debug
+ * API responses stable even when trace generation fails.
+ * @param {string} html Raw HTML payload.
+ * @param {string} provider Provider token for window-key selection.
+ * @returns {Record<string, unknown>} Window-trace payload or structured error.
+ */
+function _buildWindowAssignmentDiagnostics(html, provider) {
+  try {
+    return extractWindowAssignmentDiagnostics(html, { provider });
+  } catch (error) {
+    return {
+      provider,
+      error: String(error?.message ?? error),
+    };
+  }
+}
+
+/**
+ * @brief Execute provider-level diagnose routine for one provider token.
+ * @details Downloads provider pages, executes parser flows, and returns combined
+ * response probes, parser payloads, usability checks, and window traces.
+ * @param {string} provider Provider token.
+ * @param {Record<string, unknown>} args Debug command arguments.
+ * @param {number} maxChars Bounded response preview size.
+ * @returns {Promise<Record<string, unknown>>} Diagnose payload.
+ */
+async function _executeProviderDiagnoseCommand(provider, args, maxChars) {
+  if (provider === "copilot_merged") {
+    const featuresDownload = await _downloadDebugUrl(
+      args?.url_features ?? DEBUG_API_PROVIDER_DEFAULT_URLS.copilot_features
+    );
+    const premiumDownload = await _downloadDebugUrl(
+      args?.url_premium ?? DEBUG_API_PROVIDER_DEFAULT_URLS.copilot_premium
+    );
+    const featuresPayload = parseCopilotFeaturesHtml(featuresDownload.body_text);
+    const premiumPayload = parseCopilotPremiumHtml(premiumDownload.body_text);
+    const mergedPayload = mergeCopilotPayloads(featuresPayload, premiumPayload);
+    const mergedQuality = _buildPayloadQuality(mergedPayload);
+
+    return {
+      sources: {
+        features: {
+          request_url: featuresDownload.requested_url,
+          response: await _buildDebugHttpResponse(featuresDownload, maxChars),
+          parser_signal_diagnostics: extractSignalDiagnostics(featuresDownload.body_text),
+          window_assignment_diagnostics: _buildWindowAssignmentDiagnostics(
+            featuresDownload.body_text,
+            "copilot_features"
+          ),
+          parser_payload: featuresPayload,
+          payload_quality: _buildPayloadQuality(featuresPayload),
+          payload_assertion: _buildPayloadAssertion("copilot_features", featuresPayload),
+        },
+        premium: {
+          request_url: premiumDownload.requested_url,
+          response: await _buildDebugHttpResponse(premiumDownload, maxChars),
+          parser_signal_diagnostics: extractSignalDiagnostics(premiumDownload.body_text),
+          window_assignment_diagnostics: _buildWindowAssignmentDiagnostics(
+            premiumDownload.body_text,
+            "copilot_premium"
+          ),
+          parser_payload: premiumPayload,
+          payload_quality: _buildPayloadQuality(premiumPayload),
+          payload_assertion: _buildPayloadAssertion("copilot_premium", premiumPayload),
+        },
+      },
+      parser_payload: mergedPayload,
+      payload_quality: mergedQuality,
+      payload_usable: mergedQuality.payload_usable,
+      payload_assertion: _buildPayloadAssertion("copilot", mergedPayload),
+    };
+  }
+
+  const parser = _resolveDebugParser(provider);
+  const download = await _downloadDebugUrl(args?.url ?? DEBUG_API_PROVIDER_DEFAULT_URLS[provider]);
+  const parserPayload = parser(download.body_text);
+  const payloadQuality = _buildPayloadQuality(parserPayload);
+
+  return {
+    request: {
+      url: download.requested_url,
+      max_chars: maxChars,
+    },
+    response: await _buildDebugHttpResponse(download, maxChars),
+    parser_signal_diagnostics: extractSignalDiagnostics(download.body_text),
+    window_assignment_diagnostics: _buildWindowAssignmentDiagnostics(download.body_text, provider),
+    parser_payload: parserPayload,
+    payload_quality: payloadQuality,
+    payload_usable: payloadQuality.payload_usable,
+    payload_assertion: _buildPayloadAssertion(provider, parserPayload),
+  };
+}
+
+/**
  * @brief Resolve parser function by debug provider key.
  * @param {string} provider Provider key token.
  * @returns {(html: string) => Record<string, unknown>} Parser function.
@@ -507,6 +630,7 @@ function _describeDebugApi() {
         "copilot_premium",
         "copilot_merged",
       ],
+      providers_diagnose_default: [...DEBUG_API_DEFAULT_PROVIDER_DIAGNOSE_SET],
     },
   };
 }
@@ -566,9 +690,14 @@ async function _executeDebugApiCommand(command, args) {
             features: extractSignalDiagnostics(featuresHtml),
             premium: extractSignalDiagnostics(premiumHtml),
           },
+          window_assignment_diagnostics: {
+            features: _buildWindowAssignmentDiagnostics(featuresHtml, "copilot_features"),
+            premium: _buildWindowAssignmentDiagnostics(premiumHtml, "copilot_premium"),
+          },
           parser_payload: mergedPayload,
           payload_quality: payloadQuality,
           payload_usable: payloadQuality.payload_usable,
+          payload_assertion: _buildPayloadAssertion("copilot", mergedPayload),
         };
       }
 
@@ -583,9 +712,11 @@ async function _executeDebugApiCommand(command, args) {
         provider,
         html_probe: _buildHtmlProbe(html),
         parser_signal_diagnostics: extractSignalDiagnostics(html),
+        window_assignment_diagnostics: _buildWindowAssignmentDiagnostics(html, provider),
         parser_payload: parserPayload,
         payload_quality: payloadQuality,
         payload_usable: payloadQuality.payload_usable,
+        payload_assertion: _buildPayloadAssertion(provider, parserPayload),
       };
     }
     case "provider.diagnose": {
@@ -594,60 +725,52 @@ async function _executeDebugApiCommand(command, args) {
         throw new Error("provider.diagnose requires provider argument");
       }
       const maxChars = _normalizeDebugMaxChars(args?.max_chars);
-
-      if (provider === "copilot_merged") {
-        const featuresDownload = await _downloadDebugUrl(
-          args?.url_features ?? DEBUG_API_PROVIDER_DEFAULT_URLS.copilot_features
-        );
-        const premiumDownload = await _downloadDebugUrl(
-          args?.url_premium ?? DEBUG_API_PROVIDER_DEFAULT_URLS.copilot_premium
-        );
-        const featuresPayload = parseCopilotFeaturesHtml(featuresDownload.body_text);
-        const premiumPayload = parseCopilotPremiumHtml(premiumDownload.body_text);
-        const mergedPayload = mergeCopilotPayloads(featuresPayload, premiumPayload);
-        const mergedQuality = _buildPayloadQuality(mergedPayload);
-
-        return {
-          command: "provider.diagnose",
-          provider: "copilot_merged",
-          sources: {
-            features: {
-              request_url: featuresDownload.requested_url,
-              response: await _buildDebugHttpResponse(featuresDownload, maxChars),
-              parser_signal_diagnostics: extractSignalDiagnostics(featuresDownload.body_text),
-              parser_payload: featuresPayload,
-              payload_quality: _buildPayloadQuality(featuresPayload),
-            },
-            premium: {
-              request_url: premiumDownload.requested_url,
-              response: await _buildDebugHttpResponse(premiumDownload, maxChars),
-              parser_signal_diagnostics: extractSignalDiagnostics(premiumDownload.body_text),
-              parser_payload: premiumPayload,
-              payload_quality: _buildPayloadQuality(premiumPayload),
-            },
-          },
-          parser_payload: mergedPayload,
-          payload_quality: mergedQuality,
-          payload_usable: mergedQuality.payload_usable,
-        };
-      }
-
-      const parser = _resolveDebugParser(provider);
-      const download = await _downloadDebugUrl(args?.url ?? DEBUG_API_PROVIDER_DEFAULT_URLS[provider]);
-      const parserPayload = parser(download.body_text);
-      const payloadQuality = _buildPayloadQuality(parserPayload);
       return {
         command: "provider.diagnose",
         provider,
+        ...(await _executeProviderDiagnoseCommand(provider, args, maxChars)),
+      };
+    }
+    case "providers.diagnose": {
+      const maxChars = _normalizeDebugMaxChars(args?.max_chars);
+      const providerTokens = Array.isArray(args?.providers)
+        ? args.providers.map((token) => String(token).trim()).filter((token) => Boolean(token))
+        : [...DEBUG_API_DEFAULT_PROVIDER_DIAGNOSE_SET];
+      const dedupedProviders = Array.from(new Set(providerTokens));
+      if (dedupedProviders.length === 0) {
+        throw new Error("providers.diagnose requires at least one provider token");
+      }
+
+      const providers = {};
+      for (const provider of dedupedProviders) {
+        try {
+          providers[provider] = {
+            ok: true,
+            diagnostics: await _executeProviderDiagnoseCommand(provider, args, maxChars),
+          };
+        } catch (error) {
+          providers[provider] = {
+            ok: false,
+            error: String(error?.message ?? error),
+          };
+        }
+      }
+
+      const summary = {
+        total: dedupedProviders.length,
+        ok: Object.values(providers).filter((entry) => entry?.ok).length,
+      };
+      summary.fail = summary.total - summary.ok;
+
+      return {
+        command: "providers.diagnose",
         request: {
-          url: download.requested_url,
+          providers: dedupedProviders,
           max_chars: maxChars,
         },
-        response: await _buildDebugHttpResponse(download, maxChars),
-        parser_signal_diagnostics: extractSignalDiagnostics(download.body_text),
-        parser_payload: parserPayload,
-        payload_quality: payloadQuality,
-        payload_usable: payloadQuality.payload_usable,
+        summary,
+        provider_fetch_sequence: [...PROVIDER_FETCH_SEQUENCE],
+        providers,
       };
     }
     case "state.get":
