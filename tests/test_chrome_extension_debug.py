@@ -11,9 +11,9 @@ from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEBUG_PATH = PROJECT_ROOT / "src" / "aibar" / "chrome-extension" / "debug.mjs"
+DEBUG_PATH = PROJECT_ROOT / "src" / "aibar" / "chrome-extension" / "debug.js"
 POPUP_HTML_PATH = PROJECT_ROOT / "src" / "aibar" / "chrome-extension" / "popup.html"
-POPUP_SCRIPT_PATH = PROJECT_ROOT / "src" / "aibar" / "chrome-extension" / "popup.mjs"
+POPUP_SCRIPT_PATH = PROJECT_ROOT / "src" / "aibar" / "chrome-extension" / "popup.js"
 
 
 def test_debug_module_declares_storage_ring_buffer_and_bundle_export() -> None:

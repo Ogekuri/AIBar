@@ -266,23 +266,23 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | REQ-033 | `scripts/test-gnome-extension.sh` + no subcommand parameter; executes nested-shell launch directly on invocation. |
 | TST-009 | `tests/test_install_gnome_extension.py` + executable check, syntax check, git root resolution, source validation, and missing-source exit code assertions. |
 | PRJ-009 | `src/aibar/chrome-extension/manifest.json` + popup/action wiring and `src/aibar/chrome-extension/popup.html` + provider-tab set `claude`, `copilot`, `codex`. |
-| PRJ-010 | `src/aibar/chrome-extension/background.mjs` + `_fetchHtml` website downloads and parser pipeline without subprocess `aibar` invocation. |
-| CTN-008 | `src/aibar/chrome-extension/background.mjs` + `REFRESH_INTERVAL_SECONDS = 180` and `_scheduleRefreshAlarm` interval configuration path. |
-| CTN-009 | `src/aibar/chrome-extension/background.mjs` + `PROVIDER_FETCH_SEQUENCE` and ordered fetch execution in `_refreshAllProviders`. |
-| CTN-010 | `src/aibar/chrome-extension/parsers.mjs` + `_extractProgressMetrics`, `_extractDatetimeCandidates`, and `_extractEmbeddedJsonObjects` semantic extraction path. |
-| CTN-011 | `src/aibar/chrome-extension/debug.mjs` + storage-backed structured logs and `src/aibar/chrome-extension/popup.mjs` + debug export/clear actions. |
+| PRJ-010 | `src/aibar/chrome-extension/background.js` + `_fetchHtml` website downloads and parser pipeline without subprocess `aibar` invocation. |
+| CTN-008 | `src/aibar/chrome-extension/background.js` + `REFRESH_INTERVAL_SECONDS = 180` and `_scheduleRefreshAlarm` interval configuration path. |
+| CTN-009 | `src/aibar/chrome-extension/background.js` + `PROVIDER_FETCH_SEQUENCE` and ordered fetch execution in `_refreshAllProviders`. |
+| CTN-010 | `src/aibar/chrome-extension/parsers.js` + `_extractProgressMetrics`, `_extractDatetimeCandidates`, and `_extractEmbeddedJsonObjects` semantic extraction path. |
+| CTN-011 | `src/aibar/chrome-extension/debug.js` + storage-backed structured logs and `src/aibar/chrome-extension/popup.js` + debug export/clear actions. |
 | DES-007 | `src/aibar/chrome-extension/icons/icon16.png`, `icon32.png`, `icon48.png`, `icon128.png` referenced by `manifest.json` icon entries. |
 | DES-008 | `src/aibar/chrome-extension/popup.html` + tab/card skeleton and `src/aibar/chrome-extension/popup.css` + GNOME-parity class taxonomy. |
-| DES-009 | `src/aibar/chrome-extension/background.mjs` + service-worker execution unit with alarm-triggered periodic refresh and state publish. |
+| DES-009 | `src/aibar/chrome-extension/background.js` + service-worker execution unit with alarm-triggered periodic refresh and state publish. |
 | DES-010 | `tests/test_chrome_extension_temp_removed.py` + asserts repository absence of `src/aibar/chrome-extension/temp/`. |
 | REQ-038 | `src/aibar/chrome-extension/popup.html` + toolbar popup layout with exact `claude`, `copilot`, `codex` tab entries. |
-| REQ-039 | `src/aibar/chrome-extension/popup.mjs` + `_buildWindowRow/_renderProviderCard` progress-card rendering and `popup.css` provider color semantics. |
-| REQ-040 | `src/aibar/chrome-extension/background.mjs` + Claude URL fetch and `src/aibar/chrome-extension/parsers.mjs` + `parseClaudeUsageHtml`. |
-| REQ-041 | `src/aibar/chrome-extension/background.mjs` + Codex URL fetch and `src/aibar/chrome-extension/parsers.mjs` + `parseCodexUsageHtml`. |
-| REQ-042 | `src/aibar/chrome-extension/background.mjs` + dual Copilot page fetch and `src/aibar/chrome-extension/parsers.mjs` + `mergeCopilotPayloads`. |
-| REQ-043 | `src/aibar/chrome-extension/background.mjs` + alarm scheduler and popup publish message `usage.updated` after recurring refresh cycles. |
-| REQ-044 | `src/aibar/chrome-extension/debug.mjs` + `buildDebugBundle` and `src/aibar/chrome-extension/popup.mjs` + `_exportDebugBundle` JSON dump flow. |
-| REQ-045 | `src/aibar/chrome-extension/background.mjs` + `_applyProviderFailure` preserving previous payload while recording failure diagnostics. |
+| REQ-039 | `src/aibar/chrome-extension/popup.js` + `_buildWindowRow/_renderProviderCard` progress-card rendering and `popup.css` provider color semantics. |
+| REQ-040 | `src/aibar/chrome-extension/background.js` + Claude URL fetch and `src/aibar/chrome-extension/parsers.js` + `parseClaudeUsageHtml`. |
+| REQ-041 | `src/aibar/chrome-extension/background.js` + Codex URL fetch and `src/aibar/chrome-extension/parsers.js` + `parseCodexUsageHtml`. |
+| REQ-042 | `src/aibar/chrome-extension/background.js` + dual Copilot page fetch and `src/aibar/chrome-extension/parsers.js` + `mergeCopilotPayloads`. |
+| REQ-043 | `src/aibar/chrome-extension/background.js` + alarm scheduler and popup publish message `usage.updated` after recurring refresh cycles. |
+| REQ-044 | `src/aibar/chrome-extension/debug.js` + `buildDebugBundle` and `src/aibar/chrome-extension/popup.js` + `_exportDebugBundle` JSON dump flow. |
+| REQ-045 | `src/aibar/chrome-extension/background.js` + `_applyProviderFailure` preserving previous payload while recording failure diagnostics. |
 | TST-013 | `tests/test_chrome_extension_manifest.py` + manifest/popup tab/icon assertions for Chrome extension wiring. |
 | TST-014 | `tests/test_chrome_extension_background.py` + refresh interval default and provider-order assertions. |
 | TST-015 | `tests/test_chrome_extension_parser.py` + Node-driven localized fixture parser verification. |

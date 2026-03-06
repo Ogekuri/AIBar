@@ -1,5 +1,5 @@
 /**
- * @file popup.mjs
+ * @file popup.js
  * @brief Popup controller for rendering provider tabs and debug actions.
  * @details Consumes normalized state emitted by background service-worker and renders
  * GNOME-parity card/progress visuals for Claude, Copilot, and Codex providers.
@@ -8,7 +8,7 @@
  * @satisfies REQ-044
  */
 
-import { createLogger } from "./debug.mjs";
+import { createLogger } from "./debug.js";
 
 /** @brief Popup logger instance. */
 const logger = createLogger("popup");

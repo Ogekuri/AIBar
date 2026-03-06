@@ -21,7 +21,7 @@
     }
   },
   "background": {
-    "service_worker": "background.mjs",
+    "service_worker": "background.js",
     "type": "module"
   },
   "permissions": [

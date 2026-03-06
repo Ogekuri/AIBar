@@ -1,5 +1,5 @@
 /**
- * @file debug.mjs
+ * @file debug.js
  * @brief Structured debug instrumentation for AIBar Chrome extension runtime.
  * @details Provides console logging, persisted ring-buffer logging in chrome.storage.local,
  * and debug-bundle utilities used by background and popup execution units.

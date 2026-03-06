@@ -16,7 +16,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_DIR = PROJECT_ROOT / "tests" / "fixtures" / "chrome_extension"
 NODE_PARSER_RUNNER = PROJECT_ROOT / "tests" / "helpers" / "chrome_parser_runner.mjs"
 NODE_MERGE_RUNNER = PROJECT_ROOT / "tests" / "helpers" / "chrome_merge_runner.mjs"
-PARSER_MODULE_PATH = PROJECT_ROOT / "src" / "aibar" / "chrome-extension" / "parsers.mjs"
+PARSER_MODULE_PATH = PROJECT_ROOT / "src" / "aibar" / "chrome-extension" / "parsers.js"
 
 
 def _run_parser(function_name: str, fixture_name: str) -> dict:

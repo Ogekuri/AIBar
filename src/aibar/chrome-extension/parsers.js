@@ -1,5 +1,5 @@
 /**
- * @file parsers.mjs
+ * @file parsers.js
  * @brief Localization-independent HTML parser primitives for AIBar Chrome extension.
  * @details Extracts quota and progress metrics from provider usage pages by using
  * DOM semantics (`role=progressbar`, numeric attributes, `datetime`, embedded JSON)

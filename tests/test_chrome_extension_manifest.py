@@ -25,7 +25,7 @@ def test_manifest_declares_popup_and_service_worker_module() -> None:
     manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
     assert manifest["action"]["default_popup"] == "popup.html"
     assert manifest["action"]["default_title"] == "AIBar"
-    assert manifest["background"]["service_worker"] == "background.mjs"
+    assert manifest["background"]["service_worker"] == "background.js"
     assert manifest["background"]["type"] == "module"
 
 

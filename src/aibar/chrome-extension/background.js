@@ -1,5 +1,5 @@
 /**
- * @file background.mjs
+ * @file background.js
  * @brief Chrome extension service-worker runtime for autonomous provider refresh.
  * @details Executes ordered provider page downloads, parser normalization, state
  * persistence, and debug instrumentation on a recurring alarm interval.
@@ -16,14 +16,14 @@ import {
   clearDebugRecords,
   createLogger,
   readDebugRecords,
-} from "./debug.mjs";
+} from "./debug.js";
 import {
   mergeCopilotPayloads,
   parseClaudeUsageHtml,
   parseCodexUsageHtml,
   parseCopilotFeaturesHtml,
   parseCopilotPremiumHtml,
-} from "./parsers.mjs";
+} from "./parsers.js";
 
 /** @brief Default hardcoded refresh interval in seconds. */
 export const REFRESH_INTERVAL_SECONDS = 180;

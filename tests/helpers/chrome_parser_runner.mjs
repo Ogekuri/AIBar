@@ -20,7 +20,7 @@ async function main() {
   }
 
   const parserModuleUrl = pathToFileURL(
-    path.resolve(process.cwd(), "src/aibar/chrome-extension/parsers.mjs")
+    path.resolve(process.cwd(), "src/aibar/chrome-extension/parsers.js")
   ).href;
   const parserModule = await import(parserModuleUrl);
   const target = parserModule[fnName];
