@@ -69,3 +69,18 @@ def test_api_reference_includes_simple_api_call_examples() -> None:
     assert "enabled: true" in source
     assert "await chrome.runtime.sendMessage({" in source
     assert 'type: "debug.api.execute"' in source
+
+
+def test_api_reference_includes_curl_and_wget_examples() -> None:
+    """
+    @brief Verify API reference includes CLI HTTP call examples.
+    @details Enforces integration-ready examples for automation pipelines that
+    collect extension-local API snapshots through local HTTP bridges.
+    @satisfies PRJ-012
+    @satisfies REQ-054
+    """
+    source = API_REFERENCE_PATH.read_text(encoding="utf-8")
+    assert "### Example: `curl` request" in source
+    assert "curl -sS" in source
+    assert "### Example: `wget` request" in source
+    assert "wget -qO-" in source
