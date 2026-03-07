@@ -407,20 +407,6 @@ console.log(diagnosticsResponse.result.summary);
 ## HTTP CLI Examples (`curl` / `wget`)
 - `scope_note`: direct `curl`/`wget` calls can fetch provider pages immediately; runtime message payload examples require an external local bridge that forwards HTTP payloads to `chrome.runtime.sendMessage`.
 
-### Example: `curl` request
-```bash
-curl -sS \
-  -H "Cookie: <session-cookie>" \
-  "https://chatgpt.com/codex/settings/usage"
-```
-
-### Example: `wget` request
-```bash
-wget -qO- \
-  --header="Cookie: <session-cookie>" \
-  "https://github.com/settings/copilot/features"
-```
-
 ### Example: `curl` JSON payload for `debug.api.execute` bridge
 ```bash
 curl -sS -X POST "http://127.0.0.1:8765/extension/message" \
