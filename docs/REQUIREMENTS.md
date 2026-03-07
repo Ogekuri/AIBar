@@ -1,7 +1,7 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.3.12"
+version: "0.3.13"
 date: "2026-03-07"
 author: "req-change"
 scope:
@@ -104,7 +104,7 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **CTN-005**: MAY depend on unofficial/internal endpoints when official usage APIs are unavailable for Claude, Copilot, or Codex integrations.
 - **CTN-006**: MUST keep `docs/REFERENCES.md` synchronized with symbols defined under `src/` and `.github/workflows/`.
 - **CTN-007**: MUST declare `hatchling` as `[build-system]` backend in `pyproject.toml` with `[project]` metadata including `name`, `version`, `requires-python`, `dependencies`, and `[project.scripts]` console entry point.
-- **CTN-008**: MUST execute Chrome extension provider updates every 180 seconds by default through a hardcoded interval constant that remains configurable in source.
+- **CTN-008**: MUST execute Chrome extension provider updates every 180 seconds by default through a persisted interval value that the user MAY override and that MUST survive browser restarts via `chrome.storage.local`.
 - **CTN-009**: MUST process Chrome extension source pages in fixed order: Claude usage, Codex usage, Copilot features usage, Copilot premium usage.
 - **CTN-010**: MUST extract Chrome extension usage values from localization-independent DOM semantics, bootstrap-script payloads, and escaped script key-value artifacts, and MUST NOT rely on localized visible-label strings.
 - **CTN-011**: MUST expose Chrome extension runtime debugging through console-safe structured logs, optional persisted extension-local log records, and API-retrievable parser/window diagnostic traces for fetched provider pages.
@@ -112,12 +112,13 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **CTN-013**: MUST cap debug HTTP response body previews through bounded `max_chars` truncation to prevent unbounded payload growth.
 - **CTN-014**: MUST keep debug API enablement as a non-persistent in-memory flag defaulting to disabled on runtime startup, and MUST NOT persist debug enablement in extension storage.
 - **CTN-015**: MUST declare `host_permissions` in Chrome extension manifest for all provider domains so that service-worker `fetch()` includes browser session credentials via `credentials: "include"`.
+- **CTN-016**: MUST persist user-configured refresh interval in `chrome.storage.local` under a deterministic key and MUST restore it on service-worker startup before scheduling the first alarm.
 
 ## 3. Requirements
 
 ### 3.1 Design and Implementation
 - **DES-001**: MUST define `BaseProvider` as an abstract interface with `fetch`, `is_configured`, and `get_config_help`.
-- **DES-002**: MUST encode supported windows as `5h`, `7d`, and `30d` and provider names as `claude`, `openai`, `openrouter`, `copilot`, and `codex`.
+- **DES-002**: MUST encode supported windows as `5h`, `7d`, `30d`, and `code_review` and provider names as `claude`, `openai`, `openrouter`, `copilot`, and `codex`.
 - **DES-003**: MUST reject invalid CLI window values and provider values using Click `BadParameter`.
 - **DES-004**: MUST sanitize sensitive keys (`token`, `key`, `secret`, `password`, `authorization`) from cached raw payloads before disk writes.
 - **DES-005**: MUST parse env-file assignments with optional `export`, quoted values, and inline comments in GNOME extension env loading.
@@ -127,7 +128,7 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **DES-009**: MUST run Chrome extension refresh scheduling in a dedicated background execution unit that updates shared provider state for popup rendering.
 - **DES-010**: MUST remove repository directory `src/aibar/chrome-extension/temp/` after parser extraction logic is implemented and validated.
 - **DES-011**: MUST implement a background API dispatcher with `api.main.snapshot`, `debug.api.describe`, and `debug.api.execute` routes and a centralized debug-access guard controlled by runtime configuration state.
-- **DES-012**: MUST expose popup configuration controls to read and update the runtime debug-access flag through message-based configuration routes without storage persistence.
+- **DES-012**: MUST expose popup configuration controls limited to refresh-now, interval input, debug-enable checkbox, and debug status label; debug export, log-clear, and page-fetch actions MUST be accessible only through debug API commands.
 
 ### 3.2 Functions
 - **REQ-001**: MUST skip unconfigured providers in `show` output and print missing environment-variable hints when text mode is used.
@@ -170,7 +171,7 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **REQ-038**: MUST open the Chrome extension popup panel on toolbar icon click and render tab navigation with exactly `claude`, `copilot`, and `codex` entries.
 - **REQ-039**: MUST render Chrome popup tab visual hierarchy, progress bars, and metric card structure equivalent to GNOME extension semantics for corresponding providers.
 - **REQ-040**: MUST parse Claude `5h` and `7d` usage windows from `https://claude.ai/settings/usage` with deterministic window assignment and MUST fail refresh when no usable quota/progress metrics are extracted.
-- **REQ-041**: MUST parse Codex `5h` and `7d` windows from `https://chatgpt.com/codex/settings/usage`, including remaining-percentage-to-usage normalization and non-window artifact rejection, and MUST fail refresh when usable metrics are absent.
+- **REQ-041**: MUST parse Codex `5h`, `7d`, and `code_review` windows from `https://chatgpt.com/codex/settings/usage`, including remaining-percentage-to-usage normalization and non-window artifact rejection, and MUST fail refresh when usable metrics are absent.
 - **REQ-042**: MUST combine Copilot data from `https://github.com/settings/copilot/features` and `https://github.com/settings/billing/premium_requests_usage`, including consumed-of-included quota fractions and monthly reset extraction for merged `30d` payload.
 - **REQ-043**: MUST run recurring provider updates in the background execution unit every configured interval and publish fresh normalized tab state to popup consumers.
 - **REQ-044**: MUST support manual debug dump export containing raw extraction traces, normalized provider payloads, and timestamped refresh diagnostics when debug access is enabled.
@@ -182,10 +183,11 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **REQ-050**: MUST emit structured debug log records for debug API command start/completion including command identifier, duration, and success/failure status, and MUST keep logger sinks non-throwing when console or storage writes fail.
 - **REQ-051**: MUST return deterministic error responses for all runtime message types prefixed with `debug.` when debug access is disabled, while non-debug APIs continue to operate.
 - **REQ-052**: MUST expose runtime configuration messages `config.debug_api.get` and `config.debug_api.set` to read and mutate debug-access enablement in memory.
-- **REQ-053**: MUST expose popup debug UI controls for runtime enablement and provider-page GET diagnostics, and MUST keep all debug action controls disabled while debug access is off.
+- **REQ-053**: MUST expose popup debug UI controls limited to debug-enable checkbox and status badge, and MUST NOT render export-debug, clear-logs, or fetch-pages buttons in the popup HTML.
 - **REQ-054**: MUST keep `guidelines/Google_Extension_API_Reference.md` updated on every Chrome-extension API change and include complete request/response schemas for `api.main.snapshot`, `debug.api.describe`, and `debug.api.execute`.
 - **REQ-055**: MUST hide Chrome extension popup window progress bars and quota elements for a provider when that provider has an error and no populated window data, showing only the error message in the card.
 - **REQ-056**: MUST render Chrome extension popup window progress bars alongside the error message when a provider has an error but prior successful window data is still present in state.
+- **REQ-057**: MUST render Chrome extension popup controls section with only refresh-now button, interval input with set button, debug-enable checkbox, and debug status badge — without export-debug, clear-logs, or fetch-pages buttons.
 
 ## 4. Test Requirements
 
@@ -218,6 +220,8 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 - **TST-025**: MUST verify parser fixtures matching current Claude/Copilot/Codex usage-page structures produce correct normalized usage, quota, and reset fields for popup progress-bar rendering.
 - **TST-026**: MUST verify Chrome extension manifest declares `host_permissions` entries for `claude.ai`, `chatgpt.com`, and `github.com` enabling authenticated session-credential fetch.
 - **TST-027**: MUST verify Chrome extension popup hides window progress bars and quota for an errored provider when no prior window data exists, and renders both windows and error when prior window data is present.
+- **TST-028**: MUST verify Chrome extension popup HTML does not contain export-debug, clear-logs, or fetch-pages buttons, and contains only refresh-now, interval input, debug-enable checkbox, and debug status controls.
+- **TST-029**: MUST verify Chrome extension persisted refresh interval is restored on service-worker startup and survives simulated browser restart.
 
 ## 5. Evidence
 
@@ -238,7 +242,7 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | CTN-006 | `docs/REFERENCES.md` + full symbol index grouped by source file, regenerated from repository code. |
 | CTN-007 | `pyproject.toml` + `[build-system] requires = ["hatchling"]` + `[project]` metadata fields `name`, `version`, `requires-python`, `dependencies`, `[project.scripts]`. |
 | DES-001 | `src/aibar/aibar/providers/base.py` + `class BaseProvider(ABC)` + abstract methods `fetch`, `is_configured`, `get_config_help`. |
-| DES-002 | `src/aibar/aibar/providers/base.py` + `WindowPeriod/ProviderName` + enum literals `5h/7d/30d` and provider names. |
+| DES-002 | `src/aibar/aibar/providers/base.py` + `WindowPeriod/ProviderName` + enum literals `5h/7d/30d/code_review` and provider names; `src/aibar/chrome-extension/parsers.js` + `WINDOW_HINT_REGEX` + `_extractWindowHint` token set. |
 | DES-003 | `src/aibar/aibar/cli.py` + `parse_window/parse_provider` + raises `click.BadParameter` for invalid inputs. |
 | DES-004 | `src/aibar/aibar/cache.py` + `_sanitize_raw` + redacts keys in sensitive set before file write. |
 | DES-005 | `src/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_loadEnvFromFile` + parses `export KEY=VALUE`, handles quotes/comments/semicolon cleanup. |
@@ -295,7 +299,7 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | TST-009 | `tests/test_install_gnome_extension.py` + executable check, syntax check, git root resolution, source validation, and missing-source exit code assertions. |
 | PRJ-009 | `src/aibar/chrome-extension/manifest.json` + popup/action wiring and `src/aibar/chrome-extension/popup.html` + provider-tab set `claude`, `copilot`, `codex`. |
 | PRJ-010 | `src/aibar/chrome-extension/background.js` + `_fetchHtml` website downloads and parser pipeline without subprocess `aibar` invocation. |
-| CTN-008 | `src/aibar/chrome-extension/background.js` + `REFRESH_INTERVAL_SECONDS = 180` and `_scheduleRefreshAlarm` interval configuration path. |
+| CTN-008 | `src/aibar/chrome-extension/background.js` + `REFRESH_INTERVAL_SECONDS = 180`, `INTERVAL_OVERRIDE_STORAGE_KEY`, `_getRefreshIntervalSeconds`, and `_loadPersistedState` interval restoration path. |
 | CTN-009 | `src/aibar/chrome-extension/background.js` + `PROVIDER_FETCH_SEQUENCE` and ordered fetch execution in `_refreshAllProviders`. |
 | CTN-010 | `src/aibar/chrome-extension/parsers.js` + `_extractProgressMetrics`, `_extractEmbeddedJsonObjects`, `_extractBootstrapJsonFromScriptBody`, and `_extractEscapedScriptMetricCandidates` extraction path without localized UI labels. |
 | CTN-011 | `src/aibar/chrome-extension/debug.js` + bound-safe console logger + storage-backed records, `src/aibar/chrome-extension/background.js` + parser/window diagnostic command responses, and `src/aibar/chrome-extension/popup.js` + debug export/clear actions. |
@@ -306,7 +310,7 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | REQ-038 | `src/aibar/chrome-extension/popup.html` + toolbar popup layout with exact `claude`, `copilot`, `codex` tab entries. |
 | REQ-039 | `src/aibar/chrome-extension/popup.js` + `_buildWindowRow/_renderProviderCard` progress-card rendering and `popup.css` provider color semantics. |
 | REQ-040 | `src/aibar/chrome-extension/background.js` + Claude fetch with `_assertProviderPayloadUsable`, and `src/aibar/chrome-extension/parsers.js` + deterministic `5h/7d` assignment in `parseClaudeUsageHtml`/`_buildWindows`. |
-| REQ-041 | `src/aibar/chrome-extension/background.js` + Codex fetch with `_assertProviderPayloadUsable`, and `src/aibar/chrome-extension/parsers.js` + remaining-percent normalization + artifact rejection in `parseCodexUsageHtml`/`_buildWindows`. |
+| REQ-041 | `src/aibar/chrome-extension/background.js` + Codex fetch with `_assertProviderPayloadUsable`, and `src/aibar/chrome-extension/parsers.js` + remaining-percent normalization + artifact rejection + `code_review` window in `parseCodexUsageHtml`/`_buildWindows`. |
 | REQ-042 | `src/aibar/chrome-extension/background.js` + dual Copilot fetch and `src/aibar/chrome-extension/parsers.js` + `mergeCopilotPayloads` preferring features percentage with premium fraction/reset merge. |
 | REQ-043 | `src/aibar/chrome-extension/background.js` + alarm scheduler and popup publish message `usage.updated` after recurring refresh cycles. |
 | REQ-044 | `src/aibar/chrome-extension/debug.js` + `buildDebugBundle` and `src/aibar/chrome-extension/popup.js` + `_exportDebugBundle` JSON dump flow. |
@@ -323,7 +327,7 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | CTN-013 | `src/aibar/chrome-extension/background.js` + `_normalizeDebugMaxChars` with bounded preview caps and `http.get` truncation metadata. |
 | CTN-014 | `src/aibar/chrome-extension/background.js` + in-memory `debugApiEnabled` flag defaulting to `false` and no storage writes for debug enablement state. |
 | DES-011 | `src/aibar/chrome-extension/background.js` + `_buildMainApiSnapshot`, `_describeDebugApi`, `_executeDebugApiCommand`, and centralized debug guard in `_handleMessage`. |
-| DES-012 | `src/aibar/chrome-extension/popup.html` + debug-enable checkbox controls and `src/aibar/chrome-extension/popup.js` + config route wiring for runtime debug flag updates. |
+| DES-012 | `src/aibar/chrome-extension/popup.html` + debug-enable checkbox and `src/aibar/chrome-extension/popup.js` + config route wiring; export/clear-logs/fetch-pages buttons removed from popup, accessible only via debug API. |
 | REQ-046 | `src/aibar/chrome-extension/background.js` + `api.main.snapshot` response (`_buildMainApiSnapshot`) with null-safe numeric normalization (`_toFiniteMetricNumber`) for popup tab/progress rendering fields. |
 | REQ-047 | `src/aibar/chrome-extension/background.js` + `http.get` command route returning bounded previews, hash, and HTML probe metadata when debug access is enabled. |
 | REQ-048 | `src/aibar/chrome-extension/background.js` + `parser.run`/`provider.diagnose`/`providers.diagnose`/`providers.pages.get` command dispatch with parser diagnostics, payload assertions, and per-page related-content diagnostics behind debug-access guard. |
@@ -331,7 +335,7 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | REQ-050 | `src/aibar/chrome-extension/background.js` + structured debug command lifecycle logging and `src/aibar/chrome-extension/debug.js` + non-throwing sink wrappers (`_resolveConsoleMethod`, `_emitConsoleSafe`, guarded `appendDebugRecord`). |
 | REQ-051 | `src/aibar/chrome-extension/background.js` + `_ensureDebugAccessEnabled` deterministic rejection path for all `debug.*` message types when debug access is disabled. |
 | REQ-052 | `src/aibar/chrome-extension/background.js` + `config.debug_api.get`/`config.debug_api.set` handlers for runtime debug-enable state mutation without persistence. |
-| REQ-053 | `src/aibar/chrome-extension/popup.html` + debug-enable + provider-page fetch controls and `src/aibar/chrome-extension/popup.js` + runtime disablement + diagnostics output rendering. |
+| REQ-053 | `src/aibar/chrome-extension/popup.html` + debug-enable checkbox and status badge only; `src/aibar/chrome-extension/popup.js` + runtime enablement wiring without export/clear-logs/fetch-pages buttons. |
 | REQ-054 | `guidelines/Google_Extension_API_Reference.md` + complete request/response schemas and disabled-debug error semantics for primary/debug extension APIs. |
 | TST-019 | `tests/test_chrome_extension_debug_api.py` + route assertions for `api.main.snapshot` and debug endpoints plus primary snapshot schema checks. |
 | TST-020 | `tests/test_chrome_extension_debug_api.py` + HTTPS allowlist validation, `http.get` preview/hash/probe assertions, and `providers.pages.get` aggregate provider-page diagnostics assertions. |
@@ -345,3 +349,5 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | REQ-056 | `src/aibar/chrome-extension/popup.js` + `_renderProviderCard` + renders window progress bars alongside error when prior successful window data persists in provider state. |
 | TST-026 | `tests/test_chrome_extension_manifest.py` + `host_permissions` assertions for `claude.ai`, `chatgpt.com`, and `github.com` domains. |
 | TST-027 | `tests/test_chrome_extension_popup.py` + popup error-rendering assertions for hidden windows on error-only state and visible windows when prior data exists. |
+| CTN-016 | `src/aibar/chrome-extension/background.js` + `INTERVAL_OVERRIDE_STORAGE_KEY` persistence in `_getRefreshIntervalSeconds` and restoration in `_loadPersistedState` before first alarm scheduling. |
+| REQ-057 | `src/aibar/chrome-extension/popup.html` + controls section containing only refresh-now, interval input/set, debug-enable checkbox, and debug status badge. |

@@ -12,7 +12,7 @@
 ## Message Routing Model
 - `non_debug_routes`: always callable.
 - `debug_routes`: any message where `type` starts with `debug.`; callable only when debug flag is enabled.
-- `config_routes`: used to read/update debug flag.
+- `config_routes`: used to read/update debug flag and refresh interval.
 
 ## API Index
 - `api.main.snapshot` (primary non-debug API)
@@ -20,6 +20,7 @@
 - `usage.refresh_now` (non-debug trigger API)
 - `config.debug_api.get` (non-debug config API)
 - `config.debug_api.set` (non-debug config API)
+- `config.refresh_interval.set` (non-debug config API)
 - `debug.api.describe` (debug API)
 - `debug.api.execute` (debug API)
   - `providers.pages.get` debug command available only via `debug.api.execute`
@@ -49,7 +50,7 @@
     "tab_windows": {
       "claude": ["5h", "7d"],
       "copilot": ["30d"],
-      "codex": ["5h", "7d"]
+      "codex": ["5h", "7d", "code_review"]
     },
     "refresh_interval_seconds": 180,
     "last_cycle_status": "idle|running|ok|partial_error",
@@ -133,6 +134,31 @@
   "error": "config.debug_api.set requires boolean enabled"
 }
 ```
+
+### Route: `config.refresh_interval.set`
+- `intent`: update refresh interval override with persistent storage and alarm reschedule; always callable without debug enablement.
+- `request_schema`:
+```json
+{
+  "type": "config.refresh_interval.set",
+  "seconds": 180
+}
+```
+- `response_schema`:
+```json
+{
+  "ok": true,
+  "refresh_interval_seconds": 180
+}
+```
+- `validation_error_schema`:
+```json
+{
+  "ok": false,
+  "error": "Refresh interval must be >= 60 seconds"
+}
+```
+- `persistence`: value is written to `chrome.storage.local` under `INTERVAL_OVERRIDE_STORAGE_KEY` and survives browser restarts.
 
 ## Debug API
 

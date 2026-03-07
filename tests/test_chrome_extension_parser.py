@@ -20,7 +20,9 @@ NODE_MERGE_RUNNER = PROJECT_ROOT / "tests" / "helpers" / "chrome_merge_runner.mj
 PARSER_MODULE_PATH = PROJECT_ROOT / "src" / "aibar" / "chrome-extension" / "parsers.js"
 
 
-def _run_parser(function_name: str, fixture_name: str, second_payload: dict | None = None) -> dict:
+def _run_parser(
+    function_name: str, fixture_name: str, second_payload: dict | None = None
+) -> dict:
     """
     @brief Execute one parser function through Node helper.
     @param function_name {str} Exported parser function name.
@@ -167,7 +169,9 @@ def test_signal_diagnostics_reports_metric_key_matches_for_escaped_script() -> N
     @satisfies TST-021
     @satisfies REQ-048
     """
-    diagnostics = _run_parser("extractSignalDiagnostics", "codex_usage_escaped_script.html")
+    diagnostics = _run_parser(
+        "extractSignalDiagnostics", "codex_usage_escaped_script.html"
+    )
     assert diagnostics["signal_counts"]["metric_key_matches"] >= 2
     assert diagnostics["signal_samples"]["metric_key_matches"]
 
@@ -184,7 +188,7 @@ def test_window_assignment_diagnostics_exposes_ranked_trace_payload() -> None:
         {"provider": "codex"},
     )
     assert diagnostics["provider"] == "codex"
-    assert diagnostics["window_keys"] == ["5h", "7d"]
+    assert diagnostics["window_keys"] == ["5h", "7d", "code_review"]
     assert diagnostics["window_trace"]["5h"]["ranked_candidates"]["json"]
     assert "derived_window" in diagnostics["window_trace"]["7d"]
 
@@ -226,10 +230,12 @@ def test_codex_parser_converts_remaining_percentages_from_current_fixture() -> N
     """
     payload = _run_parser("parseCodexUsageHtml", "codex_usage_current_signals.html")
     assert payload["provider"] == "codex"
-    assert payload["windows"]["5h"]["usage_percent"] == 4
-    assert payload["windows"]["7d"]["usage_percent"] == 22
-    assert payload["windows"]["5h"]["reset_at"] == "2026-03-06T22:53:00.000Z"
-    assert payload["windows"]["7d"]["reset_at"] == "2026-03-12T12:16:00.000Z"
+    assert payload["windows"]["5h"]["usage_percent"] == 0
+    assert payload["windows"]["7d"]["usage_percent"] == 32
+    assert payload["windows"]["code_review"]["usage_percent"] == 0
+    assert payload["windows"]["5h"]["reset_at"] == "2026-03-07T18:30:00.000Z"
+    assert payload["windows"]["7d"]["reset_at"] == "2026-03-10T12:16:00.000Z"
+    assert payload["windows"]["code_review"]["reset_at"] is None
 
 
 def test_copilot_merge_matches_current_features_and_premium_fixture() -> None:
@@ -243,8 +249,8 @@ def test_copilot_merge_matches_current_features_and_premium_fixture() -> None:
         "copilot_premium_current_signals.html",
     )
     assert payload["provider"] == "copilot"
-    assert payload["windows"]["30d"]["usage_percent"] == 17.9
-    assert payload["windows"]["30d"]["remaining"] == 1240
+    assert payload["windows"]["30d"]["usage_percent"] == 20.4
+    assert payload["windows"]["30d"]["remaining"] == 1228
     assert payload["windows"]["30d"]["limit"] == 1500
     assert payload["windows"]["30d"]["reset_at"] == "2026-04-01T00:00:00.000Z"
 
@@ -256,7 +262,7 @@ def test_parser_module_uses_semantic_markers_instead_of_language_labels() -> Non
     @satisfies TST-015
     """
     source = PARSER_MODULE_PATH.read_text(encoding="utf-8")
-    assert "role\\s*=\\s*(?:\"progressbar\"|\'progressbar\')" in source
+    assert "role\\s*=\\s*(?:\"progressbar\"|'progressbar')" in source
     assert "datetime\\s*=\\s*(?:\"([^\"]+)\"|'([^']+)')" in source
     assert "_extractEmbeddedJsonObjects" in source
     assert "_extractEscapedScriptMetricCandidates" in source

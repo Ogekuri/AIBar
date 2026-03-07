@@ -1,14 +1,16 @@
 /**
  * @file popup.js
- * @brief Popup controller for rendering provider tabs and debug actions.
+ * @brief Popup controller for rendering provider tabs and debug-enable control.
  * @details Consumes normalized state emitted by background service-worker and renders
  * GNOME-parity card/progress visuals for Claude, Copilot, and Codex providers.
+ * Debug export, log-clear, and page-fetch actions are accessible only through debug
+ * API commands and are not rendered in the popup.
  * @satisfies REQ-038
  * @satisfies REQ-039
- * @satisfies REQ-044
  * @satisfies REQ-053
  * @satisfies REQ-055
  * @satisfies REQ-056
+ * @satisfies REQ-057
  */
 
 import { createLogger } from "./debug.js";
@@ -23,7 +25,7 @@ const PROVIDER_TABS = ["claude", "copilot", "codex"];
 const PROVIDER_WINDOWS = {
   claude: ["5h", "7d"],
   copilot: ["30d"],
-  codex: ["5h", "7d"],
+  codex: ["5h", "7d", "code_review"],
 };
 
 /** @brief Last received runtime state snapshot. */
@@ -35,14 +37,10 @@ let activeProvider = "claude";
 /** @brief DOM cache for popup controls. */
 const dom = {
   refreshButton: document.getElementById("refreshButton"),
-  exportButton: document.getElementById("exportButton"),
-  clearLogsButton: document.getElementById("clearLogsButton"),
   intervalInput: document.getElementById("intervalInput"),
   setIntervalButton: document.getElementById("setIntervalButton"),
-  providerPagesButton: document.getElementById("providerPagesButton"),
   debugEnableCheckbox: document.getElementById("debugEnableCheckbox"),
   debugStatusLabel: document.getElementById("debugStatusLabel"),
-  debugOutput: document.getElementById("debugOutput"),
   updatedLabel: document.getElementById("updatedLabel"),
   statusLabel: document.getElementById("statusLabel"),
   tabButtons: Array.from(document.querySelectorAll("[data-provider]")),
@@ -58,8 +56,9 @@ let debugApiEnabled = false;
 
 /**
  * @brief Apply debug-access status to popup control interactivity.
- * @details Ensures UI mirrors runtime debug guard by disabling debug-only actions
- * whenever the non-persistent debug flag is not enabled.
+ * @details Ensures UI mirrors runtime debug guard by updating the status badge.
+ * Debug export, log-clear, and page-fetch actions are no longer in the popup
+ * and are accessible only through debug API commands.
  * @param {boolean} enabled Runtime debug-access state.
  * @returns {void}
  * @satisfies REQ-053
@@ -67,26 +66,7 @@ let debugApiEnabled = false;
 function _applyDebugAccessState(enabled) {
   debugApiEnabled = enabled;
   dom.debugEnableCheckbox.checked = enabled;
-  dom.exportButton.disabled = !enabled;
-  dom.clearLogsButton.disabled = !enabled;
-  dom.intervalInput.disabled = !enabled;
-  dom.setIntervalButton.disabled = !enabled;
-  dom.providerPagesButton.disabled = !enabled;
   dom.debugStatusLabel.textContent = enabled ? "debug on" : "debug off";
-  if (!enabled) {
-    dom.debugOutput.textContent = "Debug output unavailable.";
-  }
-}
-
-/**
- * @brief Write compact debug command output payload in popup panel.
- * @param {unknown} payload Debug command payload.
- * @returns {void}
- * @satisfies REQ-053
- */
-function _setDebugOutput(payload) {
-  const normalized = payload ?? { status: "empty" };
-  dom.debugOutput.textContent = JSON.stringify(normalized, null, 2);
 }
 
 /**
@@ -394,72 +374,23 @@ async function _setDebugAccessState(enabled) {
 }
 
 /**
- * @brief Export debug bundle as downloadable JSON file.
- * @returns {Promise<void>} Completion promise.
- */
-async function _exportDebugBundle() {
-  const response = await chrome.runtime.sendMessage({ type: "debug.export_bundle" });
-  if (!response?.ok) {
-    throw new Error(response?.error ?? "debug.export_bundle failed");
-  }
-
-  const payload = JSON.stringify(response.bundle, null, 2);
-  const blob = new Blob([payload], { type: "application/json" });
-  const blobUrl = URL.createObjectURL(blob);
-
-  const anchor = document.createElement("a");
-  anchor.href = blobUrl;
-  anchor.download = `aibar-debug-${Date.now()}.json`;
-  anchor.click();
-
-  URL.revokeObjectURL(blobUrl);
-}
-
-/**
- * @brief Clear persisted debug logs.
- * @returns {Promise<void>} Completion promise.
- */
-async function _clearLogs() {
-  const response = await chrome.runtime.sendMessage({ type: "debug.clear_logs" });
-  if (!response?.ok) {
-    throw new Error(response?.error ?? "debug.clear_logs failed");
-  }
-}
-
-/**
  * @brief Apply refresh interval override from popup input.
+ * @details Sends a non-debug message to persist the interval in extension storage.
+ * The interval is always user-configurable, not gated behind debug access.
  * @returns {Promise<void>} Completion promise.
+ * @satisfies CTN-008
+ * @satisfies CTN-016
  */
 async function _setIntervalOverride() {
   const seconds = Number(dom.intervalInput.value);
   const response = await chrome.runtime.sendMessage({
-    type: "debug.set_refresh_interval",
+    type: "config.refresh_interval.set",
     seconds,
   });
   if (!response?.ok) {
-    throw new Error(response?.error ?? "debug.set_refresh_interval failed");
+    throw new Error(response?.error ?? "config.refresh_interval.set failed");
   }
   await _requestState();
-}
-
-/**
- * @brief Fetch required provider pages through debug API and render diagnostics.
- * @returns {Promise<void>} Completion promise.
- * @satisfies REQ-053
- */
-async function _fetchProviderPagesDiagnostics() {
-  const response = await chrome.runtime.sendMessage({
-    type: "debug.api.execute",
-    command: "providers.pages.get",
-    args: {
-      max_chars: 12000,
-      max_related_resources: 4,
-    },
-  });
-  if (!response?.ok) {
-    throw new Error(response?.error ?? "providers.pages.get failed");
-  }
-  _setDebugOutput(response.result);
 }
 
 /**
@@ -473,29 +404,9 @@ function _wireUiEvents() {
     });
   });
 
-  dom.exportButton.addEventListener("click", () => {
-    void _exportDebugBundle().catch((error) => {
-      logger.error("export-debug-failure", { error: String(error) });
-    });
-  });
-
-  dom.clearLogsButton.addEventListener("click", () => {
-    void _clearLogs().catch((error) => {
-      logger.error("clear-logs-failure", { error: String(error) });
-    });
-  });
-
   dom.setIntervalButton.addEventListener("click", () => {
     void _setIntervalOverride().catch((error) => {
       logger.error("set-interval-failure", { error: String(error) });
-    });
-  });
-
-  dom.providerPagesButton.addEventListener("click", () => {
-    _setDebugOutput({ status: "running", command: "providers.pages.get" });
-    void _fetchProviderPagesDiagnostics().catch((error) => {
-      logger.error("providers-pages-fetch-failure", { error: String(error) });
-      _setDebugOutput({ status: "error", error: String(error) });
     });
   });
 

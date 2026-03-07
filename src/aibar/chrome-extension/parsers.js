@@ -11,13 +11,13 @@
  */
 
 /** @brief Parser semantic version for debug payloads. */
-export const PARSER_VERSION = "2026.03.06.3";
+export const PARSER_VERSION = "2026.03.07.1";
 
-/** @brief Token regex for window hints. */
-const WINDOW_HINT_REGEX = /\b(5h|7d|30d)\b/i;
+/** @brief Token regex for window hints including code_review. */
+const WINDOW_HINT_REGEX = /\b(5h|7d|30d|code_review)\b/i;
 
 /** @brief Global token regex for iterating over window hints in text streams. */
-const WINDOW_HINT_GLOBAL_REGEX = /\b(5h|7d|30d)\b/ig;
+const WINDOW_HINT_GLOBAL_REGEX = /\b(5h|7d|30d|code_review)\b/ig;
 
 /** @brief Token regex for numeric fractions. */
 const FRACTION_REGEX = /([0-9][0-9\s.,]*)\s*\/\s*([0-9][0-9\s.,]*)/g;
@@ -279,7 +279,7 @@ function _extractAttribute(tagHtml, attributeName) {
 /**
  * @brief Infer usage window token from local HTML context.
  * @param {string} context Text context around parsed metric element.
- * @returns {string | null} Window hint token (`5h`, `7d`, `30d`) or null.
+ * @returns {string | null} Window hint token (`5h`, `7d`, `30d`, `code_review`) or null.
  */
 function _extractWindowHint(context) {
   const source = String(context ?? "");
@@ -295,6 +295,9 @@ function _extractWindowHint(context) {
   }
   if (/\b(?:30\s*(?:d|day|days|giorni|dias|jours|tage)|monthly|month|mensil\w*|mensuel\w*)\b/i.test(source)) {
     return "30d";
+  }
+  if (/\b(?:code[\s_-]*review)\b/i.test(source)) {
+    return "code_review";
   }
   return null;
 }
@@ -1444,9 +1447,15 @@ function _buildWindows(
 
     const resetAtCandidate =
       typeof jsonCandidate?.reset_at === "string" ? jsonCandidate.reset_at : null;
+    /**
+     * @brief Datetime fallback is only used when no JSON candidate was matched
+     * for this window.  When a JSON candidate IS matched but carries no reset_at,
+     * the absence is intentional and the datetime pipeline must not inject a
+     * spurious timestamp from an unrelated window.
+     */
     const resetAt =
       resetAtCandidate ??
-      (hasQuotaOrUsageSignal ? datetimeCandidate : null);
+      (!jsonCandidate && hasQuotaOrUsageSignal ? datetimeCandidate : null);
 
     windows[windowKey] = {
       usage_percent: usagePercent,
@@ -1650,8 +1659,10 @@ export function extractWindowAssignmentDiagnostics(html, options = {}) {
   let windowKeys;
   switch (providerToken) {
     case "claude":
-    case "codex":
       windowKeys = ["5h", "7d"];
+      break;
+    case "codex":
+      windowKeys = ["5h", "7d", "code_review"];
       break;
     case "copilot":
     case "copilot_features":
@@ -1720,7 +1731,7 @@ export function parseClaudeUsageHtml(html) {
 export function parseCodexUsageHtml(html) {
   const signals = _extractSignals(html);
   const windows = _buildWindows(
-    ["5h", "7d"],
+    ["5h", "7d", "code_review"],
     signals.progress,
     signals.fractions,
     signals.percentages,

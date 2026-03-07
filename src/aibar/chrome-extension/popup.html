@@ -2,10 +2,13 @@
 <!--
   @file popup.html
   @brief Toolbar popup view for AIBar Chrome extension.
-  @details Hosts provider tabs, progress cards, debug actions, and runtime status labels.
+  @details Hosts provider tabs, progress cards, and runtime status labels.
+  Debug export, log-clear, and page-fetch actions are accessible only through
+  debug API commands — not rendered in the popup.
   @satisfies REQ-038
   @satisfies REQ-039
-  @satisfies REQ-044
+  @satisfies REQ-053
+  @satisfies REQ-057
 -->
 <html lang="en">
   <head>
@@ -23,8 +26,6 @@
 
       <section class="aibar-controls">
         <button id="refreshButton" class="aibar-btn" type="button">Refresh now</button>
-        <button id="exportButton" class="aibar-btn" type="button" disabled>Export debug</button>
-        <button id="clearLogsButton" class="aibar-btn" type="button" disabled>Clear logs</button>
         <input
           id="intervalInput"
           class="aibar-input"
@@ -33,19 +34,13 @@
           step="1"
           value="180"
           aria-label="Refresh interval seconds"
-          disabled
         />
-        <button id="setIntervalButton" class="aibar-btn" type="button" disabled>Set sec</button>
-        <button id="providerPagesButton" class="aibar-btn" type="button" disabled>Fetch pages</button>
+        <button id="setIntervalButton" class="aibar-btn" type="button">Set sec</button>
         <label class="aibar-checkbox" for="debugEnableCheckbox">
           <input id="debugEnableCheckbox" type="checkbox" />
           Enable debug API (session only)
         </label>
         <span id="debugStatusLabel" class="aibar-badge">debug off</span>
-      </section>
-
-      <section class="aibar-debug-output">
-        <pre id="debugOutput" class="aibar-debug-pre">Debug output unavailable.</pre>
       </section>
 
       <nav class="aibar-tab-bar" aria-label="Providers">

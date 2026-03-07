@@ -10,6 +10,7 @@
  * @satisfies CTN-012
  * @satisfies CTN-013
  * @satisfies CTN-014
+ * @satisfies CTN-016
  * @satisfies REQ-043
  * @satisfies REQ-044
  * @satisfies REQ-046
@@ -66,7 +67,7 @@ const MAIN_API_TAB_ORDER = ["claude", "copilot", "codex"];
 const MAIN_API_PROVIDER_WINDOWS = {
   claude: ["5h", "7d"],
   copilot: ["30d"],
-  codex: ["5h", "7d"],
+  codex: ["5h", "7d", "code_review"],
 };
 
 /** @brief Debug API command identifiers exposed by runtime messaging. */
@@ -322,10 +323,13 @@ async function _persistState() {
 }
 
 /**
- * @brief Read configured refresh interval with override support.
+ * @brief Read configured refresh interval with persistence support.
  * @details Uses hardcoded default REFRESH_INTERVAL_SECONDS and allows optional
- * storage override to support field debugging with shorter/longer cycles.
+ * storage override persisted in `chrome.storage.local` that survives browser
+ * restarts.  The interval value is restored on service-worker startup.
  * @returns {Promise<number>} Effective interval in seconds.
+ * @satisfies CTN-008
+ * @satisfies CTN-016
  */
 async function _getRefreshIntervalSeconds() {
   const stored = await chrome.storage.local.get(INTERVAL_OVERRIDE_STORAGE_KEY);
@@ -460,7 +464,7 @@ function _buildHtmlProbe(html) {
     title,
     has_progressbar_role: html.includes("progressbar"),
     has_next_data: html.includes("__NEXT_DATA__"),
-    has_window_tokens: /\b(?:5h|7d|30d)\b/i.test(html),
+    has_window_tokens: /\b(?:5h|7d|30d|code_review)\b/i.test(html),
     has_cloudflare_challenge: /just a moment|cf_chl|challenge-platform|cf-mitigated/i.test(compactHtml),
     has_login_marker: /sign in|log in|login|enable javascript and cookies to continue/i.test(compactHtml),
     script_tag_count: (html.match(/<script\b/gi) || []).length,
@@ -1377,6 +1381,31 @@ async function _handleMessage(message, sendResponse) {
       ok: true,
       debug_api_enabled: debugApiEnabled,
       persisted: false,
+    });
+    return;
+  }
+
+  /**
+   * @brief Set refresh interval override (always available, not debug-gated).
+   * @satisfies REQ-057
+   * @satisfies CTN-008
+   * @satisfies CTN-016
+   */
+  if (message.type === "config.refresh_interval.set") {
+    const value = Number(message.seconds);
+    if (!Number.isFinite(value) || value < 60) {
+      sendResponse({ ok: false, error: "Refresh interval must be >= 60 seconds" });
+      return;
+    }
+    await chrome.storage.local.set({ [INTERVAL_OVERRIDE_STORAGE_KEY]: Math.round(value) });
+    await _scheduleRefreshAlarm();
+    logger.info("refresh-interval-updated", {
+      source: "config.refresh_interval.set",
+      refresh_interval_seconds: runtimeState.refresh_interval_seconds,
+    });
+    sendResponse({
+      ok: true,
+      refresh_interval_seconds: runtimeState.refresh_interval_seconds,
     });
     return;
   }

@@ -50,7 +50,7 @@
 - `id: THR:chrome-ext#popup-ui`
   - `type: Thread`
   - `parent_process: PROC:chrome-ext`
-  - `role: popup UI render/event thread for provider cards and debug actions`
+  - `role: popup UI render/event thread for provider cards and configuration actions`
   - `entrypoint_symbols: _wireUiEvents(...), _requestState(...)`
   - `defining_files: src/aibar/chrome-extension/popup.js`
 
@@ -132,6 +132,8 @@
       - `_normalizeMainApiWindow(...)`: provider-window metric normalization [`src/aibar/chrome-extension/background.js`]
         - `_toFiniteMetricNumber(...)`: null-safe numeric coercion for metric fields [`src/aibar/chrome-extension/background.js`]
     - `debugApiEnabled` read/write path: runtime configuration get/set routes without storage persistence [`src/aibar/chrome-extension/background.js`]
+    - `config.refresh_interval.set` handler: non-debug-gated interval override with `chrome.storage.local` persistence and alarm reschedule [`src/aibar/chrome-extension/background.js`]
+      - `_scheduleRefreshAlarm(...)`: interval override reconfiguration [`src/aibar/chrome-extension/background.js`]
     - `_ensureDebugAccessEnabled(...)`: deterministic guard for all `debug.*` message types [`src/aibar/chrome-extension/background.js`]
     - `_refreshAllProviders(...)`: manual refresh route [`src/aibar/chrome-extension/background.js`]
       - `_buildMainApiSnapshot(...)`: refresh response payload normalization [`src/aibar/chrome-extension/background.js`]
@@ -193,9 +195,9 @@
   - popup bootstrap script body: initial state load + event wiring [`src/aibar/chrome-extension/popup.js`]
   - `chrome.runtime.onMessage` callback: push update route [`src/aibar/chrome-extension/popup.js`]
   - `Lifecycle/Trigger`
-  - Starts when user clicks browser-action icon and opens popup.
-  - Renders tab cards, synchronizes runtime debug-access configuration, and handles manual refresh/debug actions.
-  - `Internal Call-Trace Tree`
+   - Starts when user clicks browser-action icon and opens popup.
+   - Renders tab cards, synchronizes runtime debug-access configuration, and handles manual refresh and interval override actions.
+   - `Internal Call-Trace Tree`
   - popup bootstrap: initialization [`src/aibar/chrome-extension/popup.js`]
     - `_wireUiEvents(...)`: bind tab/control handlers [`src/aibar/chrome-extension/popup.js`]
     - `_setActiveProvider(...)`: initial tab activation [`src/aibar/chrome-extension/popup.js`]
@@ -209,16 +211,11 @@
     - control callbacks
       - `_refreshNow(...)`: manual refresh RPC [`src/aibar/chrome-extension/popup.js`]
       - `_setDebugAccessState(...)`: runtime debug-access toggle RPC [`src/aibar/chrome-extension/popup.js`]
-      - `_exportDebugBundle(...)`: debug JSON export action [`src/aibar/chrome-extension/popup.js`]
-      - `_clearLogs(...)`: log clear action [`src/aibar/chrome-extension/popup.js`]
-      - `_setIntervalOverride(...)`: scheduler override action [`src/aibar/chrome-extension/popup.js`]
-      - `_fetchProviderPagesDiagnostics(...)`: `providers.pages.get` execution and popup diagnostics panel update [`src/aibar/chrome-extension/popup.js`]
-        - `_setDebugOutput(...)`: JSON diagnostics render helper [`src/aibar/chrome-extension/popup.js`]
+      - `_setIntervalOverride(...)`: refresh-interval override RPC via non-debug `config.refresh_interval.set` message [`src/aibar/chrome-extension/popup.js`]
   - `chrome.runtime.onMessage` callback: update push handler [`src/aibar/chrome-extension/popup.js`]
     - `_renderState(...)`: view update [`src/aibar/chrome-extension/popup.js`]
 - `External Boundaries`
   - Browser DOM APIs for popup rendering.
-  - Blob URL download for debug export file.
   - Chrome runtime messaging APIs.
 
 ### PROC:main
@@ -470,8 +467,8 @@
   - `destination: PROC:chrome-ext`
   - `direction: request-response`
   - `mechanism: chrome.runtime.sendMessage RPC`
-  - `endpoint_or_channel: message types api.main.snapshot, usage.get_state, usage.refresh_now, config.debug_api.get, config.debug_api.set, debug.export_bundle, debug.clear_logs, debug.set_refresh_interval, debug.api.describe, debug.api.execute`
-  - `payload_data_shape: JSON request objects with type discriminators; debug command execution uses command+args envelope and returns deterministic DEBUG_API_DISABLED failures when runtime debug flag is off`
+  - `endpoint_or_channel: message types api.main.snapshot, usage.get_state, usage.refresh_now, config.debug_api.get, config.debug_api.set, config.refresh_interval.set, debug.api.describe, debug.api.execute`
+  - `payload_data_shape: JSON request objects with type discriminators; config.refresh_interval.set is always callable; debug command execution uses command+args envelope and returns deterministic DEBUG_API_DISABLED failures when runtime debug flag is off`
   - `declaration_files: src/aibar/chrome-extension/popup.js, src/aibar/chrome-extension/background.js`
 
 - `id: EDGE-006`
