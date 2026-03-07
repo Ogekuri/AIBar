@@ -239,7 +239,7 @@ class AIBarIndicator extends PanelMenu.Button {
 
     /**
      * @brief Execute build popup menu.
-     * @details Applies build popup menu logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
+     * @details Applies build popup menu logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects, including forced CLI refresh wiring for `Refresh Now`.
      * @returns {any} Function return value.
      */
     _buildPopupMenu() {
@@ -295,7 +295,7 @@ class AIBarIndicator extends PanelMenu.Button {
 
         let refreshItem = new PopupMenu.PopupMenuItem('Refresh Now');
         refreshItem.connect('activate', () => {
-            this._refreshData();
+            this._refreshData(true);
         });
         this.menu.addMenuItem(refreshItem);
 
@@ -864,10 +864,11 @@ class AIBarIndicator extends PanelMenu.Button {
 
     /**
      * @brief Execute refresh data.
-     * @details Applies refresh data logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
+     * @details Applies refresh data logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects; optionally appends `--force` to bypass CLI idle-time gating.
+     * @param {boolean} forceRefresh When true, execute `aibar show --json --force`; otherwise execute `aibar show --json`.
      * @returns {any} Function return value.
      */
-    _refreshData() {
+    _refreshData(forceRefresh = false) {
         this._panelLabel.set_text('...');
 
         try {
@@ -879,7 +880,11 @@ class AIBarIndicator extends PanelMenu.Button {
             for (let [key, value] of Object.entries(envFromFile))
                 launcher.setenv(key, value, true);
 
-            let proc = launcher.spawnv([_getAiBarPath(), 'show', '--json']);
+            const commandArgs = [_getAiBarPath(), 'show', '--json'];
+            if (forceRefresh)
+                commandArgs.push('--force');
+
+            let proc = launcher.spawnv(commandArgs);
 
             proc.communicate_utf8_async(null, null, (proc, result) => {
                 try {

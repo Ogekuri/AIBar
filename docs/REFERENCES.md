@@ -1954,7 +1954,7 @@ from aibar.providers.base import (
 
 ---
 
-# extension.js | JavaScript | 1189L | 17 symbols | 8 imports | 28 comments
+# extension.js | JavaScript | 1194L | 17 symbols | 8 imports | 28 comments
 > Path: `src/aibar/gnome-extension/aibar@aibar.panel/extension.js`
 - @brief GNOME Shell panel extension for aibar metrics.
 - @details Collects usage JSON from the aibar CLI and renders provider-specific quota/cost cards in the GNOME panel popup.
@@ -2030,14 +2030,14 @@ full usage for limit-reached warning rendering.
 
 ### fn `const showResetPendingHint = () =>` (L663-665)
 
-### fn `const toPercent = (value) =>` (L955-960)
+### fn `const toPercent = (value) =>` (L960-965)
 - @brief Execute update u i.
 - @details Applies update u i logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @return s {any} Function return value.
 
-### fn `const getPanelUsageValues = (providerName, data) =>` (L962-1019)
+### fn `const getPanelUsageValues = (providerName, data) =>` (L967-1024)
 
-### class `export default class AIBarExtension` (L1155-1189)
+### class `export default class AIBarExtension` (L1160-1194)
 - @brief GNOME extension lifecycle adapter for AIBarIndicator registration. */
 - @brief Execute constructor.
 - @details Applies constructor logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
@@ -2060,7 +2060,7 @@ full usage for limit-reached warning rendering.
 |`updateWindowBar`|fn||640-698|const updateWindowBar = (bar, pct, resetTime, useDays) =>|
 |`setResetLabel`|fn||646-652|const setResetLabel = (baseText) =>|
 |`showResetPendingHint`|fn||663-665|const showResetPendingHint = () =>|
-|`toPercent`|fn||955-960|const toPercent = (value) =>|
-|`getPanelUsageValues`|fn||962-1019|const getPanelUsageValues = (providerName, data) =>|
-|`AIBarExtension`|class||1155-1189|export default class AIBarExtension|
+|`toPercent`|fn||960-965|const toPercent = (value) =>|
+|`getPanelUsageValues`|fn||967-1024|const getPanelUsageValues = (providerName, data) =>|
+|`AIBarExtension`|class||1160-1194|export default class AIBarExtension|
 

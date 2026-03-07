@@ -76,6 +76,23 @@ def test_popup_labels_use_aibar_brand_casing() -> None:
     assert "PopupMenu.PopupMenuItem('Open aibar UI')" not in source
 
 
+def test_refresh_now_popup_action_executes_forced_cli_refresh() -> None:
+    """
+    @brief Verify popup Refresh Now action triggers forced CLI refresh.
+    @details Asserts popup wiring calls `_refreshData(true)` and refresh command
+    assembly appends `--force` when `forceRefresh` is enabled.
+    @return {None} Function return value.
+    @satisfies DES-006
+    @satisfies REQ-016
+    @satisfies TST-004
+    """
+    source = EXTENSION_PATH.read_text(encoding="utf-8")
+    assert "PopupMenu.PopupMenuItem('Refresh Now')" in source
+    assert "this._refreshData(true);" in source
+    assert "if (forceRefresh)" in source
+    assert "commandArgs.push('--force');" in source
+
+
 def test_popup_status_line_renders_last_and_next_update_times() -> None:
     """
     @brief Verify popup status line includes scheduler-derived next-update text.

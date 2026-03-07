@@ -260,11 +260,11 @@
   - `AIBarExtension.enable(...)`: extension enable adapter [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
     - `AIBarIndicator._init(...)`: indicator runtime bootstrap [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
       - `AIBarIndicator._buildPanelButton(...)`: panel icon/percentage/summary-label setup with five ordered percentage labels (Claude 5h, Claude 7d, Copilot, Codex 5h, Codex 7d) and primary/secondary style classes [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
-      - `AIBarIndicator._buildPopupMenu(...)`: popup structure and actions setup including `Last updated`/`next update` status item scaffold [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
-        - `AIBarIndicator._refreshData(...)`: refresh action handler [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+      - `AIBarIndicator._buildPopupMenu(...)`: popup structure and actions setup including `Last updated`/`next update` status item scaffold and `Refresh Now` forced-refresh action wiring [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+        - `AIBarIndicator._refreshData(...)`: refresh action handler with forced CLI path (`aibar show --json --force`) for popup `Refresh Now` [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
         - `AIBarIndicator._openTerminalWithCommand(...)`: UI-launch action handler [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
         - menu `open-state-changed` callback -> `AIBarIndicator._applyBarWidths(...)`: re-apply progress bar fill widths on popup open using cached `_barData` [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
-      - `AIBarIndicator._refreshData(...)`: subprocess-based JSON refresh [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+      - `AIBarIndicator._refreshData(forceRefresh = false)`: subprocess-based JSON refresh with optional `--force` argument injection [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
         - `_loadEnvFromFile(...)`: extension env map parse [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
         - `_getAiBarPath(...)`: executable path resolution [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
         - callback chain
@@ -304,7 +304,7 @@
   - `destination: PROC:main`
   - `direction: request-response`
   - `mechanism: subprocess spawn + async stdio`
-  - `endpoint_or_channel: argv [aibar, show, --json] + child stdout`
+  - `endpoint_or_channel: argv [aibar, show, --json] for scheduled/initial refresh and argv [aibar, show, --json, --force] for popup `Refresh Now` + child stdout`
   - `payload_data_shape: JSON object keyed by provider name to ProviderResult JSON payload`
   - `declaration_files: src/aibar/gnome-extension/aibar@aibar.panel/extension.js, src/aibar/aibar/cli.py, src/aibar/aibar/providers/base.py`
 
