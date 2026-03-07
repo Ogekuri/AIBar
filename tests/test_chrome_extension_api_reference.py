@@ -51,3 +51,21 @@ def test_api_reference_documents_session_persisted_debug_enablement() -> None:
     source = API_REFERENCE_PATH.read_text(encoding="utf-8")
     assert "chrome.storage.session" in source
     assert "persists in `chrome.storage.session` across service-worker restarts" in source
+
+
+def test_api_reference_includes_simple_api_call_examples() -> None:
+    """
+    @brief Verify API reference includes runnable simple API call examples.
+    @details Ensures contract documentation remains integration-ready by
+    providing minimal `chrome.runtime.sendMessage` snippets for primary,
+    configuration, and debug API routes.
+    @satisfies PRJ-012
+    @satisfies REQ-054
+    """
+    source = API_REFERENCE_PATH.read_text(encoding="utf-8")
+    assert "## Simple API Call Examples" in source
+    assert "await chrome.runtime.sendMessage({ type: \"api.main.snapshot\" })" in source
+    assert "type: \"config.debug_api.set\"" in source
+    assert "enabled: true" in source
+    assert "await chrome.runtime.sendMessage({" in source
+    assert 'type: "debug.api.execute"' in source

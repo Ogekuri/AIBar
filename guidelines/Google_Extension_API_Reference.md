@@ -351,3 +351,55 @@
 - Call `config.debug_api.set` explicitly to enable debug routes for current browser session.
 - Do not assume debug enablement persistence across browser restarts.
 - Consume `api.main.snapshot` as the canonical one-call source for tab rendering model (`tab_order`, `tab_windows`, `providers[*].windows`).
+
+## Simple API Call Examples
+
+### Example: Primary snapshot (always available)
+```js
+const snapshotResponse = await chrome.runtime.sendMessage({ type: "api.main.snapshot" });
+if (!snapshotResponse?.ok) {
+  throw new Error(snapshotResponse?.error ?? "api.main.snapshot failed");
+}
+console.log(snapshotResponse.snapshot.providers.claude.windows["5h"]);
+```
+
+### Example: Enable debug API for current browser session
+```js
+const enableDebugResponse = await chrome.runtime.sendMessage({
+  type: "config.debug_api.set",
+  enabled: true,
+});
+if (!enableDebugResponse?.ok) {
+  throw new Error(enableDebugResponse?.error ?? "config.debug_api.set failed");
+}
+console.log(enableDebugResponse.debug_api_enabled);
+```
+
+### Example: Discover debug command catalog
+```js
+const describeResponse = await chrome.runtime.sendMessage({ type: "debug.api.describe" });
+if (!describeResponse?.ok) {
+  throw new Error(describeResponse?.error ?? "debug.api.describe failed");
+}
+console.log(describeResponse.api.commands);
+```
+
+### Example: Execute `debug.api.execute` with `providers.pages.get`
+```js
+const diagnosticsResponse = await chrome.runtime.sendMessage({
+  type: "debug.api.execute",
+  command: "providers.pages.get",
+  args: {
+    max_chars: 12000,
+    max_related_resources: 4,
+  },
+});
+
+if (!diagnosticsResponse?.ok) {
+  if (diagnosticsResponse?.code === "DEBUG_API_DISABLED") {
+    throw new Error("Enable debug API first via config.debug_api.set");
+  }
+  throw new Error(diagnosticsResponse?.error ?? "debug.api.execute failed");
+}
+console.log(diagnosticsResponse.result.summary);
+```
