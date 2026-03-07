@@ -141,3 +141,19 @@ def test_background_persists_debug_access_in_browser_session_storage() -> None:
     assert "async function _persistDebugAccessState(enabled)" in source
     assert "await _loadDebugAccessState();" in source
     assert "const persisted = await _persistDebugAccessState(debugApiEnabled);" in source
+
+
+def test_background_localhost_listener_uses_default_port_with_descending_fallback() -> None:
+    """
+    @brief Verify localhost API listener binds to 127.0.0.1 with descending port probes.
+    @details Asserts background service-worker defines host `127.0.0.1`, default
+    port `32767`, and descending fallback loop until first available lower port.
+    @satisfies REQ-060
+    @satisfies TST-032
+    @return {None} No return value.
+    """
+    source = BACKGROUND_PATH.read_text(encoding="utf-8")
+    assert 'const LOCAL_API_LISTEN_HOST = "127.0.0.1";' in source
+    assert "const LOCAL_API_DEFAULT_PORT = 32767;" in source
+    assert "const LOCAL_API_MIN_PORT = 1024;" in source
+    assert "for (let port = LOCAL_API_DEFAULT_PORT; port >= LOCAL_API_MIN_PORT; port -= 1)" in source

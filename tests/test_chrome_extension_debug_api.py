@@ -228,3 +228,22 @@ def test_debug_api_logs_command_lifecycle_events() -> None:
     assert 'logger.info("debug-api-command-success"' in source
     assert 'logger.error("debug-api-command-failure"' in source
     assert "duration_ms" in source
+
+
+def test_localhost_external_api_routes_map_to_main_and_debug_handlers() -> None:
+    """
+    @brief Verify localhost HTTP routes expose main/debug APIs for external callers.
+    @details Confirms route dispatcher maps `/api/main/snapshot`,
+    `/debug/api/describe`, and `/debug/api/execute` and preserves deterministic
+    debug-disabled response on external debug endpoints.
+    @satisfies REQ-061
+    @satisfies TST-033
+    @return {None} No return value.
+    """
+    source = BACKGROUND_PATH.read_text(encoding="utf-8")
+    assert 'path === "/api/main/snapshot"' in source
+    assert 'path === "/debug/api/describe"' in source
+    assert 'path === "/debug/api/execute"' in source
+    assert "_buildDebugDescribeResponse()" in source
+    assert "await _buildDebugExecuteResponse(body ?? {})" in source
+    assert 'code: "DEBUG_API_DISABLED"' in source

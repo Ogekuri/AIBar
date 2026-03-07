@@ -191,6 +191,8 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **REQ-057**: MUST render Chrome extension popup controls section with only refresh-now button, interval input with set button, debug-enable checkbox, and debug status badge — without export-debug, clear-logs, or fetch-pages buttons.
 - **REQ-058**: MUST render popup cards from latest background provider state immediately on popup open without requiring manual refresh, debug API activation, or popup-triggered provider download.
 - **REQ-059**: MUST render popup layout with provider tab bar above provider cards and configuration controls below provider cards.
+- **REQ-060**: MUST start a localhost external API listener bound to `127.0.0.1` on port `32767`, or bind the first available lower port using strictly descending port probes.
+- **REQ-061**: MUST expose external HTTP routes for `api.main.snapshot`, `debug.api.describe`, and `debug.api.execute` through the localhost listener while preserving existing debug-access authorization behavior.
 
 ## 4. Test Requirements
 
@@ -227,6 +229,8 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 - **TST-029**: MUST verify Chrome extension persisted refresh interval is restored on service-worker startup and survives simulated browser restart.
 - **TST-030**: MUST verify popup initial render consumes existing background snapshot data and displays provider cards without requiring a mandatory foreground refresh.
 - **TST-031**: MUST verify popup HTML places provider tab bar before provider cards and places configuration controls after provider cards.
+- **TST-032**: MUST verify Chrome extension background defines localhost listener constants for host `127.0.0.1`, default port `32767`, and descending fallback probing for first available lower port.
+- **TST-033**: MUST verify localhost external API routes dispatch to `api.main.snapshot`, `debug.api.describe`, and `debug.api.execute`, and preserve debug-disabled deterministic errors for debug routes.
 
 ## 5. Evidence
 
@@ -361,3 +365,7 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | REQ-057 | `src/aibar/chrome-extension/popup.html` + controls section containing only refresh-now, interval input/set, debug-enable checkbox, and debug status badge. |
 | TST-030 | `tests/test_chrome_extension_popup.py` + popup boot render assertions using preloaded background snapshot state without forced foreground refresh. |
 | TST-031 | `tests/test_chrome_extension_popup.py` + popup HTML structure assertions for tab-before-cards and controls-after-cards ordering. |
+| REQ-060 | `src/aibar/chrome-extension/background.js` + localhost listener bootstrap with `127.0.0.1` binding, default `32767` port, and descending fallback port-probe selection. |
+| REQ-061 | `src/aibar/chrome-extension/background.js` + external HTTP route dispatcher mapping `/api/main/snapshot`, `/debug/api/describe`, and `/debug/api/execute` to runtime API handlers. |
+| TST-032 | `tests/test_chrome_extension_background.py` + localhost listener constant and descending fallback assertions. |
+| TST-033 | `tests/test_chrome_extension_debug_api.py` + localhost route mapping and debug-disabled deterministic error assertions for external debug routes. |

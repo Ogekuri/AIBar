@@ -22,6 +22,8 @@
  * @satisfies REQ-051
  * @satisfies REQ-052
  * @satisfies REQ-045
+ * @satisfies REQ-060
+ * @satisfies REQ-061
  */
 
 import {
@@ -127,6 +129,18 @@ const DEBUG_API_PROVIDER_PAGES = [
 /** @brief Default maximum same-origin related resources fetched per provider page. */
 const DEBUG_API_PROVIDER_PAGES_DEFAULT_RELATED_LIMIT = 6;
 
+/** @brief Localhost address used by external API listener. */
+const LOCAL_API_LISTEN_HOST = "127.0.0.1";
+
+/** @brief Default port used by external API listener. */
+const LOCAL_API_DEFAULT_PORT = 32767;
+
+/** @brief Minimum fallback port when probing in descending order. */
+const LOCAL_API_MIN_PORT = 1024;
+
+/** @brief TCP backlog used by localhost API listener. */
+const LOCAL_API_BACKLOG = 10;
+
 /** @brief Dedicated logger for background runtime events. */
 const logger = createLogger("background");
 
@@ -176,6 +190,15 @@ let refreshInFlight = null;
 
 /** @brief In-memory non-persistent debug-access toggle. */
 let debugApiEnabled = false;
+
+/** @brief Current tcpServer socket id for localhost API listener. */
+let localApiServerSocketId = null;
+
+/** @brief Resolved localhost API port after successful bind. */
+let localApiBoundPort = null;
+
+/** @brief Flag preventing duplicate localhost accept loops. */
+let localApiAcceptLoopRunning = false;
 
 /**
  * @brief Deep clone state into message-safe payload.
@@ -1047,6 +1070,139 @@ function _describeDebugApi() {
 }
 
 /**
+ * @brief Build deterministic debug-disabled response envelope.
+ * @details Centralizes disabled-debug rejection payload shape so runtime and
+ * localhost external routes preserve identical contract semantics.
+ * Time complexity: O(1).
+ * Space complexity: O(1).
+ * @param {unknown} errorSource Candidate error instance/value.
+ * @returns {{ok: false, code: string, error: string}} Deterministic disabled-debug payload.
+ * @satisfies REQ-051
+ */
+function _buildDebugDisabledResponse(errorSource) {
+  return {
+    ok: false,
+    code: "DEBUG_API_DISABLED",
+    error: String(errorSource?.message ?? errorSource),
+  };
+}
+
+/**
+ * @brief Execute debug API command with structured lifecycle logging.
+ * @details Reuses command-dispatch implementation and emits deterministic
+ * start/success/failure log records used by runtime and localhost API calls.
+ * Time complexity: O(C), where C is command-specific execution complexity.
+ * Space complexity: O(C), where C is command-specific response payload size.
+ * @param {string} command Debug command identifier.
+ * @param {Record<string, unknown>} args Debug command arguments.
+ * @returns {Promise<Record<string, unknown>>} Standardized command response envelope.
+ * @satisfies REQ-048
+ * @satisfies REQ-050
+ */
+async function _runDebugApiExecute(command, args) {
+  const startedAt = Date.now();
+  logger.info("debug-api-command-start", {
+    command,
+    args: _summarizeDebugArgs(args),
+  });
+
+  try {
+    const result = await _executeDebugApiCommand(command, args);
+    const durationMs = Date.now() - startedAt;
+    logger.info("debug-api-command-success", {
+      command,
+      duration_ms: durationMs,
+    });
+    return {
+      ok: true,
+      command,
+      debug_api_enabled: debugApiEnabled,
+      duration_ms: durationMs,
+      result,
+    };
+  } catch (error) {
+    const durationMs = Date.now() - startedAt;
+    const messageText = String(error?.message ?? error);
+    logger.error("debug-api-command-failure", {
+      command,
+      duration_ms: durationMs,
+      error: messageText,
+    });
+    return {
+      ok: false,
+      command,
+      debug_api_enabled: debugApiEnabled,
+      duration_ms: durationMs,
+      error: messageText,
+    };
+  }
+}
+
+/**
+ * @brief Evaluate debug access gate and return deterministic failure payload.
+ * @details Runs debug gate once and returns null for enabled state; otherwise
+ * returns REQ-051-compliant disabled-debug response.
+ * Time complexity: O(1).
+ * Space complexity: O(1).
+ * @returns {{ok: false, code: string, error: string} | null} Disabled-debug response or null.
+ * @satisfies REQ-051
+ */
+function _getDebugGateFailure() {
+  try {
+    _ensureDebugAccessEnabled();
+    return null;
+  } catch (error) {
+    return _buildDebugDisabledResponse(error);
+  }
+}
+
+/**
+ * @brief Resolve structured payload for `debug.api.describe`.
+ * @details Applies debug-access gate before returning command-catalog metadata.
+ * Time complexity: O(1).
+ * Space complexity: O(1).
+ * @returns {Record<string, unknown>} Describe response envelope.
+ * @satisfies REQ-048
+ * @satisfies REQ-051
+ */
+function _buildDebugDescribeResponse() {
+  const gateFailure = _getDebugGateFailure();
+  if (gateFailure) {
+    return gateFailure;
+  }
+  return {
+    ok: true,
+    debug_api_enabled: debugApiEnabled,
+    api: _describeDebugApi(),
+  };
+}
+
+/**
+ * @brief Resolve structured payload for `debug.api.execute`.
+ * @details Validates command token, enforces debug gate, and dispatches to
+ * lifecycle-logged command execution helper.
+ * Time complexity: O(C), where C is command-specific complexity.
+ * Space complexity: O(C), where C is command payload size.
+ * @param {Record<string, unknown>} request Candidate execute request payload.
+ * @returns {Promise<Record<string, unknown>>} Execute response envelope.
+ * @satisfies REQ-048
+ * @satisfies REQ-050
+ * @satisfies REQ-051
+ */
+async function _buildDebugExecuteResponse(request) {
+  const gateFailure = _getDebugGateFailure();
+  if (gateFailure) {
+    return gateFailure;
+  }
+  const command = typeof request?.command === "string" ? request.command.trim() : "";
+  if (!command) {
+    return { ok: false, error: "debug.api.execute requires command string" };
+  }
+  const args = request?.args && typeof request.args === "object" ? request.args : {};
+  return await _runDebugApiExecute(command, args);
+}
+
+/**
  * @brief Execute one debug API command.
  * @details Dispatches debug commands for HTTP retrieval, parser execution, and
  * standard runtime operations with deterministic structured responses.
@@ -1231,6 +1387,383 @@ async function _executeDebugApiCommand(command, args) {
 }
 
 /**
+ * @brief Check whether sockets transport exists for localhost API listener.
+ * @details Validates MV3 runtime support for tcpServer/tcp socket namespaces.
+ * Time complexity: O(1).
+ * Space complexity: O(1).
+ * @returns {boolean} True when sockets transport APIs are available.
+ * @satisfies REQ-060
+ */
+function _localApiTransportSupported() {
+  return Boolean(chrome?.sockets?.tcpServer && chrome?.sockets?.tcp);
+}
+
+/**
+ * @brief Create one TCP server socket through callback-based Chrome API.
+ * @details Wraps callback API into Promise envelope for deterministic async flow.
+ * Time complexity: O(1).
+ * Space complexity: O(1).
+ * @returns {Promise<number>} Created server socket identifier.
+ * @throws {Error} If server socket creation fails.
+ * @satisfies REQ-060
+ */
+function _createTcpServerSocket() {
+  return new Promise((resolve, reject) => {
+    chrome.sockets.tcpServer.create({}, (createInfo) => {
+      if (!createInfo || !Number.isInteger(createInfo.socketId)) {
+        reject(new Error("Failed to create localhost API server socket"));
+        return;
+      }
+      resolve(createInfo.socketId);
+    });
+  });
+}
+
+/**
+ * @brief Listen on candidate localhost port for external API bridge.
+ * @details Attempts tcpServer listen call and returns Chrome result code.
+ * Time complexity: O(1).
+ * Space complexity: O(1).
+ * @param {number} socketId Server socket id.
+ * @param {number} port Candidate localhost port.
+ * @returns {Promise<number>} Listen result code; >=0 indicates success.
+ * @satisfies REQ-060
+ */
+function _listenTcpServerSocket(socketId, port) {
+  return new Promise((resolve) => {
+    chrome.sockets.tcpServer.listen(
+      socketId,
+      LOCAL_API_LISTEN_HOST,
+      port,
+      LOCAL_API_BACKLOG,
+      (resultCode) => {
+        resolve(resultCode);
+      }
+    );
+  });
+}
+
+/**
+ * @brief Close TCP server socket best-effort.
+ * @details Swallows close-time errors because socket may already be closed.
+ * Time complexity: O(1).
+ * Space complexity: O(1).
+ * @param {number} socketId Server socket id.
+ * @returns {void}
+ */
+function _closeTcpServerSocket(socketId) {
+  try {
+    chrome.sockets.tcpServer.close(socketId);
+  } catch (error) {
+    logger.warn("localhost-api-server-close-failure", {
+      socket_id: socketId,
+      error: String(error?.message ?? error),
+    });
+  }
+}
+
+/**
+ * @brief Accept one pending client connection on localhost API listener.
+ * @details Wraps callback API into Promise to keep accept-loop sequential.
+ * Time complexity: O(1) excluding socket wait time.
+ * Space complexity: O(1).
+ * @param {number} socketId Server socket id.
+ * @returns {Promise<{resultCode: number, clientSocketId: number}>} Accepted client metadata.
+ * @satisfies REQ-060
+ */
+function _acceptTcpClient(socketId) {
+  return new Promise((resolve) => {
+    chrome.sockets.tcpServer.accept(socketId, (acceptInfo) => {
+      resolve({
+        resultCode: Number(acceptInfo?.resultCode ?? -1),
+        clientSocketId: Number(acceptInfo?.clientSocketId ?? -1),
+      });
+    });
+  });
+}
+
+/**
+ * @brief Read request bytes from accepted client socket.
+ * @details Reads one request chunk for compact HTTP request parsing.
+ * Time complexity: O(N), where N is received byte count.
+ * Space complexity: O(N).
+ * @param {number} clientSocketId Accepted client socket id.
+ * @returns {Promise<{resultCode: number, data: ArrayBuffer | null}>} Read result metadata.
+ * @satisfies REQ-061
+ */
+function _readTcpClientChunk(clientSocketId) {
+  return new Promise((resolve) => {
+    chrome.sockets.tcp.recv(clientSocketId, (recvInfo) => {
+      resolve({
+        resultCode: Number(recvInfo?.resultCode ?? -1),
+        data: recvInfo?.data ?? null,
+      });
+    });
+  });
+}
+
+/**
+ * @brief Write one HTTP response payload to accepted client socket.
+ * @details Serializes response text via UTF-8 encoder and forwards bytes via tcp.send.
+ * Time complexity: O(N), where N is response byte count.
+ * Space complexity: O(N).
+ * @param {number} clientSocketId Accepted client socket id.
+ * @param {string} payload HTTP response payload.
+ * @returns {Promise<void>} Completion promise.
+ * @satisfies REQ-061
+ */
+function _writeTcpClientPayload(clientSocketId, payload) {
+  return new Promise((resolve) => {
+    const bytes = new TextEncoder().encode(payload);
+    chrome.sockets.tcp.send(clientSocketId, bytes.buffer, () => {
+      resolve();
+    });
+  });
+}
+
+/**
+ * @brief Close accepted client socket best-effort.
+ * @details Executes disconnect and close without propagating close-time failures.
+ * Time complexity: O(1).
+ * Space complexity: O(1).
+ * @param {number} clientSocketId Accepted client socket id.
+ * @returns {void}
+ */
+function _closeTcpClientSocket(clientSocketId) {
+  try {
+    chrome.sockets.tcp.disconnect(clientSocketId);
+  } catch (error) {
+    logger.warn("localhost-api-client-disconnect-failure", {
+      socket_id: clientSocketId,
+      error: String(error?.message ?? error),
+    });
+  }
+  try {
+    chrome.sockets.tcp.close(clientSocketId);
+  } catch (error) {
+    logger.warn("localhost-api-client-close-failure", {
+      socket_id: clientSocketId,
+      error: String(error?.message ?? error),
+    });
+  }
+}
+
+/**
+ * @brief Build canonical HTTP JSON response payload.
+ * @details Converts body object into HTTP/1.1 JSON response with content length.
+ * Time complexity: O(N), where N is serialized JSON length.
+ * Space complexity: O(N).
+ * @param {number} statusCode HTTP status code.
+ * @param {Record<string, unknown>} body Response payload object.
+ * @returns {string} Serialized HTTP response text.
+ * @satisfies REQ-061
+ */
+function _buildLocalApiHttpResponse(statusCode, body) {
+  const jsonPayload = JSON.stringify(body);
+  const bodyBytes = new TextEncoder().encode(jsonPayload);
+  return [
+    `HTTP/1.1 ${statusCode} ${statusCode === 200 ? "OK" : "ERROR"}`,
+    "Content-Type: application/json; charset=utf-8",
+    `Content-Length: ${bodyBytes.length}`,
+    "Connection: close",
+    "",
+    jsonPayload,
+  ].join("\r\n");
+}
+
+/**
+ * @brief Parse one HTTP request line/body pair from raw socket text.
+ * @details Extracts method, path, and optional JSON body from first read chunk.
+ * Time complexity: O(N), where N is request text length.
+ * Space complexity: O(N).
+ * @param {string} requestText Decoded HTTP request text.
+ * @returns {{method: string, path: string, body: Record<string, unknown> | null}} Parsed request envelope.
+ * @throws {Error} If method/path/body cannot be parsed.
+ * @satisfies REQ-061
+ */
+function _parseLocalApiHttpRequest(requestText) {
+  const [head, bodyText] = requestText.split("\r\n\r\n", 2);
+  const lines = head.split("\r\n");
+  const requestLine = lines[0] ?? "";
+  const match = requestLine.match(/^([A-Z]+)\s+([^\s]+)\s+HTTP\/1\.[01]$/);
+  if (!match) {
+    throw new Error("Invalid HTTP request line");
+  }
+  const method = match[1];
+  const path = match[2];
+  let body = null;
+  if (bodyText && bodyText.trim()) {
+    body = JSON.parse(bodyText);
+  }
+  return {
+    method,
+    path,
+    body,
+  };
+}
+
+/**
+ * @brief Dispatch localhost HTTP request to primary/debug API handlers.
+ * @details Maps route path/method to existing internal API builders and preserves
+ * debug gate semantics for debug endpoints.
+ * Time complexity: O(C), where C is selected handler complexity.
+ * Space complexity: O(C), where C is handler payload size.
+ * @param {string} method HTTP method token.
+ * @param {string} path HTTP path token.
+ * @param {Record<string, unknown> | null} body Parsed request body.
+ * @returns {Promise<{statusCode: number, body: Record<string, unknown>}>} Response envelope.
+ * @satisfies REQ-061
+ */
+async function _dispatchLocalApiHttpRequest(method, path, body) {
+  if (method === "GET" && path === "/api/main/snapshot") {
+    return {
+      statusCode: 200,
+      body: {
+        ok: true,
+        snapshot: _buildMainApiSnapshot(),
+      },
+    };
+  }
+
+  if (method === "GET" && path === "/debug/api/describe") {
+    const response = _buildDebugDescribeResponse();
+    return {
+      statusCode: response.ok ? 200 : 403,
+      body: response,
+    };
+  }
+
+  if (method === "POST" && path === "/debug/api/execute") {
+    const response = await _buildDebugExecuteResponse(body ?? {});
+    return {
+      statusCode: response.ok ? 200 : (response.code === "DEBUG_API_DISABLED" ? 403 : 400),
+      body: response,
+    };
+  }
+
+  return {
+    statusCode: 404,
+    body: {
+      ok: false,
+      error: "Unsupported localhost API route",
+    },
+  };
+}
+
+/**
+ * @brief Process one accepted localhost TCP client request.
+ * @details Reads one HTTP request chunk, dispatches API response, writes JSON
+ * envelope, and closes client socket.
+ * Time complexity: O(N + C), where N=request bytes and C=handler complexity.
+ * Space complexity: O(N + C).
+ * @param {number} clientSocketId Accepted client socket id.
+ * @returns {Promise<void>} Completion promise.
+ * @satisfies REQ-061
+ */
+async function _handleLocalApiClient(clientSocketId) {
+  try {
+    const recvInfo = await _readTcpClientChunk(clientSocketId);
+    if (recvInfo.resultCode <= 0 || !recvInfo.data) {
+      return;
+    }
+    const requestText = new TextDecoder().decode(new Uint8Array(recvInfo.data));
+    const request = _parseLocalApiHttpRequest(requestText);
+    const response = await _dispatchLocalApiHttpRequest(request.method, request.path, request.body);
+    await _writeTcpClientPayload(
+      clientSocketId,
+      _buildLocalApiHttpResponse(response.statusCode, response.body)
+    );
+  } catch (error) {
+    await _writeTcpClientPayload(
+      clientSocketId,
+      _buildLocalApiHttpResponse(400, { ok: false, error: String(error?.message ?? error) })
+    );
+  } finally {
+    _closeTcpClientSocket(clientSocketId);
+  }
+}
+
+/**
+ * @brief Run accept loop for localhost API listener.
+ * @details Continuously accepts client sockets and dispatches request handlers
+ * until listener socket is closed or replaced.
+ * Time complexity: O(K), where K is accepted connection count.
+ * Space complexity: O(1) plus per-request handler memory.
+ * @returns {Promise<void>} Completion promise.
+ * @satisfies REQ-060
+ * @satisfies REQ-061
+ */
+async function _runLocalApiAcceptLoop() {
+  if (localApiAcceptLoopRunning || !Number.isInteger(localApiServerSocketId)) {
+    return;
+  }
+  localApiAcceptLoopRunning = true;
+  try {
+    while (Number.isInteger(localApiServerSocketId)) {
+      const acceptInfo = await _acceptTcpClient(localApiServerSocketId);
+      if (acceptInfo.resultCode < 0 || acceptInfo.clientSocketId < 0) {
+        if (!Number.isInteger(localApiServerSocketId)) {
+          break;
+        }
+        continue;
+      }
+      void _handleLocalApiClient(acceptInfo.clientSocketId).catch((error) => {
+        logger.error("localhost-api-client-failure", {
+          error: String(error?.message ?? error),
+        });
+      });
+    }
+  } finally {
+    localApiAcceptLoopRunning = false;
+  }
+}
+
+/**
+ * @brief Start localhost API listener on default or descending fallback port.
+ * @details Probes port `32767` first, then decrements port one-by-one until
+ * first successful bind to `127.0.0.1`.
+ * Time complexity: O(P), where P is attempted port count.
+ * Space complexity: O(1).
+ * @returns {Promise<void>} Completion promise.
+ * @throws {Error} If no candidate port can be bound.
+ * @satisfies REQ-060
+ */
+async function _startLocalApiListener() {
+  if (Number.isInteger(localApiServerSocketId)) {
+    return;
+  }
+  if (!_localApiTransportSupported()) {
+    logger.error("localhost-api-transport-unsupported", {
+      host: LOCAL_API_LISTEN_HOST,
+      default_port: LOCAL_API_DEFAULT_PORT,
+    });
+    return;
+  }
+
+  for (let port = LOCAL_API_DEFAULT_PORT; port >= LOCAL_API_MIN_PORT; port -= 1) {
+    const socketId = await _createTcpServerSocket();
+    const resultCode = await _listenTcpServerSocket(socketId, port);
+    if (resultCode >= 0) {
+      localApiServerSocketId = socketId;
+      localApiBoundPort = port;
+      logger.info("localhost-api-listening", {
+        host: LOCAL_API_LISTEN_HOST,
+        port: localApiBoundPort,
+      });
+      void _runLocalApiAcceptLoop().catch((error) => {
+        logger.error("localhost-api-accept-loop-failure", {
+          error: String(error?.message ?? error),
+        });
+      });
+      return;
+    }
+    _closeTcpServerSocket(socketId);
+  }
+
+  throw new Error("Failed to bind localhost API listener on descending fallback range");
+}
+
+/**
  * @brief Apply successful provider refresh payload.
  * @param {string} provider Provider key.
  * @param {Record<string, unknown>} payload Parsed provider payload.
@@ -1377,14 +1910,16 @@ async function _refreshAllProviders(trigger) {
 /**
  * @brief Initialize scheduler and persisted state for service-worker lifecycle.
  * @details Restores persisted runtime/debug state, executes one immediate refresh
- * cycle, and then schedules recurring refresh alarms.
+ * cycle, starts localhost API listener, and then schedules recurring refresh alarms.
  * @param {string} trigger Initialization trigger label.
  * @returns {Promise<void>} Completion promise.
  * @satisfies REQ-043
+ * @satisfies REQ-060
  */
 async function _initializeRuntime(trigger) {
   await _loadPersistedState();
   await _loadDebugAccessState();
+  await _startLocalApiListener();
   await _refreshAllProviders(trigger);
   await _scheduleRefreshAlarm();
 }
@@ -1488,72 +2023,20 @@ async function _handleMessage(message, sendResponse) {
   }
 
   if (typeof message.type === "string" && message.type.startsWith("debug.")) {
-    try {
-      _ensureDebugAccessEnabled();
-    } catch (error) {
-      sendResponse({
-        ok: false,
-        code: "DEBUG_API_DISABLED",
-        error: String(error?.message ?? error),
-      });
+    const gateFailure = _getDebugGateFailure();
+    if (gateFailure) {
+      sendResponse(gateFailure);
       return;
     }
   }
 
   if (message.type === "debug.api.describe") {
-    sendResponse({
-      ok: true,
-      debug_api_enabled: debugApiEnabled,
-      api: _describeDebugApi(),
-    });
+    sendResponse(_buildDebugDescribeResponse());
     return;
   }
 
   if (message.type === "debug.api.execute") {
-    const command = typeof message.command === "string" ? message.command.trim() : "";
-    if (!command) {
-      sendResponse({ ok: false, error: "debug.api.execute requires command string" });
-      return;
-    }
-
-    const args = message.args && typeof message.args === "object" ? message.args : {};
-    const startedAt = Date.now();
-
-    logger.info("debug-api-command-start", {
-      command,
-      args: _summarizeDebugArgs(args),
-    });
-
-    try {
-      const result = await _executeDebugApiCommand(command, args);
-      const durationMs = Date.now() - startedAt;
-      logger.info("debug-api-command-success", {
-        command,
-        duration_ms: durationMs,
-      });
-      sendResponse({
-        ok: true,
-        command,
-        debug_api_enabled: debugApiEnabled,
-        duration_ms: durationMs,
-        result,
-      });
-    } catch (error) {
-      const durationMs = Date.now() - startedAt;
-      const messageText = String(error?.message ?? error);
-      logger.error("debug-api-command-failure", {
-        command,
-        duration_ms: durationMs,
-        error: messageText,
-      });
-      sendResponse({
-        ok: false,
-        command,
-        debug_api_enabled: debugApiEnabled,
-        duration_ms: durationMs,
-        error: messageText,
-      });
-    }
+    sendResponse(await _buildDebugExecuteResponse(message));
     return;
   }
 
@@ -1593,38 +2076,40 @@ async function _handleMessage(message, sendResponse) {
   sendResponse({ ok: false, error: "Unsupported message type" });
 }
 
-chrome.runtime.onInstalled.addListener(() => {
-  void _initializeRuntime("install").catch((error) => {
-    logger.error("runtime-init-failure", { trigger: "install", error: String(error) });
-  });
-});
-
-chrome.runtime.onStartup.addListener(() => {
-  void _initializeRuntime("startup").catch((error) => {
-    logger.error("runtime-init-failure", { trigger: "startup", error: String(error) });
-  });
-});
-
-chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name !== REFRESH_ALARM_NAME) {
-    return;
-  }
-  void _refreshAllProviders("alarm").catch((error) => {
-    logger.error("refresh-alarm-failure", { error: String(error) });
-  });
-});
-
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  void _handleMessage(message, sendResponse).catch((error) => {
-    logger.error("message-handler-failure", {
-      type: message?.type ?? null,
-      error: String(error?.message ?? error),
+if (typeof chrome !== "undefined" && chrome?.runtime && chrome?.alarms) {
+  chrome.runtime.onInstalled.addListener(() => {
+    void _initializeRuntime("install").catch((error) => {
+      logger.error("runtime-init-failure", { trigger: "install", error: String(error) });
     });
-    sendResponse({ ok: false, error: String(error?.message ?? error) });
   });
-  return true;
-});
 
-void _initializeRuntime("service_worker_bootstrap").catch((error) => {
-  logger.error("runtime-init-failure", { trigger: "service_worker_bootstrap", error: String(error) });
-});
+  chrome.runtime.onStartup.addListener(() => {
+    void _initializeRuntime("startup").catch((error) => {
+      logger.error("runtime-init-failure", { trigger: "startup", error: String(error) });
+    });
+  });
+
+  chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name !== REFRESH_ALARM_NAME) {
+      return;
+    }
+    void _refreshAllProviders("alarm").catch((error) => {
+      logger.error("refresh-alarm-failure", { error: String(error) });
+    });
+  });
+
+  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    void _handleMessage(message, sendResponse).catch((error) => {
+      logger.error("message-handler-failure", {
+        type: message?.type ?? null,
+        error: String(error?.message ?? error),
+      });
+      sendResponse({ ok: false, error: String(error?.message ?? error) });
+    });
+    return true;
+  });
+
+  void _initializeRuntime("service_worker_bootstrap").catch((error) => {
+    logger.error("runtime-init-failure", { trigger: "service_worker_bootstrap", error: String(error) });
+  });
+}

@@ -1758,7 +1758,7 @@ from aibar.providers.base import (
 
 ---
 
-# background.js | JavaScript | 1630L | 59 symbols | 2 imports | 67 comments
+# background.js | JavaScript | 2113L | 82 symbols | 2 imports | 93 comments
 > Path: `src/aibar/chrome-extension/background.js`
 - @brief Chrome extension service-worker runtime for autonomous provider refresh.
 - @details Executes ordered provider page downloads, parser normalization, state
@@ -1782,6 +1782,8 @@ persistence, and debug instrumentation on a recurring alarm interval.
 - @satisfies REQ-051
 - @satisfies REQ-052
 - @satisfies REQ-045
+- @satisfies REQ-060
+- @satisfies REQ-061
 
 ## Imports
 ```
@@ -1791,59 +1793,67 @@ import {
 
 ## Definitions
 
-- const `export const REFRESH_INTERVAL_SECONDS = 180;` (L45)
+- const `export const REFRESH_INTERVAL_SECONDS = 180;` (L47)
 - @brief Default hardcoded refresh interval in seconds. */
-- const `const STATE_STORAGE_KEY = "aibar.chrome.state";` (L48)
+- const `const STATE_STORAGE_KEY = "aibar.chrome.state";` (L50)
 - @brief Storage key for normalized runtime state. */
-- const `const INTERVAL_OVERRIDE_STORAGE_KEY = "aibar.chrome.refresh_interval_seconds";` (L51)
+- const `const INTERVAL_OVERRIDE_STORAGE_KEY = "aibar.chrome.refresh_interval_seconds";` (L53)
 - @brief Storage key for optional refresh interval override. */
-- const `const DEBUG_API_ENABLED_SESSION_STORAGE_KEY = "aibar.chrome.debug_api_enabled";` (L54)
+- const `const DEBUG_API_ENABLED_SESSION_STORAGE_KEY = "aibar.chrome.debug_api_enabled";` (L56)
 - @brief Session-scoped storage key for debug API enablement state. */
-- const `const REFRESH_ALARM_NAME = "aibar-refresh";` (L57)
+- const `const REFRESH_ALARM_NAME = "aibar-refresh";` (L59)
 - @brief Alarm name used by service-worker scheduler. */
-- const `const PROVIDER_FETCH_SEQUENCE = [` (L60)
+- const `const PROVIDER_FETCH_SEQUENCE = [` (L62)
 - @brief Fixed provider download sequence required by requirements. */
-- const `const MAIN_API_TAB_ORDER = ["claude", "copilot", "codex"];` (L68)
+- const `const MAIN_API_TAB_ORDER = ["claude", "copilot", "codex"];` (L70)
 - @brief Canonical popup tab order represented by the primary API snapshot. */
-- const `const MAIN_API_PROVIDER_WINDOWS = {` (L71)
+- const `const MAIN_API_PROVIDER_WINDOWS = {` (L73)
 - @brief Canonical window order by provider for popup progress-bar rendering. */
-- const `const DEBUG_API_SUPPORTED_COMMANDS = [` (L78)
+- const `const DEBUG_API_SUPPORTED_COMMANDS = [` (L80)
 - @brief Debug API command identifiers exposed by runtime messaging. */
-- const `const DEBUG_API_ALLOWED_HOSTS = new Set(["claude.ai", "chatgpt.com", "github.com"]);` (L93)
+- const `const DEBUG_API_ALLOWED_HOSTS = new Set(["claude.ai", "chatgpt.com", "github.com"]);` (L95)
 - @brief Allowed hostnames for debug HTTP retrieval command. */
-- const `const DEBUG_API_DEFAULT_MAX_CHARS = 16000;` (L96)
+- const `const DEBUG_API_DEFAULT_MAX_CHARS = 16000;` (L98)
 - @brief Default debug-body preview cap in characters. */
-- const `const DEBUG_API_MAX_CHARS = 120000;` (L99)
+- const `const DEBUG_API_MAX_CHARS = 120000;` (L101)
 - @brief Absolute debug-body preview cap in characters. */
-- const `const DEBUG_API_DISABLED_ERROR = "Debug API disabled: enable it in popup configuration for this runtime session.";` (L102)
+- const `const DEBUG_API_DISABLED_ERROR = "Debug API disabled: enable it in popup configuration for this runtime session.";` (L104)
 - @brief Deterministic debug-disabled error returned by all debug API routes. */
-- const `const DEBUG_API_PROVIDER_DEFAULT_URLS = {` (L105)
+- const `const DEBUG_API_PROVIDER_DEFAULT_URLS = {` (L107)
 - @brief Provider default URLs used by debug parser command. */
-- const `const DEBUG_API_DEFAULT_PROVIDER_DIAGNOSE_SET = ["claude", "codex", "copilot_merged"];` (L113)
+- const `const DEBUG_API_DEFAULT_PROVIDER_DIAGNOSE_SET = ["claude", "codex", "copilot_merged"];` (L115)
 - @brief Default provider set used by aggregate diagnose command. */
-- const `const DEBUG_API_PROVIDER_PAGES = [` (L116)
+- const `const DEBUG_API_PROVIDER_PAGES = [` (L118)
 - @brief Required provider pages for one-call debug download diagnostics. */
-- const `const DEBUG_API_PROVIDER_PAGES_DEFAULT_RELATED_LIMIT = 6;` (L128)
+- const `const DEBUG_API_PROVIDER_PAGES_DEFAULT_RELATED_LIMIT = 6;` (L130)
 - @brief Default maximum same-origin related resources fetched per provider page. */
-### fn `function _emptyProviderState(provider)` (L138-149)
+- const `const LOCAL_API_LISTEN_HOST = "127.0.0.1";` (L133)
+- @brief Localhost address used by external API listener. */
+- const `const LOCAL_API_DEFAULT_PORT = 32767;` (L136)
+- @brief Default port used by external API listener. */
+- const `const LOCAL_API_MIN_PORT = 1024;` (L139)
+- @brief Minimum fallback port when probing in descending order. */
+- const `const LOCAL_API_BACKLOG = 10;` (L142)
+- @brief TCP backlog used by localhost API listener. */
+### fn `function _emptyProviderState(provider)` (L152-163)
 - @brief Build empty provider state object.
 - @param {string} provider Provider identifier.
 - @return s {Record<string, unknown>} Empty provider state.
 
-### fn `function _emptyState()` (L155-169)
+### fn `function _emptyState()` (L169-183)
 - @brief Build empty extension runtime state.
 - @return s {Record<string, unknown>} Empty state snapshot.
 
-### fn `function _cloneState()` (L184-186)
+### fn `function _cloneState()` (L207-209)
 - @brief Deep clone state into message-safe payload.
 - @return s {Record<string, unknown>} Cloned state snapshot.
 
-### fn `function _toFiniteMetricNumber(token)` (L193-199)
+### fn `function _toFiniteMetricNumber(token)` (L216-222)
 - @brief Convert optional metric token into finite number without null coercion.
 - @param {unknown} token Candidate token.
 - @return s {number | null} Finite number or null when token is empty/invalid.
 
-### fn `function _normalizeMainApiWindow(windowData)` (L211-222)
+### fn `function _normalizeMainApiWindow(windowData)` (L234-245)
 - @brief Normalize one window metric payload for primary API transport.
 - @details Restricts window payload shape to popup-rendered progress and quota
 fields so API consumers can rebuild tab cards deterministically.
@@ -1853,7 +1863,7 @@ Space complexity: O(1).
 - @return s {{usage_percent: number | null, remaining: number | null, limit: number | null, reset_at: string | null}} Normalized window metrics.
 - @satisfies REQ-046
 
-### fn `function _buildMainApiSnapshot()` (L233-267)
+### fn `function _buildMainApiSnapshot()` (L256-290)
 - @brief Build machine-readable primary API snapshot payload.
 - @details Returns one-call popup/UI model with tab order plus per-provider
 progress/quota windows, preserving runtime error and scheduler fields.
@@ -1862,7 +1872,7 @@ Space complexity: O(P*W).
 - @return s {Record<string, unknown>} Primary API snapshot payload.
 - @satisfies REQ-046
 
-### fn `function _ensureDebugAccessEnabled()` (L281-288)
+### fn `function _ensureDebugAccessEnabled()` (L304-311)
 - @brief Enforce runtime debug-access gate before serving debug routes.
 - @details Uses runtime debug-access flag restored from browser-session storage
 and throws deterministic error to ensure all debug message routes fail
@@ -1874,13 +1884,13 @@ Space complexity: O(1).
 - @satisfies CTN-014
 - @satisfies REQ-051
 
-### fn `async function _loadPersistedState()` (L296-320)
+### fn `async function _loadPersistedState()` (L319-343)
 - @brief Merge persisted state into in-memory runtime state.
 - @details Preserves last successful provider payloads across service-worker restarts
 to satisfy failure fallback requirements.
 - @return s {Promise<void>} Completion promise.
 
-### fn `function _getSessionStorageArea()` (L332-342)
+### fn `function _getSessionStorageArea()` (L355-365)
 - @brief Resolve optional browser-session storage area used for debug-flag persistence.
 - @details Returns `chrome.storage.session` when available in current runtime.
 Falls back to `null` when session storage APIs are unavailable so callers can
@@ -1890,7 +1900,7 @@ Space complexity: O(1).
 - @return s {chrome.storage.StorageArea | null} Session storage area or null.
 - @satisfies CTN-017
 
-### fn `async function _loadDebugAccessState()` (L357-366)
+### fn `async function _loadDebugAccessState()` (L380-389)
 - @brief Load debug API enablement from browser-session storage.
 - @details Initializes `debugApiEnabled` using session-scoped persistence so the
 flag survives service-worker restarts while resetting on browser termination.
@@ -1903,7 +1913,7 @@ Space complexity: O(1).
 - @satisfies CTN-017
 - @satisfies REQ-052
 
-### fn `async function _persistDebugAccessState(enabled)` (L380-387)
+### fn `async function _persistDebugAccessState(enabled)` (L403-410)
 - @brief Persist debug API enablement into browser-session storage.
 - @details Writes session-scoped debug-access value so explicit enablement
 survives service-worker restarts but is dropped on browser shutdown.
@@ -1915,11 +1925,11 @@ Space complexity: O(1).
 - @satisfies CTN-017
 - @satisfies REQ-052
 
-### fn `async function _persistState()` (L393-395)
+### fn `async function _persistState()` (L416-418)
 - @brief Persist current runtime state to extension storage.
 - @return s {Promise<void>} Completion promise.
 
-### fn `async function _getRefreshIntervalSeconds()` (L406-413)
+### fn `async function _getRefreshIntervalSeconds()` (L429-436)
 - @brief Read configured refresh interval with persistence support.
 - @details Uses hardcoded default REFRESH_INTERVAL_SECONDS and allows optional
 storage override persisted in `chrome.storage.local` that survives browser
@@ -1928,17 +1938,17 @@ restarts. The interval value is restored on service-worker startup.
 - @satisfies CTN-008
 - @satisfies CTN-016
 
-### fn `async function _scheduleRefreshAlarm()` (L419-432)
+### fn `async function _scheduleRefreshAlarm()` (L442-455)
 - @brief Configure periodic refresh alarm.
 - @return s {Promise<void>} Completion promise.
 
-### fn `async function _fetchHtml(url)` (L440-452)
+### fn `async function _fetchHtml(url)` (L463-475)
 - @brief Download one provider page using authenticated extension fetch.
 - @param {string} url Target page URL.
 - @return s {Promise<string>} Downloaded HTML content.
 - @throws {Error} When HTTP status is not OK.
 
-### fn `function _normalizeDebugMaxChars(token)` (L464-470)
+### fn `function _normalizeDebugMaxChars(token)` (L487-493)
 - @brief Normalize debug-body preview length with hard bounds.
 - @details Converts caller-provided `max_chars` tokens into bounded integers to
 avoid oversized responses in debug API payloads.
@@ -1948,7 +1958,7 @@ Space complexity: O(1).
 - @return s {number} Bounded preview length.
 - @satisfies CTN-013
 
-### fn `function _normalizeDebugUrl(token)` (L483-504)
+### fn `function _normalizeDebugUrl(token)` (L506-527)
 - @brief Normalize and validate debug URL token.
 - @details Enforces `https` scheme and allowlisted hosts for debug retrieval
 commands to reduce abuse surface.
@@ -1959,47 +1969,47 @@ Space complexity: O(1).
 - @throws {Error} If URL is invalid, non-HTTPS, or host is not allowed.
 - @satisfies CTN-012
 
-### fn `function _serializeHeaders(headers)` (L512-523)
+### fn `function _serializeHeaders(headers)` (L535-546)
 - @brief Convert response headers into bounded JSON-safe object.
 - @details Serializes at most 30 headers to constrain debug response footprint.
 - @param {Headers} headers Response headers object.
 - @return s {Record<string, string>} Serialized headers map.
 
-### fn `function _buildHtmlProbe(html)` (L530-544)
+### fn `function _buildHtmlProbe(html)` (L553-567)
 - @brief Build deterministic HTML probe metadata for parser diagnostics.
 - @param {string} html Raw HTML text.
 - @return s {Record<string, unknown>} Probe metadata object.
 
-### fn `async function _sha256Hex(text)` (L551-557)
+### fn `async function _sha256Hex(text)` (L574-580)
 - @brief Compute SHA-256 hash for deterministic body identity checks.
 - @param {string} text Input text payload.
 - @return s {Promise<string>} Hex-encoded digest.
 
-### fn `function _buildPayloadQuality(payload)` (L564-594)
+### fn `function _buildPayloadQuality(payload)` (L587-617)
 - @brief Build payload-quality summary for parsed provider windows.
 - @param {Record<string, unknown>} payload Parsed provider payload.
 - @return s {Record<string, unknown>} Quality summary object.
 
-### fn `function _assertProviderPayloadUsable(provider, payload)` (L603-611)
+### fn `function _assertProviderPayloadUsable(provider, payload)` (L626-634)
 - @brief Build parser failure error when payload has no usable metrics.
 - @param {string} provider Provider key.
 - @param {Record<string, unknown>} payload Parsed payload.
 - @return s {void}
 - @throws {Error} If payload is missing quota/progress metrics.
 
-### fn `async function _downloadDebugUrl(urlToken)` (L619-637)
+### fn `async function _downloadDebugUrl(urlToken)` (L642-660)
 - @brief Download one debug URL and capture response metadata.
 - @param {string} urlToken Debug URL token.
 - @return s {Promise<Record<string, unknown>>} Download result with full body.
 - @satisfies REQ-047
 
-### fn `async function _buildDebugHttpResponse(download, maxChars)` (L645-662)
+### fn `async function _buildDebugHttpResponse(download, maxChars)` (L668-685)
 - @brief Build debug HTTP response payload with bounded preview and hash metadata.
 - @param {Record<string, unknown>} download Raw download payload.
 - @param {number} maxChars Bounded preview size.
 - @return s {Promise<Record<string, unknown>>} HTTP response payload.
 
-### fn `function _normalizeDebugRelatedLimit(token)` (L674-680)
+### fn `function _normalizeDebugRelatedLimit(token)` (L697-703)
 - @brief Normalize max related-resource downloads for providers.pages.get.
 - @details Applies deterministic hard bounds to prevent unbounded secondary page
 downloads during debug diagnostics runs.
@@ -2009,7 +2019,7 @@ Space complexity: O(1).
 - @return s {number} Bounded related-resource limit.
 - @satisfies REQ-048
 
-### fn `function _extractRelatedResourceUrls(html, pageUrl)` (L693-721)
+### fn `function _extractRelatedResourceUrls(html, pageUrl)` (L716-744)
 - @brief Extract same-origin related resource URLs from one HTML page.
 - @details Parses script/link resource attributes and keeps only `https`
 same-origin URLs so follow-up debug downloads remain within current host scope.
@@ -2020,14 +2030,14 @@ Space complexity: O(M) on extracted URLs.
 - @return s {Array<string>} Ordered unique same-origin resource URLs.
 - @satisfies REQ-048
 
-### fn `function _buildProviderPayloadAnalysis(provider, payload)` (L730-739)
+### fn `function _buildProviderPayloadAnalysis(provider, payload)` (L753-762)
 - @brief Build parser-centric quality summary for one provider payload.
 - @param {string} provider Provider token.
 - @param {Record<string, unknown>} payload Parsed payload.
 - @return s {Record<string, unknown>} Structured quality summary.
 - @satisfies REQ-048
 
-### fn `async function _downloadRelatedResources(html, pageUrl, maxChars, maxRelated)` (L750-776)
+### fn `async function _downloadRelatedResources(html, pageUrl, maxChars, maxRelated)` (L773-799)
 - @brief Download same-origin related resources for one provider page.
 - @param {string} html Page HTML.
 - @param {string} pageUrl Source page URL.
@@ -2036,7 +2046,7 @@ Space complexity: O(M) on extracted URLs.
 - @return s {Promise<Record<string, unknown>>} Related-resource diagnostics payload.
 - @satisfies REQ-048
 
-### fn `async function _executeProviderPageDownload(descriptor, maxChars, maxRelated)` (L786-813)
+### fn `async function _executeProviderPageDownload(descriptor, maxChars, maxRelated)` (L809-836)
 - @brief Execute one provider-page download diagnostic entry.
 - @param {{key: string, url: string, parser: string}} descriptor Provider page descriptor.
 - @param {number} maxChars Preview-size limit.
@@ -2044,7 +2054,7 @@ Space complexity: O(M) on extracted URLs.
 - @return s {Promise<Record<string, unknown>>} Page diagnostics payload.
 - @satisfies REQ-048
 
-### fn `async function _executeProvidersPagesGetCommand(args)` (L823-858)
+### fn `async function _executeProvidersPagesGetCommand(args)` (L846-881)
 - @brief Execute providers.pages.get debug command.
 - @details Downloads required provider pages and same-origin related resources,
 runs provider-specific parsers, and returns one aggregate diagnostics payload.
@@ -2052,7 +2062,7 @@ runs provider-specific parsers, and returns one aggregate diagnostics payload.
 - @return s {Promise<Record<string, unknown>>} Aggregate page diagnostics payload.
 - @satisfies REQ-048
 
-### fn `function _buildPayloadAssertion(provider, payload)` (L868-881)
+### fn `function _buildPayloadAssertion(provider, payload)` (L891-904)
 - @brief Build payload-usability assertion status for diagnostics commands.
 - @details Reuses runtime parser-usability gate and returns structured pass/fail
 metadata without throwing to simplify field-debug report consumption.
@@ -2060,7 +2070,7 @@ metadata without throwing to simplify field-debug report consumption.
 - @param {Record<string, unknown>} payload Parsed payload.
 - @return s {{ok: boolean, error: string | null}} Assertion status payload.
 
-### fn `function _buildWindowAssignmentDiagnostics(html, provider)` (L891-900)
+### fn `function _buildWindowAssignmentDiagnostics(html, provider)` (L914-923)
 - @brief Build window-assignment diagnostics for one parser HTML source.
 - @details Wraps parser trace extraction in non-throwing envelope to keep debug
 API responses stable even when trace generation fails.
@@ -2068,7 +2078,7 @@ API responses stable even when trace generation fails.
 - @param {string} provider Provider token for window-key selection.
 - @return s {Record<string, unknown>} Window-trace payload or structured error.
 
-### fn `async function _executeProviderDiagnoseCommand(provider, args, maxChars)` (L911-976)
+### fn `async function _executeProviderDiagnoseCommand(provider, args, maxChars)` (L934-999)
 - @brief Execute provider-level diagnose routine for one provider token.
 - @details Downloads provider pages, executes parser flows, and returns combined
 response probes, parser payloads, usability checks, and window traces.
@@ -2077,24 +2087,76 @@ response probes, parser payloads, usability checks, and window traces.
 - @param {number} maxChars Bounded response preview size.
 - @return s {Promise<Record<string, unknown>>} Diagnose payload.
 
-### fn `function _resolveDebugParser(provider)` (L984-997)
+### fn `function _resolveDebugParser(provider)` (L1007-1020)
 - @brief Resolve parser function by debug provider key.
 - @param {string} provider Provider key token.
 - @return s {(html: string) => Record<string, unknown>} Parser function.
 - @throws {Error} If provider key is unsupported.
 
-### fn `function _summarizeDebugArgs(args)` (L1005-1020)
+### fn `function _summarizeDebugArgs(args)` (L1028-1043)
 - @brief Build summary-safe command args for debug logging.
 - @details Redacts large inline HTML fields by replacing them with length metadata.
 - @param {Record<string, unknown>} args Debug command args.
 - @return s {Record<string, unknown>} Sanitized argument summary.
 
-### fn `function _describeDebugApi()` (L1027-1047)
+### fn `function _describeDebugApi()` (L1050-1070)
 - @brief Build debug API command catalog payload.
 - @return s {Record<string, unknown>} Supported command catalog.
 - @satisfies REQ-046
 
-### fn `async function _executeDebugApiCommand(command, args)` (L1061-1231)
+### fn `function _buildDebugDisabledResponse(errorSource)` (L1082-1088)
+- @brief Build deterministic debug-disabled response envelope.
+- @details Centralizes disabled-debug rejection payload shape so runtime and
+localhost external routes preserve identical contract semantics.
+Time complexity: O(1).
+Space complexity: O(1).
+- @param {unknown} errorSource Candidate error instance/value.
+- @return s {{ok: false, code: string, error: string}} Deterministic disabled-debug payload.
+- @satisfies REQ-051
+
+### fn `async function _runDebugApiExecute(command, args)` (L1102-1139)
+- @brief Execute debug API command with structured lifecycle logging.
+- @details Reuses command-dispatch implementation and emits deterministic
+start/success/failure log records used by runtime and localhost API calls.
+Time complexity: O(C), where C is command-specific execution complexity.
+Space complexity: O(C), where C is command-specific response payload size.
+- @param {string} command Debug command identifier.
+- @param {Record<string, unknown>} args Debug command arguments.
+- @return s {Promise<Record<string, unknown>>} Standardized command response envelope.
+- @satisfies REQ-048
+- @satisfies REQ-050
+
+### fn `function _getDebugGateFailure()` (L1150-1157)
+- @brief Evaluate debug access gate and return deterministic failure payload.
+- @details Runs debug gate once and returns null for enabled state; otherwise
+returns REQ-051-compliant disabled-debug response.
+Time complexity: O(1).
+Space complexity: O(1).
+- @return s {{ok: false, code: string, error: string} | null} Disabled-debug response or null.
+- @satisfies REQ-051
+
+### fn `function _buildDebugDescribeResponse()` (L1168-1178)
+- @brief Resolve structured payload for `debug.api.describe`.
+- @details Applies debug-access gate before returning command-catalog metadata.
+Time complexity: O(1).
+Space complexity: O(1).
+- @return s {Record<string, unknown>} Describe response envelope.
+- @satisfies REQ-048
+- @satisfies REQ-051
+
+### fn `async function _buildDebugExecuteResponse(request)` (L1192-1203)
+- @brief Resolve structured payload for `debug.api.execute`.
+- @details Validates command token, enforces debug gate, and dispatches to
+lifecycle-logged command execution helper.
+Time complexity: O(C), where C is command-specific complexity.
+Space complexity: O(C), where C is command payload size.
+- @param {Record<string, unknown>} request Candidate execute request payload.
+- @return s {Promise<Record<string, unknown>>} Execute response envelope.
+- @satisfies REQ-048
+- @satisfies REQ-050
+- @satisfies REQ-051
+
+### fn `async function _executeDebugApiCommand(command, args)` (L1217-1387)
 - @brief Execute one debug API command.
 - @details Dispatches debug commands for HTTP retrieval, parser execution, and
 standard runtime operations with deterministic structured responses.
@@ -2106,33 +2168,167 @@ standard runtime operations with deterministic structured responses.
 - @satisfies REQ-048
 - @satisfies REQ-049
 
-### fn `function _applyProviderSuccess(provider, payload)` (L1239-1246)
+### fn `function _localApiTransportSupported()` (L1397-1399)
+- @brief Check whether sockets transport exists for localhost API listener.
+- @details Validates MV3 runtime support for tcpServer/tcp socket namespaces.
+Time complexity: O(1).
+Space complexity: O(1).
+- @return s {boolean} True when sockets transport APIs are available.
+- @satisfies REQ-060
+
+### fn `function _createTcpServerSocket()` (L1410-1420)
+- @brief Create one TCP server socket through callback-based Chrome API.
+- @details Wraps callback API into Promise envelope for deterministic async flow.
+Time complexity: O(1).
+Space complexity: O(1).
+- @return s {Promise<number>} Created server socket identifier.
+- @throws {Error} If server socket creation fails.
+- @satisfies REQ-060
+
+### fn `function _listenTcpServerSocket(socketId, port)` (L1432-1444)
+- @brief Listen on candidate localhost port for external API bridge.
+- @details Attempts tcpServer listen call and returns Chrome result code.
+Time complexity: O(1).
+Space complexity: O(1).
+- @param {number} socketId Server socket id.
+- @param {number} port Candidate localhost port.
+- @return s {Promise<number>} Listen result code; >=0 indicates success.
+- @satisfies REQ-060
+
+### fn `function _closeTcpServerSocket(socketId)` (L1454-1463)
+- @brief Close TCP server socket best-effort.
+- @details Swallows close-time errors because socket may already be closed.
+Time complexity: O(1).
+Space complexity: O(1).
+- @param {number} socketId Server socket id.
+- @return s {void}
+
+### fn `function _acceptTcpClient(socketId)` (L1474-1483)
+- @brief Accept one pending client connection on localhost API listener.
+- @details Wraps callback API into Promise to keep accept-loop sequential.
+Time complexity: O(1) excluding socket wait time.
+Space complexity: O(1).
+- @param {number} socketId Server socket id.
+- @return s {Promise<{resultCode: number, clientSocketId: number}>} Accepted client metadata.
+- @satisfies REQ-060
+
+### fn `function _readTcpClientChunk(clientSocketId)` (L1494-1503)
+- @brief Read request bytes from accepted client socket.
+- @details Reads one request chunk for compact HTTP request parsing.
+Time complexity: O(N), where N is received byte count.
+Space complexity: O(N).
+- @param {number} clientSocketId Accepted client socket id.
+- @return s {Promise<{resultCode: number, data: ArrayBuffer | null}>} Read result metadata.
+- @satisfies REQ-061
+
+### fn `function _writeTcpClientPayload(clientSocketId, payload)` (L1515-1522)
+- @brief Write one HTTP response payload to accepted client socket.
+- @details Serializes response text via UTF-8 encoder and forwards bytes via tcp.send.
+Time complexity: O(N), where N is response byte count.
+Space complexity: O(N).
+- @param {number} clientSocketId Accepted client socket id.
+- @param {string} payload HTTP response payload.
+- @return s {Promise<void>} Completion promise.
+- @satisfies REQ-061
+
+### fn `function _closeTcpClientSocket(clientSocketId)` (L1532-1549)
+- @brief Close accepted client socket best-effort.
+- @details Executes disconnect and close without propagating close-time failures.
+Time complexity: O(1).
+Space complexity: O(1).
+- @param {number} clientSocketId Accepted client socket id.
+- @return s {void}
+
+### fn `function _buildLocalApiHttpResponse(statusCode, body)` (L1561-1572)
+- @brief Build canonical HTTP JSON response payload.
+- @details Converts body object into HTTP/1.1 JSON response with content length.
+Time complexity: O(N), where N is serialized JSON length.
+Space complexity: O(N).
+- @param {number} statusCode HTTP status code.
+- @param {Record<string, unknown>} body Response payload object.
+- @return s {string} Serialized HTTP response text.
+- @satisfies REQ-061
+
+### fn `function _parseLocalApiHttpRequest(requestText)` (L1584-1603)
+- @brief Parse one HTTP request line/body pair from raw socket text.
+- @details Extracts method, path, and optional JSON body from first read chunk.
+Time complexity: O(N), where N is request text length.
+Space complexity: O(N).
+- @param {string} requestText Decoded HTTP request text.
+- @return s {{method: string, path: string, body: Record<string, unknown> | null}} Parsed request envelope.
+- @throws {Error} If method/path/body cannot be parsed.
+- @satisfies REQ-061
+
+### fn `async function _dispatchLocalApiHttpRequest(method, path, body)` (L1617-1651)
+- @brief Dispatch localhost HTTP request to primary/debug API handlers.
+- @details Maps route path/method to existing internal API builders and preserves
+debug gate semantics for debug endpoints.
+Time complexity: O(C), where C is selected handler complexity.
+Space complexity: O(C), where C is handler payload size.
+- @param {string} method HTTP method token.
+- @param {string} path HTTP path token.
+- @param {Record<string, unknown> | null} body Parsed request body.
+- @return s {Promise<{statusCode: number, body: Record<string, unknown>}>} Response envelope.
+- @satisfies REQ-061
+
+### fn `async function _handleLocalApiClient(clientSocketId)` (L1663-1684)
+- @brief Process one accepted localhost TCP client request.
+- @details Reads one HTTP request chunk, dispatches API response, writes JSON
+envelope, and closes client socket.
+Time complexity: O(N + C), where N=request bytes and C=handler complexity.
+Space complexity: O(N + C).
+- @param {number} clientSocketId Accepted client socket id.
+- @return s {Promise<void>} Completion promise.
+- @satisfies REQ-061
+
+### fn `async function _runLocalApiAcceptLoop()` (L1696-1719)
+- @brief Run accept loop for localhost API listener.
+- @details Continuously accepts client sockets and dispatches request handlers
+until listener socket is closed or replaced.
+Time complexity: O(K), where K is accepted connection count.
+Space complexity: O(1) plus per-request handler memory.
+- @return s {Promise<void>} Completion promise.
+- @satisfies REQ-060
+- @satisfies REQ-061
+
+### fn `async function _startLocalApiListener()` (L1731-1764)
+- @brief Start localhost API listener on default or descending fallback port.
+- @details Probes port `32767` first, then decrements port one-by-one until
+first successful bind to `127.0.0.1`.
+Time complexity: O(P), where P is attempted port count.
+Space complexity: O(1).
+- @return s {Promise<void>} Completion promise.
+- @throws {Error} If no candidate port can be bound.
+- @satisfies REQ-060
+
+### fn `function _applyProviderSuccess(provider, payload)` (L1772-1779)
 - @brief Apply successful provider refresh payload.
 - @param {string} provider Provider key.
 - @param {Record<string, unknown>} payload Parsed provider payload.
 - @return s {void}
 
-### fn `function _applyProviderFailure(provider, error)` (L1254-1260)
+### fn `function _applyProviderFailure(provider, error)` (L1787-1793)
 - @brief Apply provider refresh failure while preserving last successful windows.
 - @param {string} provider Provider key.
 - @param {Error} error Failure object.
 - @return s {void}
 
-### fn `async function _refreshAllProviders(trigger)` (L1268-1375)
+### fn `async function _refreshAllProviders(trigger)` (L1801-1908)
 - @brief Execute one ordered refresh cycle across all provider pages.
 - @details Preserves successful state on errors and emits debug logs for each step.
 - @param {string} trigger Refresh trigger source.
 - @return s {Promise<void>} Completion promise.
 
-### fn `async function _initializeRuntime(trigger)` (L1385-1390)
+### fn `async function _initializeRuntime(trigger)` (L1919-1925)
 - @brief Initialize scheduler and persisted state for service-worker lifecycle.
 - @details Restores persisted runtime/debug state, executes one immediate refresh
-cycle, and then schedules recurring refresh alarms.
+cycle, starts localhost API listener, and then schedules recurring refresh alarms.
 - @param {string} trigger Initialization trigger label.
 - @return s {Promise<void>} Completion promise.
 - @satisfies REQ-043
+- @satisfies REQ-060
 
-### fn `async function _handleMessage(message, sendResponse)` (L1400-1594)
+### fn `async function _handleMessage(message, sendResponse)` (L1935-2077)
 - @brief Handle incoming runtime messages from popup/UI contexts.
 - @details Supports state retrieval, manual refresh, debug log operations, and
 refresh-interval override updates.
@@ -2143,65 +2339,88 @@ refresh-interval override updates.
 ## Symbol Index
 |Symbol|Kind|Vis|Lines|Sig|
 |---|---|---|---|---|
-|`REFRESH_INTERVAL_SECONDS`|const||45||
-|`STATE_STORAGE_KEY`|const||48||
-|`INTERVAL_OVERRIDE_STORAGE_KEY`|const||51||
-|`DEBUG_API_ENABLED_SESSION_STORAGE_KEY`|const||54||
-|`REFRESH_ALARM_NAME`|const||57||
-|`PROVIDER_FETCH_SEQUENCE`|const||60||
-|`MAIN_API_TAB_ORDER`|const||68||
-|`MAIN_API_PROVIDER_WINDOWS`|const||71||
-|`DEBUG_API_SUPPORTED_COMMANDS`|const||78||
-|`DEBUG_API_ALLOWED_HOSTS`|const||93||
-|`DEBUG_API_DEFAULT_MAX_CHARS`|const||96||
-|`DEBUG_API_MAX_CHARS`|const||99||
-|`DEBUG_API_DISABLED_ERROR`|const||102||
-|`DEBUG_API_PROVIDER_DEFAULT_URLS`|const||105||
-|`DEBUG_API_DEFAULT_PROVIDER_DIAGNOSE_SET`|const||113||
-|`DEBUG_API_PROVIDER_PAGES`|const||116||
-|`DEBUG_API_PROVIDER_PAGES_DEFAULT_RELATED_LIMIT`|const||128||
-|`_emptyProviderState`|fn||138-149|function _emptyProviderState(provider)|
-|`_emptyState`|fn||155-169|function _emptyState()|
-|`_cloneState`|fn||184-186|function _cloneState()|
-|`_toFiniteMetricNumber`|fn||193-199|function _toFiniteMetricNumber(token)|
-|`_normalizeMainApiWindow`|fn||211-222|function _normalizeMainApiWindow(windowData)|
-|`_buildMainApiSnapshot`|fn||233-267|function _buildMainApiSnapshot()|
-|`_ensureDebugAccessEnabled`|fn||281-288|function _ensureDebugAccessEnabled()|
-|`_loadPersistedState`|fn||296-320|async function _loadPersistedState()|
-|`_getSessionStorageArea`|fn||332-342|function _getSessionStorageArea()|
-|`_loadDebugAccessState`|fn||357-366|async function _loadDebugAccessState()|
-|`_persistDebugAccessState`|fn||380-387|async function _persistDebugAccessState(enabled)|
-|`_persistState`|fn||393-395|async function _persistState()|
-|`_getRefreshIntervalSeconds`|fn||406-413|async function _getRefreshIntervalSeconds()|
-|`_scheduleRefreshAlarm`|fn||419-432|async function _scheduleRefreshAlarm()|
-|`_fetchHtml`|fn||440-452|async function _fetchHtml(url)|
-|`_normalizeDebugMaxChars`|fn||464-470|function _normalizeDebugMaxChars(token)|
-|`_normalizeDebugUrl`|fn||483-504|function _normalizeDebugUrl(token)|
-|`_serializeHeaders`|fn||512-523|function _serializeHeaders(headers)|
-|`_buildHtmlProbe`|fn||530-544|function _buildHtmlProbe(html)|
-|`_sha256Hex`|fn||551-557|async function _sha256Hex(text)|
-|`_buildPayloadQuality`|fn||564-594|function _buildPayloadQuality(payload)|
-|`_assertProviderPayloadUsable`|fn||603-611|function _assertProviderPayloadUsable(provider, payload)|
-|`_downloadDebugUrl`|fn||619-637|async function _downloadDebugUrl(urlToken)|
-|`_buildDebugHttpResponse`|fn||645-662|async function _buildDebugHttpResponse(download, maxChars)|
-|`_normalizeDebugRelatedLimit`|fn||674-680|function _normalizeDebugRelatedLimit(token)|
-|`_extractRelatedResourceUrls`|fn||693-721|function _extractRelatedResourceUrls(html, pageUrl)|
-|`_buildProviderPayloadAnalysis`|fn||730-739|function _buildProviderPayloadAnalysis(provider, payload)|
-|`_downloadRelatedResources`|fn||750-776|async function _downloadRelatedResources(html, pageUrl, m...|
-|`_executeProviderPageDownload`|fn||786-813|async function _executeProviderPageDownload(descriptor, m...|
-|`_executeProvidersPagesGetCommand`|fn||823-858|async function _executeProvidersPagesGetCommand(args)|
-|`_buildPayloadAssertion`|fn||868-881|function _buildPayloadAssertion(provider, payload)|
-|`_buildWindowAssignmentDiagnostics`|fn||891-900|function _buildWindowAssignmentDiagnostics(html, provider)|
-|`_executeProviderDiagnoseCommand`|fn||911-976|async function _executeProviderDiagnoseCommand(provider, ...|
-|`_resolveDebugParser`|fn||984-997|function _resolveDebugParser(provider)|
-|`_summarizeDebugArgs`|fn||1005-1020|function _summarizeDebugArgs(args)|
-|`_describeDebugApi`|fn||1027-1047|function _describeDebugApi()|
-|`_executeDebugApiCommand`|fn||1061-1231|async function _executeDebugApiCommand(command, args)|
-|`_applyProviderSuccess`|fn||1239-1246|function _applyProviderSuccess(provider, payload)|
-|`_applyProviderFailure`|fn||1254-1260|function _applyProviderFailure(provider, error)|
-|`_refreshAllProviders`|fn||1268-1375|async function _refreshAllProviders(trigger)|
-|`_initializeRuntime`|fn||1385-1390|async function _initializeRuntime(trigger)|
-|`_handleMessage`|fn||1400-1594|async function _handleMessage(message, sendResponse)|
+|`REFRESH_INTERVAL_SECONDS`|const||47||
+|`STATE_STORAGE_KEY`|const||50||
+|`INTERVAL_OVERRIDE_STORAGE_KEY`|const||53||
+|`DEBUG_API_ENABLED_SESSION_STORAGE_KEY`|const||56||
+|`REFRESH_ALARM_NAME`|const||59||
+|`PROVIDER_FETCH_SEQUENCE`|const||62||
+|`MAIN_API_TAB_ORDER`|const||70||
+|`MAIN_API_PROVIDER_WINDOWS`|const||73||
+|`DEBUG_API_SUPPORTED_COMMANDS`|const||80||
+|`DEBUG_API_ALLOWED_HOSTS`|const||95||
+|`DEBUG_API_DEFAULT_MAX_CHARS`|const||98||
+|`DEBUG_API_MAX_CHARS`|const||101||
+|`DEBUG_API_DISABLED_ERROR`|const||104||
+|`DEBUG_API_PROVIDER_DEFAULT_URLS`|const||107||
+|`DEBUG_API_DEFAULT_PROVIDER_DIAGNOSE_SET`|const||115||
+|`DEBUG_API_PROVIDER_PAGES`|const||118||
+|`DEBUG_API_PROVIDER_PAGES_DEFAULT_RELATED_LIMIT`|const||130||
+|`LOCAL_API_LISTEN_HOST`|const||133||
+|`LOCAL_API_DEFAULT_PORT`|const||136||
+|`LOCAL_API_MIN_PORT`|const||139||
+|`LOCAL_API_BACKLOG`|const||142||
+|`_emptyProviderState`|fn||152-163|function _emptyProviderState(provider)|
+|`_emptyState`|fn||169-183|function _emptyState()|
+|`_cloneState`|fn||207-209|function _cloneState()|
+|`_toFiniteMetricNumber`|fn||216-222|function _toFiniteMetricNumber(token)|
+|`_normalizeMainApiWindow`|fn||234-245|function _normalizeMainApiWindow(windowData)|
+|`_buildMainApiSnapshot`|fn||256-290|function _buildMainApiSnapshot()|
+|`_ensureDebugAccessEnabled`|fn||304-311|function _ensureDebugAccessEnabled()|
+|`_loadPersistedState`|fn||319-343|async function _loadPersistedState()|
+|`_getSessionStorageArea`|fn||355-365|function _getSessionStorageArea()|
+|`_loadDebugAccessState`|fn||380-389|async function _loadDebugAccessState()|
+|`_persistDebugAccessState`|fn||403-410|async function _persistDebugAccessState(enabled)|
+|`_persistState`|fn||416-418|async function _persistState()|
+|`_getRefreshIntervalSeconds`|fn||429-436|async function _getRefreshIntervalSeconds()|
+|`_scheduleRefreshAlarm`|fn||442-455|async function _scheduleRefreshAlarm()|
+|`_fetchHtml`|fn||463-475|async function _fetchHtml(url)|
+|`_normalizeDebugMaxChars`|fn||487-493|function _normalizeDebugMaxChars(token)|
+|`_normalizeDebugUrl`|fn||506-527|function _normalizeDebugUrl(token)|
+|`_serializeHeaders`|fn||535-546|function _serializeHeaders(headers)|
+|`_buildHtmlProbe`|fn||553-567|function _buildHtmlProbe(html)|
+|`_sha256Hex`|fn||574-580|async function _sha256Hex(text)|
+|`_buildPayloadQuality`|fn||587-617|function _buildPayloadQuality(payload)|
+|`_assertProviderPayloadUsable`|fn||626-634|function _assertProviderPayloadUsable(provider, payload)|
+|`_downloadDebugUrl`|fn||642-660|async function _downloadDebugUrl(urlToken)|
+|`_buildDebugHttpResponse`|fn||668-685|async function _buildDebugHttpResponse(download, maxChars)|
+|`_normalizeDebugRelatedLimit`|fn||697-703|function _normalizeDebugRelatedLimit(token)|
+|`_extractRelatedResourceUrls`|fn||716-744|function _extractRelatedResourceUrls(html, pageUrl)|
+|`_buildProviderPayloadAnalysis`|fn||753-762|function _buildProviderPayloadAnalysis(provider, payload)|
+|`_downloadRelatedResources`|fn||773-799|async function _downloadRelatedResources(html, pageUrl, m...|
+|`_executeProviderPageDownload`|fn||809-836|async function _executeProviderPageDownload(descriptor, m...|
+|`_executeProvidersPagesGetCommand`|fn||846-881|async function _executeProvidersPagesGetCommand(args)|
+|`_buildPayloadAssertion`|fn||891-904|function _buildPayloadAssertion(provider, payload)|
+|`_buildWindowAssignmentDiagnostics`|fn||914-923|function _buildWindowAssignmentDiagnostics(html, provider)|
+|`_executeProviderDiagnoseCommand`|fn||934-999|async function _executeProviderDiagnoseCommand(provider, ...|
+|`_resolveDebugParser`|fn||1007-1020|function _resolveDebugParser(provider)|
+|`_summarizeDebugArgs`|fn||1028-1043|function _summarizeDebugArgs(args)|
+|`_describeDebugApi`|fn||1050-1070|function _describeDebugApi()|
+|`_buildDebugDisabledResponse`|fn||1082-1088|function _buildDebugDisabledResponse(errorSource)|
+|`_runDebugApiExecute`|fn||1102-1139|async function _runDebugApiExecute(command, args)|
+|`_getDebugGateFailure`|fn||1150-1157|function _getDebugGateFailure()|
+|`_buildDebugDescribeResponse`|fn||1168-1178|function _buildDebugDescribeResponse()|
+|`_buildDebugExecuteResponse`|fn||1192-1203|async function _buildDebugExecuteResponse(request)|
+|`_executeDebugApiCommand`|fn||1217-1387|async function _executeDebugApiCommand(command, args)|
+|`_localApiTransportSupported`|fn||1397-1399|function _localApiTransportSupported()|
+|`_createTcpServerSocket`|fn||1410-1420|function _createTcpServerSocket()|
+|`_listenTcpServerSocket`|fn||1432-1444|function _listenTcpServerSocket(socketId, port)|
+|`_closeTcpServerSocket`|fn||1454-1463|function _closeTcpServerSocket(socketId)|
+|`_acceptTcpClient`|fn||1474-1483|function _acceptTcpClient(socketId)|
+|`_readTcpClientChunk`|fn||1494-1503|function _readTcpClientChunk(clientSocketId)|
+|`_writeTcpClientPayload`|fn||1515-1522|function _writeTcpClientPayload(clientSocketId, payload)|
+|`_closeTcpClientSocket`|fn||1532-1549|function _closeTcpClientSocket(clientSocketId)|
+|`_buildLocalApiHttpResponse`|fn||1561-1572|function _buildLocalApiHttpResponse(statusCode, body)|
+|`_parseLocalApiHttpRequest`|fn||1584-1603|function _parseLocalApiHttpRequest(requestText)|
+|`_dispatchLocalApiHttpRequest`|fn||1617-1651|async function _dispatchLocalApiHttpRequest(method, path,...|
+|`_handleLocalApiClient`|fn||1663-1684|async function _handleLocalApiClient(clientSocketId)|
+|`_runLocalApiAcceptLoop`|fn||1696-1719|async function _runLocalApiAcceptLoop()|
+|`_startLocalApiListener`|fn||1731-1764|async function _startLocalApiListener()|
+|`_applyProviderSuccess`|fn||1772-1779|function _applyProviderSuccess(provider, payload)|
+|`_applyProviderFailure`|fn||1787-1793|function _applyProviderFailure(provider, error)|
+|`_refreshAllProviders`|fn||1801-1908|async function _refreshAllProviders(trigger)|
+|`_initializeRuntime`|fn||1919-1925|async function _initializeRuntime(trigger)|
+|`_handleMessage`|fn||1935-2077|async function _handleMessage(message, sendResponse)|
 
 
 ---

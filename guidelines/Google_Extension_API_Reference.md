@@ -3,6 +3,7 @@
 ## Contract Metadata
 - `scope`: `src/aibar/chrome-extension/background.js` message dispatcher.
 - `transport`: `chrome.runtime.sendMessage(request)`.
+- `external_transport`: localhost HTTP listener at `127.0.0.1:32767` with descending fallback to the first available lower port.
 - `response_envelope`: JSON object with top-level `ok: boolean`.
 - `session_persisted_debug_flag`: `debugApiEnabled` defaults to `false`, persists in `chrome.storage.session` across service-worker restarts, and resets on browser process termination.
 - `deterministic_debug_disabled_error`:
@@ -13,6 +14,7 @@
 - `non_debug_routes`: always callable.
 - `debug_routes`: any message where `type` starts with `debug.`; callable only when debug flag is enabled.
 - `config_routes`: used to read/update debug flag and refresh interval.
+- `external_http_routes`: `/api/main/snapshot`, `/debug/api/describe`, `/debug/api/execute`.
 
 ## API Index
 - `api.main.snapshot` (primary non-debug API)
@@ -407,12 +409,12 @@ console.log(diagnosticsResponse.result.summary);
 ## HTTP CLI Examples (`curl` / `wget`)
 - `scope_note`: direct `curl`/`wget` calls can fetch provider pages immediately; runtime message payload examples require an external local bridge that forwards HTTP payloads to `chrome.runtime.sendMessage`.
 
-### Example: `curl` JSON payload for `debug.api.execute` bridge
+### Example: `curl` request
+#### JSON payload for `debug.api.execute` bridge
 ```bash
-curl -sS -X POST "http://127.0.0.1:8765/extension/message" \
+curl -sS -X POST "http://127.0.0.1:32767/debug/api/execute" \
   -H "Content-Type: application/json" \
   -d '{
-    "type": "debug.api.execute",
     "command": "http.get",
     "args": {
       "url": "https://claude.ai/settings/usage",
@@ -421,10 +423,10 @@ curl -sS -X POST "http://127.0.0.1:8765/extension/message" \
   }'
 ```
 
-### Example: `wget` JSON payload for `api.main.snapshot` bridge
+### Example: `wget` request
+#### JSON payload for `api.main.snapshot` bridge
 ```bash
 wget -qO- \
   --header="Content-Type: application/json" \
-  --post-data='{"type":"api.main.snapshot"}' \
-  "http://127.0.0.1:8765/extension/message"
+  "http://127.0.0.1:32767/api/main/snapshot"
 ```

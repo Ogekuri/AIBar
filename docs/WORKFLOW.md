@@ -35,8 +35,8 @@
 - `id: PROC:chrome-ext`
   - `type: Process`
   - `parent_process: null`
-  - `role: Chrome extension runtime process for popup rendering and autonomous provider refresh`
-  - `entrypoint_symbols: _initializeRuntime(...), _handleMessage(...)`
+  - `role: Chrome extension runtime process for popup rendering, autonomous provider refresh, and localhost external API serving`
+  - `entrypoint_symbols: _initializeRuntime(...), _handleMessage(...), _runLocalApiAcceptLoop(...)`
   - `defining_files: src/aibar/chrome-extension/background.js, src/aibar/chrome-extension/popup.js, src/aibar/chrome-extension/parsers.js, src/aibar/chrome-extension/debug.js`
   - `thread_model: explicit threads detected (THR:chrome-ext#refresh-alarm, THR:chrome-ext#popup-ui)`
 
@@ -101,11 +101,31 @@
   - `_handleMessage(...)`: popup/background RPC dispatcher [`src/aibar/chrome-extension/background.js`]
 - `Lifecycle/Trigger`
   - Starts when the Chrome extension service worker is loaded.
-  - Registers recurring alarm scheduling, processes provider refresh cycles, persists normalized state, and serves popup RPC requests.
+  - Registers localhost external API listener, recurring alarm scheduling, processes provider refresh cycles, persists normalized state, and serves popup/external API requests.
 - `Internal Call-Trace Tree`
   - `_initializeRuntime(...)`: startup orchestrator [`src/aibar/chrome-extension/background.js`]
     - `_loadPersistedState(...)`: restore last successful payloads from storage [`src/aibar/chrome-extension/background.js`]
     - `_loadDebugAccessState(...)`: restore debug-access enablement from browser-session storage [`src/aibar/chrome-extension/background.js`]
+    - `_startLocalApiListener(...)`: bind localhost listener on default/fallback port [`src/aibar/chrome-extension/background.js`]
+      - `_localApiTransportSupported(...)`: sockets API capability gate [`src/aibar/chrome-extension/background.js`]
+      - `_createTcpServerSocket(...)`: tcpServer socket creation [`src/aibar/chrome-extension/background.js`]
+      - `_listenTcpServerSocket(...)`: host/port bind probe (`127.0.0.1`, descending from `32767`) [`src/aibar/chrome-extension/background.js`]
+      - `_runLocalApiAcceptLoop(...)`: asynchronous localhost client accept loop [`src/aibar/chrome-extension/background.js`]
+        - `_acceptTcpClient(...)`: pending client acceptance [`src/aibar/chrome-extension/background.js`]
+        - `_handleLocalApiClient(...)`: one client request parser/dispatcher [`src/aibar/chrome-extension/background.js`]
+          - `_readTcpClientChunk(...)`: request-byte read [`src/aibar/chrome-extension/background.js`]
+          - `_parseLocalApiHttpRequest(...)`: HTTP line/body parser [`src/aibar/chrome-extension/background.js`]
+          - `_dispatchLocalApiHttpRequest(...)`: external route dispatcher [`src/aibar/chrome-extension/background.js`]
+            - `_buildMainApiSnapshot(...)`: `/api/main/snapshot` route payload builder [`src/aibar/chrome-extension/background.js`]
+            - `_buildDebugDescribeResponse(...)`: `/debug/api/describe` route responder [`src/aibar/chrome-extension/background.js`]
+              - `_getDebugGateFailure(...)`: debug-access gate evaluation [`src/aibar/chrome-extension/background.js`]
+            - `_buildDebugExecuteResponse(...)`: `/debug/api/execute` route responder [`src/aibar/chrome-extension/background.js`]
+              - `_getDebugGateFailure(...)`: debug-access gate evaluation [`src/aibar/chrome-extension/background.js`]
+              - `_runDebugApiExecute(...)`: command execution wrapper with lifecycle logging [`src/aibar/chrome-extension/background.js`]
+                - `_executeDebugApiCommand(...)`: command dispatcher [`src/aibar/chrome-extension/background.js`]
+          - `_buildLocalApiHttpResponse(...)`: HTTP response serializer [`src/aibar/chrome-extension/background.js`]
+          - `_writeTcpClientPayload(...)`: response-byte write [`src/aibar/chrome-extension/background.js`]
+          - `_closeTcpClientSocket(...)`: connection teardown [`src/aibar/chrome-extension/background.js`]
     - `_refreshAllProviders(...)`: ordered provider refresh execution [`src/aibar/chrome-extension/background.js`]
       - `_fetchHtml(...)`: authenticated HTML download [`src/aibar/chrome-extension/background.js`]
       - `parseClaudeUsageHtml(...)`: Claude metric extraction [`src/aibar/chrome-extension/parsers.js`]
@@ -135,15 +155,19 @@
       - `_persistDebugAccessState(...)`: session-scoped debug flag persistence [`src/aibar/chrome-extension/background.js`]
     - `config.refresh_interval.set` handler: non-debug-gated interval override with `chrome.storage.local` persistence and alarm reschedule [`src/aibar/chrome-extension/background.js`]
       - `_scheduleRefreshAlarm(...)`: interval override reconfiguration [`src/aibar/chrome-extension/background.js`]
-    - `_ensureDebugAccessEnabled(...)`: deterministic guard for all `debug.*` message types [`src/aibar/chrome-extension/background.js`]
+    - `_getDebugGateFailure(...)`: deterministic guard for all `debug.*` message types [`src/aibar/chrome-extension/background.js`]
     - `_refreshAllProviders(...)`: manual refresh route [`src/aibar/chrome-extension/background.js`]
       - `_buildMainApiSnapshot(...)`: refresh response payload normalization [`src/aibar/chrome-extension/background.js`]
     - `readDebugRecords(...)`: debug log retrieval [`src/aibar/chrome-extension/debug.js`]
     - `clearDebugRecords(...)`: debug log reset [`src/aibar/chrome-extension/debug.js`]
     - `buildDebugBundle(...)`: debug export payload generation [`src/aibar/chrome-extension/debug.js`]
     - `_scheduleRefreshAlarm(...)`: interval override reconfiguration [`src/aibar/chrome-extension/background.js`]
-    - `_describeDebugApi(...)`: debug command catalog response [`src/aibar/chrome-extension/background.js`]
-    - `_executeDebugApiCommand(...)`: debug command dispatcher [`src/aibar/chrome-extension/background.js`]
+    - `_buildDebugDescribeResponse(...)`: debug command catalog response wrapper [`src/aibar/chrome-extension/background.js`]
+      - `_describeDebugApi(...)`: debug command catalog response payload [`src/aibar/chrome-extension/background.js`]
+    - `_buildDebugExecuteResponse(...)`: debug command dispatcher wrapper [`src/aibar/chrome-extension/background.js`]
+      - `_runDebugApiExecute(...)`: command execution with lifecycle logging [`src/aibar/chrome-extension/background.js`]
+        - `_summarizeDebugArgs(...)`: command-argument logging sanitizer [`src/aibar/chrome-extension/background.js`]
+        - `_executeDebugApiCommand(...)`: debug command dispatcher [`src/aibar/chrome-extension/background.js`]
       - `_normalizeDebugMaxChars(...)`: debug payload-size normalization [`src/aibar/chrome-extension/background.js`]
       - `_downloadDebugUrl(...)`: validated HTTPS retrieval for debug command [`src/aibar/chrome-extension/background.js`]
         - `_normalizeDebugUrl(...)`: host/scheme allowlist validation [`src/aibar/chrome-extension/background.js`]
@@ -165,10 +189,10 @@
       - `extractSignalDiagnostics(...)`: parser signal extraction snapshot [`src/aibar/chrome-extension/parsers.js`]
       - `_buildPayloadQuality(...)`: parsed payload usability summary [`src/aibar/chrome-extension/background.js`]
         - `_toFiniteMetricNumber(...)`: null-safe metric coercion for quality computation [`src/aibar/chrome-extension/background.js`]
-      - `_summarizeDebugArgs(...)`: command-argument logging sanitizer [`src/aibar/chrome-extension/background.js`]
 - `External Boundaries`
-  - Chrome extension runtime APIs (`chrome.runtime`, `chrome.alarms`, `chrome.storage.local`, `chrome.storage.session`).
+  - Chrome extension runtime APIs (`chrome.runtime`, `chrome.alarms`, `chrome.storage.local`, `chrome.storage.session`, `chrome.sockets.tcpServer`, `chrome.sockets.tcp`).
   - HTTPS page downloads for Claude, ChatGPT Codex, and GitHub Copilot settings pages.
+  - Localhost TCP clients over `127.0.0.1`.
   - Browser console output for runtime diagnostics.
 
 ### THR:chrome-ext#refresh-alarm
@@ -480,3 +504,12 @@
   - `endpoint_or_channel: message type usage.updated`
   - `payload_data_shape: primary API snapshot object containing tab_order, tab_windows, provider windows/metrics/errors, timestamps, cycle status, and scheduler metadata`
   - `declaration_files: src/aibar/chrome-extension/background.js, src/aibar/chrome-extension/popup.js`
+
+- `id: EDGE-007`
+  - `source: External boundary (localhost clients)`
+  - `destination: PROC:chrome-ext`
+  - `direction: request-response`
+  - `mechanism: localhost TCP HTTP bridge`
+  - `endpoint_or_channel: GET /api/main/snapshot, GET /debug/api/describe, POST /debug/api/execute`
+  - `payload_data_shape: JSON request/response envelopes mapped to api.main.snapshot, debug.api.describe, and debug.api.execute; debug routes preserve deterministic DEBUG_API_DISABLED response when runtime debug flag is off`
+  - `declaration_files: src/aibar/chrome-extension/background.js, guidelines/Google_Extension_API_Reference.md`

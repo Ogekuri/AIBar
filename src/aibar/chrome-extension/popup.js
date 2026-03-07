@@ -35,22 +35,41 @@ let currentState = null;
 /** @brief Active provider tab name. */
 let activeProvider = "claude";
 
+/** @brief DOM availability flag for browser popup runtime. */
+const HAS_DOCUMENT = typeof document !== "undefined";
+
 /** @brief DOM cache for popup controls. */
-const dom = {
-  refreshButton: document.getElementById("refreshButton"),
-  intervalInput: document.getElementById("intervalInput"),
-  setIntervalButton: document.getElementById("setIntervalButton"),
-  debugEnableCheckbox: document.getElementById("debugEnableCheckbox"),
-  debugStatusLabel: document.getElementById("debugStatusLabel"),
-  updatedLabel: document.getElementById("updatedLabel"),
-  statusLabel: document.getElementById("statusLabel"),
-  tabButtons: Array.from(document.querySelectorAll("[data-provider]")),
-  cards: {
-    claude: document.getElementById("card-claude"),
-    copilot: document.getElementById("card-copilot"),
-    codex: document.getElementById("card-codex"),
-  },
-};
+const dom = HAS_DOCUMENT
+  ? {
+    refreshButton: document.getElementById("refreshButton"),
+    intervalInput: document.getElementById("intervalInput"),
+    setIntervalButton: document.getElementById("setIntervalButton"),
+    debugEnableCheckbox: document.getElementById("debugEnableCheckbox"),
+    debugStatusLabel: document.getElementById("debugStatusLabel"),
+    updatedLabel: document.getElementById("updatedLabel"),
+    statusLabel: document.getElementById("statusLabel"),
+    tabButtons: Array.from(document.querySelectorAll("[data-provider]")),
+    cards: {
+      claude: document.getElementById("card-claude"),
+      copilot: document.getElementById("card-copilot"),
+      codex: document.getElementById("card-codex"),
+    },
+  }
+  : {
+    refreshButton: null,
+    intervalInput: null,
+    setIntervalButton: null,
+    debugEnableCheckbox: null,
+    debugStatusLabel: null,
+    updatedLabel: null,
+    statusLabel: null,
+    tabButtons: [],
+    cards: {
+      claude: null,
+      copilot: null,
+      codex: null,
+    },
+  };
 
 /** @brief Last known runtime debug-access status. */
 let debugApiEnabled = false;
@@ -432,20 +451,22 @@ function _wireUiEvents() {
   }
 }
 
-chrome.runtime.onMessage.addListener((message) => {
-  if (message?.type !== "usage.updated") {
-    return;
-  }
-  currentState = message.snapshot ?? message.state ?? currentState;
-  _renderState();
-});
+if (HAS_DOCUMENT && typeof chrome !== "undefined" && chrome?.runtime) {
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message?.type !== "usage.updated") {
+      return;
+    }
+    currentState = message.snapshot ?? message.state ?? currentState;
+    _renderState();
+  });
 
-_wireUiEvents();
-_setActiveProvider(activeProvider);
-_applyDebugAccessState(false);
-void _requestState().catch((error) => {
-  logger.error("initial-state-load-failure", { error: String(error) });
-});
-void _requestDebugAccessState().catch((error) => {
-  logger.error("debug-access-load-failure", { error: String(error) });
-});
+  _wireUiEvents();
+  _setActiveProvider(activeProvider);
+  _applyDebugAccessState(false);
+  void _requestState().catch((error) => {
+    logger.error("initial-state-load-failure", { error: String(error) });
+  });
+  void _requestDebugAccessState().catch((error) => {
+    logger.error("debug-access-load-failure", { error: String(error) });
+  });
+}

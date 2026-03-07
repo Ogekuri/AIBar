@@ -26,7 +26,8 @@
   },
   "permissions": [
     "alarms",
-    "storage"
+    "storage",
+    "sockets"
   ],
   "host_permissions": [
     "https://claude.ai/*",
