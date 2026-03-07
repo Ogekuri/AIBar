@@ -2435,7 +2435,7 @@ refresh-interval override updates.
 
 ---
 
-# debug.js | JavaScript | 226L | 13 symbols | 0 imports | 19 comments
+# debug.js | JavaScript | 256L | 14 symbols | 0 imports | 20 comments
 > Path: `src/aibar/chrome-extension/debug.js`
 - @brief Structured debug instrumentation for AIBar Chrome extension runtime.
 - @details Provides console logging, persisted ring-buffer logging in chrome.storage.local,
@@ -2475,7 +2475,17 @@ Space complexity: O(1).
 - @return s {((...args: Array<unknown>) => void) | null} Bound console method or null.
 - @satisfies REQ-050
 
-### fn `function _emitConsoleSafe(level, prefix, safeDetails)` (L101-111)
+### fn `function _toConsoleDetailsText(safeDetails)` (L99-112)
+- @brief Normalize structured console details into one sink-safe text fragment.
+- @details Converts details payload to JSON/text to avoid unsupported object
+console sink errors while preserving non-throwing logger semantics.
+Time complexity: O(N), where N is serialized payload length.
+Space complexity: O(N).
+- @param {unknown} safeDetails Serialization-safe details payload.
+- @return s {string} Console-safe text fragment; empty string when details absent.
+- @satisfies REQ-050
+
+### fn `function _emitConsoleSafe(level, prefix, safeDetails)` (L126-141)
 - @brief Emit one console log entry while suppressing sink-level failures.
 - @details Prevents logging-path exceptions from breaking caller execution by
 guarding bound console method invocation in a local try/catch block.
@@ -2487,7 +2497,7 @@ Space complexity: O(1).
 - @return s {void}
 - @satisfies REQ-050
 
-### fn `export async function appendDebugRecord(record)` (L122-129)
+### fn `export async function appendDebugRecord(record)` (L152-159)
 - @brief Persist one debug record into storage ring buffer.
 - @details Appends a single record under DEBUG_LOG_STORAGE_KEY and truncates
 older records to DEBUG_LOG_MAX_RECORDS to keep bounded storage usage.
@@ -2496,7 +2506,7 @@ Space complexity: O(N) for stored log array.
 - @param {Record<string, unknown>} record Structured log record.
 - @return s {Promise<void>} Completion promise.
 
-### fn `export function createLogger(scope)` (L138-190)
+### fn `export function createLogger(scope)` (L168-220)
 - @brief Create scoped logger with console + persisted logging sinks.
 - @brief Emit one structured log event.
 - @details Each log method emits to the browser console and asynchronously appends
@@ -2509,7 +2519,7 @@ one structured record to storage while preserving refresh/runtime execution flow
 - @return s {{debug: Function, info: Function, warn: Function, error: Function}} Scoped logger API.
 - @return s {Promise<void>} Completion promise.
 
-### fn `async function write(level, event, details = {})` (L148-170)
+### fn `async function write(level, event, details = {})` (L178-200)
 - @brief Emit one structured log event.
 - @details Normalizes payload values through bounded cloning and appends one
 timestamped record to storage while mirroring output in console.
@@ -2518,18 +2528,18 @@ timestamped record to storage while mirroring output in console.
 - @param {Record<string, unknown>} details Structured context payload.
 - @return s {Promise<void>} Completion promise.
 
-### fn `export async function readDebugRecords()` (L198-202)
+### fn `export async function readDebugRecords()` (L228-232)
 - @brief Load persisted debug records from storage.
 - @details Returns records as-is from storage ring buffer key; returns empty array
 when no records are available.
 - @return s {Promise<Array<Record<string, unknown>>>} Persisted records.
 
-### fn `export async function clearDebugRecords()` (L209-211)
+### fn `export async function clearDebugRecords()` (L239-241)
 - @brief Remove all persisted debug records.
 - @details Deletes the storage key used for ring-buffer logs.
 - @return s {Promise<void>} Completion promise.
 
-### fn `export async function buildDebugBundle(state)` (L219-226)
+### fn `export async function buildDebugBundle(state)` (L249-256)
 - @brief Build one export-ready debug bundle from state and records.
 - @details Produces deterministic JSON payload used by popup export action.
 - @param {Record<string, unknown>} state Current extension state snapshot.
@@ -2544,13 +2554,14 @@ when no records are available.
 |`DEBUG_CLONE_DEPTH_LIMIT`|const||22||
 |`_cloneDebugValue`|fn||34-63|function _cloneDebugValue(value, depth = 0)|
 |`_resolveConsoleMethod`|fn||75-87|function _resolveConsoleMethod(level)|
-|`_emitConsoleSafe`|fn||101-111|function _emitConsoleSafe(level, prefix, safeDetails)|
-|`appendDebugRecord`|fn||122-129|export async function appendDebugRecord(record)|
-|`createLogger`|fn||138-190|export function createLogger(scope)|
-|`write`|fn||148-170|async function write(level, event, details = {})|
-|`readDebugRecords`|fn||198-202|export async function readDebugRecords()|
-|`clearDebugRecords`|fn||209-211|export async function clearDebugRecords()|
-|`buildDebugBundle`|fn||219-226|export async function buildDebugBundle(state)|
+|`_toConsoleDetailsText`|fn||99-112|function _toConsoleDetailsText(safeDetails)|
+|`_emitConsoleSafe`|fn||126-141|function _emitConsoleSafe(level, prefix, safeDetails)|
+|`appendDebugRecord`|fn||152-159|export async function appendDebugRecord(record)|
+|`createLogger`|fn||168-220|export function createLogger(scope)|
+|`write`|fn||178-200|async function write(level, event, details = {})|
+|`readDebugRecords`|fn||228-232|export async function readDebugRecords()|
+|`clearDebugRecords`|fn||239-241|export async function clearDebugRecords()|
+|`buildDebugBundle`|fn||249-256|export async function buildDebugBundle(state)|
 
 
 ---

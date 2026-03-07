@@ -166,6 +166,7 @@
       - `_describeDebugApi(...)`: debug command catalog response payload [`src/aibar/chrome-extension/background.js`]
     - `_buildDebugExecuteResponse(...)`: debug command dispatcher wrapper [`src/aibar/chrome-extension/background.js`]
       - `_runDebugApiExecute(...)`: command execution with lifecycle logging [`src/aibar/chrome-extension/background.js`]
+        - `createLogger(...).<level>(...)`: structured lifecycle logging with console-safe details text normalization [`src/aibar/chrome-extension/debug.js`]
         - `_summarizeDebugArgs(...)`: command-argument logging sanitizer [`src/aibar/chrome-extension/background.js`]
         - `_executeDebugApiCommand(...)`: debug command dispatcher [`src/aibar/chrome-extension/background.js`]
       - `_normalizeDebugMaxChars(...)`: debug payload-size normalization [`src/aibar/chrome-extension/background.js`]

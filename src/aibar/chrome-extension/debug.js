@@ -87,6 +87,31 @@ function _resolveConsoleMethod(level) {
 }
 
 /**
+ * @brief Normalize structured console details into one sink-safe text fragment.
+ * @details Converts details payload to JSON/text to avoid unsupported object
+ * console sink errors while preserving non-throwing logger semantics.
+ * Time complexity: O(N), where N is serialized payload length.
+ * Space complexity: O(N).
+ * @param {unknown} safeDetails Serialization-safe details payload.
+ * @returns {string} Console-safe text fragment; empty string when details absent.
+ * @satisfies REQ-050
+ */
+function _toConsoleDetailsText(safeDetails) {
+  if (safeDetails === undefined || safeDetails === null) {
+    return "";
+  }
+  if (typeof safeDetails === "string") {
+    return safeDetails;
+  }
+  try {
+    const serialized = JSON.stringify(safeDetails);
+    return typeof serialized === "string" ? serialized : String(safeDetails);
+  } catch (_error) {
+    return String(safeDetails);
+  }
+}
+
+/**
  * @brief Emit one console log entry while suppressing sink-level failures.
  * @details Prevents logging-path exceptions from breaking caller execution by
  * guarding bound console method invocation in a local try/catch block.
@@ -104,7 +129,12 @@ function _emitConsoleSafe(level, prefix, safeDetails) {
     if (!consoleMethod) {
       return;
     }
-    consoleMethod(prefix, safeDetails);
+    const detailsText = _toConsoleDetailsText(safeDetails);
+    if (detailsText.length === 0) {
+      consoleMethod(prefix);
+      return;
+    }
+    consoleMethod(`${prefix} ${detailsText}`);
   } catch (_error) {
     // Keep logger non-throwing even on console sink failures.
   }

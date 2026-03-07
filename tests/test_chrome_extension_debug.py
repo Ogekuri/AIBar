@@ -81,3 +81,16 @@ def test_debug_logger_binds_console_methods_before_invocation() -> None:
     assert (
         '_emitConsoleSafe("error", "[AIBar:debug] appendDebugRecord failed"' in source
     )
+
+
+def test_debug_logger_console_sink_stringifies_details_for_console_safety() -> None:
+    """
+    @brief Verify console sink converts structured details into string payloads.
+    @details Prevents console "unsupported object" sink errors by avoiding direct
+    object-argument emission in `_emitConsoleSafe`.
+    @satisfies REQ-050
+    @satisfies TST-022
+    """
+    source = DEBUG_PATH.read_text(encoding="utf-8")
+    assert "function _toConsoleDetailsText(safeDetails)" in source
+    assert "consoleMethod(prefix, safeDetails);" not in source
