@@ -1,8 +1,8 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.3.11"
-date: "2026-03-06"
+version: "0.3.12"
+date: "2026-03-07"
 author: "req-change"
 scope:
   paths:
@@ -111,6 +111,7 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **CTN-012**: MUST restrict debug HTTP retrieval commands to `https` URLs and allowed hosts `claude.ai`, `chatgpt.com`, and `github.com`.
 - **CTN-013**: MUST cap debug HTTP response body previews through bounded `max_chars` truncation to prevent unbounded payload growth.
 - **CTN-014**: MUST keep debug API enablement as a non-persistent in-memory flag defaulting to disabled on runtime startup, and MUST NOT persist debug enablement in extension storage.
+- **CTN-015**: MUST declare `host_permissions` in Chrome extension manifest for all provider domains so that service-worker `fetch()` includes browser session credentials via `credentials: "include"`.
 
 ## 3. Requirements
 
@@ -183,6 +184,8 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **REQ-052**: MUST expose runtime configuration messages `config.debug_api.get` and `config.debug_api.set` to read and mutate debug-access enablement in memory.
 - **REQ-053**: MUST expose popup debug UI controls for runtime enablement and provider-page GET diagnostics, and MUST keep all debug action controls disabled while debug access is off.
 - **REQ-054**: MUST keep `guidelines/Google_Extension_API_Reference.md` updated on every Chrome-extension API change and include complete request/response schemas for `api.main.snapshot`, `debug.api.describe`, and `debug.api.execute`.
+- **REQ-055**: MUST hide Chrome extension popup window progress bars and quota elements for a provider when that provider has an error and no populated window data, showing only the error message in the card.
+- **REQ-056**: MUST render Chrome extension popup window progress bars alongside the error message when a provider has an error but prior successful window data is still present in state.
 
 ## 4. Test Requirements
 
@@ -213,6 +216,8 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 - **TST-023**: MUST verify all `debug.*` runtime message calls return errors while debug access is disabled, and verify `config.debug_api.set` enables debug access without storage persistence.
 - **TST-024**: MUST verify `guidelines/Google_Extension_API_Reference.md` documents `api.main.snapshot`, `debug.api.describe`, `debug.api.execute`, `providers.pages.get`, configuration routes, and disabled-debug error semantics.
 - **TST-025**: MUST verify parser fixtures matching current Claude/Copilot/Codex usage-page structures produce correct normalized usage, quota, and reset fields for popup progress-bar rendering.
+- **TST-026**: MUST verify Chrome extension manifest declares `host_permissions` entries for `claude.ai`, `chatgpt.com`, and `github.com` enabling authenticated session-credential fetch.
+- **TST-027**: MUST verify Chrome extension popup hides window progress bars and quota for an errored provider when no prior window data exists, and renders both windows and error when prior window data is present.
 
 ## 5. Evidence
 
@@ -335,3 +340,8 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | TST-023 | `tests/test_chrome_extension_debug_api.py` + disabled-debug rejection assertions and `config.debug_api.set` runtime enablement assertions. |
 | TST-024 | `tests/test_chrome_extension_api_reference.py` + API-reference coverage assertions for primary/debug/configuration routes including `providers.pages.get` and disabled-debug error semantics. |
 | TST-025 | `tests/test_chrome_extension_parser.py` + fixtures `claude_usage_current_signals.html`, `copilot_features_current_signals.html`, `copilot_premium_current_signals.html`, `codex_usage_current_signals.html`, and `codex_usage_noise_fractions.html` validating current usage normalization and noise-artifact rejection. |
+| CTN-015 | `src/aibar/chrome-extension/manifest.json` + `host_permissions` entries for `https://claude.ai/*`, `https://chatgpt.com/*`, `https://github.com/*` enabling `credentials: "include"` in service-worker `fetch()`. |
+| REQ-055 | `src/aibar/chrome-extension/popup.js` + `_renderProviderCard` + error-only rendering path hides window container when provider state has error and no populated windows. |
+| REQ-056 | `src/aibar/chrome-extension/popup.js` + `_renderProviderCard` + renders window progress bars alongside error when prior successful window data persists in provider state. |
+| TST-026 | `tests/test_chrome_extension_manifest.py` + `host_permissions` assertions for `claude.ai`, `chatgpt.com`, and `github.com` domains. |
+| TST-027 | `tests/test_chrome_extension_popup.py` + popup error-rendering assertions for hidden windows on error-only state and visible windows when prior data exists. |

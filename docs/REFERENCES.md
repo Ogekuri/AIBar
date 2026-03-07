@@ -2717,7 +2717,7 @@ parser signal counters for traceable diagnostics.
 
 ---
 
-# popup.js | JavaScript | 494L | 21 symbols | 1 imports | 27 comments
+# popup.js | JavaScript | 535L | 22 symbols | 1 imports | 28 comments
 > Path: `src/aibar/chrome-extension/popup.js`
 - @brief Popup controller for rendering provider tabs and debug actions.
 - @details Consumes normalized state emitted by background service-worker and renders
@@ -2726,6 +2726,8 @@ GNOME-parity card/progress visuals for Claude, Copilot, and Codex providers.
 - @satisfies REQ-039
 - @satisfies REQ-044
 - @satisfies REQ-053
+- @satisfies REQ-055
+- @satisfies REQ-056
 
 ## Imports
 ```
@@ -2738,7 +2740,7 @@ import { createLogger } from "./debug.js";
 - @brief Supported provider tab order. */
 - const `const PROVIDER_WINDOWS = {` (L21)
 - @brief Window render ordering by provider. */
-### fn `function _applyDebugAccessState(enabled)` (L65-77)
+### fn `function _applyDebugAccessState(enabled)` (L67-79)
 - @brief Apply debug-access status to popup control interactivity.
 - @details Ensures UI mirrors runtime debug guard by disabling debug-only actions
 whenever the non-persistent debug flag is not enabled.
@@ -2746,91 +2748,107 @@ whenever the non-persistent debug flag is not enabled.
 - @return s {void}
 - @satisfies REQ-053
 
-### fn `function _setDebugOutput(payload)` (L85-88)
+### fn `function _setDebugOutput(payload)` (L87-90)
 - @brief Write compact debug command output payload in popup panel.
 - @param {unknown} payload Debug command payload.
 - @return s {void}
 - @satisfies REQ-053
 
-### fn `function _progressClass(usagePercent)` (L95-106)
+### fn `function _progressClass(usagePercent)` (L97-108)
 - @brief Resolve CSS class for progress severity by percentage.
 - @param {number | null} usagePercent Usage percentage value.
 - @return s {string} CSS class name.
 
-### fn `function _formatPercent(value)` (L113-118)
+### fn `function _formatPercent(value)` (L115-120)
 - @brief Format percentage for UI display.
 - @param {number | null} value Percentage value.
 - @return s {string} UI label.
 
-### fn `function _formatMetric(value)` (L125-130)
+### fn `function _formatMetric(value)` (L127-132)
 - @brief Format numeric metric for UI display.
 - @param {number | null} value Numeric metric.
 - @return s {string} UI label.
 
-### fn `function _formatReset(resetAt)` (L137-160)
+### fn `function _formatReset(resetAt)` (L139-162)
 - @brief Format reset timestamp into compact relative text.
 - @param {string | null | undefined} resetAt ISO timestamp.
 - @return s {string} Relative-time display label.
 
-### fn `function _buildWindowRow(windowKey, windowData)` (L168-212)
+### fn `function _buildWindowRow(windowKey, windowData)` (L170-214)
 - @brief Build one window progress-bar row element.
 - @param {string} windowKey Window key (`5h`, `7d`, `30d`).
 - @param {Record<string, number | string | null> | null} windowData Window data object.
 - @return s {HTMLElement} Rendered row container.
 
-### fn `function _renderProviderCard(provider)` (L219-251)
+### fn `function _hasPopulatedWindows(provider, windows)` (L227-245)
+- @brief Test whether provider windows object contains any populated metric data.
+- @details Iterates expected window keys for the provider and returns true when at
+least one window entry contains a finite `usage_percent`, `remaining`, or `limit`
+value.  Used to decide whether window progress bars should render alongside errors.
+- @param {string} provider Provider key.
+- @param {Record<string, unknown> | null | undefined} windows Windows data object from provider state.
+- @return s {boolean} True when at least one window has a usable numeric metric.
+- @satisfies REQ-055
+- @satisfies REQ-056
+
+### fn `function _renderProviderCard(provider)` (L257-292)
 - @brief Render one provider card from current state.
+- @details Hides window progress bars and quota elements when the provider has an
+error and no prior populated window data (REQ-055).  Renders both windows and
+error when prior window data persists (REQ-056).
 - @param {string} provider Provider key.
 - @return s {void}
+- @satisfies REQ-055
+- @satisfies REQ-056
 
-### fn `function _renderState()` (L257-272)
+### fn `function _renderState()` (L298-313)
 - @brief Render popup-wide status/footer labels and all provider cards.
 - @return s {void}
 
-### fn `function _setActiveProvider(provider)` (L279-295)
+### fn `function _setActiveProvider(provider)` (L320-336)
 - @brief Apply active tab classes and card visibility state.
 - @param {string} provider Target provider.
 - @return s {void}
 
-### fn `async function _requestState()` (L301-308)
+### fn `async function _requestState()` (L342-349)
 - @brief Request latest state from background service worker.
 - @return s {Promise<void>} Completion promise.
 
-### fn `async function _refreshNow()` (L314-321)
+### fn `async function _refreshNow()` (L355-362)
 - @brief Trigger manual refresh request.
 - @return s {Promise<void>} Completion promise.
 
-### fn `async function _requestDebugAccessState()` (L329-335)
+### fn `async function _requestDebugAccessState()` (L370-376)
 - @brief Fetch runtime debug-access configuration.
 - @return s {Promise<void>} Completion promise.
 - @satisfies REQ-052
 - @satisfies REQ-053
 
-### fn `async function _setDebugAccessState(enabled)` (L344-353)
+### fn `async function _setDebugAccessState(enabled)` (L385-394)
 - @brief Set runtime debug-access configuration.
 - @param {boolean} enabled Desired debug-access state.
 - @return s {Promise<void>} Completion promise.
 - @satisfies REQ-052
 - @satisfies REQ-053
 
-### fn `async function _exportDebugBundle()` (L359-375)
+### fn `async function _exportDebugBundle()` (L400-416)
 - @brief Export debug bundle as downloadable JSON file.
 - @return s {Promise<void>} Completion promise.
 
-### fn `async function _clearLogs()` (L381-386)
+### fn `async function _clearLogs()` (L422-427)
 - @brief Clear persisted debug logs.
 - @return s {Promise<void>} Completion promise.
 
-### fn `async function _setIntervalOverride()` (L392-402)
+### fn `async function _setIntervalOverride()` (L433-443)
 - @brief Apply refresh interval override from popup input.
 - @return s {Promise<void>} Completion promise.
 
-### fn `async function _fetchProviderPagesDiagnostics()` (L409-422)
+### fn `async function _fetchProviderPagesDiagnostics()` (L450-463)
 - @brief Fetch required provider pages through debug API and render diagnostics.
 - @return s {Promise<void>} Completion promise.
 - @satisfies REQ-053
 
-### fn `function _wireUiEvents()` (L428-476)
+### fn `function _wireUiEvents()` (L469-517)
 - @brief Register popup event handlers.
 - @return s {void}
 
@@ -2839,25 +2857,26 @@ whenever the non-persistent debug flag is not enabled.
 |---|---|---|---|---|
 |`PROVIDER_TABS`|const||18||
 |`PROVIDER_WINDOWS`|const||21||
-|`_applyDebugAccessState`|fn||65-77|function _applyDebugAccessState(enabled)|
-|`_setDebugOutput`|fn||85-88|function _setDebugOutput(payload)|
-|`_progressClass`|fn||95-106|function _progressClass(usagePercent)|
-|`_formatPercent`|fn||113-118|function _formatPercent(value)|
-|`_formatMetric`|fn||125-130|function _formatMetric(value)|
-|`_formatReset`|fn||137-160|function _formatReset(resetAt)|
-|`_buildWindowRow`|fn||168-212|function _buildWindowRow(windowKey, windowData)|
-|`_renderProviderCard`|fn||219-251|function _renderProviderCard(provider)|
-|`_renderState`|fn||257-272|function _renderState()|
-|`_setActiveProvider`|fn||279-295|function _setActiveProvider(provider)|
-|`_requestState`|fn||301-308|async function _requestState()|
-|`_refreshNow`|fn||314-321|async function _refreshNow()|
-|`_requestDebugAccessState`|fn||329-335|async function _requestDebugAccessState()|
-|`_setDebugAccessState`|fn||344-353|async function _setDebugAccessState(enabled)|
-|`_exportDebugBundle`|fn||359-375|async function _exportDebugBundle()|
-|`_clearLogs`|fn||381-386|async function _clearLogs()|
-|`_setIntervalOverride`|fn||392-402|async function _setIntervalOverride()|
-|`_fetchProviderPagesDiagnostics`|fn||409-422|async function _fetchProviderPagesDiagnostics()|
-|`_wireUiEvents`|fn||428-476|function _wireUiEvents()|
+|`_applyDebugAccessState`|fn||67-79|function _applyDebugAccessState(enabled)|
+|`_setDebugOutput`|fn||87-90|function _setDebugOutput(payload)|
+|`_progressClass`|fn||97-108|function _progressClass(usagePercent)|
+|`_formatPercent`|fn||115-120|function _formatPercent(value)|
+|`_formatMetric`|fn||127-132|function _formatMetric(value)|
+|`_formatReset`|fn||139-162|function _formatReset(resetAt)|
+|`_buildWindowRow`|fn||170-214|function _buildWindowRow(windowKey, windowData)|
+|`_hasPopulatedWindows`|fn||227-245|function _hasPopulatedWindows(provider, windows)|
+|`_renderProviderCard`|fn||257-292|function _renderProviderCard(provider)|
+|`_renderState`|fn||298-313|function _renderState()|
+|`_setActiveProvider`|fn||320-336|function _setActiveProvider(provider)|
+|`_requestState`|fn||342-349|async function _requestState()|
+|`_refreshNow`|fn||355-362|async function _refreshNow()|
+|`_requestDebugAccessState`|fn||370-376|async function _requestDebugAccessState()|
+|`_setDebugAccessState`|fn||385-394|async function _setDebugAccessState(enabled)|
+|`_exportDebugBundle`|fn||400-416|async function _exportDebugBundle()|
+|`_clearLogs`|fn||422-427|async function _clearLogs()|
+|`_setIntervalOverride`|fn||433-443|async function _setIntervalOverride()|
+|`_fetchProviderPagesDiagnostics`|fn||450-463|async function _fetchProviderPagesDiagnostics()|
+|`_wireUiEvents`|fn||469-517|function _wireUiEvents()|
 
 
 ---
