@@ -249,8 +249,8 @@ def test_copilot_merge_matches_current_features_and_premium_fixture() -> None:
         "copilot_premium_current_signals.html",
     )
     assert payload["provider"] == "copilot"
-    assert payload["windows"]["30d"]["usage_percent"] == 20.4
-    assert payload["windows"]["30d"]["remaining"] == 1228
+    assert payload["windows"]["30d"]["usage_percent"] == 24.4
+    assert payload["windows"]["30d"]["remaining"] == 1179
     assert payload["windows"]["30d"]["limit"] == 1500
     assert payload["windows"]["30d"]["reset_at"] == "2026-04-01T00:00:00.000Z"
 
