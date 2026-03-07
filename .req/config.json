@@ -56,7 +56,11 @@
     ],
     "JavaScript": [
       {
-        "module": "Dummy"
+        "module": "Command",
+        "cmd": "node",
+        "params": [
+          "--check"
+        ]
       }
     ]
   },
