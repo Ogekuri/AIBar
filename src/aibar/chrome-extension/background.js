@@ -10,6 +10,7 @@
  * @satisfies CTN-012
  * @satisfies CTN-013
  * @satisfies CTN-014
+ * @satisfies CTN-017
  * @satisfies CTN-016
  * @satisfies REQ-043
  * @satisfies REQ-044
@@ -48,6 +49,9 @@ const STATE_STORAGE_KEY = "aibar.chrome.state";
 
 /** @brief Storage key for optional refresh interval override. */
 const INTERVAL_OVERRIDE_STORAGE_KEY = "aibar.chrome.refresh_interval_seconds";
+
+/** @brief Session-scoped storage key for debug API enablement state. */
+const DEBUG_API_ENABLED_SESSION_STORAGE_KEY = "aibar.chrome.debug_api_enabled";
 
 /** @brief Alarm name used by service-worker scheduler. */
 const REFRESH_ALARM_NAME = "aibar-refresh";
@@ -264,8 +268,9 @@ function _buildMainApiSnapshot() {
 
 /**
  * @brief Enforce runtime debug-access gate before serving debug routes.
- * @details Uses non-persistent in-memory flag and throws deterministic error to
- * ensure all debug message routes fail uniformly when disabled.
+ * @details Uses runtime debug-access flag restored from browser-session storage
+ * and throws deterministic error to ensure all debug message routes fail
+ * uniformly when disabled.
  * Time complexity: O(1).
  * Space complexity: O(1).
  * @returns {void}
@@ -312,6 +317,73 @@ async function _loadPersistedState() {
       };
     }
   }
+}
+
+/**
+ * @brief Resolve optional browser-session storage area used for debug-flag persistence.
+ * @details Returns `chrome.storage.session` when available in current runtime.
+ * Falls back to `null` when session storage APIs are unavailable so callers can
+ * preserve deterministic in-memory behavior.
+ * Time complexity: O(1).
+ * Space complexity: O(1).
+ * @returns {chrome.storage.StorageArea | null} Session storage area or null.
+ * @satisfies CTN-017
+ */
+function _getSessionStorageArea() {
+  const sessionArea = chrome?.storage?.session;
+  if (
+    sessionArea
+    && typeof sessionArea.get === "function"
+    && typeof sessionArea.set === "function"
+  ) {
+    return sessionArea;
+  }
+  return null;
+}
+
+/**
+ * @brief Load debug API enablement from browser-session storage.
+ * @details Initializes `debugApiEnabled` using session-scoped persistence so the
+ * flag survives service-worker restarts while resetting on browser termination.
+ * Defaults to `false` when no persisted value exists.
+ * Time complexity: O(1).
+ * Space complexity: O(1).
+ * @returns {Promise<boolean>} True when state was loaded from session storage.
+ * @throws {Error} If session storage access throws.
+ * @satisfies CTN-014
+ * @satisfies CTN-017
+ * @satisfies REQ-052
+ */
+async function _loadDebugAccessState() {
+  debugApiEnabled = false;
+  const sessionStorage = _getSessionStorageArea();
+  if (!sessionStorage) {
+    return false;
+  }
+  const stored = await sessionStorage.get(DEBUG_API_ENABLED_SESSION_STORAGE_KEY);
+  debugApiEnabled = stored?.[DEBUG_API_ENABLED_SESSION_STORAGE_KEY] === true;
+  return true;
+}
+
+/**
+ * @brief Persist debug API enablement into browser-session storage.
+ * @details Writes session-scoped debug-access value so explicit enablement
+ * survives service-worker restarts but is dropped on browser shutdown.
+ * Time complexity: O(1).
+ * Space complexity: O(1).
+ * @param {boolean} enabled Debug-access target state.
+ * @returns {Promise<boolean>} True when session storage persistence is available.
+ * @throws {Error} If session storage write fails.
+ * @satisfies CTN-017
+ * @satisfies REQ-052
+ */
+async function _persistDebugAccessState(enabled) {
+  const sessionStorage = _getSessionStorageArea();
+  if (!sessionStorage) {
+    return false;
+  }
+  await sessionStorage.set({ [DEBUG_API_ENABLED_SESSION_STORAGE_KEY]: enabled });
+  return true;
 }
 
 /**
@@ -1304,14 +1376,17 @@ async function _refreshAllProviders(trigger) {
 
 /**
  * @brief Initialize scheduler and persisted state for service-worker lifecycle.
+ * @details Restores persisted runtime/debug state, executes one immediate refresh
+ * cycle, and then schedules recurring refresh alarms.
  * @param {string} trigger Initialization trigger label.
  * @returns {Promise<void>} Completion promise.
+ * @satisfies REQ-043
  */
 async function _initializeRuntime(trigger) {
-  debugApiEnabled = false;
   await _loadPersistedState();
-  await _scheduleRefreshAlarm();
+  await _loadDebugAccessState();
   await _refreshAllProviders(trigger);
+  await _scheduleRefreshAlarm();
 }
 
 /**
@@ -1356,10 +1431,11 @@ async function _handleMessage(message, sendResponse) {
   }
 
   if (message.type === "config.debug_api.get") {
+    const persisted = _getSessionStorageArea() !== null;
     sendResponse({
       ok: true,
       debug_api_enabled: debugApiEnabled,
-      persisted: false,
+      persisted,
     });
     return;
   }
@@ -1373,14 +1449,15 @@ async function _handleMessage(message, sendResponse) {
       return;
     }
     debugApiEnabled = message.enabled;
+    const persisted = await _persistDebugAccessState(debugApiEnabled);
     logger.info("debug-access-updated", {
       enabled: debugApiEnabled,
-      persisted: false,
+      persisted,
     });
     sendResponse({
       ok: true,
       debug_api_enabled: debugApiEnabled,
-      persisted: false,
+      persisted,
     });
     return;
   }

@@ -110,9 +110,10 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **CTN-011**: MUST expose Chrome extension runtime debugging through console-safe structured logs, optional persisted extension-local log records, and API-retrievable parser/window diagnostic traces for fetched provider pages.
 - **CTN-012**: MUST restrict debug HTTP retrieval commands to `https` URLs and allowed hosts `claude.ai`, `chatgpt.com`, and `github.com`.
 - **CTN-013**: MUST cap debug HTTP response body previews through bounded `max_chars` truncation to prevent unbounded payload growth.
-- **CTN-014**: MUST keep debug API enablement as a non-persistent in-memory flag defaulting to disabled on runtime startup, and MUST NOT persist debug enablement in extension storage.
+- **CTN-014**: MUST default debug API enablement to disabled and MUST allow debug API commands only after explicit user enablement.
 - **CTN-015**: MUST declare `host_permissions` in Chrome extension manifest for all provider domains so that service-worker `fetch()` includes browser session credentials via `credentials: "include"`.
 - **CTN-016**: MUST persist user-configured refresh interval in `chrome.storage.local` under a deterministic key and MUST restore it on service-worker startup before scheduling the first alarm.
+- **CTN-017**: MUST persist debug API enablement for the current browser session across service-worker restarts and MUST clear it when the browser process terminates.
 
 ## 3. Requirements
 
@@ -173,21 +174,23 @@ Performance note: explicit caching optimization is implemented via in-memory + d
 - **REQ-040**: MUST parse Claude `5h` and `7d` usage windows from `https://claude.ai/settings/usage` with deterministic window assignment and MUST fail refresh when no usable quota/progress metrics are extracted.
 - **REQ-041**: MUST parse Codex `5h`, `7d`, and `code_review` windows from `https://chatgpt.com/codex/settings/usage`, including remaining-percentage-to-usage normalization and non-window artifact rejection, and MUST fail refresh when usable metrics are absent.
 - **REQ-042**: MUST combine Copilot data from `https://github.com/settings/copilot/features` and `https://github.com/settings/billing/premium_requests_usage`, including consumed-of-included quota fractions and monthly reset extraction for merged `30d` payload.
-- **REQ-043**: MUST run recurring provider updates in the background execution unit every configured interval and publish fresh normalized tab state to popup consumers.
+- **REQ-043**: MUST start provider refresh on service-worker startup before first alarm scheduling and MUST continue recurring updates every configured interval independently of popup lifecycle and debug API enablement.
 - **REQ-044**: MUST support manual debug dump export containing raw extraction traces, normalized provider payloads, and timestamped refresh diagnostics when debug access is enabled.
 - **REQ-045**: MUST continue rendering the latest successful provider state when network fetch or parser-usable-metric validation fails and MUST surface failure diagnostics through debug instrumentation.
-- **REQ-046**: MUST return a machine-readable primary snapshot when runtime message type `api.main.snapshot` is requested, including tab order and provider window metrics/errors used by Claude, Copilot, and Codex popup rendering.
+- **REQ-046**: MUST serve runtime message type `api.main.snapshot` regardless of debug API enablement and return latest background-downloaded Claude, Copilot, and Codex percentages, credits, and reset times.
 - **REQ-047**: MUST execute debug command `http.get` when debug access is enabled by downloading requested URL and returning HTTP metadata, bounded previews, deterministic body hash, and HTML probe markers.
 - **REQ-048**: MUST execute debug diagnostics commands (`parser.run`, `provider.diagnose`, `providers.diagnose`, `providers.pages.get`) when debug access is enabled and return parser payloads, probes, signal traces, payload-usability summaries, and page-blockage diagnostics.
 - **REQ-049**: MUST execute debug standard commands `state.get`, `refresh.run`, `logs.get`, `logs.clear`, `interval.get`, and `interval.set` only when debug access is enabled.
 - **REQ-050**: MUST emit structured debug log records for debug API command start/completion including command identifier, duration, and success/failure status, and MUST keep logger sinks non-throwing when console or storage writes fail.
 - **REQ-051**: MUST return deterministic error responses for all runtime message types prefixed with `debug.` when debug access is disabled, while non-debug APIs continue to operate.
-- **REQ-052**: MUST expose runtime configuration messages `config.debug_api.get` and `config.debug_api.set` to read and mutate debug-access enablement in memory.
+- **REQ-052**: MUST expose runtime configuration messages `config.debug_api.get` and `config.debug_api.set` to read and mutate debug-access enablement with browser-session persistence.
 - **REQ-053**: MUST expose popup debug UI controls limited to debug-enable checkbox and status badge, and MUST NOT render export-debug, clear-logs, or fetch-pages buttons in the popup HTML.
 - **REQ-054**: MUST keep `guidelines/Google_Extension_API_Reference.md` updated on every Chrome-extension API change and include complete request/response schemas for `api.main.snapshot`, `debug.api.describe`, and `debug.api.execute`.
 - **REQ-055**: MUST hide Chrome extension popup window progress bars and quota elements for a provider when that provider has an error and no populated window data, showing only the error message in the card.
 - **REQ-056**: MUST render Chrome extension popup window progress bars alongside the error message when a provider has an error but prior successful window data is still present in state.
 - **REQ-057**: MUST render Chrome extension popup controls section with only refresh-now button, interval input with set button, debug-enable checkbox, and debug status badge — without export-debug, clear-logs, or fetch-pages buttons.
+- **REQ-058**: MUST render popup cards from latest background provider state immediately on popup open without requiring manual refresh, debug API activation, or popup-triggered provider download.
+- **REQ-059**: MUST render popup layout with provider tab bar above provider cards and configuration controls below provider cards.
 
 ## 4. Test Requirements
 
@@ -206,22 +209,24 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 - **TST-011**: MUST verify Claude dual-window text output on HTTP 429 prints rate-limit error only in 5h, keeps 5h usage at `100.0%`, and renders 7d usage/reset values from persisted Claude payload.
 - **TST-012**: MUST verify Textual provider cards suppress `Error: Rate limited. Try again later.` and append `⚠️ Limit reached!` after `Resets in:` when displayed usage is `100.0%`.
 - **TST-013**: MUST verify Chrome extension manifest wiring opens popup UI with only `claude`, `copilot`, and `codex` tabs and toolbar icon assets resolved from GNOME icon sources.
-- **TST-014**: MUST verify Chrome background scheduler executes provider refresh in required source-page order with default `180`-second interval and configurable constant override path.
+- **TST-014**: MUST verify Chrome background scheduler performs startup refresh before first alarm, executes provider refresh in required source-page order, and preserves default `180`-second interval with configurable persisted override.
 - **TST-015**: MUST verify provider parsers extract required quota/progress fields from localized, bootstrap-script, and escaped-script fixtures, ignore reset-only artifacts, and remain independent from translated display strings.
 - **TST-016**: MUST verify Copilot parser merges features and premium pages into one normalized payload consumed by popup `copilot` tab rendering.
 - **TST-017**: MUST verify refresh failures preserve last successful tab payloads and emit structured debug records to console and persisted log storage.
 - **TST-018**: MUST verify repository no longer contains `src/aibar/chrome-extension/temp/` after implementation changes are completed.
-- **TST-019**: MUST verify runtime message handler exposes `api.main.snapshot`, `debug.api.describe`, and `debug.api.execute`, and MUST verify the primary snapshot payload contains tab-order and per-window fields required by popup progress rendering.
+- **TST-019**: MUST verify runtime message handler exposes `api.main.snapshot`, `debug.api.describe`, and `debug.api.execute`, and MUST verify `api.main.snapshot` remains callable while debug is disabled with percentages, credits, and reset values.
 - **TST-020**: MUST verify `debug.api.execute` commands `http.get` and `providers.pages.get` enforce URL safety constraints and return bounded previews, deterministic hashes, and per-provider download diagnostics when debug access is enabled.
 - **TST-021**: MUST verify debug parser-diagnostics dispatch maps provider keys to parser flows and returns probes, signal diagnostics, parser payloads, window-assignment traces, payload-usability summaries, and metric-key evidence when debug access is enabled.
 - **TST-022**: MUST verify debug standard commands route to state/refresh/log/interval handlers with interval constraints and verify logger implementation remains non-throwing on console/storage sink failures.
-- **TST-023**: MUST verify all `debug.*` runtime message calls return errors while debug access is disabled, and verify `config.debug_api.set` enables debug access without storage persistence.
+- **TST-023**: MUST verify all `debug.*` runtime message calls return errors while debug access is disabled, and verify `config.debug_api.set` persists debug enablement across service-worker restarts but resets on browser restart.
 - **TST-024**: MUST verify `guidelines/Google_Extension_API_Reference.md` documents `api.main.snapshot`, `debug.api.describe`, `debug.api.execute`, `providers.pages.get`, configuration routes, and disabled-debug error semantics.
 - **TST-025**: MUST verify parser fixtures matching current Claude/Copilot/Codex usage-page structures produce correct normalized usage, quota, and reset fields for popup progress-bar rendering.
 - **TST-026**: MUST verify Chrome extension manifest declares `host_permissions` entries for `claude.ai`, `chatgpt.com`, and `github.com` enabling authenticated session-credential fetch.
 - **TST-027**: MUST verify Chrome extension popup hides window progress bars and quota for an errored provider when no prior window data exists, and renders both windows and error when prior window data is present.
 - **TST-028**: MUST verify Chrome extension popup HTML does not contain export-debug, clear-logs, or fetch-pages buttons, and contains only refresh-now, interval input, debug-enable checkbox, and debug status controls.
 - **TST-029**: MUST verify Chrome extension persisted refresh interval is restored on service-worker startup and survives simulated browser restart.
+- **TST-030**: MUST verify popup initial render consumes existing background snapshot data and displays provider cards without requiring a mandatory foreground refresh.
+- **TST-031**: MUST verify popup HTML places provider tab bar before provider cards and places configuration controls after provider cards.
 
 ## 5. Evidence
 
@@ -312,11 +317,11 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | REQ-040 | `src/aibar/chrome-extension/background.js` + Claude fetch with `_assertProviderPayloadUsable`, and `src/aibar/chrome-extension/parsers.js` + deterministic `5h/7d` assignment in `parseClaudeUsageHtml`/`_buildWindows`. |
 | REQ-041 | `src/aibar/chrome-extension/background.js` + Codex fetch with `_assertProviderPayloadUsable`, and `src/aibar/chrome-extension/parsers.js` + remaining-percent normalization + artifact rejection + `code_review` window in `parseCodexUsageHtml`/`_buildWindows`. |
 | REQ-042 | `src/aibar/chrome-extension/background.js` + dual Copilot fetch and `src/aibar/chrome-extension/parsers.js` + `mergeCopilotPayloads` preferring features percentage with premium fraction/reset merge. |
-| REQ-043 | `src/aibar/chrome-extension/background.js` + alarm scheduler and popup publish message `usage.updated` after recurring refresh cycles. |
+| REQ-043 | `src/aibar/chrome-extension/background.js` + startup refresh in `_loadPersistedState`/`_initialize`, recurring scheduler in `_scheduleRefreshAlarm`, and `usage.updated` publication after refresh completion. |
 | REQ-044 | `src/aibar/chrome-extension/debug.js` + `buildDebugBundle` and `src/aibar/chrome-extension/popup.js` + `_exportDebugBundle` JSON dump flow. |
 | REQ-045 | `src/aibar/chrome-extension/background.js` + `_assertProviderPayloadUsable` + `_applyProviderFailure` preserving prior payload when parser/network validation fails. |
 | TST-013 | `tests/test_chrome_extension_manifest.py` + manifest/popup tab/icon assertions for Chrome extension wiring. |
-| TST-014 | `tests/test_chrome_extension_background.py` + refresh interval default and provider-order assertions. |
+| TST-014 | `tests/test_chrome_extension_background.py` + startup refresh, alarm interval, and provider-order assertions. |
 | TST-015 | `tests/test_chrome_extension_parser.py` + localized + bootstrap + escaped-script fixtures and reset-only artifact rejection assertions. |
 | TST-016 | `tests/test_chrome_extension_parser.py` + Copilot features+premium merge assertion for normalized `30d` payload. |
 | TST-017 | `tests/test_chrome_extension_background.py` and `tests/test_chrome_extension_debug.py` + fallback state and debug instrumentation assertions. |
@@ -325,23 +330,26 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | PRJ-012 | `guidelines/Google_Extension_API_Reference.md` + API contract sections for primary/debug endpoints and configuration routes kept synchronized with implementation. |
 | CTN-012 | `src/aibar/chrome-extension/background.js` + `_normalizeDebugUrl` enforces `https` protocol and host allowlist set (`claude.ai`, `chatgpt.com`, `github.com`). |
 | CTN-013 | `src/aibar/chrome-extension/background.js` + `_normalizeDebugMaxChars` with bounded preview caps and `http.get` truncation metadata. |
-| CTN-014 | `src/aibar/chrome-extension/background.js` + in-memory `debugApiEnabled` flag defaulting to `false` and no storage writes for debug enablement state. |
+| CTN-014 | `src/aibar/chrome-extension/background.js` + default disabled debug gate (`debugApiEnabled=false`) and command guard in `_ensureDebugAccessEnabled`. |
+| CTN-017 | `src/aibar/chrome-extension/background.js` + debug-session persistence load/save hooks backed by browser-session-scoped storage and restore during service-worker initialization. |
 | DES-011 | `src/aibar/chrome-extension/background.js` + `_buildMainApiSnapshot`, `_describeDebugApi`, `_executeDebugApiCommand`, and centralized debug guard in `_handleMessage`. |
 | DES-012 | `src/aibar/chrome-extension/popup.html` + debug-enable checkbox and `src/aibar/chrome-extension/popup.js` + config route wiring; export/clear-logs/fetch-pages buttons removed from popup, accessible only via debug API. |
-| REQ-046 | `src/aibar/chrome-extension/background.js` + `api.main.snapshot` response (`_buildMainApiSnapshot`) with null-safe numeric normalization (`_toFiniteMetricNumber`) for popup tab/progress rendering fields. |
+| REQ-046 | `src/aibar/chrome-extension/background.js` + unconditional `api.main.snapshot` route in `_handleMessage` and snapshot payload builder exposing percentages/credits/reset fields from latest background state. |
 | REQ-047 | `src/aibar/chrome-extension/background.js` + `http.get` command route returning bounded previews, hash, and HTML probe metadata when debug access is enabled. |
 | REQ-048 | `src/aibar/chrome-extension/background.js` + `parser.run`/`provider.diagnose`/`providers.diagnose`/`providers.pages.get` command dispatch with parser diagnostics, payload assertions, and per-page related-content diagnostics behind debug-access guard. |
 | REQ-049 | `src/aibar/chrome-extension/background.js` + debug standard command routes `state.get`, `refresh.run`, `logs.get`, `logs.clear`, `interval.get`, and `interval.set` behind debug-access guard. |
 | REQ-050 | `src/aibar/chrome-extension/background.js` + structured debug command lifecycle logging and `src/aibar/chrome-extension/debug.js` + non-throwing sink wrappers (`_resolveConsoleMethod`, `_emitConsoleSafe`, guarded `appendDebugRecord`). |
 | REQ-051 | `src/aibar/chrome-extension/background.js` + `_ensureDebugAccessEnabled` deterministic rejection path for all `debug.*` message types when debug access is disabled. |
-| REQ-052 | `src/aibar/chrome-extension/background.js` + `config.debug_api.get`/`config.debug_api.set` handlers for runtime debug-enable state mutation without persistence. |
+| REQ-052 | `src/aibar/chrome-extension/background.js` + `config.debug_api.get`/`config.debug_api.set` handlers with browser-session persistence for debug-enable state. |
+| REQ-058 | `src/aibar/chrome-extension/popup.js` + initial snapshot fetch path that renders cards from shared background state before any manual refresh action. |
+| REQ-059 | `src/aibar/chrome-extension/popup.html` + DOM order places provider tab bar before cards and configuration controls after cards. |
 | REQ-053 | `src/aibar/chrome-extension/popup.html` + debug-enable checkbox and status badge only; `src/aibar/chrome-extension/popup.js` + runtime enablement wiring without export/clear-logs/fetch-pages buttons. |
 | REQ-054 | `guidelines/Google_Extension_API_Reference.md` + complete request/response schemas and disabled-debug error semantics for primary/debug extension APIs. |
-| TST-019 | `tests/test_chrome_extension_debug_api.py` + route assertions for `api.main.snapshot` and debug endpoints plus primary snapshot schema checks. |
+| TST-019 | `tests/test_chrome_extension_debug_api.py` + route assertions for `api.main.snapshot`/debug endpoints and snapshot availability while debug is disabled. |
 | TST-020 | `tests/test_chrome_extension_debug_api.py` + HTTPS allowlist validation, `http.get` preview/hash/probe assertions, and `providers.pages.get` aggregate provider-page diagnostics assertions. |
 | TST-021 | `tests/test_chrome_extension_debug_api.py` + parser/provider/providers-diagnose dispatch assertions plus `providers.pages.get` parser/window-analysis payload checks. |
 | TST-022 | `tests/test_chrome_extension_debug_api.py` + debug standard-command/lifecycle assertions and `tests/test_chrome_extension_debug.py` + logger non-throwing sink-wrapper assertions. |
-| TST-023 | `tests/test_chrome_extension_debug_api.py` + disabled-debug rejection assertions and `config.debug_api.set` runtime enablement assertions. |
+| TST-023 | `tests/test_chrome_extension_debug_api.py` + disabled-debug rejection assertions and session-persistent debug-enable lifecycle assertions across service-worker restart simulation. |
 | TST-024 | `tests/test_chrome_extension_api_reference.py` + API-reference coverage assertions for primary/debug/configuration routes including `providers.pages.get` and disabled-debug error semantics. |
 | TST-025 | `tests/test_chrome_extension_parser.py` + fixtures `claude_usage_current_signals.html`, `copilot_features_current_signals.html`, `copilot_premium_current_signals.html`, `codex_usage_current_signals.html`, and `codex_usage_noise_fractions.html` validating current usage normalization and noise-artifact rejection. |
 | CTN-015 | `src/aibar/chrome-extension/manifest.json` + `host_permissions` entries for `https://claude.ai/*`, `https://chatgpt.com/*`, `https://github.com/*` enabling `credentials: "include"` in service-worker `fetch()`. |
@@ -351,3 +359,5 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | TST-027 | `tests/test_chrome_extension_popup.py` + popup error-rendering assertions for hidden windows on error-only state and visible windows when prior data exists. |
 | CTN-016 | `src/aibar/chrome-extension/background.js` + `INTERVAL_OVERRIDE_STORAGE_KEY` persistence in `_getRefreshIntervalSeconds` and restoration in `_loadPersistedState` before first alarm scheduling. |
 | REQ-057 | `src/aibar/chrome-extension/popup.html` + controls section containing only refresh-now, interval input/set, debug-enable checkbox, and debug status badge. |
+| TST-030 | `tests/test_chrome_extension_popup.py` + popup boot render assertions using preloaded background snapshot state without forced foreground refresh. |
+| TST-031 | `tests/test_chrome_extension_popup.py` + popup HTML structure assertions for tab-before-cards and controls-after-cards ordering. |

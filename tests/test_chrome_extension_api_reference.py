@@ -40,3 +40,14 @@ def test_api_reference_documents_disabled_debug_error_semantics() -> None:
     source = API_REFERENCE_PATH.read_text(encoding="utf-8")
     assert "DEBUG_API_DISABLED" in source
     assert "Debug API disabled: enable it in popup configuration for this runtime session." in source
+
+
+def test_api_reference_documents_session_persisted_debug_enablement() -> None:
+    """
+    @brief Verify API reference documents browser-session debug enablement persistence.
+    @satisfies TST-024
+    @satisfies CTN-017
+    """
+    source = API_REFERENCE_PATH.read_text(encoding="utf-8")
+    assert "chrome.storage.session" in source
+    assert "persists in `chrome.storage.session` across service-worker restarts" in source

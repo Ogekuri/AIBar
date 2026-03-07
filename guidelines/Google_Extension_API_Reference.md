@@ -4,7 +4,7 @@
 - `scope`: `src/aibar/chrome-extension/background.js` message dispatcher.
 - `transport`: `chrome.runtime.sendMessage(request)`.
 - `response_envelope`: JSON object with top-level `ok: boolean`.
-- `non_persistent_debug_flag`: `debugApiEnabled` is in-memory only, defaults to `false`, and resets on service-worker restart.
+- `session_persisted_debug_flag`: `debugApiEnabled` defaults to `false`, persists in `chrome.storage.session` across service-worker restarts, and resets on browser process termination.
 - `deterministic_debug_disabled_error`:
   - `code`: `DEBUG_API_DISABLED`
   - `error`: `Debug API disabled: enable it in popup configuration for this runtime session.`
@@ -107,7 +107,7 @@
 {
   "ok": true,
   "debug_api_enabled": false,
-  "persisted": false
+  "persisted": true
 }
 ```
 
@@ -124,7 +124,7 @@
 {
   "ok": true,
   "debug_api_enabled": true,
-  "persisted": false
+  "persisted": true
 }
 ```
 - `validation_error_schema`:
@@ -192,6 +192,7 @@
       "parser.run",
       "provider.diagnose",
       "providers.diagnose",
+      "providers.pages.get",
       "state.get",
       "refresh.run",
       "logs.get",
@@ -347,6 +348,6 @@
 
 ## Integration Rules
 - Always call `config.debug_api.get` on popup initialization to synchronize UI toggle state.
-- Call `config.debug_api.set` explicitly to enable debug routes for current runtime session.
-- Do not assume debug enablement persistence across browser restarts, extension worker restarts, or service-worker reloads.
+- Call `config.debug_api.set` explicitly to enable debug routes for current browser session.
+- Do not assume debug enablement persistence across browser restarts.
 - Consume `api.main.snapshot` as the canonical one-call source for tab rendering model (`tab_order`, `tab_windows`, `providers[*].windows`).

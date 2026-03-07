@@ -11,6 +11,7 @@
  * @satisfies REQ-055
  * @satisfies REQ-056
  * @satisfies REQ-057
+ * @satisfies REQ-058
  */
 
 import { createLogger } from "./debug.js";
@@ -317,7 +318,11 @@ function _setActiveProvider(provider) {
 
 /**
  * @brief Request latest state from background service worker.
+ * @details Uses `api.main.snapshot` as the canonical initial popup data source
+ * so cards render from background-managed state without requiring a foreground
+ * refresh request.
  * @returns {Promise<void>} Completion promise.
+ * @satisfies REQ-058
  */
 async function _requestState() {
   const response = await chrome.runtime.sendMessage({ type: "api.main.snapshot" });
@@ -438,9 +443,9 @@ chrome.runtime.onMessage.addListener((message) => {
 _wireUiEvents();
 _setActiveProvider(activeProvider);
 _applyDebugAccessState(false);
-void _requestDebugAccessState().catch((error) => {
-  logger.error("debug-access-load-failure", { error: String(error) });
-});
 void _requestState().catch((error) => {
   logger.error("initial-state-load-failure", { error: String(error) });
+});
+void _requestDebugAccessState().catch((error) => {
+  logger.error("debug-access-load-failure", { error: String(error) });
 });

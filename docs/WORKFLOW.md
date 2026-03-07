@@ -104,10 +104,8 @@
   - Registers recurring alarm scheduling, processes provider refresh cycles, persists normalized state, and serves popup RPC requests.
 - `Internal Call-Trace Tree`
   - `_initializeRuntime(...)`: startup orchestrator [`src/aibar/chrome-extension/background.js`]
-    - `debugApiEnabled = false`: reset non-persistent debug-access flag on runtime initialization [`src/aibar/chrome-extension/background.js`]
     - `_loadPersistedState(...)`: restore last successful payloads from storage [`src/aibar/chrome-extension/background.js`]
-    - `_scheduleRefreshAlarm(...)`: configure periodic scheduler [`src/aibar/chrome-extension/background.js`]
-      - `_getRefreshIntervalSeconds(...)`: resolve default/override interval [`src/aibar/chrome-extension/background.js`]
+    - `_loadDebugAccessState(...)`: restore debug-access enablement from browser-session storage [`src/aibar/chrome-extension/background.js`]
     - `_refreshAllProviders(...)`: ordered provider refresh execution [`src/aibar/chrome-extension/background.js`]
       - `_fetchHtml(...)`: authenticated HTML download [`src/aibar/chrome-extension/background.js`]
       - `parseClaudeUsageHtml(...)`: Claude metric extraction [`src/aibar/chrome-extension/parsers.js`]
@@ -127,11 +125,14 @@
       - `_buildMainApiSnapshot(...)`: normalized popup-facing snapshot assembly [`src/aibar/chrome-extension/background.js`]
         - `_normalizeMainApiWindow(...)`: provider-window metric normalization [`src/aibar/chrome-extension/background.js`]
           - `_toFiniteMetricNumber(...)`: null-safe numeric coercion for metric fields [`src/aibar/chrome-extension/background.js`]
+    - `_scheduleRefreshAlarm(...)`: configure periodic scheduler [`src/aibar/chrome-extension/background.js`]
+      - `_getRefreshIntervalSeconds(...)`: resolve default/override interval [`src/aibar/chrome-extension/background.js`]
   - `_handleMessage(...)`: popup RPC route [`src/aibar/chrome-extension/background.js`]
     - `_buildMainApiSnapshot(...)`: primary API response for popup rendering model [`src/aibar/chrome-extension/background.js`]
       - `_normalizeMainApiWindow(...)`: provider-window metric normalization [`src/aibar/chrome-extension/background.js`]
         - `_toFiniteMetricNumber(...)`: null-safe numeric coercion for metric fields [`src/aibar/chrome-extension/background.js`]
-    - `debugApiEnabled` read/write path: runtime configuration get/set routes without storage persistence [`src/aibar/chrome-extension/background.js`]
+    - `debugApiEnabled` read/write path: runtime configuration get/set routes with browser-session persistence [`src/aibar/chrome-extension/background.js`]
+      - `_persistDebugAccessState(...)`: session-scoped debug flag persistence [`src/aibar/chrome-extension/background.js`]
     - `config.refresh_interval.set` handler: non-debug-gated interval override with `chrome.storage.local` persistence and alarm reschedule [`src/aibar/chrome-extension/background.js`]
       - `_scheduleRefreshAlarm(...)`: interval override reconfiguration [`src/aibar/chrome-extension/background.js`]
     - `_ensureDebugAccessEnabled(...)`: deterministic guard for all `debug.*` message types [`src/aibar/chrome-extension/background.js`]
@@ -166,7 +167,7 @@
         - `_toFiniteMetricNumber(...)`: null-safe metric coercion for quality computation [`src/aibar/chrome-extension/background.js`]
       - `_summarizeDebugArgs(...)`: command-argument logging sanitizer [`src/aibar/chrome-extension/background.js`]
 - `External Boundaries`
-  - Chrome extension runtime APIs (`chrome.runtime`, `chrome.alarms`, `chrome.storage.local`).
+  - Chrome extension runtime APIs (`chrome.runtime`, `chrome.alarms`, `chrome.storage.local`, `chrome.storage.session`).
   - HTTPS page downloads for Claude, ChatGPT Codex, and GitHub Copilot settings pages.
   - Browser console output for runtime diagnostics.
 
@@ -202,12 +203,12 @@
     - `_wireUiEvents(...)`: bind tab/control handlers [`src/aibar/chrome-extension/popup.js`]
     - `_setActiveProvider(...)`: initial tab activation [`src/aibar/chrome-extension/popup.js`]
     - `_applyDebugAccessState(...)`: initialize debug-control disabled/enabled UI state and diagnostics-output reset [`src/aibar/chrome-extension/popup.js`]
-    - `_requestDebugAccessState(...)`: fetch runtime debug-access flag from background configuration API [`src/aibar/chrome-extension/popup.js`]
     - `_requestState(...)`: initial state fetch [`src/aibar/chrome-extension/popup.js`]
       - `_renderState(...)`: full popup render [`src/aibar/chrome-extension/popup.js`]
         - `_renderProviderCard(...)`: provider card render with error-gated window visibility [`src/aibar/chrome-extension/popup.js`]
           - `_hasPopulatedWindows(...)`: window-data presence test for error/window rendering gate [`src/aibar/chrome-extension/popup.js`]
           - `_buildWindowRow(...)`: progress bar + reset/quota line render [`src/aibar/chrome-extension/popup.js`]
+    - `_requestDebugAccessState(...)`: fetch runtime debug-access flag from background configuration API [`src/aibar/chrome-extension/popup.js`]
     - control callbacks
       - `_refreshNow(...)`: manual refresh RPC [`src/aibar/chrome-extension/popup.js`]
       - `_setDebugAccessState(...)`: runtime debug-access toggle RPC [`src/aibar/chrome-extension/popup.js`]
@@ -468,7 +469,7 @@
   - `direction: request-response`
   - `mechanism: chrome.runtime.sendMessage RPC`
   - `endpoint_or_channel: message types api.main.snapshot, usage.get_state, usage.refresh_now, config.debug_api.get, config.debug_api.set, config.refresh_interval.set, debug.api.describe, debug.api.execute`
-  - `payload_data_shape: JSON request objects with type discriminators; config.refresh_interval.set is always callable; debug command execution uses command+args envelope and returns deterministic DEBUG_API_DISABLED failures when runtime debug flag is off`
+  - `payload_data_shape: JSON request objects with type discriminators; config.refresh_interval.set is always callable; config.debug_api.set persists debug-enable state for current browser session; debug command execution uses command+args envelope and returns deterministic DEBUG_API_DISABLED failures when runtime debug flag is off`
   - `declaration_files: src/aibar/chrome-extension/popup.js, src/aibar/chrome-extension/background.js`
 
 - `id: EDGE-006`

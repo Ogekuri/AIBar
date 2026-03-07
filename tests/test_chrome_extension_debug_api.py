@@ -50,6 +50,20 @@ def test_primary_snapshot_contract_contains_tab_and_progress_window_schema() -> 
     assert "token === null || token === undefined || token === \"\"" in source
 
 
+def test_primary_snapshot_route_remains_available_without_debug_enablement() -> None:
+    """
+    @brief Verify api.main.snapshot route executes before debug.* guard.
+    @details Ensures primary API remains callable while debug API is disabled.
+    @satisfies TST-019
+    @satisfies REQ-046
+    @satisfies REQ-051
+    """
+    source = BACKGROUND_PATH.read_text(encoding="utf-8")
+    snapshot_idx = source.index('message.type === "api.main.snapshot"')
+    debug_guard_idx = source.index('message.type.startsWith("debug.")')
+    assert snapshot_idx < debug_guard_idx
+
+
 def test_debug_api_command_catalog_includes_http_parser_and_standard_commands() -> None:
     """
     @brief Verify debug command list includes required command set.
@@ -86,18 +100,24 @@ def test_debug_api_calls_are_rejected_when_runtime_debug_access_is_disabled() ->
     assert "Debug API disabled: enable it in popup configuration for this runtime session." in source
 
 
-def test_config_routes_toggle_debug_access_without_storage_persistence() -> None:
+def test_config_routes_toggle_debug_access_with_session_persistence() -> None:
     """
-    @brief Verify config routes mutate in-memory debug flag and report non-persistence.
+    @brief Verify config routes mutate debug flag and persist state per browser session.
+    @details Confirms config handlers use session storage read/write helpers and
+    expose `persisted` response metadata.
     @satisfies TST-023
     @satisfies REQ-052
-    @satisfies CTN-014
+    @satisfies CTN-017
     """
     source = BACKGROUND_PATH.read_text(encoding="utf-8")
     assert 'message.type === "config.debug_api.get"' in source
     assert 'message.type === "config.debug_api.set"' in source
+    assert "async function _loadDebugAccessState()" in source
+    assert "async function _persistDebugAccessState(enabled)" in source
+    assert "DEBUG_API_ENABLED_SESSION_STORAGE_KEY" in source
     assert "debugApiEnabled = message.enabled;" in source
-    assert "persisted: false" in source
+    assert "const persisted = _getSessionStorageArea() !== null;" in source
+    assert "const persisted = await _persistDebugAccessState(debugApiEnabled);" in source
 
 
 def test_debug_http_command_enforces_https_and_allowlisted_hosts() -> None:

@@ -9,6 +9,7 @@
   @satisfies REQ-039
   @satisfies REQ-053
   @satisfies REQ-057
+  @satisfies REQ-059
 -->
 <html lang="en">
   <head>
@@ -23,6 +24,22 @@
         <img class="aibar-header-icon" src="icons/icon32.png" alt="AIBar" />
         <span class="aibar-header-label">AIBar</span>
       </header>
+
+      <nav class="aibar-tab-bar" aria-label="Providers">
+        <button class="aibar-tab-active aibar-tab-active-claude" data-provider="claude" type="button">
+          <span class="aibar-tab-label aibar-tab-label-claude">Claude</span>
+        </button>
+        <button class="aibar-tab" data-provider="copilot" type="button">
+          <span class="aibar-tab-label aibar-tab-label-copilot">Copilot</span>
+        </button>
+        <button class="aibar-tab" data-provider="codex" type="button">
+          <span class="aibar-tab-label aibar-tab-label-codex">Codex</span>
+        </button>
+      </nav>
+
+      <section id="card-claude" class="aibar-card aibar-provider-claude aibar-card-visible"></section>
+      <section id="card-copilot" class="aibar-card aibar-provider-copilot"></section>
+      <section id="card-codex" class="aibar-card aibar-provider-codex"></section>
 
       <section class="aibar-controls">
         <button id="refreshButton" class="aibar-btn" type="button">Refresh now</button>
@@ -42,22 +59,6 @@
         </label>
         <span id="debugStatusLabel" class="aibar-badge">debug off</span>
       </section>
-
-      <nav class="aibar-tab-bar" aria-label="Providers">
-        <button class="aibar-tab-active aibar-tab-active-claude" data-provider="claude" type="button">
-          <span class="aibar-tab-label aibar-tab-label-claude">Claude</span>
-        </button>
-        <button class="aibar-tab" data-provider="copilot" type="button">
-          <span class="aibar-tab-label aibar-tab-label-copilot">Copilot</span>
-        </button>
-        <button class="aibar-tab" data-provider="codex" type="button">
-          <span class="aibar-tab-label aibar-tab-label-codex">Codex</span>
-        </button>
-      </nav>
-
-      <section id="card-claude" class="aibar-card aibar-provider-claude aibar-card-visible"></section>
-      <section id="card-copilot" class="aibar-card aibar-provider-copilot"></section>
-      <section id="card-codex" class="aibar-card aibar-provider-codex"></section>
 
       <footer class="aibar-footer">
         <span id="updatedLabel">Updated: n/a</span>

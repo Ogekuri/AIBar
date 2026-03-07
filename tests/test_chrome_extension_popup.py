@@ -3,11 +3,17 @@
 @brief Chrome extension popup error-rendering contract assertions.
 @details Validates that the popup controller hides window progress bars and quota
 elements when a provider has an error and no prior populated window data (REQ-055),
-and renders both windows and error when prior data persists (REQ-056).
-Tests are static source analysis against popup.js.
+renders both windows and error when prior data persists (REQ-056), renders
+startup data from background snapshot (REQ-058), and preserves required layout
+ordering with tabs above cards and controls below cards (REQ-059).
+Tests are static source analysis against popup.js and popup.html.
 @satisfies TST-027
+@satisfies TST-030
+@satisfies TST-031
 @satisfies REQ-055
 @satisfies REQ-056
+@satisfies REQ-058
+@satisfies REQ-059
 """
 
 from pathlib import Path
@@ -15,6 +21,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 POPUP_JS_PATH = PROJECT_ROOT / "src" / "aibar" / "chrome-extension" / "popup.js"
+POPUP_HTML_PATH = PROJECT_ROOT / "src" / "aibar" / "chrome-extension" / "popup.html"
 
 
 def test_popup_declares_has_populated_windows_helper() -> None:
@@ -93,3 +100,33 @@ def test_popup_render_card_does_not_unconditionally_append_windows() -> None:
     assert windows_class_count == 1, "windows container must appear exactly once"
     # It must be inside an if (hasWindows) block
     assert "if (hasWindows)" in render_fn_body
+
+
+def test_popup_bootstrap_requests_background_snapshot_without_forced_refresh() -> None:
+    """
+    @brief Verify popup bootstrap uses api.main.snapshot as initial data source.
+    @details Confirms startup path calls _requestState and does not trigger
+    _refreshNow implicitly.
+    @satisfies REQ-058
+    @satisfies TST-030
+    """
+    source = POPUP_JS_PATH.read_text(encoding="utf-8")
+    assert 'type: "api.main.snapshot"' in source
+    assert "void _requestState().catch" in source
+    bootstrap_idx = source.index("void _requestState().catch")
+    assert "_refreshNow().catch" not in source[bootstrap_idx:bootstrap_idx + 220]
+
+
+def test_popup_html_orders_tabs_before_cards_and_controls_after_cards() -> None:
+    """
+    @brief Verify popup DOM order places tabs above cards and controls below cards.
+    @details Enforces requested UI structure for immediate tab-focused rendering
+    with configuration controls in the bottom section.
+    @satisfies REQ-059
+    @satisfies TST-031
+    """
+    source = POPUP_HTML_PATH.read_text(encoding="utf-8")
+    tab_idx = source.index('<nav class="aibar-tab-bar"')
+    first_card_idx = source.index('<section id="card-claude"')
+    controls_idx = source.index('<section class="aibar-controls">')
+    assert tab_idx < first_card_idx < controls_idx
