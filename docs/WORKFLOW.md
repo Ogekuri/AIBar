@@ -203,7 +203,8 @@
     - `_requestDebugAccessState(...)`: fetch runtime debug-access flag from background configuration API [`src/aibar/chrome-extension/popup.js`]
     - `_requestState(...)`: initial state fetch [`src/aibar/chrome-extension/popup.js`]
       - `_renderState(...)`: full popup render [`src/aibar/chrome-extension/popup.js`]
-        - `_renderProviderCard(...)`: provider card render [`src/aibar/chrome-extension/popup.js`]
+        - `_renderProviderCard(...)`: provider card render with error-gated window visibility [`src/aibar/chrome-extension/popup.js`]
+          - `_hasPopulatedWindows(...)`: window-data presence test for error/window rendering gate [`src/aibar/chrome-extension/popup.js`]
           - `_buildWindowRow(...)`: progress bar + reset/quota line render [`src/aibar/chrome-extension/popup.js`]
     - control callbacks
       - `_refreshNow(...)`: manual refresh RPC [`src/aibar/chrome-extension/popup.js`]

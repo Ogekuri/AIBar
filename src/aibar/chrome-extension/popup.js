@@ -7,6 +7,8 @@
  * @satisfies REQ-039
  * @satisfies REQ-044
  * @satisfies REQ-053
+ * @satisfies REQ-055
+ * @satisfies REQ-056
  */
 
 import { createLogger } from "./debug.js";
@@ -212,9 +214,45 @@ function _buildWindowRow(windowKey, windowData) {
 }
 
 /**
+ * @brief Test whether provider windows object contains any populated metric data.
+ * @details Iterates expected window keys for the provider and returns true when at
+ * least one window entry contains a finite `usage_percent`, `remaining`, or `limit`
+ * value.  Used to decide whether window progress bars should render alongside errors.
+ * @param {string} provider Provider key.
+ * @param {Record<string, unknown> | null | undefined} windows Windows data object from provider state.
+ * @returns {boolean} True when at least one window has a usable numeric metric.
+ * @satisfies REQ-055
+ * @satisfies REQ-056
+ */
+function _hasPopulatedWindows(provider, windows) {
+  if (!windows) {
+    return false;
+  }
+  for (const wk of PROVIDER_WINDOWS[provider]) {
+    const wd = windows[wk];
+    if (!wd) {
+      continue;
+    }
+    if (
+      Number.isFinite(Number(wd.usage_percent)) ||
+      Number.isFinite(Number(wd.remaining)) ||
+      Number.isFinite(Number(wd.limit))
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * @brief Render one provider card from current state.
+ * @details Hides window progress bars and quota elements when the provider has an
+ * error and no prior populated window data (REQ-055).  Renders both windows and
+ * error when prior window data persists (REQ-056).
  * @param {string} provider Provider key.
  * @returns {void}
+ * @satisfies REQ-055
+ * @satisfies REQ-056
  */
 function _renderProviderCard(provider) {
   const card = dom.cards[provider];
@@ -233,14 +271,17 @@ function _renderProviderCard(provider) {
     return;
   }
 
-  const windowsContainer = document.createElement("div");
-  windowsContainer.className = "aibar-window-bars";
+  const hasWindows = _hasPopulatedWindows(provider, providerState.windows);
 
-  for (const windowKey of PROVIDER_WINDOWS[provider]) {
-    const windowData = providerState.windows?.[windowKey] ?? null;
-    windowsContainer.appendChild(_buildWindowRow(windowKey, windowData));
+  if (hasWindows) {
+    const windowsContainer = document.createElement("div");
+    windowsContainer.className = "aibar-window-bars";
+    for (const windowKey of PROVIDER_WINDOWS[provider]) {
+      const windowData = providerState.windows?.[windowKey] ?? null;
+      windowsContainer.appendChild(_buildWindowRow(windowKey, windowData));
+    }
+    card.appendChild(windowsContainer);
   }
-  card.appendChild(windowsContainer);
 
   if (providerState.error) {
     const error = document.createElement("div");
