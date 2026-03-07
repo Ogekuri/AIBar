@@ -1758,7 +1758,7 @@ from aibar.providers.base import (
 
 ---
 
-# background.js | JavaScript | 2113L | 82 symbols | 2 imports | 93 comments
+# background.js | JavaScript | 2147L | 85 symbols | 2 imports | 93 comments
 > Path: `src/aibar/chrome-extension/background.js`
 - @brief Chrome extension service-worker runtime for autonomous provider refresh.
 - @details Executes ordered provider page downloads, parser normalization, state
@@ -2203,16 +2203,23 @@ Space complexity: O(1).
 - @param {number} socketId Server socket id.
 - @return s {void}
 
-### fn `function _acceptTcpClient(socketId)` (L1474-1483)
+### fn `function _acceptTcpClient(socketId)` (L1475-1515)
 - @brief Accept one pending client connection on localhost API listener.
-- @details Wraps callback API into Promise to keep accept-loop sequential.
+- @details Waits for `tcpServer.onAccept` / `tcpServer.onAcceptError` events and
+resolves one accept cycle for the active listener socket.
 Time complexity: O(1) excluding socket wait time.
 Space complexity: O(1).
 - @param {number} socketId Server socket id.
 - @return s {Promise<{resultCode: number, clientSocketId: number}>} Accepted client metadata.
 - @satisfies REQ-060
 
-### fn `function _readTcpClientChunk(clientSocketId)` (L1494-1503)
+### fn `const cleanup = () =>` (L1485-1488)
+
+### fn `const onAccept = (acceptInfo) =>` (L1490-1499)
+
+### fn `const onAcceptError = (acceptErrorInfo) =>` (L1501-1510)
+
+### fn `function _readTcpClientChunk(clientSocketId)` (L1526-1535)
 - @brief Read request bytes from accepted client socket.
 - @details Reads one request chunk for compact HTTP request parsing.
 Time complexity: O(N), where N is received byte count.
@@ -2221,7 +2228,7 @@ Space complexity: O(N).
 - @return s {Promise<{resultCode: number, data: ArrayBuffer | null}>} Read result metadata.
 - @satisfies REQ-061
 
-### fn `function _writeTcpClientPayload(clientSocketId, payload)` (L1515-1522)
+### fn `function _writeTcpClientPayload(clientSocketId, payload)` (L1547-1554)
 - @brief Write one HTTP response payload to accepted client socket.
 - @details Serializes response text via UTF-8 encoder and forwards bytes via tcp.send.
 Time complexity: O(N), where N is response byte count.
@@ -2231,7 +2238,7 @@ Space complexity: O(N).
 - @return s {Promise<void>} Completion promise.
 - @satisfies REQ-061
 
-### fn `function _closeTcpClientSocket(clientSocketId)` (L1532-1549)
+### fn `function _closeTcpClientSocket(clientSocketId)` (L1564-1581)
 - @brief Close accepted client socket best-effort.
 - @details Executes disconnect and close without propagating close-time failures.
 Time complexity: O(1).
@@ -2239,7 +2246,7 @@ Space complexity: O(1).
 - @param {number} clientSocketId Accepted client socket id.
 - @return s {void}
 
-### fn `function _buildLocalApiHttpResponse(statusCode, body)` (L1561-1572)
+### fn `function _buildLocalApiHttpResponse(statusCode, body)` (L1593-1604)
 - @brief Build canonical HTTP JSON response payload.
 - @details Converts body object into HTTP/1.1 JSON response with content length.
 Time complexity: O(N), where N is serialized JSON length.
@@ -2249,7 +2256,7 @@ Space complexity: O(N).
 - @return s {string} Serialized HTTP response text.
 - @satisfies REQ-061
 
-### fn `function _parseLocalApiHttpRequest(requestText)` (L1584-1603)
+### fn `function _parseLocalApiHttpRequest(requestText)` (L1616-1635)
 - @brief Parse one HTTP request line/body pair from raw socket text.
 - @details Extracts method, path, and optional JSON body from first read chunk.
 Time complexity: O(N), where N is request text length.
@@ -2259,7 +2266,7 @@ Space complexity: O(N).
 - @throws {Error} If method/path/body cannot be parsed.
 - @satisfies REQ-061
 
-### fn `async function _dispatchLocalApiHttpRequest(method, path, body)` (L1617-1651)
+### fn `async function _dispatchLocalApiHttpRequest(method, path, body)` (L1649-1683)
 - @brief Dispatch localhost HTTP request to primary/debug API handlers.
 - @details Maps route path/method to existing internal API builders and preserves
 debug gate semantics for debug endpoints.
@@ -2271,7 +2278,7 @@ Space complexity: O(C), where C is handler payload size.
 - @return s {Promise<{statusCode: number, body: Record<string, unknown>}>} Response envelope.
 - @satisfies REQ-061
 
-### fn `async function _handleLocalApiClient(clientSocketId)` (L1663-1684)
+### fn `async function _handleLocalApiClient(clientSocketId)` (L1695-1716)
 - @brief Process one accepted localhost TCP client request.
 - @details Reads one HTTP request chunk, dispatches API response, writes JSON
 envelope, and closes client socket.
@@ -2281,7 +2288,7 @@ Space complexity: O(N + C).
 - @return s {Promise<void>} Completion promise.
 - @satisfies REQ-061
 
-### fn `async function _runLocalApiAcceptLoop()` (L1696-1719)
+### fn `async function _runLocalApiAcceptLoop()` (L1728-1751)
 - @brief Run accept loop for localhost API listener.
 - @details Continuously accepts client sockets and dispatches request handlers
 until listener socket is closed or replaced.
@@ -2291,7 +2298,7 @@ Space complexity: O(1) plus per-request handler memory.
 - @satisfies REQ-060
 - @satisfies REQ-061
 
-### fn `async function _startLocalApiListener()` (L1731-1764)
+### fn `async function _startLocalApiListener()` (L1763-1796)
 - @brief Start localhost API listener on default or descending fallback port.
 - @details Probes port `32767` first, then decrements port one-by-one until
 first successful bind to `127.0.0.1`.
@@ -2301,25 +2308,25 @@ Space complexity: O(1).
 - @throws {Error} If no candidate port can be bound.
 - @satisfies REQ-060
 
-### fn `function _applyProviderSuccess(provider, payload)` (L1772-1779)
+### fn `function _applyProviderSuccess(provider, payload)` (L1804-1811)
 - @brief Apply successful provider refresh payload.
 - @param {string} provider Provider key.
 - @param {Record<string, unknown>} payload Parsed provider payload.
 - @return s {void}
 
-### fn `function _applyProviderFailure(provider, error)` (L1787-1793)
+### fn `function _applyProviderFailure(provider, error)` (L1819-1825)
 - @brief Apply provider refresh failure while preserving last successful windows.
 - @param {string} provider Provider key.
 - @param {Error} error Failure object.
 - @return s {void}
 
-### fn `async function _refreshAllProviders(trigger)` (L1801-1908)
+### fn `async function _refreshAllProviders(trigger)` (L1833-1940)
 - @brief Execute one ordered refresh cycle across all provider pages.
 - @details Preserves successful state on errors and emits debug logs for each step.
 - @param {string} trigger Refresh trigger source.
 - @return s {Promise<void>} Completion promise.
 
-### fn `async function _initializeRuntime(trigger)` (L1919-1925)
+### fn `async function _initializeRuntime(trigger)` (L1951-1957)
 - @brief Initialize scheduler and persisted state for service-worker lifecycle.
 - @details Restores persisted runtime/debug state, executes one immediate refresh
 cycle, starts localhost API listener, and then schedules recurring refresh alarms.
@@ -2328,7 +2335,7 @@ cycle, starts localhost API listener, and then schedules recurring refresh alarm
 - @satisfies REQ-043
 - @satisfies REQ-060
 
-### fn `async function _handleMessage(message, sendResponse)` (L1935-2077)
+### fn `async function _handleMessage(message, sendResponse)` (L1967-2109)
 - @brief Handle incoming runtime messages from popup/UI contexts.
 - @details Supports state retrieval, manual refresh, debug log operations, and
 refresh-interval override updates.
@@ -2406,21 +2413,24 @@ refresh-interval override updates.
 |`_createTcpServerSocket`|fn||1410-1420|function _createTcpServerSocket()|
 |`_listenTcpServerSocket`|fn||1432-1444|function _listenTcpServerSocket(socketId, port)|
 |`_closeTcpServerSocket`|fn||1454-1463|function _closeTcpServerSocket(socketId)|
-|`_acceptTcpClient`|fn||1474-1483|function _acceptTcpClient(socketId)|
-|`_readTcpClientChunk`|fn||1494-1503|function _readTcpClientChunk(clientSocketId)|
-|`_writeTcpClientPayload`|fn||1515-1522|function _writeTcpClientPayload(clientSocketId, payload)|
-|`_closeTcpClientSocket`|fn||1532-1549|function _closeTcpClientSocket(clientSocketId)|
-|`_buildLocalApiHttpResponse`|fn||1561-1572|function _buildLocalApiHttpResponse(statusCode, body)|
-|`_parseLocalApiHttpRequest`|fn||1584-1603|function _parseLocalApiHttpRequest(requestText)|
-|`_dispatchLocalApiHttpRequest`|fn||1617-1651|async function _dispatchLocalApiHttpRequest(method, path,...|
-|`_handleLocalApiClient`|fn||1663-1684|async function _handleLocalApiClient(clientSocketId)|
-|`_runLocalApiAcceptLoop`|fn||1696-1719|async function _runLocalApiAcceptLoop()|
-|`_startLocalApiListener`|fn||1731-1764|async function _startLocalApiListener()|
-|`_applyProviderSuccess`|fn||1772-1779|function _applyProviderSuccess(provider, payload)|
-|`_applyProviderFailure`|fn||1787-1793|function _applyProviderFailure(provider, error)|
-|`_refreshAllProviders`|fn||1801-1908|async function _refreshAllProviders(trigger)|
-|`_initializeRuntime`|fn||1919-1925|async function _initializeRuntime(trigger)|
-|`_handleMessage`|fn||1935-2077|async function _handleMessage(message, sendResponse)|
+|`_acceptTcpClient`|fn||1475-1515|function _acceptTcpClient(socketId)|
+|`cleanup`|fn||1485-1488|const cleanup = () =>|
+|`onAccept`|fn||1490-1499|const onAccept = (acceptInfo) =>|
+|`onAcceptError`|fn||1501-1510|const onAcceptError = (acceptErrorInfo) =>|
+|`_readTcpClientChunk`|fn||1526-1535|function _readTcpClientChunk(clientSocketId)|
+|`_writeTcpClientPayload`|fn||1547-1554|function _writeTcpClientPayload(clientSocketId, payload)|
+|`_closeTcpClientSocket`|fn||1564-1581|function _closeTcpClientSocket(clientSocketId)|
+|`_buildLocalApiHttpResponse`|fn||1593-1604|function _buildLocalApiHttpResponse(statusCode, body)|
+|`_parseLocalApiHttpRequest`|fn||1616-1635|function _parseLocalApiHttpRequest(requestText)|
+|`_dispatchLocalApiHttpRequest`|fn||1649-1683|async function _dispatchLocalApiHttpRequest(method, path,...|
+|`_handleLocalApiClient`|fn||1695-1716|async function _handleLocalApiClient(clientSocketId)|
+|`_runLocalApiAcceptLoop`|fn||1728-1751|async function _runLocalApiAcceptLoop()|
+|`_startLocalApiListener`|fn||1763-1796|async function _startLocalApiListener()|
+|`_applyProviderSuccess`|fn||1804-1811|function _applyProviderSuccess(provider, payload)|
+|`_applyProviderFailure`|fn||1819-1825|function _applyProviderFailure(provider, error)|
+|`_refreshAllProviders`|fn||1833-1940|async function _refreshAllProviders(trigger)|
+|`_initializeRuntime`|fn||1951-1957|async function _initializeRuntime(trigger)|
+|`_handleMessage`|fn||1967-2109|async function _handleMessage(message, sendResponse)|
 
 
 ---
@@ -2986,7 +2996,7 @@ parser signal counters for traceable diagnostics.
 
 ---
 
-# popup.js | JavaScript | 451L | 18 symbols | 1 imports | 24 comments
+# popup.js | JavaScript | 472L | 19 symbols | 1 imports | 25 comments
 > Path: `src/aibar/chrome-extension/popup.js`
 - @brief Popup controller for rendering provider tabs and debug-enable control.
 - @details Consumes normalized state emitted by background service-worker and renders
@@ -3012,7 +3022,9 @@ import { createLogger } from "./debug.js";
 - @brief Supported provider tab order. */
 - const `const PROVIDER_WINDOWS = {` (L26)
 - @brief Window render ordering by provider. */
-### fn `function _applyDebugAccessState(enabled)` (L67-71)
+- const `const HAS_DOCUMENT = typeof document !== "undefined";` (L39)
+- @brief DOM availability flag for browser popup runtime. */
+### fn `function _applyDebugAccessState(enabled)` (L86-90)
 - @brief Apply debug-access status to popup control interactivity.
 - @details Ensures UI mirrors runtime debug guard by updating the status badge.
 Debug export, log-clear, and page-fetch actions are no longer in the popup
@@ -3021,33 +3033,33 @@ and are accessible only through debug API commands.
 - @return s {void}
 - @satisfies REQ-053
 
-### fn `function _progressClass(usagePercent)` (L78-89)
+### fn `function _progressClass(usagePercent)` (L97-108)
 - @brief Resolve CSS class for progress severity by percentage.
 - @param {number | null} usagePercent Usage percentage value.
 - @return s {string} CSS class name.
 
-### fn `function _formatPercent(value)` (L96-101)
+### fn `function _formatPercent(value)` (L115-120)
 - @brief Format percentage for UI display.
 - @param {number | null} value Percentage value.
 - @return s {string} UI label.
 
-### fn `function _formatMetric(value)` (L108-113)
+### fn `function _formatMetric(value)` (L127-132)
 - @brief Format numeric metric for UI display.
 - @param {number | null} value Numeric metric.
 - @return s {string} UI label.
 
-### fn `function _formatReset(resetAt)` (L120-143)
+### fn `function _formatReset(resetAt)` (L139-162)
 - @brief Format reset timestamp into compact relative text.
 - @param {string | null | undefined} resetAt ISO timestamp.
 - @return s {string} Relative-time display label.
 
-### fn `function _buildWindowRow(windowKey, windowData)` (L151-195)
+### fn `function _buildWindowRow(windowKey, windowData)` (L170-214)
 - @brief Build one window progress-bar row element.
 - @param {string} windowKey Window key (`5h`, `7d`, `30d`).
 - @param {Record<string, number | string | null> | null} windowData Window data object.
 - @return s {HTMLElement} Rendered row container.
 
-### fn `function _hasPopulatedWindows(provider, windows)` (L208-226)
+### fn `function _hasPopulatedWindows(provider, windows)` (L227-245)
 - @brief Test whether provider windows object contains any populated metric data.
 - @details Iterates expected window keys for the provider and returns true when at
 least one window entry contains a finite `usage_percent`, `remaining`, or `limit`
@@ -3058,7 +3070,7 @@ value. Used to decide whether window progress bars should render alongside error
 - @satisfies REQ-055
 - @satisfies REQ-056
 
-### fn `function _renderProviderCard(provider)` (L238-273)
+### fn `function _renderProviderCard(provider)` (L257-292)
 - @brief Render one provider card from current state.
 - @details Hides window progress bars and quota elements when the provider has an
 error and no prior populated window data (REQ-055). Renders both windows and
@@ -3068,16 +3080,16 @@ error when prior window data persists (REQ-056).
 - @satisfies REQ-055
 - @satisfies REQ-056
 
-### fn `function _renderState()` (L279-294)
+### fn `function _renderState()` (L298-313)
 - @brief Render popup-wide status/footer labels and all provider cards.
 - @return s {void}
 
-### fn `function _setActiveProvider(provider)` (L301-317)
+### fn `function _setActiveProvider(provider)` (L320-336)
 - @brief Apply active tab classes and card visibility state.
 - @param {string} provider Target provider.
 - @return s {void}
 
-### fn `async function _requestState()` (L327-334)
+### fn `async function _requestState()` (L346-353)
 - @brief Request latest state from background service worker.
 - @details Uses `api.main.snapshot` as the canonical initial popup data source
 so cards render from background-managed state without requiring a foreground
@@ -3085,24 +3097,24 @@ refresh request.
 - @return s {Promise<void>} Completion promise.
 - @satisfies REQ-058
 
-### fn `async function _refreshNow()` (L340-347)
+### fn `async function _refreshNow()` (L359-366)
 - @brief Trigger manual refresh request.
 - @return s {Promise<void>} Completion promise.
 
-### fn `async function _requestDebugAccessState()` (L355-361)
+### fn `async function _requestDebugAccessState()` (L374-380)
 - @brief Fetch runtime debug-access configuration.
 - @return s {Promise<void>} Completion promise.
 - @satisfies REQ-052
 - @satisfies REQ-053
 
-### fn `async function _setDebugAccessState(enabled)` (L370-379)
+### fn `async function _setDebugAccessState(enabled)` (L389-398)
 - @brief Set runtime debug-access configuration.
 - @param {boolean} enabled Desired debug-access state.
 - @return s {Promise<void>} Completion promise.
 - @satisfies REQ-052
 - @satisfies REQ-053
 
-### fn `async function _setIntervalOverride()` (L389-399)
+### fn `async function _setIntervalOverride()` (L408-418)
 - @brief Apply refresh interval override from popup input.
 - @details Sends a non-debug message to persist the interval in extension storage.
 The interval is always user-configurable, not gated behind debug access.
@@ -3110,7 +3122,7 @@ The interval is always user-configurable, not gated behind debug access.
 - @satisfies CTN-008
 - @satisfies CTN-016
 
-### fn `function _wireUiEvents()` (L405-433)
+### fn `function _wireUiEvents()` (L424-452)
 - @brief Register popup event handlers.
 - @return s {void}
 
@@ -3119,22 +3131,23 @@ The interval is always user-configurable, not gated behind debug access.
 |---|---|---|---|---|
 |`PROVIDER_TABS`|const||23||
 |`PROVIDER_WINDOWS`|const||26||
-|`_applyDebugAccessState`|fn||67-71|function _applyDebugAccessState(enabled)|
-|`_progressClass`|fn||78-89|function _progressClass(usagePercent)|
-|`_formatPercent`|fn||96-101|function _formatPercent(value)|
-|`_formatMetric`|fn||108-113|function _formatMetric(value)|
-|`_formatReset`|fn||120-143|function _formatReset(resetAt)|
-|`_buildWindowRow`|fn||151-195|function _buildWindowRow(windowKey, windowData)|
-|`_hasPopulatedWindows`|fn||208-226|function _hasPopulatedWindows(provider, windows)|
-|`_renderProviderCard`|fn||238-273|function _renderProviderCard(provider)|
-|`_renderState`|fn||279-294|function _renderState()|
-|`_setActiveProvider`|fn||301-317|function _setActiveProvider(provider)|
-|`_requestState`|fn||327-334|async function _requestState()|
-|`_refreshNow`|fn||340-347|async function _refreshNow()|
-|`_requestDebugAccessState`|fn||355-361|async function _requestDebugAccessState()|
-|`_setDebugAccessState`|fn||370-379|async function _setDebugAccessState(enabled)|
-|`_setIntervalOverride`|fn||389-399|async function _setIntervalOverride()|
-|`_wireUiEvents`|fn||405-433|function _wireUiEvents()|
+|`HAS_DOCUMENT`|const||39||
+|`_applyDebugAccessState`|fn||86-90|function _applyDebugAccessState(enabled)|
+|`_progressClass`|fn||97-108|function _progressClass(usagePercent)|
+|`_formatPercent`|fn||115-120|function _formatPercent(value)|
+|`_formatMetric`|fn||127-132|function _formatMetric(value)|
+|`_formatReset`|fn||139-162|function _formatReset(resetAt)|
+|`_buildWindowRow`|fn||170-214|function _buildWindowRow(windowKey, windowData)|
+|`_hasPopulatedWindows`|fn||227-245|function _hasPopulatedWindows(provider, windows)|
+|`_renderProviderCard`|fn||257-292|function _renderProviderCard(provider)|
+|`_renderState`|fn||298-313|function _renderState()|
+|`_setActiveProvider`|fn||320-336|function _setActiveProvider(provider)|
+|`_requestState`|fn||346-353|async function _requestState()|
+|`_refreshNow`|fn||359-366|async function _refreshNow()|
+|`_requestDebugAccessState`|fn||374-380|async function _requestDebugAccessState()|
+|`_setDebugAccessState`|fn||389-398|async function _setDebugAccessState(enabled)|
+|`_setIntervalOverride`|fn||408-418|async function _setIntervalOverride()|
+|`_wireUiEvents`|fn||424-452|function _wireUiEvents()|
 
 
 ---

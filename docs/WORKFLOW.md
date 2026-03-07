@@ -111,7 +111,7 @@
       - `_createTcpServerSocket(...)`: tcpServer socket creation [`src/aibar/chrome-extension/background.js`]
       - `_listenTcpServerSocket(...)`: host/port bind probe (`127.0.0.1`, descending from `32767`) [`src/aibar/chrome-extension/background.js`]
       - `_runLocalApiAcceptLoop(...)`: asynchronous localhost client accept loop [`src/aibar/chrome-extension/background.js`]
-        - `_acceptTcpClient(...)`: pending client acceptance [`src/aibar/chrome-extension/background.js`]
+        - `_acceptTcpClient(...)`: pending client acceptance via tcpServer accept events [`src/aibar/chrome-extension/background.js`]
         - `_handleLocalApiClient(...)`: one client request parser/dispatcher [`src/aibar/chrome-extension/background.js`]
           - `_readTcpClientChunk(...)`: request-byte read [`src/aibar/chrome-extension/background.js`]
           - `_parseLocalApiHttpRequest(...)`: HTTP line/body parser [`src/aibar/chrome-extension/background.js`]

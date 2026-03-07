@@ -247,3 +247,18 @@ def test_localhost_external_api_routes_map_to_main_and_debug_handlers() -> None:
     assert "_buildDebugDescribeResponse()" in source
     assert "await _buildDebugExecuteResponse(body ?? {})" in source
     assert 'code: "DEBUG_API_DISABLED"' in source
+
+
+def test_localhost_listener_uses_tcpserver_accept_events() -> None:
+    """
+    @brief Verify localhost listener consumes tcpServer onAccept/onAcceptError events.
+    @details Guards against direct `tcpServer.accept(...)` calls that are not part of
+    the extension sockets API contract and break external localhost accessibility.
+    @satisfies REQ-060
+    @satisfies TST-033
+    @return {None} No return value.
+    """
+    source = BACKGROUND_PATH.read_text(encoding="utf-8")
+    assert "chrome.sockets.tcpServer.onAccept.addListener" in source
+    assert "chrome.sockets.tcpServer.onAcceptError.addListener" in source
+    assert "chrome.sockets.tcpServer.accept(" not in source

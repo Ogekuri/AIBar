@@ -1464,7 +1464,8 @@ function _closeTcpServerSocket(socketId) {
 
 /**
  * @brief Accept one pending client connection on localhost API listener.
- * @details Wraps callback API into Promise to keep accept-loop sequential.
+ * @details Waits for `tcpServer.onAccept` / `tcpServer.onAcceptError` events and
+ * resolves one accept cycle for the active listener socket.
  * Time complexity: O(1) excluding socket wait time.
  * Space complexity: O(1).
  * @param {number} socketId Server socket id.
@@ -1473,12 +1474,43 @@ function _closeTcpServerSocket(socketId) {
  */
 function _acceptTcpClient(socketId) {
   return new Promise((resolve) => {
-    chrome.sockets.tcpServer.accept(socketId, (acceptInfo) => {
+    if (!chrome?.sockets?.tcpServer?.onAccept || !chrome?.sockets?.tcpServer?.onAcceptError) {
       resolve({
-        resultCode: Number(acceptInfo?.resultCode ?? -1),
+        resultCode: -1,
+        clientSocketId: -1,
+      });
+      return;
+    }
+
+    const cleanup = () => {
+      chrome.sockets.tcpServer.onAccept.removeListener(onAccept);
+      chrome.sockets.tcpServer.onAcceptError.removeListener(onAcceptError);
+    };
+
+    const onAccept = (acceptInfo) => {
+      if (Number(acceptInfo?.socketId ?? -1) !== socketId) {
+        return;
+      }
+      cleanup();
+      resolve({
+        resultCode: Number(acceptInfo?.resultCode ?? 0),
         clientSocketId: Number(acceptInfo?.clientSocketId ?? -1),
       });
-    });
+    };
+
+    const onAcceptError = (acceptErrorInfo) => {
+      if (Number(acceptErrorInfo?.socketId ?? -1) !== socketId) {
+        return;
+      }
+      cleanup();
+      resolve({
+        resultCode: Number(acceptErrorInfo?.resultCode ?? -1),
+        clientSocketId: -1,
+      });
+    };
+
+    chrome.sockets.tcpServer.onAccept.addListener(onAccept);
+    chrome.sockets.tcpServer.onAcceptError.addListener(onAcceptError);
   });
 }
 
