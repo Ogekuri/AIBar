@@ -24,12 +24,30 @@ def _patch_config_paths(monkeypatch, tmp_path: Path) -> Path:
     @return {Path} Effective `~/.config/aibar` replacement directory.
     """
     config_dir = tmp_path / ".config" / "aibar"
+    cache_dir = tmp_path / ".cache" / "aibar"
     monkeypatch.setattr(config_module, "APP_CONFIG_DIR", config_dir)
+    monkeypatch.setattr(config_module, "APP_CACHE_DIR", cache_dir)
     monkeypatch.setattr(config_module, "ENV_FILE_PATH", config_dir / "env")
     monkeypatch.setattr(config_module, "RUNTIME_CONFIG_PATH", config_dir / "config.json")
-    monkeypatch.setattr(config_module, "CACHE_FILE_PATH", config_dir / "cache.json")
-    monkeypatch.setattr(config_module, "IDLE_TIME_PATH", config_dir / "idle-time.json")
+    monkeypatch.setattr(config_module, "CACHE_FILE_PATH", cache_dir / "cache.json")
+    monkeypatch.setattr(config_module, "IDLE_TIME_PATH", cache_dir / "idle-time.json")
     return config_dir
+
+
+def test_default_cache_and_idle_time_paths_use_home_cache_directory() -> None:
+    """
+    @brief Verify default CLI cache and idle-time paths target `~/.cache/aibar`.
+    @details Asserts module-level path constants for cache and idle-time
+    persistence resolve under the user cache directory, while runtime config
+    remains in `~/.config/aibar`.
+    @return {None} Function return value.
+    @satisfies CTN-004
+    @satisfies CTN-009
+    """
+    expected_cache_dir = Path.home() / ".cache" / "aibar"
+    assert config_module.APP_CACHE_DIR == expected_cache_dir
+    assert config_module.CACHE_FILE_PATH == expected_cache_dir / "cache.json"
+    assert config_module.IDLE_TIME_PATH == expected_cache_dir / "idle-time.json"
 
 
 def test_setup_prompts_runtime_config_before_credentials(monkeypatch, tmp_path: Path) -> None:

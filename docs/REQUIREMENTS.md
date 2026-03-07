@@ -1,7 +1,7 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.3.14"
+version: "0.3.15"
 date: "2026-03-07"
 author: "req-change"
 scope:
@@ -38,7 +38,7 @@ Used libraries/components evidenced by direct imports:
 - Python: `click`, `textual`, `pydantic`, `httpx` (`src/aibar/aibar/*.py`, `src/aibar/aibar/providers/*.py`)
 - GNOME JS: `GLib`, `St`, `Gio`, `Clutter`, `GObject`, `Main`, `PanelMenu`, `PopupMenu` (`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`)
 
-Performance note: explicit caching optimization uses persistent CLI cache (`~/.config/aibar/cache.json`), idle-time gating (`~/.config/aibar/idle-time.json`), and configurable provider-call throttling (`api_call_delay_seconds`) to minimize API request volume.
+Performance note: explicit caching optimization uses persistent CLI cache (`~/.cache/aibar/cache.json`), idle-time gating (`~/.cache/aibar/idle-time.json`), and configurable provider-call throttling (`api_call_delay_seconds`) to minimize API request volume.
 
 ### 1.3 Repository Structure (evidence snapshot)
 ```text
@@ -96,12 +96,12 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **CTN-001**: MUST resolve provider credentials with precedence: environment variable, then `~/.config/aibar/env`, then provider-specific local credential stores.
 - **CTN-002**: MUST represent provider fetch output with `ProviderResult` containing `provider`, `window`, `metrics`, `updated_at`, `raw`, and optional `error`.
 - **CTN-003**: MUST perform external HTTP API calls with `httpx.AsyncClient(timeout=30.0)` for provider integrations.
-- **CTN-004**: MUST persist the latest successful multi-provider `show` dataset in `~/.config/aibar/cache.json` using exactly the same top-level and nested JSON schema emitted by `aibar show --json`.
+- **CTN-004**: MUST persist the latest successful multi-provider `show` dataset in `~/.cache/aibar/cache.json` using exactly the same top-level and nested JSON schema emitted by `aibar show --json`.
 - **CTN-005**: MAY depend on unofficial/internal endpoints when official usage APIs are unavailable for Claude, Copilot, or Codex integrations.
 - **CTN-006**: MUST keep `docs/REFERENCES.md` synchronized with symbols defined under `src/` and `.github/workflows/`.
 - **CTN-007**: MUST declare `hatchling` as `[build-system]` backend in `pyproject.toml` with `[project]` metadata including `name`, `version`, `requires-python`, `dependencies`, and `[project.scripts]` console entry point.
 - **CTN-008**: MUST persist runtime throttling configuration in `~/.config/aibar/config.json` with keys `idle_delay_seconds` and `api_call_delay_seconds`.
-- **CTN-009**: MUST persist idle-time state in `~/.config/aibar/idle-time.json` with epoch and human-readable fields for `last_success_at` and `idle_until`.
+- **CTN-009**: MUST persist idle-time state in `~/.cache/aibar/idle-time.json` with epoch and human-readable fields for `last_success_at` and `idle_until`.
 
 ## 3. Requirements
 
@@ -111,7 +111,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **DES-003**: MUST reject invalid CLI window values and provider values using Click `BadParameter`.
 - **DES-004**: MUST sanitize sensitive keys (`token`, `key`, `secret`, `password`, `authorization`) from cached raw payloads before disk writes.
 - **DES-005**: MUST parse env-file assignments with optional `export`, quoted values, and inline comments in GNOME extension env loading.
-- **DES-006**: MUST auto-refresh GNOME extension data every 300 seconds and also support manual refresh from the popup menu.
+- **DES-006**: MUST auto-refresh GNOME extension data every configured scheduler interval, support manual refresh from the popup menu, and render status text as `Last updated: <time>, next update: <time>` based on that scheduler.
 
 ### 3.2 Functions
 - **REQ-001**: MUST skip unconfigured providers in `show` output and print missing environment-variable hints when text mode is used.
@@ -122,7 +122,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-006**: MUST fail Claude login when CLI credentials are missing or expired and MUST print `claude setup-token` remediation guidance.
 - **REQ-007**: MUST execute GitHub device-flow login for Copilot and save the token in `~/.config/aibar/copilot.json`.
 - **REQ-008**: MUST render Textual provider cards for all providers, support refresh, support 5h/7d switching, support JSON-tab toggling, suppress `Error: Rate limited. Try again later.`, and append `⚠️ Limit reached!` after `Resets in:` at displayed `100.0%`.
-- **REQ-009**: MUST skip provider refresh when `idle_until` in `~/.config/aibar/idle-time.json` is in the future and MUST serve `show` data from `~/.config/aibar/cache.json`.
+- **REQ-009**: MUST skip provider refresh when `idle_until` in `~/.cache/aibar/idle-time.json` is in the future and MUST serve `show` data from `~/.cache/aibar/cache.json`.
 - **REQ-010**: MUST map OpenAI `5h` requests to a one-day API range before requesting usage and costs.
 - **REQ-011**: MUST derive OpenRouter `cost` from window-specific usage fields (`usage_daily`, `usage_weekly`, `usage_monthly`) and include `limit` and `limit_remaining`.
 - **REQ-012**: MUST ignore requested window for Copilot fetch and return results with effective window `30d`.
@@ -130,7 +130,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-014**: MUST attempt Codex token refresh when refresh token exists and `last_refresh` age is at least eight days.
 - **REQ-015**: SHOULD continue Codex fetch with existing credentials when non-authentication refresh exceptions occur, leaving refresh failures non-fatal.
 - **REQ-016**: MUST load `~/.config/aibar/env` into subprocess environment before GNOME extension executes `aibar show --json`.
-- **REQ-017**: MUST set GNOME panel label to total cost when cost metrics exist, otherwise configured-provider count when quota metrics exist, otherwise `N/A`; quota-only cards MUST render `Remaining credits: <remaining>/<limit>` with `<remaining>` in bold; reset labels in extension cards MUST start with `Reset in:` and append `⚠️ Limit reached!` at displayed `100.0%`; rate-limit quota payloads MUST NOT render `Error: Rate limited. Try again later.`; Copilot cards MUST render a `30d` window bar with reset text directly below that bar and before remaining-credits text; popup header/action labels MUST render `AIBar` branding (`AIBar`, `Open AIBar UI`).
+- **REQ-017**: MUST set GNOME panel label to total cost when cost metrics exist, otherwise configured-provider count when quota metrics exist, otherwise `N/A`; quota-only cards MUST render `Remaining credits: <remaining>/<limit>` with `<remaining>` in bold; reset labels in extension cards MUST start with `Reset in:` and append `⚠️ Limit reached!` at displayed `100.0%`; rate-limit quota payloads MUST NOT render `Error: Rate limited. Try again later.`; Copilot cards MUST render a `30d` window bar with reset text directly below that bar and before remaining-credits text; popup header/action labels MUST render `AIBar` branding (`AIBar`, `Open AIBar UI`); popup status text MUST render `Last updated: <time>, next update: <time>` where `next update` is computed from scheduler interval.
 - **REQ-018**: MUST set GNOME panel label to `Err` and truncate popup error text to 40 characters when command execution or JSON parsing fails.
 - **REQ-019**: SHOULD order extension provider tabs/cards by `claude`, `openrouter`, `copilot`, `codex`, with providers not listed in ordering array appended alphabetically.
 - **REQ-020**: MUST include each discovered source symbol in `docs/REFERENCES.md` with file path, symbol kind, line-range evidence, and parsed Doxygen fields (`@brief`, `@param`, `@return`, `@raises`) when present in source declarations.
@@ -151,8 +151,8 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-035**: MUST print `Remaining credits: <remaining> / <limit>` for Claude, Codex, and Copilot when both values exist in CLI text output.
 - **REQ-036**: MUST render Claude HTTP 429 as partial-window output: 5h shows `Error: Rate limited. Try again later.` and `Usage: ... 100.0%`; 5h reset and all 7d usage/reset values MUST use persisted Claude payload when available.
 - **REQ-037**: MUST use synthetic Claude partial-window fallback values when persisted Claude payload is unavailable during HTTP 429 rendering.
-- **REQ-038**: MUST set `last_success_at` to refresh completion time and `idle_until` to `last_success_at + idle_delay_seconds` after every successful provider refresh, then persist epoch and human-readable values in `~/.config/aibar/idle-time.json`.
-- **REQ-039**: MUST support `show --force` to delete `~/.config/aibar/idle-time.json`, bypass idle-time gating for the current run, and execute a fresh provider refresh.
+- **REQ-038**: MUST set `last_success_at` to refresh completion time and `idle_until` to `last_success_at + idle_delay_seconds` after every successful provider refresh, then persist epoch and human-readable values in `~/.cache/aibar/idle-time.json`.
+- **REQ-039**: MUST support `show --force` to delete `~/.cache/aibar/idle-time.json`, bypass idle-time gating for the current run, and execute a fresh provider refresh.
 - **REQ-040**: MUST enforce at least `api_call_delay_seconds` between consecutive provider API requests during refresh execution, with default `20` seconds when configuration is missing.
 - **REQ-041**: MUST update idle-time on HTTP `429` using `max(retry_after_seconds, idle_delay_seconds)` and, when multiple `429` responses occur, MUST persist the largest computed `idle_until`.
 - **REQ-042**: MUST minimize provider API requests during refresh by reusing already-fetched results within the run and by serving cached data whenever idle-time gating disables refresh.
@@ -163,8 +163,8 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 
 - **TST-001**: MUST verify `show` rejects unsupported window/provider values with non-zero exit and Click `BadParameter` diagnostics.
 - **TST-002**: MUST verify credential precedence by asserting env vars override env-file values and provider stores for at least one provider.
-- **TST-003**: MUST verify successful refresh writes `~/.config/aibar/cache.json` with exact `show --json` schema and writes `last_success_at`/`idle_until` epoch plus human-readable fields in `~/.config/aibar/idle-time.json`.
-- **TST-004**: MUST verify GNOME extension error path sets panel text `Err`, caps displayed error string length to 40 characters, renders quota-only card labels as `Remaining credits: <remaining>/<limit>` with bold `<remaining>`, renders reset labels with `Reset in:` prefix, suppresses `Error: Rate limited. Try again later.` for rate-limit quota payloads, appends `⚠️ Limit reached!` after reset countdown at displayed `100.0%`, renders Copilot `30d` bar/reset placement before remaining-credits text, renders popup labels `AIBar` and `Open AIBar UI`, and verifies `scripts/test-gnome-extension.sh` includes `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800`.
+- **TST-003**: MUST verify successful refresh writes `~/.cache/aibar/cache.json` with exact `show --json` schema and writes `last_success_at`/`idle_until` epoch plus human-readable fields in `~/.cache/aibar/idle-time.json`.
+- **TST-004**: MUST verify GNOME extension error path sets panel text `Err`, caps displayed error string length to 40 characters, renders quota-only card labels as `Remaining credits: <remaining>/<limit>` with bold `<remaining>`, renders reset labels with `Reset in:` prefix, suppresses `Error: Rate limited. Try again later.` for rate-limit quota payloads, appends `⚠️ Limit reached!` after reset countdown at displayed `100.0%`, renders Copilot `30d` bar/reset placement before remaining-credits text, renders popup labels `AIBar` and `Open AIBar UI`, renders status line `Last updated: <time>, next update: <time>` based on scheduler interval, and verifies `scripts/test-gnome-extension.sh` includes `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800`.
 - **TST-005**: MUST verify Copilot provider always returns `window=30d` regardless of requested window argument.
 - **TST-006**: MUST verify `req --here --references` reproduces `docs/REFERENCES.md` without missing symbol entries and preserves Doxygen field extraction for documented symbols.
 - **TST-007**: MUST verify GNOME panel percentage labels render in Claude 5h, Claude 7d, Copilot, Codex 5h, Codex 7d order between icon and summary label, enforce provider style classes, enforce bold primary percentages (Claude 5h/Copilot/Codex 5h), and omit labels when source metrics are unavailable.
@@ -174,8 +174,8 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 - **TST-011**: MUST verify HTTP `429` handling persists idle-time using `max(retry_after_seconds, idle_delay_seconds)` and keeps the largest computed `idle_until` when multiple rate-limit responses occur in one refresh run.
 - **TST-012**: MUST verify Textual provider cards suppress `Error: Rate limited. Try again later.` and append `⚠️ Limit reached!` after `Resets in:` when displayed usage is `100.0%`.
 - **TST-013**: MUST verify `setup` prompts idle-delay first and API-call delay second, applies defaults `300` and `20`, and persists both values into `~/.config/aibar/config.json`.
-- **TST-014**: MUST verify `show` skips provider API calls and serves `~/.config/aibar/cache.json` when `idle_until` is in the future, and refreshes providers when idle-time file is missing or expired.
-- **TST-015**: MUST verify `show --force` removes `~/.config/aibar/idle-time.json`, bypasses idle-time gating for current execution, refreshes providers, and recreates idle-time metadata.
+- **TST-014**: MUST verify `show` skips provider API calls and serves `~/.cache/aibar/cache.json` when `idle_until` is in the future, and refreshes providers when idle-time file is missing or expired.
+- **TST-015**: MUST verify `show --force` removes `~/.cache/aibar/idle-time.json`, bypasses idle-time gating for current execution, refreshes providers, and recreates idle-time metadata.
 - **TST-016**: MUST verify refresh execution enforces configured inter-call delay between provider API requests, using `20` seconds when `api_call_delay_seconds` is absent.
 
 ## 5. Evidence
@@ -192,18 +192,18 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | CTN-001 | `src/aibar/aibar/config.py` + `Config.get_token` + env var -> env file -> provider-specific stores (`ClaudeCLIAuth`, `CodexCredentialStore`, `CopilotCredentialStore`). |
 | CTN-002 | `src/aibar/aibar/providers/base.py` + `ProviderResult` model + fields `provider/window/metrics/updated_at/raw/error`. |
 | CTN-003 | `src/aibar/aibar/providers/*.py` + `fetch` methods + `httpx.AsyncClient(timeout=30.0)` in Claude/OpenAI/OpenRouter/Copilot/Codex providers. |
-| CTN-004 | `src/aibar/aibar/cache.py` + cache read/write helpers plus `src/aibar/aibar/cli.py` + CLI dataset persistence to `~/.config/aibar/cache.json` matching `show --json` schema. |
+| CTN-004 | `src/aibar/aibar/config.py` + `load_cli_cache/save_cli_cache` and `src/aibar/aibar/cli.py` + CLI dataset persistence to `~/.cache/aibar/cache.json` matching `show --json` schema. |
 | CTN-005 | `src/aibar/aibar/config.py` + `PROVIDER_INFO` notes + entries describing unofficial/internal usage for Claude, Copilot, and Codex. |
 | CTN-006 | `docs/REFERENCES.md` + full symbol index grouped by source file, regenerated from repository code. |
 | CTN-007 | `pyproject.toml` + `[build-system] requires = ["hatchling"]` + `[project]` metadata fields `name`, `version`, `requires-python`, `dependencies`, `[project.scripts]`. |
 | CTN-008 | `src/aibar/aibar/config.py` + runtime throttle config load/save helpers using `~/.config/aibar/config.json` keys `idle_delay_seconds` and `api_call_delay_seconds`. |
-| CTN-009 | `src/aibar/aibar/cli.py` + idle-time load/save logic managing epoch and human-readable `last_success_at` and `idle_until` in `~/.config/aibar/idle-time.json`. |
+| CTN-009 | `src/aibar/aibar/config.py` + `load_idle_time/save_idle_time` and `src/aibar/aibar/cli.py` + idle-time lifecycle handling in `~/.cache/aibar/idle-time.json`. |
 | DES-001 | `src/aibar/aibar/providers/base.py` + `class BaseProvider(ABC)` + abstract methods `fetch`, `is_configured`, `get_config_help`. |
 | DES-002 | `src/aibar/aibar/providers/base.py` + `WindowPeriod/ProviderName` + enum literals `5h/7d/30d/code_review` and provider names. |
 | DES-003 | `src/aibar/aibar/cli.py` + `parse_window/parse_provider` + raises `click.BadParameter` for invalid inputs. |
 | DES-004 | `src/aibar/aibar/cache.py` + `_sanitize_raw` + redacts keys in sensitive set before file write. |
 | DES-005 | `src/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_loadEnvFromFile` + parses `export KEY=VALUE`, handles quotes/comments/semicolon cleanup. |
-| DES-006 | `src/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `REFRESH_INTERVAL_SECONDS/_startAutoRefresh` + timeout 300 seconds; popup menu has `"Refresh Now"` action. |
+| DES-006 | `src/aibar/gnome-extension/aibar@aibar.panel/extension.js` + scheduler-driven `_startAutoRefresh/_refreshData` plus status labels rendering `Last updated: <time>, next update: <time>`. |
 | REQ-001 | `src/aibar/aibar/cli.py` + `show` loop + `if not prov.is_configured(): ... continue` and text hint `Set {config.ENV_VARS.get(name)}`. |
 | REQ-002 | `src/aibar/aibar/cli.py` + `show` + default-window Claude/Codex dual fetch output rendering. |
 | REQ-003 | `src/aibar/aibar/cli.py` + `show` JSON renderer emits `indent=2` from refreshed or cache-loaded payload without schema drift. |
@@ -212,7 +212,7 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | REQ-006 | `src/aibar/aibar/cli.py` + `_login_claude` + missing/expired flows print `claude setup-token` then `sys.exit(1)`. |
 | REQ-007 | `src/aibar/aibar/providers/copilot.py` + `CopilotDeviceFlow` and `CopilotProvider.login` + device-code request/poll and `save_token`. |
 | REQ-008 | `src/aibar/aibar/ui.py` + `AIBarUI.compose/BINDINGS` and `ProviderCard.watch_result` + provider cards, refresh/window/json controls, rate-limit error-string suppression, and `Resets in: ... ⚠️ Limit reached!` rendering at displayed `100.0%`. |
-| REQ-009 | `src/aibar/aibar/cli.py` + `show` idle-time gate reads `~/.config/aibar/idle-time.json` and serves `~/.config/aibar/cache.json` without provider refresh while idle window is active. |
+| REQ-009 | `src/aibar/aibar/cli.py` + `show` idle-time gate reads `~/.cache/aibar/idle-time.json` and serves `~/.cache/aibar/cache.json` without provider refresh while idle window is active. |
 | REQ-010 | `src/aibar/aibar/providers/openai_usage.py` + `_get_time_range` + dict maps `"5h"` to `1` day. |
 | REQ-011 | `src/aibar/aibar/providers/openrouter.py` + `_get_usage/_parse_response` + cost from usage field and limit metrics from payload. |
 | REQ-012 | `src/aibar/aibar/providers/copilot.py` + `fetch` + sets `effective_window = WindowPeriod.DAY_30` and returns that window. |
@@ -220,7 +220,7 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | REQ-014 | `src/aibar/aibar/providers/codex.py` + `CodexCredentials.needs_refresh` + threshold `age.days >= 8`; `CodexProvider.fetch` calls refresher. |
 | REQ-015 | `src/aibar/aibar/providers/codex.py` + `fetch` + catches generic refresh exception and continues (`pass  # Continue with existing token`). |
 | REQ-016 | `src/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_refreshData` + loads env file and `launcher.setenv(key, value, true)` before spawn. |
-| REQ-017 | `src/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_updateUI/_populateProviderCard/_buildPopupMenu` + panel label fallback chain; quota-only cards with bold remaining credits; `Reset in:` prefix; `⚠️ Limit reached!` suffix at displayed `100.0%`; suppression of `Error: Rate limited. Try again later.` for rate-limit quota payloads; Copilot `30d` reset placement; popup labels `AIBar` and `Open AIBar UI`. |
+| REQ-017 | `src/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_updateUI/_populateProviderCard/_buildPopupMenu` + panel label fallback chain; quota-only cards with bold remaining credits; `Reset in:` prefix; `⚠️ Limit reached!` suffix at displayed `100.0%`; suppression of `Error: Rate limited. Try again later.` for rate-limit quota payloads; Copilot `30d` reset placement; popup labels `AIBar` and `Open AIBar UI`; status line `Last updated: <time>, next update: <time>` based on scheduler interval. |
 | REQ-018 | `src/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_handleError` + `this._panelLabel.set_text('Err')` and `message.substring(0, 40)`. |
 | REQ-019 | `src/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_providerOrder` and `_updateUI` sorting + unknown providers rank `999` then lexical order. |
 | REQ-020 | `docs/REFERENCES.md` + per-symbol entries containing symbol identifier, file path, and line-range spans. |
@@ -232,15 +232,15 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | REQ-035 | `src/aibar/aibar/cli.py` + `_print_result` + remaining-credits line for Claude/Codex/Copilot when `remaining` and `limit` are present. |
 | REQ-036 | `src/aibar/aibar/cli.py` + `_fetch_claude_dual/_print_result` + Claude HTTP 429 output keeps 5h error+100% while 7d usage/reset are restored from persisted Claude payload. |
 | REQ-037 | `src/aibar/aibar/cli.py` + Claude HTTP 429 fallback path synthesizes deterministic values when no persisted Claude payload is available. |
-| REQ-038 | `src/aibar/aibar/cli.py` + successful refresh path computes `idle_until = last_success_at + idle_delay_seconds` and writes epoch/human-readable values to `~/.config/aibar/idle-time.json`. |
-| REQ-039 | `src/aibar/aibar/cli.py` + `show --force` removes idle-time file and bypasses idle-time gate for current execution. |
+| REQ-038 | `src/aibar/aibar/cli.py` + successful refresh path computes `idle_until = last_success_at + idle_delay_seconds` and writes epoch/human-readable values to `~/.cache/aibar/idle-time.json`. |
+| REQ-039 | `src/aibar/aibar/cli.py` + `show --force` removes `~/.cache/aibar/idle-time.json` and bypasses idle-time gate for current execution. |
 | REQ-040 | `src/aibar/aibar/cli.py` + refresh scheduler enforces configured `api_call_delay_seconds` between consecutive provider API requests. |
 | REQ-041 | `src/aibar/aibar/cli.py` + HTTP 429 handling uses `retry-after` and `idle_delay_seconds` to persist the largest computed `idle_until`. |
 | REQ-042 | `src/aibar/aibar/cli.py` + refresh pipeline reuses in-run results and idle-time cache short-circuiting to minimize provider API calls. |
 | TST-001 | `src/aibar/aibar/cli.py` + `parse_window/parse_provider` provide validation points for invalid input diagnostics. |
 | TST-002 | `src/aibar/aibar/config.py` + `get_token` implements explicit precedence chain requiring regression coverage. |
-| TST-003 | `tests/test_cli_idle_cache.py` + assertions for cache schema parity with `show --json` and idle-time epoch/human-readable field persistence after successful refresh. |
-| TST-004 | `tests/test_extension_quota_label.py` + popup-label assertions (`AIBar`, `Open AIBar UI`), reset-prefix and `⚠️ Limit reached!` assertions, and rate-limit error-string suppression assertions; `tests/test_extension_dev_script.py` + `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800`; `src/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_handleError/_populateProviderCard/_buildPopupMenu` coverage. |
+| TST-003 | `tests/test_cli_idle_cache.py` and `tests/test_cli_idle_force.py` + assertions for cache schema parity with `show --json` and idle-time epoch/human-readable field persistence under `~/.cache/aibar/`. |
+| TST-004 | `tests/test_extension_quota_label.py` + popup-label assertions (`AIBar`, `Open AIBar UI`), reset-prefix and `⚠️ Limit reached!` assertions, rate-limit error-string suppression assertions, and `Last updated`/`next update` status-line assertions; `tests/test_extension_dev_script.py` + `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800`; `src/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_handleError/_populateProviderCard/_buildPopupMenu` coverage. |
 | TST-005 | `src/aibar/aibar/providers/copilot.py` + `fetch` hard-codes `effective_window` to `WindowPeriod.DAY_30`. |
 | TST-006 | `docs/REFERENCES.md` + generated symbol coverage for tracked `src/` files validates documentation inventory completeness. |
 | TST-007 | `tests/test_extension_quota_label.py` + panel-segment assertions for five-label order, provider style classes, bold primary percentages, and missing-metric omission behavior. |
@@ -249,8 +249,8 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | TST-011 | `tests/test_cli_idle_time_429.py` + multi-429 scenarios verify `max(retry_after_seconds, idle_delay_seconds)` and largest `idle_until` persistence. |
 | TST-012 | `tests/test_ui_rate_limit_rendering.py` and `src/aibar/aibar/ui.py` + verify Textual card suppresses rate-limit error string and appends `⚠️ Limit reached!` next to reset countdown at displayed `100.0%`. |
 | TST-013 | `tests/test_setup_runtime_config.py` + setup prompt-order/default assertions and `~/.config/aibar/config.json` persistence checks for idle/API delays. |
-| TST-014 | `tests/test_cli_idle_cache.py` + idle-time future/missing/expired branches verify cache-serving behavior and provider-call gating in `show`. |
-| TST-015 | `tests/test_cli_idle_force.py` + `show --force` verifies idle-time file deletion, gate bypass, refresh invocation, and idle-time regeneration. |
+| TST-014 | `tests/test_cli_idle_cache.py` + idle-time future/missing/expired branches verify cache-serving behavior from `~/.cache/aibar/cache.json` and provider-call gating in `show`. |
+| TST-015 | `tests/test_cli_idle_force.py` + `show --force` verifies `~/.cache/aibar/idle-time.json` deletion, gate bypass, refresh invocation, and idle-time regeneration. |
 | TST-016 | `tests/test_cli_provider_throttle.py` + refresh timing assertions verify configured inter-call delay and default `20`-second fallback. |
 | PRJ-008 | `scripts/install-gnome-extension.sh` + copies extension files from `src/aibar/gnome-extension/aibar@aibar.panel/` to `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/` + enables extension via `gnome-extensions enable`. |
 | REQ-025 | `scripts/install-gnome-extension.sh` + `git rev-parse --show-toplevel` for project root resolution. |

@@ -846,7 +846,7 @@ providers other than Claude.
 
 ---
 
-# config.py | Python | 431L | 28 symbols | 11 imports | 29 comments
+# config.py | Python | 442L | 30 symbols | 11 imports | 30 comments
 > Path: `src/aibar/aibar/config.py`
 - @brief Configuration and credential resolution for aibar.
 - @details Provides environment-file parsing, token precedence resolution, and provider configuration status reporting.
@@ -869,114 +869,120 @@ from aibar.providers import (
 ## Definitions
 
 - var `APP_CONFIG_DIR = Path.home() / ".config" / "aibar"` (L19)
-- var `ENV_FILE_PATH = APP_CONFIG_DIR / "env"` (L20)
-- var `RUNTIME_CONFIG_PATH = APP_CONFIG_DIR / "config.json"` (L21)
-- var `CACHE_FILE_PATH = APP_CONFIG_DIR / "cache.json"` (L22)
-- var `IDLE_TIME_PATH = APP_CONFIG_DIR / "idle-time.json"` (L23)
-- var `DEFAULT_IDLE_DELAY_SECONDS = 300` (L25)
-- var `DEFAULT_API_CALL_DELAY_SECONDS = 20` (L26)
-### class `class RuntimeConfig(BaseModel)` : BaseModel (L29-41)
+- var `APP_CACHE_DIR = Path.home() / ".cache" / "aibar"` (L20)
+- var `ENV_FILE_PATH = APP_CONFIG_DIR / "env"` (L21)
+- var `RUNTIME_CONFIG_PATH = APP_CONFIG_DIR / "config.json"` (L22)
+- var `CACHE_FILE_PATH = APP_CACHE_DIR / "cache.json"` (L23)
+- var `IDLE_TIME_PATH = APP_CACHE_DIR / "idle-time.json"` (L24)
+- var `DEFAULT_IDLE_DELAY_SECONDS = 300` (L26)
+- var `DEFAULT_API_CALL_DELAY_SECONDS = 20` (L27)
+### class `class RuntimeConfig(BaseModel)` : BaseModel (L30-42)
 - @brief Define runtime configuration component for refresh throttling controls.
 - @details Encodes persisted CLI runtime controls used by `show` refresh logic. Fields are validated as positive integers and default to conservative values that reduce rate-limit pressure while preserving configurability.
 - @satisfies CTN-008
 
-### class `class IdleTimeState(BaseModel)` : BaseModel (L42-55)
+### class `class IdleTimeState(BaseModel)` : BaseModel (L43-56)
 - @brief Define persisted idle-time state component.
 - @details Stores last successful refresh timestamp and computed idle-until timestamp in both epoch and human-readable ISO-8601 UTC formats.
 - @satisfies CTN-009
 
-### fn `def _ensure_app_config_dir() -> None` `priv` (L56-65)
+### fn `def _ensure_app_config_dir() -> None` `priv` (L57-66)
 - @brief Ensure AIBar configuration directory exists before file persistence.
-- @details Creates `~/.config/aibar` recursively when missing. This function is called by config/cache/idle-time persistence helpers.
+- @details Creates `~/.config/aibar` recursively when missing. This function is called by env-file and runtime-config persistence helpers.
 - @return {None} Function return value.
 
-### fn `def load_runtime_config() -> RuntimeConfig` (L66-82)
+### fn `def _ensure_app_cache_dir() -> None` `priv` (L67-76)
+- @brief Ensure AIBar cache directory exists before cache and idle-time persistence.
+- @details Creates `~/.cache/aibar` recursively when missing. This function is called by CLI cache and idle-time persistence helpers.
+- @return {None} Function return value.
+
+### fn `def load_runtime_config() -> RuntimeConfig` (L77-93)
 - @brief Load runtime refresh configuration from disk with schema validation.
 - @details Reads `~/.config/aibar/config.json`, validates fields against `RuntimeConfig`, and returns defaults when file is missing or invalid.
 - @return {RuntimeConfig} Validated runtime configuration payload.
 - @satisfies CTN-008
 
-### fn `def save_runtime_config(runtime_config: RuntimeConfig) -> None` (L83-98)
+### fn `def save_runtime_config(runtime_config: RuntimeConfig) -> None` (L94-109)
 - @brief Persist runtime refresh configuration to disk.
 - @details Serializes `RuntimeConfig` to `~/.config/aibar/config.json` using stable pretty-printed JSON (`indent=2`) for deterministic readability.
 - @param runtime_config {RuntimeConfig} Validated runtime configuration model.
 - @return {None} Function return value.
 - @satisfies CTN-008
 
-### fn `def load_cli_cache() -> dict[str, Any] | None` (L99-115)
+### fn `def load_cli_cache() -> dict[str, Any] | None` (L110-126)
 - @brief Load CLI cache payload from disk.
-- @details Reads `~/.config/aibar/cache.json` and returns parsed object only when payload root is a JSON object.
+- @details Reads `~/.cache/aibar/cache.json` and returns parsed object only when payload root is a JSON object.
 - @return {dict[str, Any] | None} Parsed cache payload or None if unavailable.
 - @satisfies CTN-004
 
-### fn `def save_cli_cache(payload: dict[str, Any]) -> None` (L116-131)
+### fn `def save_cli_cache(payload: dict[str, Any]) -> None` (L127-142)
 - @brief Persist CLI cache payload in the canonical `show --json` schema.
-- @details Writes `payload` to `~/.config/aibar/cache.json` using pretty-printed JSON (`indent=2`) so the file matches CLI JSON rendering format exactly.
+- @details Writes `payload` to `~/.cache/aibar/cache.json` using pretty-printed JSON (`indent=2`) so the file matches CLI JSON rendering format exactly.
 - @param payload {dict[str, Any]} Cache payload in `show --json` shape.
 - @return {None} Function return value.
 - @satisfies CTN-004
 
-### fn `def load_idle_time() -> IdleTimeState | None` (L132-148)
+### fn `def load_idle_time() -> IdleTimeState | None` (L143-159)
 - @brief Load idle-time control state from disk.
-- @details Reads and validates `~/.config/aibar/idle-time.json`. Invalid or unreadable payloads return None and are treated as missing state.
+- @details Reads and validates `~/.cache/aibar/idle-time.json`. Invalid or unreadable payloads return None and are treated as missing state.
 - @return {IdleTimeState | None} Validated idle-time state or None.
 - @satisfies CTN-009
 
-### fn `def save_idle_time(last_success_at: datetime, idle_until: datetime) -> IdleTimeState` (L149-174)
+### fn `def save_idle_time(last_success_at: datetime, idle_until: datetime) -> IdleTimeState` (L160-185)
 - @brief Persist idle-time state using epoch and human-readable timestamp fields.
-- @details Normalizes timestamps to UTC, serializes both epoch and ISO strings, and writes `~/.config/aibar/idle-time.json` in pretty-printed JSON.
+- @details Normalizes timestamps to UTC, serializes both epoch and ISO strings, and writes `~/.cache/aibar/idle-time.json` in pretty-printed JSON.
 - @param last_success_at {datetime} Last successful refresh timestamp.
 - @param idle_until {datetime} Timestamp until refresh must remain disabled.
 - @return {IdleTimeState} Persisted idle-time model.
 - @satisfies CTN-009
 
-### fn `def remove_idle_time_file() -> None` (L175-188)
+### fn `def remove_idle_time_file() -> None` (L186-199)
 - @brief Remove persisted idle-time state file if present.
-- @details Deletes `~/.config/aibar/idle-time.json` to force immediate refresh behavior on subsequent `show` execution.
+- @details Deletes `~/.cache/aibar/idle-time.json` to force immediate refresh behavior on subsequent `show` execution.
 - @return {None} Function return value.
 - @satisfies REQ-039
 
-### fn `def load_env_file() -> dict[str, str]` (L189-207)
+### fn `def load_env_file() -> dict[str, str]` (L200-218)
 - @brief Execute load env file.
 - @details Applies load env file logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {dict[str, str]} Function return value.
 
-### fn `def write_env_file(updates: dict[str, str]) -> None` (L208-247)
+### fn `def write_env_file(updates: dict[str, str]) -> None` (L219-258)
 - @brief Execute write env file.
 - @details Applies write env file logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param updates {dict[str, str]} Input parameter `updates`.
 - @return {None} Function return value.
 
-### class `class Config` (L248-429)
+### class `class Config` (L259-440)
 - @brief Define config component.
 - @details Encapsulates config state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
-- var `ENV_VARS =` (L255)
-- var `PROVIDER_INFO =` (L264)
-- fn `def get_token(self, provider: ProviderName) -> str | None` (L297-334)
+- var `ENV_VARS =` (L266)
+- var `PROVIDER_INFO =` (L275)
+- fn `def get_token(self, provider: ProviderName) -> str | None` (L308-345)
   - @brief Execute get token.
   - @details Applies get token logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param provider {ProviderName} Input parameter `provider`.
   - @return {str | None} Function return value.
-- fn `def is_provider_configured(self, provider: ProviderName) -> bool` (L335-364)
+- fn `def is_provider_configured(self, provider: ProviderName) -> bool` (L346-375)
   - @brief Execute is provider configured.
   - @details Applies is provider configured logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param provider {ProviderName} Input parameter `provider`.
   - @return {bool} Function return value.
-- fn `def get_provider_status(self, provider: ProviderName) -> dict[str, Any]` (L365-386)
+- fn `def get_provider_status(self, provider: ProviderName) -> dict[str, Any]` (L376-397)
   - @brief Execute get provider status.
   - @details Applies get provider status logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param provider {ProviderName} Input parameter `provider`.
   - @return {dict[str, Any]} Function return value.
-- fn `def get_all_provider_status(self) -> list[dict[str, Any]]` (L387-394)
+- fn `def get_all_provider_status(self) -> list[dict[str, Any]]` (L398-405)
   - @brief Execute get all provider status.
   - @details Applies get all provider status logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {list[dict[str, Any]]} Function return value.
-- fn `def _get_token_preview(self, provider: ProviderName) -> str | None` `priv` (L395-406)
+- fn `def _get_token_preview(self, provider: ProviderName) -> str | None` `priv` (L406-417)
   - @brief Execute get token preview.
   - @details Applies get token preview logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param provider {ProviderName} Input parameter `provider`.
   - @return {str | None} Function return value.
-- fn `def get_env_var_help(self) -> str` (L407-429)
+- fn `def get_env_var_help(self) -> str` (L418-440)
   - @brief Execute get env var help.
   - @details Applies get env var help logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {str} Function return value.
@@ -985,33 +991,35 @@ from aibar.providers import (
 |Symbol|Kind|Vis|Lines|Sig|
 |---|---|---|---|---|
 |`APP_CONFIG_DIR`|var|pub|19||
-|`ENV_FILE_PATH`|var|pub|20||
-|`RUNTIME_CONFIG_PATH`|var|pub|21||
-|`CACHE_FILE_PATH`|var|pub|22||
-|`IDLE_TIME_PATH`|var|pub|23||
-|`DEFAULT_IDLE_DELAY_SECONDS`|var|pub|25||
-|`DEFAULT_API_CALL_DELAY_SECONDS`|var|pub|26||
-|`RuntimeConfig`|class|pub|29-41|class RuntimeConfig(BaseModel)|
-|`IdleTimeState`|class|pub|42-55|class IdleTimeState(BaseModel)|
-|`_ensure_app_config_dir`|fn|priv|56-65|def _ensure_app_config_dir() -> None|
-|`load_runtime_config`|fn|pub|66-82|def load_runtime_config() -> RuntimeConfig|
-|`save_runtime_config`|fn|pub|83-98|def save_runtime_config(runtime_config: RuntimeConfig) ->...|
-|`load_cli_cache`|fn|pub|99-115|def load_cli_cache() -> dict[str, Any] | None|
-|`save_cli_cache`|fn|pub|116-131|def save_cli_cache(payload: dict[str, Any]) -> None|
-|`load_idle_time`|fn|pub|132-148|def load_idle_time() -> IdleTimeState | None|
-|`save_idle_time`|fn|pub|149-174|def save_idle_time(last_success_at: datetime, idle_until:...|
-|`remove_idle_time_file`|fn|pub|175-188|def remove_idle_time_file() -> None|
-|`load_env_file`|fn|pub|189-207|def load_env_file() -> dict[str, str]|
-|`write_env_file`|fn|pub|208-247|def write_env_file(updates: dict[str, str]) -> None|
-|`Config`|class|pub|248-429|class Config|
-|`Config.ENV_VARS`|var|pub|255||
-|`Config.PROVIDER_INFO`|var|pub|264||
-|`Config.get_token`|fn|pub|297-334|def get_token(self, provider: ProviderName) -> str | None|
-|`Config.is_provider_configured`|fn|pub|335-364|def is_provider_configured(self, provider: ProviderName) ...|
-|`Config.get_provider_status`|fn|pub|365-386|def get_provider_status(self, provider: ProviderName) -> ...|
-|`Config.get_all_provider_status`|fn|pub|387-394|def get_all_provider_status(self) -> list[dict[str, Any]]|
-|`Config._get_token_preview`|fn|priv|395-406|def _get_token_preview(self, provider: ProviderName) -> s...|
-|`Config.get_env_var_help`|fn|pub|407-429|def get_env_var_help(self) -> str|
+|`APP_CACHE_DIR`|var|pub|20||
+|`ENV_FILE_PATH`|var|pub|21||
+|`RUNTIME_CONFIG_PATH`|var|pub|22||
+|`CACHE_FILE_PATH`|var|pub|23||
+|`IDLE_TIME_PATH`|var|pub|24||
+|`DEFAULT_IDLE_DELAY_SECONDS`|var|pub|26||
+|`DEFAULT_API_CALL_DELAY_SECONDS`|var|pub|27||
+|`RuntimeConfig`|class|pub|30-42|class RuntimeConfig(BaseModel)|
+|`IdleTimeState`|class|pub|43-56|class IdleTimeState(BaseModel)|
+|`_ensure_app_config_dir`|fn|priv|57-66|def _ensure_app_config_dir() -> None|
+|`_ensure_app_cache_dir`|fn|priv|67-76|def _ensure_app_cache_dir() -> None|
+|`load_runtime_config`|fn|pub|77-93|def load_runtime_config() -> RuntimeConfig|
+|`save_runtime_config`|fn|pub|94-109|def save_runtime_config(runtime_config: RuntimeConfig) ->...|
+|`load_cli_cache`|fn|pub|110-126|def load_cli_cache() -> dict[str, Any] | None|
+|`save_cli_cache`|fn|pub|127-142|def save_cli_cache(payload: dict[str, Any]) -> None|
+|`load_idle_time`|fn|pub|143-159|def load_idle_time() -> IdleTimeState | None|
+|`save_idle_time`|fn|pub|160-185|def save_idle_time(last_success_at: datetime, idle_until:...|
+|`remove_idle_time_file`|fn|pub|186-199|def remove_idle_time_file() -> None|
+|`load_env_file`|fn|pub|200-218|def load_env_file() -> dict[str, str]|
+|`write_env_file`|fn|pub|219-258|def write_env_file(updates: dict[str, str]) -> None|
+|`Config`|class|pub|259-440|class Config|
+|`Config.ENV_VARS`|var|pub|266||
+|`Config.PROVIDER_INFO`|var|pub|275||
+|`Config.get_token`|fn|pub|308-345|def get_token(self, provider: ProviderName) -> str | None|
+|`Config.is_provider_configured`|fn|pub|346-375|def is_provider_configured(self, provider: ProviderName) ...|
+|`Config.get_provider_status`|fn|pub|376-397|def get_provider_status(self, provider: ProviderName) -> ...|
+|`Config.get_all_provider_status`|fn|pub|398-405|def get_all_provider_status(self) -> list[dict[str, Any]]|
+|`Config._get_token_preview`|fn|priv|406-417|def _get_token_preview(self, provider: ProviderName) -> s...|
+|`Config.get_env_var_help`|fn|pub|418-440|def get_env_var_help(self) -> str|
 
 
 ---
@@ -1946,7 +1954,7 @@ from aibar.providers.base import (
 
 ---
 
-# extension.js | JavaScript | 1173L | 17 symbols | 8 imports | 27 comments
+# extension.js | JavaScript | 1189L | 17 symbols | 8 imports | 28 comments
 > Path: `src/aibar/gnome-extension/aibar@aibar.panel/extension.js`
 - @brief GNOME Shell panel extension for aibar metrics.
 - @details Collects usage JSON from the aibar CLI and renders provider-specific quota/cost cards in the GNOME panel popup.
@@ -2022,14 +2030,14 @@ full usage for limit-reached warning rendering.
 
 ### fn `const showResetPendingHint = () =>` (L663-665)
 
-### fn `const toPercent = (value) =>` (L940-945)
+### fn `const toPercent = (value) =>` (L955-960)
 - @brief Execute update u i.
 - @details Applies update u i logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @return s {any} Function return value.
 
-### fn `const getPanelUsageValues = (providerName, data) =>` (L947-1004)
+### fn `const getPanelUsageValues = (providerName, data) =>` (L962-1019)
 
-### class `export default class AIBarExtension` (L1139-1173)
+### class `export default class AIBarExtension` (L1155-1189)
 - @brief GNOME extension lifecycle adapter for AIBarIndicator registration. */
 - @brief Execute constructor.
 - @details Applies constructor logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
@@ -2052,7 +2060,7 @@ full usage for limit-reached warning rendering.
 |`updateWindowBar`|fn||640-698|const updateWindowBar = (bar, pct, resetTime, useDays) =>|
 |`setResetLabel`|fn||646-652|const setResetLabel = (baseText) =>|
 |`showResetPendingHint`|fn||663-665|const showResetPendingHint = () =>|
-|`toPercent`|fn||940-945|const toPercent = (value) =>|
-|`getPanelUsageValues`|fn||947-1004|const getPanelUsageValues = (providerName, data) =>|
-|`AIBarExtension`|class||1139-1173|export default class AIBarExtension|
+|`toPercent`|fn||955-960|const toPercent = (value) =>|
+|`getPanelUsageValues`|fn||962-1019|const getPanelUsageValues = (providerName, data) =>|
+|`AIBarExtension`|class||1155-1189|export default class AIBarExtension|
 

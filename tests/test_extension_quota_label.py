@@ -76,6 +76,23 @@ def test_popup_labels_use_aibar_brand_casing() -> None:
     assert "PopupMenu.PopupMenuItem('Open aibar UI')" not in source
 
 
+def test_popup_status_line_renders_last_and_next_update_times() -> None:
+    """
+    @brief Verify popup status line includes scheduler-derived next-update text.
+    @details Asserts extension source renders `Last updated` and `next update`
+    segments and computes next-update from refresh interval seconds.
+    @satisfies REQ-017
+    @satisfies TST-004
+    """
+    source = EXTENSION_PATH.read_text(encoding="utf-8")
+    assert "PopupMenu.PopupMenuItem('Last updated: Never, next update: Pending'" in source
+    assert "_formatStatusTime(dateValue)" in source
+    assert "let timeString = this._formatStatusTime(this._lastUpdated);" in source
+    assert "const nextUpdate = new Date(this._lastUpdated.getTime() + (REFRESH_INTERVAL_SECONDS * 1000));" in source
+    assert "let nextUpdateString = this._formatStatusTime(nextUpdate);" in source
+    assert "`Last updated: ${timeString}, next update: ${nextUpdateString}`" in source
+
+
 def test_panel_percentage_labels_use_fixed_order_provider_styles_and_primary_bold() -> None:
     """
     @brief Verify panel percentage label order, provider styles, and primary bold classes.

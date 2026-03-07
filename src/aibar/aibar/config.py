@@ -17,10 +17,11 @@ from aibar.providers.base import ProviderName
 
 # Runtime/config file locations
 APP_CONFIG_DIR = Path.home() / ".config" / "aibar"
+APP_CACHE_DIR = Path.home() / ".cache" / "aibar"
 ENV_FILE_PATH = APP_CONFIG_DIR / "env"
 RUNTIME_CONFIG_PATH = APP_CONFIG_DIR / "config.json"
-CACHE_FILE_PATH = APP_CONFIG_DIR / "cache.json"
-IDLE_TIME_PATH = APP_CONFIG_DIR / "idle-time.json"
+CACHE_FILE_PATH = APP_CACHE_DIR / "cache.json"
+IDLE_TIME_PATH = APP_CACHE_DIR / "idle-time.json"
 
 DEFAULT_IDLE_DELAY_SECONDS = 300
 DEFAULT_API_CALL_DELAY_SECONDS = 20
@@ -57,10 +58,20 @@ def _ensure_app_config_dir() -> None:
     """
     @brief Ensure AIBar configuration directory exists before file persistence.
     @details Creates `~/.config/aibar` recursively when missing. This function is
-    called by config/cache/idle-time persistence helpers.
+    called by env-file and runtime-config persistence helpers.
     @return {None} Function return value.
     """
     APP_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _ensure_app_cache_dir() -> None:
+    """
+    @brief Ensure AIBar cache directory exists before cache and idle-time persistence.
+    @details Creates `~/.cache/aibar` recursively when missing. This function is
+    called by CLI cache and idle-time persistence helpers.
+    @return {None} Function return value.
+    """
+    APP_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def load_runtime_config() -> RuntimeConfig:
@@ -99,7 +110,7 @@ def save_runtime_config(runtime_config: RuntimeConfig) -> None:
 def load_cli_cache() -> dict[str, Any] | None:
     """
     @brief Load CLI cache payload from disk.
-    @details Reads `~/.config/aibar/cache.json` and returns parsed object only
+    @details Reads `~/.cache/aibar/cache.json` and returns parsed object only
     when payload root is a JSON object.
     @return {dict[str, Any] | None} Parsed cache payload or None if unavailable.
     @satisfies CTN-004
@@ -116,13 +127,13 @@ def load_cli_cache() -> dict[str, Any] | None:
 def save_cli_cache(payload: dict[str, Any]) -> None:
     """
     @brief Persist CLI cache payload in the canonical `show --json` schema.
-    @details Writes `payload` to `~/.config/aibar/cache.json` using pretty-printed
+    @details Writes `payload` to `~/.cache/aibar/cache.json` using pretty-printed
     JSON (`indent=2`) so the file matches CLI JSON rendering format exactly.
     @param payload {dict[str, Any]} Cache payload in `show --json` shape.
     @return {None} Function return value.
     @satisfies CTN-004
     """
-    _ensure_app_config_dir()
+    _ensure_app_cache_dir()
     CACHE_FILE_PATH.write_text(
         json.dumps(payload, indent=2),
         encoding="utf-8",
@@ -132,7 +143,7 @@ def save_cli_cache(payload: dict[str, Any]) -> None:
 def load_idle_time() -> IdleTimeState | None:
     """
     @brief Load idle-time control state from disk.
-    @details Reads and validates `~/.config/aibar/idle-time.json`. Invalid or
+    @details Reads and validates `~/.cache/aibar/idle-time.json`. Invalid or
     unreadable payloads return None and are treated as missing state.
     @return {IdleTimeState | None} Validated idle-time state or None.
     @satisfies CTN-009
@@ -150,7 +161,7 @@ def save_idle_time(last_success_at: datetime, idle_until: datetime) -> IdleTimeS
     """
     @brief Persist idle-time state using epoch and human-readable timestamp fields.
     @details Normalizes timestamps to UTC, serializes both epoch and ISO strings,
-    and writes `~/.config/aibar/idle-time.json` in pretty-printed JSON.
+    and writes `~/.cache/aibar/idle-time.json` in pretty-printed JSON.
     @param last_success_at {datetime} Last successful refresh timestamp.
     @param idle_until {datetime} Timestamp until refresh must remain disabled.
     @return {IdleTimeState} Persisted idle-time model.
@@ -164,7 +175,7 @@ def save_idle_time(last_success_at: datetime, idle_until: datetime) -> IdleTimeS
         idle_until_timestamp=int(idle_until_utc.timestamp()),
         idle_until_human=idle_until_utc.isoformat(),
     )
-    _ensure_app_config_dir()
+    _ensure_app_cache_dir()
     IDLE_TIME_PATH.write_text(
         state.model_dump_json(indent=2),
         encoding="utf-8",
@@ -175,7 +186,7 @@ def save_idle_time(last_success_at: datetime, idle_until: datetime) -> IdleTimeS
 def remove_idle_time_file() -> None:
     """
     @brief Remove persisted idle-time state file if present.
-    @details Deletes `~/.config/aibar/idle-time.json` to force immediate refresh
+    @details Deletes `~/.cache/aibar/idle-time.json` to force immediate refresh
     behavior on subsequent `show` execution.
     @return {None} Function return value.
     @satisfies REQ-039

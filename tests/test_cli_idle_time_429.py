@@ -26,11 +26,13 @@ def _patch_config_paths(monkeypatch, tmp_path: Path) -> Path:
     @return {Path} Effective `~/.config/aibar` replacement directory.
     """
     config_dir = tmp_path / ".config" / "aibar"
+    cache_dir = tmp_path / ".cache" / "aibar"
     monkeypatch.setattr(config_module, "APP_CONFIG_DIR", config_dir)
+    monkeypatch.setattr(config_module, "APP_CACHE_DIR", cache_dir)
     monkeypatch.setattr(config_module, "ENV_FILE_PATH", config_dir / "env")
     monkeypatch.setattr(config_module, "RUNTIME_CONFIG_PATH", config_dir / "config.json")
-    monkeypatch.setattr(config_module, "CACHE_FILE_PATH", config_dir / "cache.json")
-    monkeypatch.setattr(config_module, "IDLE_TIME_PATH", config_dir / "idle-time.json")
+    monkeypatch.setattr(config_module, "CACHE_FILE_PATH", cache_dir / "cache.json")
+    monkeypatch.setattr(config_module, "IDLE_TIME_PATH", cache_dir / "idle-time.json")
     return config_dir
 
 

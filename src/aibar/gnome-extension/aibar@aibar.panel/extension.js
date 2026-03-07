@@ -307,7 +307,7 @@ class AIBarIndicator extends PanelMenu.Button {
 
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
-        this._lastUpdatedItem = new PopupMenu.PopupMenuItem('Last updated: Never', {
+        this._lastUpdatedItem = new PopupMenu.PopupMenuItem('Last updated: Never, next update: Pending', {
             reactive: false,
         });
         this._lastUpdatedItem.label.style_class = 'aibar-last-updated';
@@ -901,6 +901,21 @@ class AIBarIndicator extends PanelMenu.Button {
     }
 
     /**
+     * @brief Format popup status timestamp with local hour and minute fields.
+     * @details Generates a deterministic short-form time string reused by
+     * `Last updated` and `next update` popup status fragments.
+     * @param {Date} dateValue Input timestamp object to format.
+     * @returns {string} Localized `HH:MM` time string.
+     * @satisfies REQ-017
+     */
+    _formatStatusTime(dateValue) {
+        return dateValue.toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+    }
+
+    /**
      * @brief Execute parse output.
      * @details Applies parse output logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
      * @param {any} output Input parameter `output`.
@@ -1073,11 +1088,12 @@ class AIBarIndicator extends PanelMenu.Button {
             this._panelLabel.set_text('N/A');
 
         if (this._lastUpdated) {
-            let timeString = this._lastUpdated.toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit',
-            });
-            this._lastUpdatedItem.label.set_text(`Last updated: ${timeString}`);
+            let timeString = this._formatStatusTime(this._lastUpdated);
+            const nextUpdate = new Date(this._lastUpdated.getTime() + (REFRESH_INTERVAL_SECONDS * 1000));
+            let nextUpdateString = this._formatStatusTime(nextUpdate);
+            this._lastUpdatedItem.label.set_text(
+                `Last updated: ${timeString}, next update: ${nextUpdateString}`
+            );
         }
     }
 
