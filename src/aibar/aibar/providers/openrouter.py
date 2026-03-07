@@ -97,10 +97,18 @@ class OpenRouterUsageProvider(BaseProvider):
                     )
 
                 if response.status_code == 429:
+                    retry_after_raw = response.headers.get("retry-after", "0")
+                    try:
+                        retry_after_seconds = max(0.0, float(retry_after_raw))
+                    except (TypeError, ValueError):
+                        retry_after_seconds = 0.0
                     return self._make_error_result(
                         window=window,
                         error="Rate limited. Try again later.",
-                        raw={"status_code": 429},
+                        raw={
+                            "status_code": 429,
+                            "retry_after_seconds": retry_after_seconds,
+                        },
                     )
 
                 if response.status_code != 200:

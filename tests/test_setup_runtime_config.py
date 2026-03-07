@@ -1,0 +1,79 @@
+"""
+@file
+@brief Setup runtime-config prompt and persistence tests.
+@details Verifies setup prompt order for idle-delay and API-call delay fields and
+persists selected values to `~/.config/aibar/config.json`.
+@satisfies REQ-005
+@satisfies TST-013
+"""
+
+import json
+from pathlib import Path
+
+from click.testing import CliRunner
+
+from aibar import config as config_module
+from aibar.cli import main
+
+
+def _patch_config_paths(monkeypatch, tmp_path: Path) -> Path:
+    """
+    @brief Redirect AIBar config/cache file paths to a temporary directory.
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @param tmp_path {Path} Temporary path fixture.
+    @return {Path} Effective `~/.config/aibar` replacement directory.
+    """
+    config_dir = tmp_path / ".config" / "aibar"
+    monkeypatch.setattr(config_module, "APP_CONFIG_DIR", config_dir)
+    monkeypatch.setattr(config_module, "ENV_FILE_PATH", config_dir / "env")
+    monkeypatch.setattr(config_module, "RUNTIME_CONFIG_PATH", config_dir / "config.json")
+    monkeypatch.setattr(config_module, "CACHE_FILE_PATH", config_dir / "cache.json")
+    monkeypatch.setattr(config_module, "IDLE_TIME_PATH", config_dir / "idle-time.json")
+    return config_dir
+
+
+def test_setup_prompts_runtime_config_before_credentials(monkeypatch, tmp_path: Path) -> None:
+    """
+    @brief Verify setup prompt order and runtime-config persistence.
+    @details Ensures setup asks `idle-delay` first and `api-call delay` second,
+    then writes selected values to runtime config JSON.
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @param tmp_path {Path} Temporary path fixture.
+    @return {None} Function return value.
+    @satisfies REQ-005
+    @satisfies TST-013
+    """
+    config_dir = _patch_config_paths(monkeypatch, tmp_path)
+    prompts: list[str] = []
+    responses = iter([450, 25, "", "", ""])
+
+    def _fake_prompt(
+        text: str,
+        default=None,
+        show_default: bool = True,
+        type=None,
+        **kwargs,
+    ):
+        """
+        @brief Return deterministic prompt responses for setup flow.
+        @param text {str} Prompt label.
+        @param default {object | None} Prompt default value.
+        @param show_default {bool} Flag indicating default rendering behavior.
+        @param type {object | None} Optional click type.
+        @return {object} Predetermined prompt response value.
+        """
+        del default, show_default, type, kwargs
+        prompts.append(text)
+        return next(responses)
+
+    monkeypatch.setattr("aibar.cli.click.prompt", _fake_prompt)
+    runner = CliRunner()
+    result = runner.invoke(main, ["setup"])
+
+    assert result.exit_code == 0
+    assert prompts[0] == "  idle-delay seconds"
+    assert prompts[1] == "  api-call delay seconds"
+
+    runtime_config = json.loads((config_dir / "config.json").read_text(encoding="utf-8"))
+    assert runtime_config["idle_delay_seconds"] == 450
+    assert runtime_config["api_call_delay_seconds"] == 25

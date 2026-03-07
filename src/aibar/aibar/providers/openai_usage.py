@@ -4,6 +4,7 @@
 @details Retrieves organization completion usage and cost buckets, aggregates counters, and maps response data to normalized provider metrics.
 """
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 
 import httpx
@@ -95,11 +96,11 @@ Note: Must be an organization/admin key with usage permissions."""
                 headers = {"Authorization": f"Bearer {self._api_key}"}
                 start_time, end_time = self._get_time_range(window)
 
-                # Fetch usage and costs in parallel
-                usage_task = self._fetch_usage(client, headers, start_time, end_time)
-                costs_task = self._fetch_costs(client, headers, start_time, end_time)
+                usage_data = await self._fetch_usage(client, headers, start_time, end_time)
+                from aibar.config import load_runtime_config
 
-                usage_data, costs_data = await usage_task, await costs_task
+                await asyncio.sleep(load_runtime_config().api_call_delay_seconds)
+                costs_data = await self._fetch_costs(client, headers, start_time, end_time)
 
                 return self._build_result(window, usage_data, costs_data)
 

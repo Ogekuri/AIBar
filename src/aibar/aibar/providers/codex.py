@@ -344,10 +344,22 @@ Note: Token is refreshed automatically when needed."""
                     )
 
                 if response.status_code != 200:
+                    raw_payload = {
+                        "status_code": response.status_code,
+                        "body": response.text,
+                    }
+                    if response.status_code == 429:
+                        retry_after_raw = response.headers.get("retry-after", "0")
+                        try:
+                            raw_payload["retry_after_seconds"] = max(
+                                0.0, float(retry_after_raw)
+                            )
+                        except (TypeError, ValueError):
+                            raw_payload["retry_after_seconds"] = 0.0
                     return self._make_error_result(
                         window=window,
                         error=f"API error: HTTP {response.status_code}",
-                        raw={"status_code": response.status_code, "body": response.text},
+                        raw=raw_payload,
                     )
 
                 data = response.json()

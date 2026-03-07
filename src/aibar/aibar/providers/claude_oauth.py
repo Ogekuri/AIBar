@@ -90,9 +90,20 @@ Note: Token must start with 'sk-ant-' prefix."""
         for attempt in range(self.MAX_RETRIES):
             if response.status_code != 429:
                 return response
-            retry_after = float(response.headers.get("retry-after", "0"))
+            retry_after_raw = response.headers.get("retry-after", "0")
+            try:
+                retry_after = max(0.0, float(retry_after_raw))
+            except (TypeError, ValueError):
+                retry_after = 0.0
+            from aibar.config import load_runtime_config
+
+            min_api_delay_seconds = float(load_runtime_config().api_call_delay_seconds)
             jitter = random.uniform(0, self.RETRY_JITTER_MAX)
-            delay = max(retry_after, self.RETRY_BACKOFF_BASE * (2**attempt)) + jitter
+            delay = max(
+                retry_after,
+                self.RETRY_BACKOFF_BASE * (2**attempt),
+                min_api_delay_seconds,
+            ) + jitter
             await asyncio.sleep(delay)
             response = await client.get(self.USAGE_URL, headers=headers)
         return response
@@ -221,10 +232,18 @@ Note: Token must start with 'sk-ant-' prefix."""
             )
 
         if response.status_code == 429:
+            retry_after_raw = response.headers.get("retry-after", "0")
+            try:
+                retry_after_seconds = max(0.0, float(retry_after_raw))
+            except (TypeError, ValueError):
+                retry_after_seconds = 0.0
             return self._make_error_result(
                 window=window,
                 error="Rate limited. Try again later.",
-                raw={"status_code": 429},
+                raw={
+                    "status_code": 429,
+                    "retry_after_seconds": retry_after_seconds,
+                },
             )
 
         if response.status_code != 200:

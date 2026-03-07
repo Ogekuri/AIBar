@@ -1,0 +1,102 @@
+"""
+@file
+@brief Forced refresh tests for CLI idle-time behavior.
+@details Verifies `show --force` bypasses idle gating, refreshes provider data,
+rewrites cache payload, and regenerates idle-time state.
+@satisfies REQ-039
+@satisfies TST-015
+"""
+
+import json
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock
+
+from click.testing import CliRunner
+
+from aibar import config as config_module
+from aibar.cli import main
+from aibar.providers.base import ProviderName, ProviderResult, UsageMetrics, WindowPeriod
+
+
+def _patch_config_paths(monkeypatch, tmp_path: Path) -> Path:
+    """
+    @brief Redirect AIBar config/cache file paths to a temporary directory.
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @param tmp_path {Path} Temporary path fixture.
+    @return {Path} Effective `~/.config/aibar` replacement directory.
+    """
+    config_dir = tmp_path / ".config" / "aibar"
+    monkeypatch.setattr(config_module, "APP_CONFIG_DIR", config_dir)
+    monkeypatch.setattr(config_module, "ENV_FILE_PATH", config_dir / "env")
+    monkeypatch.setattr(config_module, "RUNTIME_CONFIG_PATH", config_dir / "config.json")
+    monkeypatch.setattr(config_module, "CACHE_FILE_PATH", config_dir / "cache.json")
+    monkeypatch.setattr(config_module, "IDLE_TIME_PATH", config_dir / "idle-time.json")
+    return config_dir
+
+
+def test_show_force_bypasses_idle_time_and_recreates_state(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """
+    @brief Verify `show --force` ignores existing idle-time and performs refresh.
+    @details Starts from active idle-time and stale cache, then asserts forced run
+    fetches provider data, rewrites cache, and regenerates idle-time metadata.
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @param tmp_path {Path} Temporary path fixture.
+    @return {None} Function return value.
+    @satisfies REQ-039
+    @satisfies TST-015
+    """
+    _patch_config_paths(monkeypatch, tmp_path)
+    config_module.save_runtime_config(
+        config_module.RuntimeConfig(idle_delay_seconds=300, api_call_delay_seconds=20)
+    )
+    stale_state = config_module.save_idle_time(
+        last_success_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        idle_until=datetime.now(timezone.utc) + timedelta(hours=2),
+    )
+    config_module.save_cli_cache({"openrouter": {"stale": True}})
+
+    fresh_result = ProviderResult(
+        provider=ProviderName.OPENROUTER,
+        window=WindowPeriod.DAY_7,
+        metrics=UsageMetrics(cost=2.5, remaining=44.0, limit=100.0),
+        raw={"status_code": 200, "source": "live"},
+    )
+    provider = MagicMock()
+    provider.name = ProviderName.OPENROUTER
+    provider.is_configured.return_value = True
+    provider.fetch = AsyncMock(return_value=fresh_result)
+
+    monkeypatch.setattr(
+        "aibar.cli.get_providers",
+        lambda: {ProviderName.OPENROUTER: provider},
+    )
+    monkeypatch.setattr("aibar.cli._apply_api_call_delay", lambda state: None)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        main,
+        [
+            "show",
+            "--provider",
+            "openrouter",
+            "--window",
+            "7d",
+            "--json",
+            "--force",
+        ],
+    )
+
+    assert result.exit_code == 0
+    provider.fetch.assert_awaited_once_with(WindowPeriod.DAY_7)
+    output_payload = json.loads(result.output)
+    persisted_cache = json.loads(config_module.CACHE_FILE_PATH.read_text(encoding="utf-8"))
+    assert output_payload == persisted_cache
+    assert output_payload["openrouter"]["raw"]["source"] == "live"
+
+    refreshed_state = json.loads(config_module.IDLE_TIME_PATH.read_text(encoding="utf-8"))
+    assert refreshed_state["last_success_timestamp"] >= stale_state.last_success_timestamp
+    assert refreshed_state["idle_until_timestamp"] > refreshed_state["last_success_timestamp"]

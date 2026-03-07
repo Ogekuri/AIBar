@@ -9,14 +9,25 @@ import json
 import math
 import os
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import click
 from click.core import ParameterSource
+from pydantic import ValidationError
 
 from aibar.cache import ResultCache
-from aibar.config import config
+from aibar.config import (
+    RuntimeConfig,
+    config,
+    load_cli_cache,
+    load_idle_time,
+    load_runtime_config,
+    remove_idle_time_file,
+    save_cli_cache,
+    save_idle_time,
+)
 from aibar.providers import (
     ClaudeOAuthProvider,
     OpenAIUsageProvider,
@@ -41,6 +52,234 @@ _WINDOW_PERIOD_TIMEDELTA: dict[WindowPeriod, timedelta] = {
 }
 _RESET_PENDING_MESSAGE = "Starts when the first message is sent"
 _CLAUDE_DUAL_SNAPSHOT_FILENAME = "claude_dual_last_success.json"
+
+
+def _normalize_utc(value: datetime) -> datetime:
+    """
+    @brief Normalize datetime values to timezone-aware UTC instances.
+    @details Ensures consistent timestamp arithmetic for idle-time persistence and
+    refresh-delay computations when source datetimes are naive or non-UTC.
+    @param value {datetime} Source datetime to normalize.
+    @return {datetime} Timezone-aware UTC datetime.
+    """
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _apply_api_call_delay(throttle_state: dict[str, float | int] | None) -> None:
+    """
+    @brief Enforce minimum spacing between consecutive provider API calls.
+    @details Uses monotonic clock values in `throttle_state` to sleep before a live
+    API request when elapsed time is below configured delay.
+    @param throttle_state {dict[str, float | int] | None} Mutable state containing
+        `delay_seconds` and `last_call_started`.
+    @return {None} Function return value.
+    @satisfies REQ-040
+    """
+    if throttle_state is None:
+        return
+
+    delay_seconds_raw = throttle_state.get("delay_seconds", 0)
+    try:
+        delay_seconds = max(0.0, float(delay_seconds_raw))
+    except (TypeError, ValueError):
+        delay_seconds = 0.0
+
+    last_call_raw = throttle_state.get("last_call_started")
+    now = time.monotonic()
+    if isinstance(last_call_raw, (int, float)) and delay_seconds > 0:
+        elapsed = now - float(last_call_raw)
+        remaining = delay_seconds - elapsed
+        if remaining > 0:
+            time.sleep(remaining)
+    throttle_state["last_call_started"] = time.monotonic()
+
+
+def _extract_retry_after_seconds(result: ProviderResult) -> int:
+    """
+    @brief Extract normalized retry-after seconds from provider error payload.
+    @details Reads `raw.retry_after_seconds` and clamps to non-negative integer
+    seconds. Invalid or missing values normalize to zero.
+    @param result {ProviderResult} Provider result to inspect.
+    @return {int} Non-negative retry-after delay in seconds.
+    @satisfies REQ-041
+    """
+    value = result.raw.get("retry_after_seconds")
+    if not isinstance(value, (int, float, str)):
+        return 0
+    try:
+        parsed = int(float(value))
+    except (TypeError, ValueError):
+        return 0
+    return max(0, parsed)
+
+
+def _is_http_429_result(result: ProviderResult) -> bool:
+    """
+    @brief Check whether result payload represents HTTP 429 rate limiting.
+    @details Uses normalized raw payload marker `status_code == 429`.
+    @param result {ProviderResult} Provider result to classify.
+    @return {bool} True when result indicates HTTP 429.
+    @satisfies REQ-041
+    """
+    return result.raw.get("status_code") == 429
+
+
+def _serialize_results_payload(
+    results: dict[str, ProviderResult],
+) -> dict[str, dict[str, object]]:
+    """
+    @brief Serialize ProviderResult mapping to `show --json` payload schema.
+    @details Converts each provider result to JSON-safe dict using Pydantic
+    serialization with stable key structure.
+    @param results {dict[str, ProviderResult]} Provider results keyed by provider id.
+    @return {dict[str, dict[str, object]]} JSON payload suitable for CLI output and cache.
+    @satisfies REQ-003
+    @satisfies CTN-004
+    """
+    return {provider_key: result.model_dump(mode="json") for provider_key, result in results.items()}
+
+
+def _filter_cached_payload(
+    payload: dict[str, object],
+    provider_filter: ProviderName | None,
+) -> dict[str, object]:
+    """
+    @brief Filter cached JSON payload by CLI provider selector.
+    @details Returns all providers when filter is None; otherwise returns only
+    selected provider payload when present.
+    @param payload {dict[str, object]} Cached JSON payload mapping provider keys to result dicts.
+    @param provider_filter {ProviderName | None} Optional provider selector.
+    @return {dict[str, object]} Filtered payload subset.
+    """
+    if provider_filter is None:
+        return payload
+    selected = payload.get(provider_filter.value)
+    if isinstance(selected, dict):
+        return {provider_filter.value: selected}
+    return {}
+
+
+def _project_cached_window(
+    result: ProviderResult,
+    target_window: WindowPeriod,
+    providers: dict[ProviderName, BaseProvider],
+) -> ProviderResult:
+    """
+    @brief Project cached raw payload to requested window without network I/O.
+    @details Attempts provider-specific `_parse_response` projection when cached
+    window differs from requested window; returns original result on projection
+    failure or when parser is unavailable.
+    @param result {ProviderResult} Cached normalized provider result.
+    @param target_window {WindowPeriod} Requested CLI window.
+    @param providers {dict[ProviderName, BaseProvider]} Provider registry.
+    @return {ProviderResult} Result aligned to requested window when possible.
+    @satisfies REQ-009
+    @satisfies REQ-042
+    """
+    if result.window == target_window:
+        return result
+    provider = providers.get(result.provider)
+    if provider is None:
+        return result
+    parser = getattr(provider, "_parse_response", None)
+    if not callable(parser) or not isinstance(result.raw, dict):
+        return result
+    try:
+        projected = parser(result.raw, target_window)
+    except (AttributeError, KeyError, TypeError, ValueError):
+        return result
+    if isinstance(projected, ProviderResult):
+        return projected
+    return result
+
+
+def _load_cached_results(
+    payload: dict[str, object],
+    provider_filter: ProviderName | None,
+    target_window: WindowPeriod,
+    providers: dict[ProviderName, BaseProvider],
+) -> dict[str, ProviderResult]:
+    """
+    @brief Decode cached JSON payload into ProviderResult mapping.
+    @details Validates cached payload entries using `ProviderResult` schema, applies
+    provider filtering, and projects cached windows to requested window when possible.
+    Invalid entries are skipped.
+    @param payload {dict[str, object]} Cached JSON payload loaded from disk.
+    @param provider_filter {ProviderName | None} Optional provider selector.
+    @param target_window {WindowPeriod} Requested CLI window for projection.
+    @param providers {dict[ProviderName, BaseProvider]} Provider registry.
+    @return {dict[str, ProviderResult]} Validated cached results keyed by provider id.
+    @satisfies REQ-009
+    @satisfies REQ-042
+    """
+    filtered_payload = _filter_cached_payload(payload, provider_filter)
+    cached_results: dict[str, ProviderResult] = {}
+    for provider_key, raw_result in filtered_payload.items():
+        if not isinstance(raw_result, dict):
+            continue
+        try:
+            validated = ProviderResult.model_validate(raw_result)
+        except ValidationError:
+            continue
+        cached_results[provider_key] = _project_cached_window(
+            validated,
+            target_window,
+            providers,
+        )
+    return cached_results
+
+
+def _update_idle_time_after_refresh(
+    fetched_results: list[ProviderResult],
+    runtime_config: RuntimeConfig,
+) -> None:
+    """
+    @brief Persist idle-time metadata after refresh completion.
+    @details Computes idle-until from last successful fetch timestamp plus
+    `idle_delay_seconds`; on HTTP 429, expands idle-until using the greater value
+    between idle-delay and maximum retry-after observed in the run.
+    @param fetched_results {list[ProviderResult]} Live results produced by refresh calls.
+    @param runtime_config {RuntimeConfig} Runtime delay configuration.
+    @return {None} Function return value.
+    @satisfies REQ-038
+    @satisfies REQ-041
+    """
+    if not fetched_results:
+        return
+
+    now_utc = datetime.now(timezone.utc)
+    successful_results = [result for result in fetched_results if not result.is_error]
+    rate_limited_results = [result for result in fetched_results if _is_http_429_result(result)]
+
+    last_success_at: datetime | None = None
+    if successful_results:
+        last_success_at = max(_normalize_utc(result.updated_at) for result in successful_results)
+    else:
+        previous_state = load_idle_time()
+        if previous_state is not None:
+            last_success_at = datetime.fromtimestamp(
+                previous_state.last_success_timestamp,
+                tz=timezone.utc,
+            )
+
+    if last_success_at is None and rate_limited_results:
+        last_success_at = now_utc
+    if last_success_at is None:
+        return
+
+    base_idle_until = last_success_at + timedelta(seconds=runtime_config.idle_delay_seconds)
+    idle_until = base_idle_until
+    if rate_limited_results:
+        max_retry_after_seconds = max(
+            _extract_retry_after_seconds(result) for result in rate_limited_results
+        )
+        retry_idle_until = now_utc + timedelta(
+            seconds=max(runtime_config.idle_delay_seconds, max_retry_after_seconds)
+        )
+        idle_until = max(base_idle_until, retry_idle_until)
+    save_idle_time(last_success_at, idle_until)
 
 
 def _claude_snapshot_path() -> Path:
@@ -180,6 +419,7 @@ def _fetch_result(
     provider: BaseProvider,
     window: WindowPeriod,
     cache: ResultCache | None = None,
+    throttle_state: dict[str, float | int] | None = None,
 ) -> ProviderResult:
     """
     @brief Execute provider fetch with cache lookup, store, and last-good fallback.
@@ -188,8 +428,11 @@ def _fetch_result(
     @param provider {BaseProvider} Provider instance to fetch from.
     @param window {WindowPeriod} Time window for the fetch.
     @param cache {ResultCache | None} Optional cache instance for TTL-based result reuse.
+    @param throttle_state {dict[str, float | int] | None} Mutable throttling state
+        used to enforce inter-call spacing for live API requests.
     @return {ProviderResult} Cached, fresh, or last-good fallback result.
     @satisfies CTN-004
+    @satisfies REQ-040
     """
     use_cache = cache is not None and provider.name != ProviderName.CLAUDE
 
@@ -203,6 +446,7 @@ def _fetch_result(
                 return last_good
 
     try:
+        _apply_api_call_delay(throttle_state)
         result = asyncio.run(provider.fetch(window))
     except ProviderError as exc:
         result = provider._make_error_result(window=window, error=str(exc))
@@ -223,7 +467,8 @@ def _fetch_result(
 
 def _fetch_claude_dual(
     provider: ClaudeOAuthProvider,
-    cache: ResultCache,
+    cache: ResultCache | None,
+    throttle_state: dict[str, float | int] | None = None,
 ) -> tuple[ProviderResult, ProviderResult]:
     """
     @brief Fetch Claude 5h and 7d results via a single API call.
@@ -234,11 +479,14 @@ def _fetch_claude_dual(
     keep the user-facing error only on 5h, force 5h usage to 100%, and restore 7d
     usage/reset plus 5h reset from persisted Claude success payload when available.
     @param provider {ClaudeOAuthProvider} Claude provider instance.
-    @param cache {ResultCache} Compatibility parameter; ignored for Claude fetch path.
+    @param cache {ResultCache | None} Compatibility parameter; ignored for Claude fetch path.
+    @param throttle_state {dict[str, float | int] | None} Mutable throttling state
+        used to enforce inter-call spacing for live API requests.
     @return {tuple[ProviderResult, ProviderResult]} (5h_result, 7d_result).
-    @satisfies REQ-002, REQ-036, REQ-037, CTN-004
+    @satisfies REQ-002, REQ-036, REQ-037, CTN-004, REQ-040
     """
     del cache
+    _apply_api_call_delay(throttle_state)
     windows = [WindowPeriod.HOUR_5, WindowPeriod.DAY_7]
     try:
         fetched = asyncio.run(provider.fetch_all_windows(windows))
@@ -534,25 +782,95 @@ def main() -> None:
     is_flag=True,
     help="Output raw JSON instead of formatted text",
 )
-def show(provider: str, window: str, output_json: bool) -> None:
+@click.option(
+    "--force",
+    "force_refresh",
+    is_flag=True,
+    help="Bypass idle-time gating and force provider refresh",
+)
+def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> None:
     """
-    @brief Execute show with per-provider TTL cache and single-call dual-window optimization.
-    @details Instantiates a ResultCache for non-Claude providers (CTN-004). Claude
-    dual-window mode uses fetch_all_windows to make one API call instead of two and
-    bypasses cache reuse.
+    @brief Execute `show` with idle-time cache gating and throttled provider refresh.
+    @details Uses persisted idle-time metadata to decide between cache-only output
+    and live provider refresh. Live refresh persists canonical JSON cache payload,
+    updates idle-time state, and enforces configurable inter-call delay.
     @param provider {str} CLI provider selector string.
     @param window {str} CLI window period string.
     @param output_json {bool} When True, emit JSON output instead of formatted text.
+    @param force_refresh {bool} When True, bypass idle-time gate for this execution.
     @return {None} Function return value.
+    @satisfies REQ-003
+    @satisfies REQ-009
+    @satisfies REQ-038
+    @satisfies REQ-039
+    @satisfies REQ-040
+    @satisfies REQ-041
+    @satisfies REQ-042
     """
     window_period = parse_window(window)
     provider_filter = parse_provider(provider)
 
     ctx = click.get_current_context()
     window_source = ctx.get_parameter_source("window")
+    runtime_config = load_runtime_config()
+
+    if force_refresh:
+        remove_idle_time_file()
 
     providers = get_providers()
-    cache = ResultCache()
+    cached_payload = load_cli_cache()
+    idle_state = load_idle_time()
+    now_utc = datetime.now(timezone.utc)
+
+    idle_active = (
+        not force_refresh
+        and idle_state is not None
+        and idle_state.idle_until_timestamp > int(now_utc.timestamp())
+    )
+    if idle_active:
+        if cached_payload is None:
+            if output_json:
+                click.echo(json.dumps({}, indent=2))
+            else:
+                click.echo("Cache unavailable while idle-time is active.")
+            return
+
+        cached_results = _load_cached_results(
+            payload=cached_payload,
+            provider_filter=provider_filter,
+            target_window=window_period,
+            providers=providers,
+        )
+        if output_json:
+            filtered_payload = _filter_cached_payload(cached_payload, provider_filter)
+            click.echo(json.dumps(filtered_payload, indent=2))
+            return
+
+        if provider_filter is not None and provider_filter.value not in cached_results:
+            click.echo(f"\n{provider_filter.value}: Not available in cache")
+            return
+
+        for provider_key, result in cached_results.items():
+            provider_name = ProviderName(provider_key)
+            show_dual_windows = (
+                window_source == ParameterSource.DEFAULT
+                and provider_name in {ProviderName.CLAUDE, ProviderName.CODEX}
+            )
+            if show_dual_windows:
+                provider_instance = providers.get(provider_name)
+                parser = getattr(provider_instance, "_parse_response", None)
+                if callable(parser) and isinstance(result.raw, dict):
+                    try:
+                        result_5h = parser(result.raw, WindowPeriod.HOUR_5)
+                        result_7d = parser(result.raw, WindowPeriod.DAY_7)
+                    except (AttributeError, KeyError, TypeError, ValueError):
+                        _print_result(provider_name, result)
+                        continue
+                    _print_result(provider_name, result_5h, label="5h")
+                    _print_result(provider_name, result_7d, label="7d")
+                    continue
+            _print_result(provider_name, result)
+        return
 
     # Filter to specific provider if requested
     if provider_filter:
@@ -563,7 +881,11 @@ def show(provider: str, window: str, output_json: bool) -> None:
             sys.exit(1)
         providers = {provider_filter: providers[provider_filter]}
 
-    results = {}
+    results: dict[str, ProviderResult] = {}
+    fetched_results: list[ProviderResult] = []
+    throttle_state: dict[str, float | int] = {
+        "delay_seconds": runtime_config.api_call_delay_seconds
+    }
     for name, prov in providers.items():
         if not prov.is_configured():
             if not output_json:
@@ -580,22 +902,65 @@ def show(provider: str, window: str, output_json: bool) -> None:
 
         if show_dual_windows:
             if name == ProviderName.CLAUDE and isinstance(prov, ClaudeOAuthProvider):
-                result_5h, result_7d = _fetch_claude_dual(prov, cache)
+                result_5h, result_7d = _fetch_claude_dual(
+                    prov,
+                    cache=None,
+                    throttle_state=throttle_state,
+                )
+                fetched_results.extend([result_5h, result_7d])
+            elif name == ProviderName.CODEX and isinstance(prov, CodexProvider):
+                result_5h = _fetch_result(
+                    prov,
+                    WindowPeriod.HOUR_5,
+                    cache=None,
+                    throttle_state=throttle_state,
+                )
+                fetched_results.append(result_5h)
+                if not result_5h.is_error and isinstance(result_5h.raw, dict):
+                    result_7d = prov._parse_response(result_5h.raw, WindowPeriod.DAY_7)
+                else:
+                    result_7d = _fetch_result(
+                        prov,
+                        WindowPeriod.DAY_7,
+                        cache=None,
+                        throttle_state=throttle_state,
+                    )
+                    fetched_results.append(result_7d)
             else:
-                result_5h = _fetch_result(prov, WindowPeriod.HOUR_5, cache)
-                result_7d = _fetch_result(prov, WindowPeriod.DAY_7, cache)
+                result_5h = _fetch_result(
+                    prov,
+                    WindowPeriod.HOUR_5,
+                    cache=None,
+                    throttle_state=throttle_state,
+                )
+                result_7d = _fetch_result(
+                    prov,
+                    WindowPeriod.DAY_7,
+                    cache=None,
+                    throttle_state=throttle_state,
+                )
+                fetched_results.extend([result_5h, result_7d])
             results[name.value] = result_7d
             _print_result(name, result_5h, label="5h")
             _print_result(name, result_7d, label="7d")
         else:
-            result = _fetch_result(prov, window_period, cache)
+            result = _fetch_result(
+                prov,
+                window_period,
+                cache=None,
+                throttle_state=throttle_state,
+            )
+            fetched_results.append(result)
             results[name.value] = result
             if not output_json:
                 _print_result(name, result)
 
+    output_payload = _serialize_results_payload(results)
+    save_cli_cache(output_payload)
+    _update_idle_time_after_refresh(fetched_results, runtime_config)
+
     if output_json:
-        output = {k: v.model_dump(mode="json") for k, v in results.items()}
-        click.echo(json.dumps(output, indent=2))
+        click.echo(json.dumps(output_payload, indent=2))
 
 
 def _print_result(name: ProviderName, result, label: str | None = None) -> None:
@@ -831,14 +1196,44 @@ def setup() -> None:
     @details Applies setup logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
     @return {None} Function return value.
     """
-    from aibar.config import ENV_FILE_PATH, write_env_file
+    from aibar.config import (
+        ENV_FILE_PATH,
+        RUNTIME_CONFIG_PATH,
+        RuntimeConfig,
+        load_runtime_config,
+        save_runtime_config,
+        write_env_file,
+    )
 
     click.echo()
     click.echo("Usage UI Setup")
     click.echo("=" * 40)
     click.echo()
     click.echo(f"Keys will be saved to: {ENV_FILE_PATH}")
+    click.echo(f"Runtime settings will be saved to: {RUNTIME_CONFIG_PATH}")
     click.echo("Press Enter to skip any key.")
+    click.echo()
+
+    runtime_config = load_runtime_config()
+    click.echo(click.style("Runtime throttling", bold=True))
+    click.echo("  idle-delay controls cache-only mode duration after successful refresh.")
+    click.echo("  api-call delay controls minimum spacing between API calls.")
+    idle_delay_seconds = click.prompt(
+        "  idle-delay seconds",
+        type=int,
+        default=runtime_config.idle_delay_seconds,
+    )
+    api_call_delay_seconds = click.prompt(
+        "  api-call delay seconds",
+        type=int,
+        default=runtime_config.api_call_delay_seconds,
+    )
+    configured_runtime = RuntimeConfig(
+        idle_delay_seconds=idle_delay_seconds,
+        api_call_delay_seconds=api_call_delay_seconds,
+    )
+    save_runtime_config(configured_runtime)
+    click.echo("  -> Saved")
     click.echo()
 
     updates: dict[str, str] = {}
