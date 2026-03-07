@@ -155,8 +155,8 @@
   - Update REQ-002 to require day-aware reset countdown text in show output.\nImplement _format_reset_duration and emit 'Resets in:' text in CLI renderer.\nAdd CLI regression test for day-token reset formatting.\nRefresh WORKFLOW and REFERENCES documentation for updated symbols.
 - rename credits label to remaining credits [useReq] *(gnome-extension)*
   - Update REQ-017 and TST-004 for quota-card label text behavior.\nSwitch GNOME extension quota-only card suffix from "credits" to "remaining credits".\nAdd regression test to assert new quota label string in extension source.\nRefresh WORKFLOW runtime note for quota-label composition path.
-- rename monitor label to IABar Monitor [useReq] *(extension)*
-  - update PRJ-004 requirement to enforce extension name IABar Monitor
+- rename monitor label to AIBar Monitor [useReq] *(extension)*
+  - update PRJ-004 requirement to enforce extension name AIBar Monitor
   - rename GNOME extension display labels in metadata and panel indicator
   - refresh WORKFLOW and REFERENCES documentation paths/evidence
 - BREAKING CHANGE: finalize AIBar rename refactor [useReq] *(core)*

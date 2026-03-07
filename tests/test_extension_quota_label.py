@@ -9,6 +9,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 EXTENSION_PATH = PROJECT_ROOT / "src" / "aibar" / "gnome-extension" / "aibar@aibar.panel" / "extension.js"
+METADATA_PATH = PROJECT_ROOT / "src" / "aibar" / "gnome-extension" / "aibar@aibar.panel" / "metadata.json"
 
 
 def test_quota_only_label_uses_remaining_credits_prefix_and_bold_remaining() -> None:
@@ -74,6 +75,24 @@ def test_popup_labels_use_aibar_brand_casing() -> None:
     assert "text: 'AIBar'," in source
     assert "PopupMenu.PopupMenuItem('Open AIBar UI')" in source
     assert "PopupMenu.PopupMenuItem('Open aibar UI')" not in source
+
+
+def test_panel_indicator_uses_aibar_monitor_name() -> None:
+    """
+    @brief Verify panel indicator title uses `AIBar Monitor`.
+    @satisfies PRJ-004
+    """
+    source = EXTENSION_PATH.read_text(encoding="utf-8")
+    assert "super._init(0.0, 'AIBar Monitor', false);" in source
+
+
+def test_metadata_declares_aibar_monitor_name() -> None:
+    """
+    @brief Verify extension metadata name is `AIBar Monitor`.
+    @satisfies PRJ-004
+    """
+    source = METADATA_PATH.read_text(encoding="utf-8")
+    assert '"name": "AIBar Monitor"' in source
 
 
 def test_refresh_now_popup_action_executes_forced_cli_refresh() -> None:

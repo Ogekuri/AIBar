@@ -147,7 +147,7 @@ class AIBarIndicator extends PanelMenu.Button {
      * @returns {any} Function return value.
      */
     _init() {
-        super._init(0.0, 'IABar Monitor', false);
+        super._init(0.0, 'AIBar Monitor', false);
 
         this._timeout = null;
         this._usageData = {};

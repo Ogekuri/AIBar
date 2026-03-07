@@ -258,7 +258,7 @@
   - On disable, destroys indicator and removes timer source.
 - `Internal Call-Trace Tree`
   - `AIBarExtension.enable(...)`: extension enable adapter [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
-    - `AIBarIndicator._init(...)`: indicator runtime bootstrap [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+    - `AIBarIndicator._init(...)`: indicator runtime bootstrap with panel title `AIBar Monitor` [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
       - `AIBarIndicator._buildPanelButton(...)`: panel icon/percentage/summary-label setup with five ordered percentage labels (Claude 5h, Claude 7d, Copilot, Codex 5h, Codex 7d) and primary/secondary style classes [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
       - `AIBarIndicator._buildPopupMenu(...)`: popup structure and actions setup including `Last updated`/`next update` status item scaffold and `Refresh Now` forced-refresh action wiring [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
         - `AIBarIndicator._refreshData(...)`: refresh action handler with forced CLI path (`aibar show --json --force`) for popup `Refresh Now` [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
