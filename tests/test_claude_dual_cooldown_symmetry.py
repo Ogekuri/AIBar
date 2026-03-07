@@ -10,7 +10,6 @@ import json
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
-from aibar.cache import ResultCache
 from aibar.providers.base import (
     ProviderName,
     ProviderResult,
@@ -65,11 +64,6 @@ class TestClaudeDualFetchBypass:
         from aibar.cli import _fetch_claude_dual
 
         with patch.dict("os.environ", {"XDG_CACHE_HOME": str(tmp_path)}):
-            cache = ResultCache(cache_dir=tmp_path / "cache")
-            cache._save_to_disk(_make_success_result(WindowPeriod.HOUR_5, 77.0))
-            cache._save_to_disk(_make_success_result(WindowPeriod.DAY_7, 66.0))
-            cache.set_rate_limited(ProviderName.CLAUDE)
-
             provider = ClaudeOAuthProvider(token="sk-ant-test-token")
             fresh = {
                 WindowPeriod.HOUR_5: _make_success_result(WindowPeriod.HOUR_5, 55.0),
@@ -81,7 +75,7 @@ class TestClaudeDualFetchBypass:
                 "fetch_all_windows",
                 new=AsyncMock(return_value=fresh),
             ) as mock_fetch:
-                result_5h, result_7d = _fetch_claude_dual(provider, cache)
+                result_5h, result_7d = _fetch_claude_dual(provider)
 
         mock_fetch.assert_awaited_once_with([WindowPeriod.HOUR_5, WindowPeriod.DAY_7])
         assert result_5h.metrics.remaining == 55.0
@@ -105,7 +99,6 @@ class TestClaudeDualFetchBypass:
                 },
             }
             provider = ClaudeOAuthProvider(token="sk-ant-test-token")
-            cache = ResultCache(cache_dir=tmp_path / "cache")
             fresh = {
                 WindowPeriod.HOUR_5: ProviderResult(
                     provider=ProviderName.CLAUDE,
@@ -126,7 +119,7 @@ class TestClaudeDualFetchBypass:
                 "fetch_all_windows",
                 new=AsyncMock(return_value=fresh),
             ):
-                _fetch_claude_dual(provider, cache)
+                _fetch_claude_dual(provider)
 
             snapshot_path = tmp_path / "aibar" / "claude_dual_last_success.json"
             assert snapshot_path.exists()
@@ -144,9 +137,6 @@ class TestClaudeDualFetchBypass:
         from aibar.cli import _fetch_claude_dual
 
         with patch.dict("os.environ", {"XDG_CACHE_HOME": str(tmp_path)}):
-            cache = ResultCache(cache_dir=tmp_path / "cache")
-            cache._save_to_disk(_make_success_result(WindowPeriod.DAY_7, 83.0))
-
             provider = ClaudeOAuthProvider(token="sk-ant-test-token")
             errors = {
                 WindowPeriod.HOUR_5: _make_429_result(provider, WindowPeriod.HOUR_5),
@@ -158,7 +148,7 @@ class TestClaudeDualFetchBypass:
                 "fetch_all_windows",
                 new=AsyncMock(return_value=errors),
             ):
-                result_5h, result_7d = _fetch_claude_dual(provider, cache)
+                result_5h, result_7d = _fetch_claude_dual(provider)
 
         assert result_5h.is_error
         assert not result_7d.is_error

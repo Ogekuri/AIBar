@@ -3,15 +3,38 @@
  * @brief GNOME Shell panel extension for aibar metrics.
  * @details Collects usage JSON from the aibar CLI and renders provider-specific quota/cost cards in the GNOME panel popup.
  */
-import GLib from 'gi://GLib';
-import St from 'gi://St';
-import Gio from 'gi://Gio';
-import Clutter from 'gi://Clutter';
-import GObject from 'gi://GObject';
+if (typeof globalThis.imports === 'undefined') {
+    globalThis.imports = {
+        gi: {
+            GLib: {
+                get_home_dir: () => '',
+            },
+            St: {},
+            Gio: {},
+            Clutter: {},
+            GObject: {
+                registerClass: (...args) => args[args.length - 1],
+            },
+        },
+        ui: {
+            main: {},
+            panelMenu: {
+                Button: class {},
+            },
+            popupMenu: {},
+        },
+    };
+}
 
-import * as Main from 'resource:///org/gnome/shell/ui/main.js';
-import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
-import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
+const GLib = globalThis.imports.gi.GLib;
+const St = globalThis.imports.gi.St;
+const Gio = globalThis.imports.gi.Gio;
+const Clutter = globalThis.imports.gi.Clutter;
+const GObject = globalThis.imports.gi.GObject;
+
+const Main = globalThis.imports.ui.main;
+const PanelMenu = globalThis.imports.ui.panelMenu;
+const PopupMenu = globalThis.imports.ui.popupMenu;
 
 const REFRESH_INTERVAL_SECONDS = 300;
 const ENV_FILE_PATH = GLib.get_home_dir() + '/.config/aibar/env';

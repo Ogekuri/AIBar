@@ -74,6 +74,41 @@ def _ensure_app_cache_dir() -> None:
     APP_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def _sanitize_cache_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """
+    @brief Redact sensitive keys from cache payload before disk persistence.
+    @details Recursively traverses dictionaries/lists and replaces values for
+    case-insensitive key matches in `{token,key,secret,password,authorization}`
+    with deterministic placeholder string `[REDACTED]`.
+    @param payload {dict[str, Any]} Provider payload in `show --json` schema.
+    @return {dict[str, Any]} Sanitized deep-copy structure safe for persistence.
+    @satisfies DES-004
+    """
+    sensitive_keys = {"token", "key", "secret", "password", "authorization"}
+
+    def clean(value: Any) -> Any:
+        """
+        @brief Apply recursive redaction to one JSON-compatible node.
+        @details Preserves structural type (dict/list/scalar) while replacing
+        values of sensitive keys with `[REDACTED]`.
+        @param value {Any} JSON-like node to sanitize.
+        @return {Any} Sanitized node.
+        """
+        if isinstance(value, dict):
+            sanitized: dict[str, Any] = {}
+            for key, node in value.items():
+                if isinstance(key, str) and key.lower() in sensitive_keys:
+                    sanitized[key] = "[REDACTED]"
+                else:
+                    sanitized[key] = clean(node)
+            return sanitized
+        if isinstance(value, list):
+            return [clean(item) for item in value]
+        return value
+
+    return clean(payload)
+
+
 def load_runtime_config() -> RuntimeConfig:
     """
     @brief Load runtime refresh configuration from disk with schema validation.
@@ -127,15 +162,18 @@ def load_cli_cache() -> dict[str, Any] | None:
 def save_cli_cache(payload: dict[str, Any]) -> None:
     """
     @brief Persist CLI cache payload in the canonical `show --json` schema.
-    @details Writes `payload` to `~/.cache/aibar/cache.json` using pretty-printed
-    JSON (`indent=2`) so the file matches CLI JSON rendering format exactly.
+    @details Redacts sensitive keys from provider raw payloads, then writes
+    sanitized payload to `~/.cache/aibar/cache.json` using pretty-printed JSON
+    (`indent=2`) so the file matches CLI JSON rendering format exactly.
     @param payload {dict[str, Any]} Cache payload in `show --json` shape.
     @return {None} Function return value.
     @satisfies CTN-004
+    @satisfies DES-004
     """
+    sanitized_payload = _sanitize_cache_payload(payload)
     _ensure_app_cache_dir()
     CACHE_FILE_PATH.write_text(
-        json.dumps(payload, indent=2),
+        json.dumps(sanitized_payload, indent=2),
         encoding="utf-8",
     )
 

@@ -96,7 +96,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **CTN-001**: MUST resolve provider credentials with precedence: environment variable, then `~/.config/aibar/env`, then provider-specific local credential stores.
 - **CTN-002**: MUST represent provider fetch output with `ProviderResult` containing `provider`, `window`, `metrics`, `updated_at`, `raw`, and optional `error`.
 - **CTN-003**: MUST perform external HTTP API calls with `httpx.AsyncClient(timeout=30.0)` for provider integrations.
-- **CTN-004**: MUST persist the latest successful multi-provider `show` dataset in `~/.cache/aibar/cache.json` using exactly the same top-level and nested JSON schema emitted by `aibar show --json`.
+- **CTN-004**: MUST persist the latest successful multi-provider dataset in `~/.cache/aibar/cache.json` and use that file as the only persisted provider-data source for `show` and Text UI.
 - **CTN-005**: MAY depend on unofficial/internal endpoints when official usage APIs are unavailable for Claude, Copilot, or Codex integrations.
 - **CTN-006**: MUST keep `docs/REFERENCES.md` synchronized with symbols defined under `src/` and `.github/workflows/`.
 - **CTN-007**: MUST declare `hatchling` as `[build-system]` backend in `pyproject.toml` with `[project]` metadata including `name`, `version`, `requires-python`, `dependencies`, and `[project.scripts]` console entry point.
@@ -122,7 +122,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-006**: MUST fail Claude login when CLI credentials are missing or expired and MUST print `claude setup-token` remediation guidance.
 - **REQ-007**: MUST execute GitHub device-flow login for Copilot and save the token in `~/.config/aibar/copilot.json`.
 - **REQ-008**: MUST render Textual provider cards for all providers, support refresh, support 5h/7d switching, support JSON-tab toggling, suppress `Error: Rate limited. Try again later.`, and append `⚠️ Limit reached!` after `Resets in:` at displayed `100.0%`.
-- **REQ-009**: MUST skip provider refresh when `idle_until` in `~/.cache/aibar/idle-time.json` is in the future and MUST serve `show` data from `~/.cache/aibar/cache.json`.
+- **REQ-009**: MUST execute provider retrieval for `show` and Text UI in this order: force-flag handling, idle-time evaluation, conditional refresh to `~/.cache/aibar/cache.json`, then data load from `~/.cache/aibar/cache.json`.
 - **REQ-010**: MUST map OpenAI `5h` requests to a one-day API range before requesting usage and costs.
 - **REQ-011**: MUST derive OpenRouter `cost` from window-specific usage fields (`usage_daily`, `usage_weekly`, `usage_monthly`) and include `limit` and `limit_remaining`.
 - **REQ-012**: MUST ignore requested window for Copilot fetch and return results with effective window `30d`.
@@ -152,10 +152,11 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-036**: MUST render Claude HTTP 429 as partial-window output: 5h shows `Error: Rate limited. Try again later.` and `Usage: ... 100.0%`; 5h reset and all 7d usage/reset values MUST use persisted Claude payload when available.
 - **REQ-037**: MUST use synthetic Claude partial-window fallback values when persisted Claude payload is unavailable during HTTP 429 rendering.
 - **REQ-038**: MUST set `last_success_at` to refresh completion time and `idle_until` to `last_success_at + idle_delay_seconds` after every successful provider refresh, then persist epoch and human-readable values in `~/.cache/aibar/idle-time.json`.
-- **REQ-039**: MUST support `show --force` to delete `~/.cache/aibar/idle-time.json`, bypass idle-time gating for the current run, and execute a fresh provider refresh.
+- **REQ-039**: MUST support force-refresh handling that deletes `~/.cache/aibar/idle-time.json`, bypasses idle-time gating for the current execution, and executes a fresh provider refresh before loading `~/.cache/aibar/cache.json`.
 - **REQ-040**: MUST enforce at least `api_call_delay_seconds` between consecutive provider API requests during refresh execution, with default `20` seconds when configuration is missing.
 - **REQ-041**: MUST update idle-time on HTTP `429` using `max(retry_after_seconds, idle_delay_seconds)` and, when multiple `429` responses occur, MUST persist the largest computed `idle_until`.
-- **REQ-042**: MUST minimize provider API requests during refresh by reusing already-fetched results within the run and by serving cached data whenever idle-time gating disables refresh.
+- **REQ-042**: MUST minimize provider API requests by serving `~/.cache/aibar/cache.json` whenever idle-time gating disables refresh and by using only `~/.cache/aibar/cache.json` plus `~/.cache/aibar/idle-time.json` as persisted retrieval artifacts.
+- **REQ-043**: MUST centralize refresh and load logic for `~/.cache/aibar/cache.json` into shared internal functions reused by CLI `show` and Text UI refresh workflows.
 
 ## 4. Test Requirements
 
@@ -174,9 +175,10 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 - **TST-011**: MUST verify HTTP `429` handling persists idle-time using `max(retry_after_seconds, idle_delay_seconds)` and keeps the largest computed `idle_until` when multiple rate-limit responses occur in one refresh run.
 - **TST-012**: MUST verify Textual provider cards suppress `Error: Rate limited. Try again later.` and append `⚠️ Limit reached!` after `Resets in:` when displayed usage is `100.0%`.
 - **TST-013**: MUST verify `setup` prompts idle-delay first and API-call delay second, applies defaults `300` and `20`, and persists both values into `~/.config/aibar/config.json`.
-- **TST-014**: MUST verify `show` skips provider API calls and serves `~/.cache/aibar/cache.json` when `idle_until` is in the future, and refreshes providers when idle-time file is missing or expired.
-- **TST-015**: MUST verify `show --force` removes `~/.cache/aibar/idle-time.json`, bypasses idle-time gating for current execution, refreshes providers, and recreates idle-time metadata.
+- **TST-014**: MUST verify `show` and Text UI refresh skip provider API calls and serve `~/.cache/aibar/cache.json` when `idle_until` is in the future, and refresh providers when idle-time state is missing or expired.
+- **TST-015**: MUST verify force-refresh handling removes `~/.cache/aibar/idle-time.json`, bypasses idle-time gating for current execution, refreshes providers, and recreates idle-time metadata before loading `~/.cache/aibar/cache.json`.
 - **TST-016**: MUST verify refresh execution enforces configured inter-call delay between provider API requests, using `20` seconds when `api_call_delay_seconds` is absent.
+- **TST-017**: MUST verify Text UI refresh and CLI `show` invoke one shared cache-retrieval implementation and do not call legacy `ResultCache` read/write APIs.
 
 ## 5. Evidence
 
@@ -192,7 +194,7 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | CTN-001 | `src/aibar/aibar/config.py` + `Config.get_token` + env var -> env file -> provider-specific stores (`ClaudeCLIAuth`, `CodexCredentialStore`, `CopilotCredentialStore`). |
 | CTN-002 | `src/aibar/aibar/providers/base.py` + `ProviderResult` model + fields `provider/window/metrics/updated_at/raw/error`. |
 | CTN-003 | `src/aibar/aibar/providers/*.py` + `fetch` methods + `httpx.AsyncClient(timeout=30.0)` in Claude/OpenAI/OpenRouter/Copilot/Codex providers. |
-| CTN-004 | `src/aibar/aibar/config.py` + `load_cli_cache/save_cli_cache` and `src/aibar/aibar/cli.py` + CLI dataset persistence to `~/.cache/aibar/cache.json` matching `show --json` schema. |
+| CTN-004 | `src/aibar/aibar/config.py` + shared cache helpers and `src/aibar/aibar/cli.py` + `src/aibar/aibar/ui.py` + unified provider-data load from `~/.cache/aibar/cache.json`. |
 | CTN-005 | `src/aibar/aibar/config.py` + `PROVIDER_INFO` notes + entries describing unofficial/internal usage for Claude, Copilot, and Codex. |
 | CTN-006 | `docs/REFERENCES.md` + full symbol index grouped by source file, regenerated from repository code. |
 | CTN-007 | `pyproject.toml` + `[build-system] requires = ["hatchling"]` + `[project]` metadata fields `name`, `version`, `requires-python`, `dependencies`, `[project.scripts]`. |
@@ -212,7 +214,7 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | REQ-006 | `src/aibar/aibar/cli.py` + `_login_claude` + missing/expired flows print `claude setup-token` then `sys.exit(1)`. |
 | REQ-007 | `src/aibar/aibar/providers/copilot.py` + `CopilotDeviceFlow` and `CopilotProvider.login` + device-code request/poll and `save_token`. |
 | REQ-008 | `src/aibar/aibar/ui.py` + `AIBarUI.compose/BINDINGS` and `ProviderCard.watch_result` + provider cards, refresh/window/json controls, rate-limit error-string suppression, and `Resets in: ... ⚠️ Limit reached!` rendering at displayed `100.0%`. |
-| REQ-009 | `src/aibar/aibar/cli.py` + `show` idle-time gate reads `~/.cache/aibar/idle-time.json` and serves `~/.cache/aibar/cache.json` without provider refresh while idle window is active. |
+| REQ-009 | `src/aibar/aibar/cli.py` + shared retrieval entrypoint used by `show` and `src/aibar/aibar/ui.py` + Text UI refresh path executing force check, idle-time check, conditional refresh, then `cache.json` load. |
 | REQ-010 | `src/aibar/aibar/providers/openai_usage.py` + `_get_time_range` + dict maps `"5h"` to `1` day. |
 | REQ-011 | `src/aibar/aibar/providers/openrouter.py` + `_get_usage/_parse_response` + cost from usage field and limit metrics from payload. |
 | REQ-012 | `src/aibar/aibar/providers/copilot.py` + `fetch` + sets `effective_window = WindowPeriod.DAY_30` and returns that window. |
@@ -233,10 +235,11 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | REQ-036 | `src/aibar/aibar/cli.py` + `_fetch_claude_dual/_print_result` + Claude HTTP 429 output keeps 5h error+100% while 7d usage/reset are restored from persisted Claude payload. |
 | REQ-037 | `src/aibar/aibar/cli.py` + Claude HTTP 429 fallback path synthesizes deterministic values when no persisted Claude payload is available. |
 | REQ-038 | `src/aibar/aibar/cli.py` + successful refresh path computes `idle_until = last_success_at + idle_delay_seconds` and writes epoch/human-readable values to `~/.cache/aibar/idle-time.json`. |
-| REQ-039 | `src/aibar/aibar/cli.py` + `show --force` removes `~/.cache/aibar/idle-time.json` and bypasses idle-time gate for current execution. |
+| REQ-039 | `src/aibar/aibar/cli.py` + shared force-refresh handling removes `~/.cache/aibar/idle-time.json`, bypasses idle-time gate, and refreshes before loading `cache.json`. |
 | REQ-040 | `src/aibar/aibar/cli.py` + refresh scheduler enforces configured `api_call_delay_seconds` between consecutive provider API requests. |
 | REQ-041 | `src/aibar/aibar/cli.py` + HTTP 429 handling uses `retry-after` and `idle_delay_seconds` to persist the largest computed `idle_until`. |
-| REQ-042 | `src/aibar/aibar/cli.py` + refresh pipeline reuses in-run results and idle-time cache short-circuiting to minimize provider API calls. |
+| REQ-042 | `src/aibar/aibar/cli.py` + `src/aibar/aibar/ui.py` + retrieval pipeline uses only `cache.json` and `idle-time.json` persisted artifacts for idle-time-gated API minimization. |
+| REQ-043 | `src/aibar/aibar/cli.py` + `src/aibar/aibar/ui.py` + shared cache refresh/load helpers provide one retrieval implementation for both command surfaces. |
 | TST-001 | `src/aibar/aibar/cli.py` + `parse_window/parse_provider` provide validation points for invalid input diagnostics. |
 | TST-002 | `src/aibar/aibar/config.py` + `get_token` implements explicit precedence chain requiring regression coverage. |
 | TST-003 | `tests/test_cli_idle_cache.py` and `tests/test_cli_idle_force.py` + assertions for cache schema parity with `show --json` and idle-time epoch/human-readable field persistence under `~/.cache/aibar/`. |
@@ -249,8 +252,9 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | TST-011 | `tests/test_cli_idle_time_429.py` + multi-429 scenarios verify `max(retry_after_seconds, idle_delay_seconds)` and largest `idle_until` persistence. |
 | TST-012 | `tests/test_ui_rate_limit_rendering.py` and `src/aibar/aibar/ui.py` + verify Textual card suppresses rate-limit error string and appends `⚠️ Limit reached!` next to reset countdown at displayed `100.0%`. |
 | TST-013 | `tests/test_setup_runtime_config.py` + setup prompt-order/default assertions and `~/.config/aibar/config.json` persistence checks for idle/API delays. |
-| TST-014 | `tests/test_cli_idle_cache.py` + idle-time future/missing/expired branches verify cache-serving behavior from `~/.cache/aibar/cache.json` and provider-call gating in `show`. |
-| TST-015 | `tests/test_cli_idle_force.py` + `show --force` verifies `~/.cache/aibar/idle-time.json` deletion, gate bypass, refresh invocation, and idle-time regeneration. |
+| TST-014 | `tests/test_cli_idle_cache.py` + `tests/test_ui_shared_cache_flow.py` + idle-time future/missing/expired branches verify cache-serving behavior and provider-call gating in `show` and Text UI refresh. |
+| TST-015 | `tests/test_cli_idle_force.py` + `tests/test_ui_shared_cache_flow.py` + force-refresh path verifies idle-time deletion, gate bypass, refresh invocation, and idle-time regeneration before cache load. |
+| TST-017 | `tests/test_ui_shared_cache_flow.py` + static symbol checks in `src/aibar/aibar/ui.py` verify shared retrieval usage and absence of `ResultCache` read/write calls. |
 | TST-016 | `tests/test_cli_provider_throttle.py` + refresh timing assertions verify configured inter-call delay and default `20`-second fallback. |
 | PRJ-008 | `scripts/install-gnome-extension.sh` + copies extension files from `src/aibar/gnome-extension/aibar@aibar.panel/` to `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/` + enables extension via `gnome-extensions enable`. |
 | REQ-025 | `scripts/install-gnome-extension.sh` + `git rev-parse --show-toplevel` for project root resolution. |

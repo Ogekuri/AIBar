@@ -6,6 +6,7 @@
 
 # pyright: reportMissingImports=false
 
+import asyncio
 import json
 from datetime import datetime, timezone
 
@@ -25,7 +26,7 @@ from textual.widgets import (
     TabPane,
 )
 
-from aibar.cache import ResultCache
+from aibar.cli import retrieve_results_via_cache_pipeline
 from aibar.config import config
 from aibar.providers import (
     ClaudeOAuthProvider,
@@ -490,7 +491,6 @@ class AIBarUI(App):
         @return {None} Function return value.
         """
         super().__init__()
-        self.cache = ResultCache()
         self.providers: dict[ProviderName, BaseProvider] = {
             ProviderName.CLAUDE: ClaudeOAuthProvider(),
             ProviderName.OPENAI: OpenAIUsageProvider(),
@@ -567,41 +567,55 @@ class AIBarUI(App):
     async def action_refresh(self) -> None:
         """
         @brief Execute action refresh.
-        @details Applies action refresh logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects. Cache hits are used only for non-Claude providers.
+        @details Executes shared cache-based retrieval pipeline reused by CLI
+        `show`: force-flag evaluation, idle-time gate check, conditional cache
+        refresh, and readback from `cache.json` before card projection.
         @return {None} Function return value.
         @satisfies REQ-009
+        @satisfies REQ-043
         """
+        for provider_name, provider in self.providers.items():
+            if not provider.is_configured():
+                continue
+            card = self._get_card(provider_name)
+            if card:
+                card.is_loading = True
+
+        try:
+            retrieval = await asyncio.to_thread(
+                retrieve_results_via_cache_pipeline,
+                provider_filter=None,
+                target_window=self.window,
+                force_refresh=False,
+                providers=self.providers,
+            )
+        except Exception as exc:
+            for provider_name, provider in self.providers.items():
+                if not provider.is_configured():
+                    continue
+                result = provider._make_error_result(
+                    window=self.window,
+                    error=f"Unexpected error: {exc}",
+                )
+                self.results[provider_name] = result
+                card = self._get_card(provider_name)
+                if card:
+                    card.result = result
+                    card.is_loading = False
+            self._update_json_view()
+            return
+
         for provider_name, provider in self.providers.items():
             if not provider.is_configured():
                 continue
 
             card = self._get_card(provider_name)
-            if card:
-                card.is_loading = True
-
-            use_cache = provider_name != ProviderName.CLAUDE
-            if use_cache:
-                # Check cache first for non-Claude providers.
-                cached = self.cache.get(provider_name, self.window)
-                if cached:
-                    self.results[provider_name] = cached
-                    if card:
-                        card.result = cached
-                        card.is_loading = False
-                    continue
-
-            # Fetch fresh data
-            try:
-                result = await provider.fetch(self.window)
-                if use_cache:
-                    self.cache.set(result)
+            result = retrieval.results.get(provider_name.value)
+            if result is not None:
                 self.results[provider_name] = result
-            except Exception as e:
-                result = provider._make_error_result(self.window, str(e))
-                self.results[provider_name] = result
-
             if card:
-                card.result = result
+                if result is not None:
+                    card.result = result
                 card.is_loading = False
 
         # Update JSON view
@@ -615,7 +629,6 @@ class AIBarUI(App):
         """
         self.window = WindowPeriod.HOUR_5
         self._update_window_buttons()
-        self.cache.invalidate()  # Clear cache to force refresh with new window
         await self.action_refresh()
 
     async def action_window_7d(self) -> None:
@@ -626,7 +639,6 @@ class AIBarUI(App):
         """
         self.window = WindowPeriod.DAY_7
         self._update_window_buttons()
-        self.cache.invalidate()
         await self.action_refresh()
 
     async def action_toggle_json(self) -> None:

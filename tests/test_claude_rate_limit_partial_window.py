@@ -12,7 +12,6 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
-from aibar.cache import ResultCache
 from aibar.cli import _fetch_claude_dual, _print_result
 from aibar.providers.base import ProviderName, ProviderResult, UsageMetrics, WindowPeriod
 from aibar.providers.claude_oauth import ClaudeOAuthProvider
@@ -79,7 +78,6 @@ def test_claude_429_renders_partial_window_output(capsys, tmp_path: Path) -> Non
         _write_claude_snapshot(tmp_path, reset_5h=reset_5h, reset_7d=reset_7d)
 
         provider = ClaudeOAuthProvider(token="sk-ant-test-token")
-        cache = ResultCache(cache_dir=tmp_path / "cache")
         live_429 = {
             WindowPeriod.HOUR_5: _make_429_result(WindowPeriod.HOUR_5),
             WindowPeriod.DAY_7: _make_429_result(WindowPeriod.DAY_7),
@@ -90,7 +88,7 @@ def test_claude_429_renders_partial_window_output(capsys, tmp_path: Path) -> Non
             "fetch_all_windows",
             new=AsyncMock(return_value=live_429),
         ):
-            result_5h, result_7d = _fetch_claude_dual(provider, cache)
+            result_5h, result_7d = _fetch_claude_dual(provider)
 
         assert result_5h.is_error
         assert not result_7d.is_error

@@ -1,19 +1,18 @@
 """
 @file
-@brief Claude provider retry and cache-bypass tests.
+@brief Claude provider retry and shared CLI fetch tests.
 @details Verifies: (1) ClaudeOAuthProvider retries on HTTP 429 respecting
 retry-after header, (2) fetch_all_windows uses one API call for dual windows,
-(3) Claude CLI fetch path bypasses cache reads/writes and cooldown fallback.
-@satisfies CTN-003, CTN-004, REQ-002
+(3) CLI shared refresh helper routes Claude 5h/7d reads through one dual-window
+fetch implementation without legacy ResultCache usage.
+@satisfies CTN-003, CTN-004, REQ-002, REQ-043
 """
 
 import asyncio
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import httpx
 
-from aibar.cache import ResultCache
 from aibar.providers.base import (
     ProviderName,
     ProviderResult,
@@ -58,17 +57,18 @@ def _make_200_response() -> httpx.Response:
     )
 
 
-def _make_good_result(window: WindowPeriod) -> ProviderResult:
+def _make_result(window: WindowPeriod, remaining: float) -> ProviderResult:
     """
-    @brief Build a synthetic successful ProviderResult.
+    @brief Build a synthetic successful ProviderResult for helper tests.
     @param window {WindowPeriod} Window period for the result.
-    @return {ProviderResult} Successful result with sample metrics.
+    @param remaining {float} Remaining quota value to encode.
+    @return {ProviderResult} Successful result with deterministic metrics.
     """
     return ProviderResult(
         provider=ProviderName.CLAUDE,
         window=window,
-        metrics=UsageMetrics(remaining=80.0, limit=100.0),
-        raw={"five_hour": {"utilization": 20.0}, "seven_day": {"utilization": 30.0}},
+        metrics=UsageMetrics(remaining=remaining, limit=100.0),
+        raw={},
     )
 
 
@@ -149,102 +149,49 @@ class TestFetchAllWindows:
         assert results[WindowPeriod.DAY_7].metrics.remaining == 70.0
 
 
-class TestCLICacheBypassForClaude:
+class TestCLISharedClaudeFetch:
     """
-    @brief Verify Claude CLI fetch path bypasses cache and cooldown fallback.
+    @brief Verify CLI helper routes Claude requests through dual-window fetch.
     @satisfies CTN-004
+    @satisfies REQ-043
     """
 
-    def test_fetch_result_ignores_cached_value_for_claude(self, tmp_path: Path) -> None:
+    def test_fetch_result_routes_day7_to_dual_fetch(self) -> None:
         """
-        @brief Verify _fetch_result calls Claude provider even when a stale disk cache exists.
-        """
-        from aibar.cli import _fetch_result
-
-        cache = ResultCache(cache_dir=tmp_path)
-        cache._save_to_disk(_make_good_result(WindowPeriod.DAY_7))
-
-        fresh_result = ProviderResult(
-            provider=ProviderName.CLAUDE,
-            window=WindowPeriod.DAY_7,
-            metrics=UsageMetrics(remaining=55.0, limit=100.0),
-            raw={"fresh": True},
-        )
-
-        provider = MagicMock(spec=ClaudeOAuthProvider)
-        provider.name = ProviderName.CLAUDE
-        provider.fetch = AsyncMock(return_value=fresh_result)
-
-        result = _fetch_result(provider, WindowPeriod.DAY_7, cache=cache)
-
-        provider.fetch.assert_awaited_once_with(WindowPeriod.DAY_7)
-        assert result.metrics.remaining == 55.0
-
-    def test_fetch_result_no_last_good_fallback_for_claude_errors(
-        self,
-        tmp_path: Path,
-    ) -> None:
-        """
-        @brief Verify Claude fetch errors are returned directly without last-good cache fallback.
+        @brief Verify `_fetch_result` returns 7d branch from `_fetch_claude_dual`.
         """
         from aibar.cli import _fetch_result
-
-        cache = ResultCache(cache_dir=tmp_path)
-        cache._save_to_disk(_make_good_result(WindowPeriod.DAY_7))
-
-        error_result = ProviderResult(
-            provider=ProviderName.CLAUDE,
-            window=WindowPeriod.DAY_7,
-            metrics=UsageMetrics(),
-            error="Rate limited. Try again later.",
-            raw={"status_code": 429},
-        )
 
         provider = ClaudeOAuthProvider(token="sk-ant-test-token")
+        result_5h = _make_result(WindowPeriod.HOUR_5, remaining=73.0)
+        result_7d = _make_result(WindowPeriod.DAY_7, remaining=64.0)
 
-        with patch.object(
-            ClaudeOAuthProvider,
-            "fetch",
-            new_callable=AsyncMock,
-            return_value=error_result,
-        ):
-            result = _fetch_result(provider, WindowPeriod.DAY_7, cache=cache)
+        with patch(
+            "aibar.cli._fetch_claude_dual",
+            return_value=(result_5h, result_7d),
+        ) as mock_dual:
+            selected = _fetch_result(provider, WindowPeriod.DAY_7)
 
-        assert result.is_error
-        assert "Rate limited" in result.error
+        mock_dual.assert_called_once_with(provider, throttle_state=None)
+        assert selected.window == WindowPeriod.DAY_7
+        assert selected.metrics.remaining == 64.0
 
-
-class TestClaudeCooldownBypass:
-    """
-    @brief Verify ResultCache cooldown markers are disabled for Claude.
-    @satisfies CTN-004
-    """
-
-    def test_cache_set_does_not_activate_cooldown_on_429_for_claude(
-        self,
-        tmp_path: Path,
-    ) -> None:
+    def test_fetch_result_routes_5h_to_dual_fetch(self) -> None:
         """
-        @brief Verify cache.set does not enable Claude cooldown on 429 payload.
+        @brief Verify `_fetch_result` returns 5h branch from `_fetch_claude_dual`.
         """
-        cache = ResultCache(cache_dir=tmp_path)
-        error_result = ProviderResult(
-            provider=ProviderName.CLAUDE,
-            window=WindowPeriod.DAY_7,
-            metrics=UsageMetrics(),
-            error="Rate limited. Try again later.",
-            raw={"status_code": 429},
-        )
+        from aibar.cli import _fetch_result
 
-        cache.set(error_result)
+        provider = ClaudeOAuthProvider(token="sk-ant-test-token")
+        result_5h = _make_result(WindowPeriod.HOUR_5, remaining=57.0)
+        result_7d = _make_result(WindowPeriod.DAY_7, remaining=48.0)
 
-        assert not cache.is_rate_limited(ProviderName.CLAUDE)
+        with patch(
+            "aibar.cli._fetch_claude_dual",
+            return_value=(result_5h, result_7d),
+        ) as mock_dual:
+            selected = _fetch_result(provider, WindowPeriod.HOUR_5)
 
-    def test_get_last_good_returns_none_for_claude(self, tmp_path: Path) -> None:
-        """
-        @brief Verify get_last_good ignores Claude disk payloads.
-        """
-        cache = ResultCache(cache_dir=tmp_path)
-        cache._save_to_disk(_make_good_result(WindowPeriod.DAY_7))
-
-        assert cache.get_last_good(ProviderName.CLAUDE, WindowPeriod.DAY_7) is None
+        mock_dual.assert_called_once_with(provider, throttle_state=None)
+        assert selected.window == WindowPeriod.HOUR_5
+        assert selected.metrics.remaining == 57.0

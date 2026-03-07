@@ -10,6 +10,7 @@ import math
 import os
 import sys
 import time
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -17,7 +18,6 @@ import click
 from click.core import ParameterSource
 from pydantic import ValidationError
 
-from aibar.cache import ResultCache
 from aibar.config import (
     RuntimeConfig,
     config,
@@ -52,6 +52,30 @@ _WINDOW_PERIOD_TIMEDELTA: dict[WindowPeriod, timedelta] = {
 }
 _RESET_PENDING_MESSAGE = "Starts when the first message is sent"
 _CLAUDE_DUAL_SNAPSHOT_FILENAME = "claude_dual_last_success.json"
+
+
+@dataclass(frozen=True)
+class RetrievalPipelineOutput:
+    """
+    @brief Define shared provider-retrieval pipeline output.
+    @details Encodes deterministic retrieval state produced by the shared
+    cache-based pipeline used by `show` and Text UI refresh execution.
+    The pipeline enforces force-flag handling, idle-time gating, conditional
+    refresh into `cache.json`, and post-refresh readback from `cache.json`.
+    @note `payload` contains serialized provider results keyed by provider id.
+    @note `results` contains validated ProviderResult objects keyed by provider id.
+    @note `idle_active` indicates that idle-time gating blocked refresh.
+    @note `cache_available` indicates `cache.json` was readable for this run.
+    @satisfies REQ-009
+    @satisfies REQ-039
+    @satisfies REQ-042
+    @satisfies REQ-043
+    """
+
+    payload: dict[str, object]
+    results: dict[str, ProviderResult]
+    idle_active: bool
+    cache_available: bool
 
 
 def _normalize_utc(value: datetime) -> datetime:
@@ -418,32 +442,33 @@ def parse_provider(provider: str) -> ProviderName | None:
 def _fetch_result(
     provider: BaseProvider,
     window: WindowPeriod,
-    cache: ResultCache | None = None,
     throttle_state: dict[str, float | int] | None = None,
 ) -> ProviderResult:
     """
-    @brief Execute provider fetch with cache lookup, store, and last-good fallback.
-    @details Applies cache lookup/store/fallback only for non-Claude providers.
-    Claude provider requests always execute a fresh API fetch and skip cache state.
+    @brief Execute one provider refresh call without legacy TTL cache reuse.
+    @details Executes throttled provider fetch and returns normalized success/error
+    results. Claude 5h/7d requests are routed through `_fetch_claude_dual` so one
+    API request can provide deterministic dual-window rate-limit normalization.
     @param provider {BaseProvider} Provider instance to fetch from.
     @param window {WindowPeriod} Time window for the fetch.
-    @param cache {ResultCache | None} Optional cache instance for TTL-based result reuse.
     @param throttle_state {dict[str, float | int] | None} Mutable throttling state
         used to enforce inter-call spacing for live API requests.
-    @return {ProviderResult} Cached, fresh, or last-good fallback result.
+    @return {ProviderResult} Refreshed provider result for requested window.
     @satisfies CTN-004
+    @satisfies REQ-043
     @satisfies REQ-040
     """
-    use_cache = cache is not None and provider.name != ProviderName.CLAUDE
-
-    if use_cache and cache is not None:
-        cached = cache.get(provider.name, window)
-        if cached is not None:
-            return cached
-        if cache.is_rate_limited(provider.name):
-            last_good = cache.get_last_good(provider.name, window)
-            if last_good is not None:
-                return last_good
+    if (
+        isinstance(provider, ClaudeOAuthProvider)
+        and window in {WindowPeriod.HOUR_5, WindowPeriod.DAY_7}
+    ):
+        result_5h, result_7d = _fetch_claude_dual(
+            provider,
+            throttle_state=throttle_state,
+        )
+        if window == WindowPeriod.HOUR_5:
+            return result_5h
+        return result_7d
 
     try:
         _apply_api_call_delay(throttle_state)
@@ -454,38 +479,25 @@ def _fetch_result(
         result = provider._make_error_result(
             window=window, error=f"Unexpected error: {exc}"
         )
-
-    if use_cache and cache is not None:
-        cache.set(result)
-        if result.is_error:
-            last_good = cache.get_last_good(provider.name, window)
-            if last_good is not None:
-                return last_good
-
     return result
 
 
 def _fetch_claude_dual(
     provider: ClaudeOAuthProvider,
-    cache: ResultCache | None,
     throttle_state: dict[str, float | int] | None = None,
 ) -> tuple[ProviderResult, ProviderResult]:
     """
     @brief Fetch Claude 5h and 7d results via a single API call.
     @details Executes ClaudeOAuthProvider.fetch_all_windows for 5h and 7d on each invocation.
-    Cache parameter is accepted for call-site compatibility but intentionally unused
-    because Claude requests MUST bypass cache reuse.
-    If Claude returns HTTP 429 for both windows, normalize to a partial-window state:
-    keep the user-facing error only on 5h, force 5h usage to 100%, and restore 7d
-    usage/reset plus 5h reset from persisted Claude success payload when available.
+    If Claude returns HTTP 429 for both windows, normalize to a partial-window state
+    that preserves 5h error visibility and restores persisted reset/utilization
+    values for deterministic cache-backed rendering.
     @param provider {ClaudeOAuthProvider} Claude provider instance.
-    @param cache {ResultCache | None} Compatibility parameter; ignored for Claude fetch path.
     @param throttle_state {dict[str, float | int] | None} Mutable throttling state
         used to enforce inter-call spacing for live API requests.
     @return {tuple[ProviderResult, ProviderResult]} (5h_result, 7d_result).
-    @satisfies REQ-002, REQ-036, REQ-037, CTN-004, REQ-040
+    @satisfies REQ-002, REQ-036, REQ-037, CTN-004, REQ-040, REQ-043
     """
-    del cache
     _apply_api_call_delay(throttle_state)
     windows = [WindowPeriod.HOUR_5, WindowPeriod.DAY_7]
     try:
@@ -747,9 +759,203 @@ def _build_claude_rate_limited_partial_result(
             "status_code": 429,
             "rate_limit_partial": True,
             "snapshot_restored": snapshot_payload is not None,
+            "snapshot_payload": snapshot_payload,
         },
         error="Rate limited. Try again later." if include_error else None,
     )
+
+
+def _refresh_and_persist_cache_payload(
+    providers: dict[ProviderName, BaseProvider],
+    target_window: WindowPeriod,
+    runtime_config: RuntimeConfig,
+) -> dict[str, object]:
+    """
+    @brief Refresh provider data and persist updates into `cache.json`.
+    @details Executes provider fetches for configured providers only, updates
+    idle-time metadata, merges refreshed provider payloads with existing
+    persisted payload, and writes canonical JSON output to `cache.json`.
+    @param providers {dict[ProviderName, BaseProvider]} Provider scope for refresh.
+    @param target_window {WindowPeriod} Requested window for refresh execution.
+    @param runtime_config {RuntimeConfig} Runtime throttling configuration.
+    @return {dict[str, object]} Persisted payload after merge.
+    @satisfies CTN-004
+    @satisfies REQ-009
+    @satisfies REQ-038
+    @satisfies REQ-041
+    @satisfies REQ-043
+    """
+    fetched_results: list[ProviderResult] = []
+    refreshed_results: dict[str, ProviderResult] = {}
+    throttle_state: dict[str, float | int] = {
+        "delay_seconds": runtime_config.api_call_delay_seconds
+    }
+    for provider_name, provider in providers.items():
+        if not provider.is_configured():
+            continue
+        result = _fetch_result(
+            provider,
+            target_window,
+            throttle_state=throttle_state,
+        )
+        fetched_results.append(result)
+        refreshed_results[provider_name.value] = result
+
+    persisted_payload = load_cli_cache() or {}
+    if refreshed_results:
+        refreshed_payload = _serialize_results_payload(refreshed_results)
+        persisted_payload = {**persisted_payload, **refreshed_payload}
+        save_cli_cache(persisted_payload)
+    _update_idle_time_after_refresh(fetched_results, runtime_config)
+    return persisted_payload
+
+
+def retrieve_results_via_cache_pipeline(
+    provider_filter: ProviderName | None,
+    target_window: WindowPeriod,
+    force_refresh: bool,
+    providers: dict[ProviderName, BaseProvider],
+) -> RetrievalPipelineOutput:
+    """
+    @brief Execute shared cache-based retrieval pipeline for CLI and Text UI.
+    @details Applies required operation order: force-flag handling, idle-time
+    evaluation, conditional refresh/update of `cache.json`, then readback and
+    decode of provider data from `cache.json` for downstream rendering.
+    @param provider_filter {ProviderName | None} Optional provider selector.
+    @param target_window {WindowPeriod} Target window requested by caller.
+    @param force_refresh {bool} Force-refresh flag for current execution.
+    @param providers {dict[ProviderName, BaseProvider]} Provider registry.
+    @return {RetrievalPipelineOutput} Shared retrieval state and decoded results.
+    @satisfies REQ-009
+    @satisfies REQ-039
+    @satisfies REQ-042
+    @satisfies REQ-043
+    """
+    if force_refresh:
+        remove_idle_time_file()
+
+    cached_payload = load_cli_cache()
+    idle_state = load_idle_time()
+    now_utc = datetime.now(timezone.utc)
+    idle_active = (
+        not force_refresh
+        and idle_state is not None
+        and idle_state.idle_until_timestamp > int(now_utc.timestamp())
+    )
+    if idle_active:
+        if cached_payload is None:
+            return RetrievalPipelineOutput(
+                payload={},
+                results={},
+                idle_active=True,
+                cache_available=False,
+            )
+        return RetrievalPipelineOutput(
+            payload=_filter_cached_payload(cached_payload, provider_filter),
+            results=_load_cached_results(
+                payload=cached_payload,
+                provider_filter=provider_filter,
+                target_window=target_window,
+                providers=providers,
+            ),
+            idle_active=True,
+            cache_available=True,
+        )
+
+    runtime_config = load_runtime_config()
+    if provider_filter is None:
+        refresh_scope = providers
+    else:
+        selected_provider = providers.get(provider_filter)
+        refresh_scope = (
+            {}
+            if selected_provider is None
+            else {provider_filter: selected_provider}
+        )
+
+    persisted_payload = _refresh_and_persist_cache_payload(
+        providers=refresh_scope,
+        target_window=target_window,
+        runtime_config=runtime_config,
+    )
+    reloaded_payload = load_cli_cache()
+    effective_payload = reloaded_payload or persisted_payload
+    cache_available = reloaded_payload is not None or bool(persisted_payload)
+    if not cache_available:
+        return RetrievalPipelineOutput(
+            payload={},
+            results={},
+            idle_active=False,
+            cache_available=False,
+        )
+    return RetrievalPipelineOutput(
+        payload=_filter_cached_payload(effective_payload, provider_filter),
+        results=_load_cached_results(
+            payload=effective_payload,
+            provider_filter=provider_filter,
+            target_window=target_window,
+            providers=providers,
+        ),
+        idle_active=False,
+        cache_available=True,
+    )
+
+
+def _build_cached_dual_window_results(
+    provider_name: ProviderName,
+    result: ProviderResult,
+    providers: dict[ProviderName, BaseProvider],
+) -> tuple[ProviderResult, ProviderResult] | None:
+    """
+    @brief Build Claude/Codex dual-window display results from cached payload data.
+    @details For cached Claude partial-rate-limit payloads, reconstructs the 5h
+    error window and 7d restored-metrics window using persisted snapshot data.
+    For other payloads, attempts parser-based 5h/7d projection from cached raw.
+    @param provider_name {ProviderName} Provider associated with cached result.
+    @param result {ProviderResult} Cached provider result.
+    @param providers {dict[ProviderName, BaseProvider]} Provider registry.
+    @return {tuple[ProviderResult, ProviderResult] | None} (5h, 7d) results when
+        dual-window expansion succeeds; otherwise None.
+    @satisfies REQ-002
+    @satisfies REQ-036
+    @satisfies REQ-043
+    """
+    if (
+        provider_name == ProviderName.CLAUDE
+        and isinstance(result.raw, dict)
+        and result.raw.get("rate_limit_partial")
+    ):
+        snapshot_payload = result.raw.get("snapshot_payload")
+        normalized_snapshot = (
+            snapshot_payload if isinstance(snapshot_payload, dict) else None
+        )
+        return (
+            _build_claude_rate_limited_partial_result(
+                WindowPeriod.HOUR_5,
+                include_error=True,
+                snapshot_payload=normalized_snapshot,
+            ),
+            _build_claude_rate_limited_partial_result(
+                WindowPeriod.DAY_7,
+                include_error=False,
+                snapshot_payload=normalized_snapshot,
+            ),
+        )
+
+    provider = providers.get(provider_name)
+    parser = getattr(provider, "_parse_response", None)
+    if not callable(parser) or not isinstance(result.raw, dict):
+        return None
+    try:
+        result_5h = parser(result.raw, WindowPeriod.HOUR_5)
+        result_7d = parser(result.raw, WindowPeriod.DAY_7)
+    except (AttributeError, KeyError, TypeError, ValueError):
+        return None
+    if not isinstance(result_5h, ProviderResult):
+        return None
+    if not isinstance(result_7d, ProviderResult):
+        return None
+    return (result_5h, result_7d)
 
 
 @click.group()
@@ -791,9 +997,9 @@ def main() -> None:
 def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> None:
     """
     @brief Execute `show` with idle-time cache gating and throttled provider refresh.
-    @details Uses persisted idle-time metadata to decide between cache-only output
-    and live provider refresh. Live refresh persists canonical JSON cache payload,
-    updates idle-time state, and enforces configurable inter-call delay.
+    @details Delegates provider retrieval to a shared cache-based pipeline that
+    applies force handling, idle-time gating, conditional cache refresh, and
+    deterministic readback from `cache.json` before rendering.
     @param provider {str} CLI provider selector string.
     @param window {str} CLI window period string.
     @param output_json {bool} When True, emit JSON output instead of formatted text.
@@ -806,71 +1012,14 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
     @satisfies REQ-040
     @satisfies REQ-041
     @satisfies REQ-042
+    @satisfies REQ-043
     """
     window_period = parse_window(window)
     provider_filter = parse_provider(provider)
 
     ctx = click.get_current_context()
     window_source = ctx.get_parameter_source("window")
-    runtime_config = load_runtime_config()
-
-    if force_refresh:
-        remove_idle_time_file()
-
     providers = get_providers()
-    cached_payload = load_cli_cache()
-    idle_state = load_idle_time()
-    now_utc = datetime.now(timezone.utc)
-
-    idle_active = (
-        not force_refresh
-        and idle_state is not None
-        and idle_state.idle_until_timestamp > int(now_utc.timestamp())
-    )
-    if idle_active:
-        if cached_payload is None:
-            if output_json:
-                click.echo(json.dumps({}, indent=2))
-            else:
-                click.echo("Cache unavailable while idle-time is active.")
-            return
-
-        cached_results = _load_cached_results(
-            payload=cached_payload,
-            provider_filter=provider_filter,
-            target_window=window_period,
-            providers=providers,
-        )
-        if output_json:
-            filtered_payload = _filter_cached_payload(cached_payload, provider_filter)
-            click.echo(json.dumps(filtered_payload, indent=2))
-            return
-
-        if provider_filter is not None and provider_filter.value not in cached_results:
-            click.echo(f"\n{provider_filter.value}: Not available in cache")
-            return
-
-        for provider_key, result in cached_results.items():
-            provider_name = ProviderName(provider_key)
-            show_dual_windows = (
-                window_source == ParameterSource.DEFAULT
-                and provider_name in {ProviderName.CLAUDE, ProviderName.CODEX}
-            )
-            if show_dual_windows:
-                provider_instance = providers.get(provider_name)
-                parser = getattr(provider_instance, "_parse_response", None)
-                if callable(parser) and isinstance(result.raw, dict):
-                    try:
-                        result_5h = parser(result.raw, WindowPeriod.HOUR_5)
-                        result_7d = parser(result.raw, WindowPeriod.DAY_7)
-                    except (AttributeError, KeyError, TypeError, ValueError):
-                        _print_result(provider_name, result)
-                        continue
-                    _print_result(provider_name, result_5h, label="5h")
-                    _print_result(provider_name, result_7d, label="7d")
-                    continue
-            _print_result(provider_name, result)
-        return
 
     # Filter to specific provider if requested
     if provider_filter:
@@ -879,88 +1028,52 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
                 f"Provider {provider_filter.value} not implemented yet.", err=True
             )
             sys.exit(1)
-        providers = {provider_filter: providers[provider_filter]}
 
-    results: dict[str, ProviderResult] = {}
-    fetched_results: list[ProviderResult] = []
-    throttle_state: dict[str, float | int] = {
-        "delay_seconds": runtime_config.api_call_delay_seconds
-    }
-    for name, prov in providers.items():
-        if not prov.is_configured():
-            if not output_json:
-                click.echo(f"\n{name.value}: Not configured")
-                click.echo(f"  Set {config.ENV_VARS.get(name)} environment variable")
-            continue
-
-        # Show both 5h and 7d windows for quota-based providers when using default window
-        show_dual_windows = (
-            not output_json
-            and window_source == ParameterSource.DEFAULT
-            and name in {ProviderName.CLAUDE, ProviderName.CODEX}
-        )
-
-        if show_dual_windows:
-            if name == ProviderName.CLAUDE and isinstance(prov, ClaudeOAuthProvider):
-                result_5h, result_7d = _fetch_claude_dual(
-                    prov,
-                    cache=None,
-                    throttle_state=throttle_state,
-                )
-                fetched_results.extend([result_5h, result_7d])
-            elif name == ProviderName.CODEX and isinstance(prov, CodexProvider):
-                result_5h = _fetch_result(
-                    prov,
-                    WindowPeriod.HOUR_5,
-                    cache=None,
-                    throttle_state=throttle_state,
-                )
-                fetched_results.append(result_5h)
-                if not result_5h.is_error and isinstance(result_5h.raw, dict):
-                    result_7d = prov._parse_response(result_5h.raw, WindowPeriod.DAY_7)
-                else:
-                    result_7d = _fetch_result(
-                        prov,
-                        WindowPeriod.DAY_7,
-                        cache=None,
-                        throttle_state=throttle_state,
-                    )
-                    fetched_results.append(result_7d)
-            else:
-                result_5h = _fetch_result(
-                    prov,
-                    WindowPeriod.HOUR_5,
-                    cache=None,
-                    throttle_state=throttle_state,
-                )
-                result_7d = _fetch_result(
-                    prov,
-                    WindowPeriod.DAY_7,
-                    cache=None,
-                    throttle_state=throttle_state,
-                )
-                fetched_results.extend([result_5h, result_7d])
-            results[name.value] = result_7d
-            _print_result(name, result_5h, label="5h")
-            _print_result(name, result_7d, label="7d")
+    retrieval = retrieve_results_via_cache_pipeline(
+        provider_filter=provider_filter,
+        target_window=window_period,
+        force_refresh=force_refresh,
+        providers=providers,
+    )
+    if retrieval.idle_active and not retrieval.cache_available:
+        if output_json:
+            click.echo(json.dumps({}, indent=2))
         else:
-            result = _fetch_result(
-                prov,
-                window_period,
-                cache=None,
-                throttle_state=throttle_state,
-            )
-            fetched_results.append(result)
-            results[name.value] = result
-            if not output_json:
-                _print_result(name, result)
-
-    output_payload = _serialize_results_payload(results)
-    save_cli_cache(output_payload)
-    _update_idle_time_after_refresh(fetched_results, runtime_config)
+            click.echo("Cache unavailable while idle-time is active.")
+        return
 
     if output_json:
-        click.echo(json.dumps(output_payload, indent=2))
+        click.echo(json.dumps(retrieval.payload, indent=2))
+        return
+
+    for name, prov in providers.items():
+        if not prov.is_configured():
+            if provider_filter is None or provider_filter == name:
+                click.echo(f"\n{name.value}: Not configured")
+                click.echo(f"  Set {config.ENV_VARS.get(name)} environment variable")
+
+    if provider_filter is not None and provider_filter.value not in retrieval.results:
+        click.echo(f"\n{provider_filter.value}: Not available in cache")
+        return
+
+    for provider_key, result in retrieval.results.items():
+        provider_name = ProviderName(provider_key)
+        show_dual_windows = (
+            window_source == ParameterSource.DEFAULT
+            and provider_name in {ProviderName.CLAUDE, ProviderName.CODEX}
+        )
+        if show_dual_windows:
+            dual_results = _build_cached_dual_window_results(
+                provider_name=provider_name,
+                result=result,
+                providers=providers,
+            )
+            if dual_results is not None:
+                result_5h, result_7d = dual_results
+                _print_result(provider_name, result_5h, label="5h")
+                _print_result(provider_name, result_7d, label="7d")
+                continue
+        _print_result(provider_name, result)
 
 
 def _print_result(name: ProviderName, result, label: str | None = None) -> None:
