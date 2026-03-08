@@ -20,7 +20,7 @@ const ENV_FILE_PATH = GLib.get_home_dir() + '/.config/aibar/env';
 const RESET_PENDING_MESSAGE = 'Starts when the first message is sent';
 const RATE_LIMIT_ERROR_MESSAGE = 'Rate limited. Try again later.';
 const PROVIDER_DISPLAY_NAMES = {
-    geminiai: 'GeminiAI',
+    geminiai: 'GEMINIAI',
 };
 
 /**

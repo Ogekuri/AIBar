@@ -479,7 +479,7 @@ from typing import Any
 
 ---
 
-# cli.py | Python | 2088L | 54 symbols | 21 imports | 67 comments
+# cli.py | Python | 2099L | 54 symbols | 21 imports | 67 comments
 > Path: `src/aibar/aibar/cli.py`
 - @brief Command-line interface for aibar.
 - @details Defines command parsing, provider dispatch, formatted output, setup helpers, login flows, and UI launch hooks.
@@ -503,10 +503,10 @@ from aibar.providers import (
 from aibar.providers.base import (
 from aibar.ui import run_ui
 from aibar.config import (
-from aibar.providers.geminiai import GeminiAICredentialStore
+from aibar.providers.geminiai import GEMINIAI_OAUTH_SCOPES, GeminiAICredentialStore
 from aibar.claude_cli_auth import ClaudeCLIAuth
 from aibar.providers.copilot import CopilotProvider
-from aibar.providers.geminiai import GeminiAICredentialStore
+from aibar.providers.geminiai import GEMINIAI_OAUTH_SCOPES, GeminiAICredentialStore
 ```
 
 ## Definitions
@@ -962,7 +962,7 @@ providers other than Claude.
 
 ### fn `def setup() -> None` (L1712-1911)
 - @brief Execute setup.
-- @details Prompts for `idle_delay_seconds`, `api_call_delay_seconds`, and `gnome_refresh_interval_seconds` in order, then prompts for provider currency symbols including `geminiai` (choices: `$`, `£`, `€`, default `$`), then persists all values to `~/.config/aibar/config.json`. Also prompts for provider API keys and writes them to `~/.config/aibar/env`.
+- @details Prompts for `idle_delay_seconds`, `api_call_delay_seconds`, and `gnome_refresh_interval_seconds` in order, then prompts for provider currency symbols including `geminiai` (choices: `$`, `£`, `€`, default `$`), then persists all values to `~/.config/aibar/config.json`. GeminiAI OAuth source supports `skip`, `file`, `paste`, and `login` (re-authorization with current scopes). Also prompts for provider API keys and writes them to `~/.config/aibar/env`.
 - @return {None} Function return value.
 - @satisfies REQ-005
 - @satisfies REQ-049
@@ -970,23 +970,23 @@ providers other than Claude.
 - @satisfies REQ-056
 - @satisfies REQ-059
 
-### fn `def login(provider: str) -> None` (L1954-1972)
+### fn `def login(provider: str) -> None` (L1965-1983)
 - @brief Execute login.
 - @details Applies login logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param provider {str} Input parameter `provider`.
 - @return {None} Function return value.
 
-### fn `def _login_claude() -> None` `priv` (L1973-2021)
+### fn `def _login_claude() -> None` `priv` (L1984-2032)
 - @brief Execute login claude.
 - @details Applies login claude logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_copilot() -> None` `priv` (L2022-2049)
+### fn `def _login_copilot() -> None` `priv` (L2033-2060)
 - @brief Execute login copilot.
 - @details Applies login copilot logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_geminiai() -> None` `priv` (L2050-2086)
+### fn `def _login_geminiai() -> None` `priv` (L2061-2097)
 - @brief Execute GeminiAI OAuth login flow.
 - @details Reuses persisted OAuth client configuration to launch browser-based authorization and persist refresh-capable Google credentials.
 - @return {None} Function return value.
@@ -1046,10 +1046,10 @@ providers other than Claude.
 |`ui`|fn|pub|1684-1694|def ui() -> None|
 |`env`|fn|pub|1699-1707|def env() -> None|
 |`setup`|fn|pub|1712-1911|def setup() -> None|
-|`login`|fn|pub|1954-1972|def login(provider: str) -> None|
-|`_login_claude`|fn|priv|1973-2021|def _login_claude() -> None|
-|`_login_copilot`|fn|priv|2022-2049|def _login_copilot() -> None|
-|`_login_geminiai`|fn|priv|2050-2086|def _login_geminiai() -> None|
+|`login`|fn|pub|1965-1983|def login(provider: str) -> None|
+|`_login_claude`|fn|priv|1984-2032|def _login_claude() -> None|
+|`_login_copilot`|fn|priv|2033-2060|def _login_copilot() -> None|
+|`_login_geminiai`|fn|priv|2061-2097|def _login_geminiai() -> None|
 
 
 ---

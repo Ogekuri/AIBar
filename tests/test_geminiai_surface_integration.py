@@ -36,6 +36,7 @@ def test_cli_registers_geminiai_provider_and_login_paths() -> None:
     source = CLI_PATH.read_text(encoding="utf-8")
     assert "ProviderName.GEMINIAI: GeminiAIProvider()," in source
     assert "geminiai oauth source" in source
+    assert 'click.Choice(["skip", "file", "paste", "login"])' in source
     assert "_currency_provider_names = [p.value for p in ProviderName]" in source
     assert 'help="Provider to query (claude, openai, openrouter, copilot, codex, geminiai, all)"' in source
     assert 'help="Provider to login to (claude, copilot, geminiai)"' in source
@@ -66,7 +67,7 @@ def test_extension_and_dependencies_include_geminiai_support() -> None:
     requirements_source = REQUIREMENTS_PATH.read_text(encoding="utf-8")
 
     assert "this._providerOrder = ['claude', 'openrouter', 'copilot', 'codex', 'geminiai'];" in extension_source
-    assert "geminiai: 'GeminiAI'" in extension_source
+    assert "geminiai: 'GEMINIAI'" in extension_source
     assert "google-api-python-client" in pyproject_source
     assert "google-cloud-bigquery" in pyproject_source
     assert "google-auth-oauthlib" in pyproject_source

@@ -212,3 +212,108 @@ def test_setup_accepts_geminiai_oauth_json_paste_and_persists_runtime_fields(
     runtime_doc = json.loads((config_dir / "config.json").read_text(encoding="utf-8"))
     assert runtime_doc["geminiai_project_id"] == "gen-lang-client-0834428245"
     assert "geminiai_billing_account" not in runtime_doc
+
+
+def test_setup_geminiai_oauth_login_source_reauthorizes_with_current_scopes(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """
+    @brief Verify setup `login` OAuth source re-runs GeminiAI authorization.
+    @details Creates persisted GeminiAI OAuth client config, selects setup source
+    `login`, and asserts `authorize_interactively` is called once with
+    `GEMINIAI_OAUTH_SCOPES`.
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @param tmp_path {Path} Temporary path fixture.
+    @return {None} Function return value.
+    @satisfies REQ-055
+    @satisfies REQ-056
+    """
+    config_dir = _patch_config_paths(monkeypatch, tmp_path)
+    from aibar.providers import geminiai as geminiai_module
+
+    client_path = config_dir / "geminiai_oauth_client.json"
+    token_path = config_dir / "geminiai_oauth_token.json"
+    monkeypatch.setattr(geminiai_module, "GEMINIAI_OAUTH_CLIENT_PATH", client_path)
+    monkeypatch.setattr(geminiai_module, "GEMINIAI_OAUTH_TOKEN_PATH", token_path)
+
+    client_path.parent.mkdir(parents=True, exist_ok=True)
+    client_path.write_text(
+        json.dumps(
+            {
+                "installed": {
+                    "client_id": "example-client.apps.googleusercontent.com",
+                    "project_id": "gen-lang-client-0834428245",
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+                    "client_secret": "example-secret",
+                    "redirect_uris": ["http://localhost"],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    recorded_scopes: list[tuple[str, ...]] = []
+
+    def _fake_authorize(self: object, scopes: tuple[str, ...] = ()) -> object:
+        """
+        @brief Capture scopes used by setup login-triggered OAuth authorization.
+        @param self {object} Credential store instance.
+        @param scopes {tuple[str, ...]} OAuth scopes passed by setup flow.
+        @return {object} Placeholder credentials object.
+        """
+        del self
+        recorded_scopes.append(tuple(scopes))
+        return object()
+
+    monkeypatch.setattr(
+        geminiai_module.GeminiAICredentialStore,
+        "authorize_interactively",
+        _fake_authorize,
+    )
+
+    responses = iter(
+        [
+            300,
+            20,
+            60,
+            "$",
+            "$",
+            "$",
+            "$",
+            "$",
+            "$",
+            "login",
+            "",
+            "",
+            "",
+            "",
+        ]
+    )
+
+    def _fake_prompt(
+        text: str,
+        default=None,
+        show_default: bool = True,
+        type=None,
+        **kwargs,
+    ):
+        """
+        @brief Return deterministic prompt responses for setup login-source flow.
+        @param text {str} Prompt label.
+        @param default {object | None} Prompt default value.
+        @param show_default {bool} Prompt default visibility flag.
+        @param type {object | None} Optional click type.
+        @return {object} Predetermined prompt response.
+        """
+        del text, default, show_default, type, kwargs
+        return next(responses)
+
+    monkeypatch.setattr("aibar.cli.click.prompt", _fake_prompt)
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["setup"])
+    assert result.exit_code == 0, result.output
+    assert recorded_scopes == [geminiai_module.GEMINIAI_OAUTH_SCOPES]

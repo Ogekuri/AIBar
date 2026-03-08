@@ -229,7 +229,7 @@ def test_geminiai_extension_tab_order_label_and_bright_pink_styles() -> None:
     """
     @brief Verify GeminiAI extension integration uses expected order, label, and colors.
     @details Asserts provider ordering array places `geminiai` after `codex`,
-    display-name mapping renders `GeminiAI`, and stylesheet defines bright-pink
+    display-name mapping renders `GEMINIAI`, and stylesheet defines bright-pink
     tab/card classes for GeminiAI.
     @satisfies REQ-061
     @satisfies REQ-062
@@ -240,7 +240,7 @@ def test_geminiai_extension_tab_order_label_and_bright_pink_styles() -> None:
 
     assert "this._providerOrder = ['claude', 'openrouter', 'copilot', 'codex', 'geminiai'];" in extension_source
     assert "const PROVIDER_DISPLAY_NAMES = {" in extension_source
-    assert "geminiai: 'GeminiAI'" in extension_source
+    assert "geminiai: 'GEMINIAI'" in extension_source
     assert "_getProviderDisplayName(providerName)" in extension_source
     assert "text: _getProviderDisplayName(providerName)" in extension_source
 

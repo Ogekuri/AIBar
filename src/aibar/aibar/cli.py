@@ -1715,8 +1715,9 @@ def setup() -> None:
     @details Prompts for `idle_delay_seconds`, `api_call_delay_seconds`, and
     `gnome_refresh_interval_seconds` in order, then prompts for provider
     currency symbols including `geminiai` (choices: `$`, `£`, `€`, default `$`), then persists
-    all values to `~/.config/aibar/config.json`. Also prompts for provider
-    API keys and writes them to `~/.config/aibar/env`.
+    all values to `~/.config/aibar/config.json`. GeminiAI OAuth source supports
+    `skip`, `file`, `paste`, and `login` (re-authorization with current scopes).
+    Also prompts for provider API keys and writes them to `~/.config/aibar/env`.
     @return {None} Function return value.
     @satisfies REQ-005
     @satisfies REQ-049
@@ -1733,7 +1734,7 @@ def setup() -> None:
         save_runtime_config,
         write_env_file,
     )
-    from aibar.providers.geminiai import GeminiAICredentialStore
+    from aibar.providers.geminiai import GEMINIAI_OAUTH_SCOPES, GeminiAICredentialStore
 
     click.echo()
     click.echo("Usage UI Setup")
@@ -1790,7 +1791,7 @@ def setup() -> None:
     )
     oauth_source = click.prompt(
         "  geminiai oauth source",
-        type=click.Choice(["skip", "file", "paste"]),
+        type=click.Choice(["skip", "file", "paste", "login"]),
         default="skip",
         show_choices=True,
     )
@@ -1798,7 +1799,17 @@ def setup() -> None:
         click.echo("  -> Skipped")
     else:
         client_payload_raw: dict[str, object] | None = None
-        if oauth_source == "file":
+        if oauth_source == "login":
+            if not credential_store.has_client_config():
+                click.echo(click.style("  -> GeminiAI OAuth client config not found.", fg="red"))
+                click.echo("  -> Configure OAuth client with source 'file' or 'paste' first.")
+            else:
+                try:
+                    credential_store.authorize_interactively(scopes=GEMINIAI_OAUTH_SCOPES)
+                    click.echo("  -> OAuth token saved")
+                except (FileNotFoundError, ValueError, OSError, ProviderError) as exc:
+                    click.echo(click.style(f"  -> GeminiAI OAuth setup failed: {exc}", fg="red"))
+        elif oauth_source == "file":
             default_path = str(credential_store.client_config_path)
             oauth_path_raw = click.prompt(
                 "  geminiai oauth client json path",
@@ -1834,7 +1845,7 @@ def setup() -> None:
                     geminiai_project_id = detected_project_id
                 click.echo("  -> OAuth client saved")
                 if click.confirm("  Open browser and authorize GeminiAI now?", default=True):
-                    credential_store.authorize_interactively()
+                    credential_store.authorize_interactively(scopes=GEMINIAI_OAUTH_SCOPES)
                     click.echo("  -> OAuth token saved")
             except (FileNotFoundError, ValueError, OSError, ProviderError) as exc:
                 click.echo(click.style(f"  -> GeminiAI OAuth setup failed: {exc}", fg="red"))
@@ -2056,7 +2067,7 @@ def _login_geminiai() -> None:
     @satisfies REQ-055
     @satisfies REQ-056
     """
-    from aibar.providers.geminiai import GeminiAICredentialStore
+    from aibar.providers.geminiai import GEMINIAI_OAUTH_SCOPES, GeminiAICredentialStore
 
     click.echo()
     click.echo("GeminiAI Login")
@@ -2070,7 +2081,7 @@ def _login_geminiai() -> None:
         sys.exit(1)
 
     try:
-        credentials = credential_store.authorize_interactively()
+        credentials = credential_store.authorize_interactively(scopes=GEMINIAI_OAUTH_SCOPES)
     except (FileNotFoundError, ValueError, OSError, ProviderError) as exc:
         click.echo(click.style(f"\n Login failed: {exc}", fg="red"))
         sys.exit(1)
