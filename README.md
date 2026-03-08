@@ -39,20 +39,42 @@ AIBar aggregates usage metrics for Claude, OpenAI, OpenRouter, GitHub Copilot, C
 
 ## Screenshots
 
+### Status Bar
+
+[![Screenshot10](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot10.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot10.png)
+
 ### Claude
 
-[![Screenshot1](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot1.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot1.png)
+[![Screenshot01](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot01.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot01.png)
 
+[![Screenshot02](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot02.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot02.png)
+
+[![Screenshot03](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot03.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot03.png)
+
+
+### Claude
+
+[![Screenshot04](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot04.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot04.png)
+
+### OpenRouter
+
+[![Screenshot05](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot05.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot05.png)
 
 ### GitHub Copilot
 
-
-[![Screenshot2](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot2.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot2.png)
-
+[![Screenshot06](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot06.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot06.png)
 
 ### OpenAI Codex
 
-[![Screenshot3](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot3.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot3.png)
+[![Screenshot07](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot07.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot07.png)
+
+### Gemini AI API
+
+[![Screenshot08](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot08.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot07.png)
+
+### OpenAI API
+
+[![Screenshot09](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot09.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot07.png)
 
 
 ## Quick Start
