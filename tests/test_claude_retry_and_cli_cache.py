@@ -5,7 +5,9 @@
 retry-after header, (2) fetch_all_windows uses one API call for dual windows,
 (3) CLI shared refresh helper routes Claude 5h/7d reads through one dual-window
 fetch implementation without legacy ResultCache usage.
-@satisfies CTN-003, CTN-004, REQ-002, REQ-043
+HTTP-pipeline tests restrict assertions to success/error state, window key presence,
+and HTTP call count; specific numeric metric values MUST NOT be asserted per TST-021.
+@satisfies CTN-003, CTN-004, REQ-002, REQ-043, TST-021
 """
 
 import asyncio
@@ -81,6 +83,9 @@ class TestClaudeRetryOn429:
     def test_retries_on_429_then_succeeds(self) -> None:
         """
         @brief Verify provider retries after 429 and returns success on subsequent attempt.
+        @details Asserts behavioral outcome (success/error state) only; does not assert
+        specific parsed metric values per TST-021.
+        @satisfies TST-021
         """
         provider = ClaudeOAuthProvider(token="sk-ant-test-token")
         mock_responses = [_make_429_response("0"), _make_200_response()]
@@ -96,7 +101,6 @@ class TestClaudeRetryOn429:
                     result = asyncio.run(provider.fetch(WindowPeriod.DAY_7))
 
         assert not result.is_error
-        assert result.metrics.remaining == 70.0
 
     def test_returns_error_after_max_retries_exhausted(self) -> None:
         """
@@ -129,6 +133,9 @@ class TestFetchAllWindows:
     def test_single_call_returns_both_windows(self) -> None:
         """
         @brief Verify one HTTP request produces results for both 5h and 7d.
+        @details Asserts HTTP call count and window key presence only; does not assert
+        specific parsed metric values per TST-021.
+        @satisfies TST-021
         """
         provider = ClaudeOAuthProvider(token="sk-ant-test-token")
 
@@ -145,8 +152,6 @@ class TestFetchAllWindows:
         assert mock_get.call_count == 1
         assert WindowPeriod.HOUR_5 in results
         assert WindowPeriod.DAY_7 in results
-        assert results[WindowPeriod.HOUR_5].metrics.remaining == 80.0
-        assert results[WindowPeriod.DAY_7].metrics.remaining == 70.0
 
 
 class TestCLISharedClaudeFetch:

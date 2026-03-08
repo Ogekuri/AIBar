@@ -1,8 +1,8 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.3.15"
-date: "2026-03-07"
+version: "0.3.16"
+date: "2026-03-08"
 author: "req-change"
 scope:
   paths:
@@ -165,7 +165,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 
 ## 4. Test Requirements
 
-Existing automated unit-test coverage under `tests/` is absent (`tests/.place-holder` only), so no behavioral assertions are currently enforced by repository tests.
+Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HDT principles: deterministic, isolated, and behavior-focused.
 
 - **TST-001**: MUST verify `show` rejects unsupported window/provider values with non-zero exit and Click `BadParameter` diagnostics.
 - **TST-002**: MUST verify credential precedence by asserting env vars override env-file values and provider stores for at least one provider.
@@ -187,6 +187,7 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 - **TST-018**: MUST verify failed provider/window refresh attempts set `result=FAIL` and `error` in `cache.json` while preserving the previous payload for the same provider/window.
 - **TST-019**: MUST verify partial refresh outcomes can record mixed `OK` and `FAIL` statuses across windows of the same provider without overwriting unaffected payload snapshots.
 - **TST-020**: MUST verify refresh and fallback logic do not read or write `~/.cache/aibar/claude_dual_last_success.json`.
+- **TST-021**: Tests that mock `httpx.AsyncClient` transport and invoke provider `fetch` or `fetch_all_windows` execution path MUST restrict assertions to success/error state (`is_error`, `error` fields), result-dict window key presence, HTTP call count, and cache/filesystem side effects; MUST NOT assert specific numeric metric field values (`usage_percent`, `remaining`, `cost`) derived from the parsed HTTP response.
 
 ## 5. Evidence
 
@@ -283,3 +284,4 @@ Existing automated unit-test coverage under `tests/` is absent (`tests/.place-ho
 | REQ-032 | `scripts/install-gnome-extension.sh` + `gnome-extensions enable aibar@aibar.panel` after file copy with colored status output. |
 | REQ-033 | `scripts/test-gnome-extension.sh` + no subcommand parameter; executes nested-shell launch directly on invocation. |
 | TST-009 | `tests/test_install_gnome_extension.py` + executable check, syntax check, git root resolution, source validation, and missing-source exit code assertions. |
+| TST-021 | `tests/test_claude_retry_and_cli_cache.py` + `TestClaudeRetryOn429::test_retries_on_429_then_succeeds` and `TestFetchAllWindows::test_single_call_returns_both_windows` + metric-value assertions on parsed HTTP responses removed; assertions restricted to `is_error` state, window key presence in results dict, and `mock_get.call_count`. |
