@@ -2,7 +2,7 @@
 @file
 @brief GeminiAI provider with Google OAuth, Monitoring, and BigQuery billing integration.
 @details Implements OAuth credential persistence, token refresh, usage retrieval from
-Cloud Monitoring and current-month billing retrieval from BigQuery, then normalizes
+Cloud Monitoring and latest-available billing-period retrieval from BigQuery, then normalizes
 results into AIBar provider result contracts.
 """
 
@@ -368,22 +368,37 @@ class GeminiAIProvider(BaseProvider):
     """
     @brief GeminiAI usage provider backed by Monitoring and BigQuery APIs.
     @details Retrieves Generative Language API usage counters and status telemetry
-    from Cloud Monitoring, retrieves current-month billing costs from BigQuery export,
+    from Cloud Monitoring, retrieves latest-available billing-period costs from BigQuery export,
     then maps data into AIBar `ProviderResult` models.
     """
 
     name = ProviderName.GEMINIAI
 
-    SERVICE_FILTER = (
-        'resource.type="api" AND resource.labels.service="generativelanguage.googleapis.com"'
+    SERVICE_FILTER = 'resource.labels.service="generativelanguage.googleapis.com"'
+    REQUEST_COUNT_FILTERS: tuple[str, ...] = (
+        'resource.type="consumed_api" AND '
+        + SERVICE_FILTER
+        + ' AND metric.type="serviceruntime.googleapis.com/api/request_count"',
+        'resource.type="api" AND '
+        + SERVICE_FILTER
+        + ' AND metric.type="serviceruntime.googleapis.com/api/request_count"',
+        SERVICE_FILTER + ' AND metric.type="serviceruntime.googleapis.com/api/request_count"',
     )
-    REQUEST_COUNT_FILTER = (
-        SERVICE_FILTER + ' AND metric.type="serviceruntime.googleapis.com/api/request_count"'
-    )
+    REQUEST_COUNT_FILTER = REQUEST_COUNT_FILTERS[0]
     TOKEN_COUNT_FILTERS: tuple[str, ...] = (
-        SERVICE_FILTER + ' AND metric.type="generativelanguage.googleapis.com/request/token_count"',
-        SERVICE_FILTER + ' AND metric.type="aiplatform.googleapis.com/prediction/token_count"',
-        REQUEST_COUNT_FILTER,
+        'resource.type="consumed_api" AND '
+        + SERVICE_FILTER
+        + ' AND metric.type="generativelanguage.googleapis.com/request/token_count"',
+        'resource.type="api" AND '
+        + SERVICE_FILTER
+        + ' AND metric.type="generativelanguage.googleapis.com/request/token_count"',
+        'resource.type="consumed_api" AND '
+        + SERVICE_FILTER
+        + ' AND metric.type="aiplatform.googleapis.com/prediction/token_count"',
+        'resource.type="api" AND '
+        + SERVICE_FILTER
+        + ' AND metric.type="aiplatform.googleapis.com/prediction/token_count"',
+        *REQUEST_COUNT_FILTERS,
     )
     LATENCY_FILTER = (
         SERVICE_FILTER + ' AND metric.type="serviceruntime.googleapis.com/api/request_latencies"'
@@ -485,14 +500,23 @@ class GeminiAIProvider(BaseProvider):
             monitoring_service = self._build_monitoring_service(credentials)
             time_range = self._build_window_range(window)
 
-            request_total, request_payload = self._query_monitoring_metric(
-                monitoring_service=monitoring_service,
-                project_id=project_id,
-                metric_filter=self.REQUEST_COUNT_FILTER,
-                start_time=time_range.start_time,
-                end_time=time_range.end_time,
-                allow_missing=True,
-            )
+            request_total: float | None = None
+            request_filter_used: str | None = None
+            request_payload: dict[str, Any] = {}
+            for metric_filter in self.REQUEST_COUNT_FILTERS:
+                metric_total, metric_payload = self._query_monitoring_metric(
+                    monitoring_service=monitoring_service,
+                    project_id=project_id,
+                    metric_filter=metric_filter,
+                    start_time=time_range.start_time,
+                    end_time=time_range.end_time,
+                    allow_missing=True,
+                )
+                if metric_total is not None:
+                    request_total = metric_total
+                    request_filter_used = metric_filter
+                    request_payload = metric_payload
+                    break
 
             token_total: float | None = None
             token_filter_used: str | None = None
@@ -540,7 +564,7 @@ class GeminiAIProvider(BaseProvider):
             raw_payload: dict[str, Any] = {
                 "project_id": project_id,
                 "monitoring": {
-                    "request_metric_filter": self.REQUEST_COUNT_FILTER,
+                    "request_metric_filter": request_filter_used,
                     "token_metric_filter": token_filter_used,
                     "latency_metric_filter": self.LATENCY_FILTER,
                     "error_metric_filter": self.ERROR_FILTER,
@@ -710,9 +734,10 @@ class GeminiAIProvider(BaseProvider):
         table_id: str,
     ) -> tuple[list[dict[str, float | str]], float]:
         """
-        @brief Query current-month billing costs grouped by Google service.
-        @details Uses explicit projection and month-partition filter to reduce scanned
-        bytes while preserving per-service gross/credit/net billing aggregates.
+        @brief Query latest-available invoice-month billing costs grouped by service.
+        @details Uses explicit projection and latest invoice-month selection
+        (`MAX(invoice.month)`), with fallback to current-month `usage_start_time`
+        filter when invoice month data is unavailable.
         @param bigquery_client {bigquery.Client} BigQuery client.
         @param project_id {str} Google Cloud project id.
         @param table_id {str} Billing export table id.
@@ -724,12 +749,35 @@ class GeminiAIProvider(BaseProvider):
         table_path = f"{project_id}.{BILLING_DATASET_ID}.{table_id}"
         query = f"""
 SELECT
-  service.description AS service_description,
+  COALESCE(
+    NULLIF(TRIM(service.description), ''),
+    NULLIF(TRIM(sku.description), ''),
+    'unknown'
+  ) AS service_description,
   SUM(cost) AS gross_cost,
   SUM(IFNULL((SELECT SUM(c.amount) FROM UNNEST(credits) c), 0)) AS credits,
   SUM(cost + IFNULL((SELECT SUM(c.amount) FROM UNNEST(credits) c), 0)) AS net_cost
 FROM `{table_path}`
-WHERE usage_start_time >= TIMESTAMP_TRUNC(CURRENT_TIMESTAMP(), MONTH)
+WHERE (
+  (
+    SELECT MAX(invoice.month)
+    FROM `{table_path}`
+    WHERE invoice.month IS NOT NULL
+  ) IS NOT NULL
+  AND invoice.month = (
+    SELECT MAX(invoice.month)
+    FROM `{table_path}`
+    WHERE invoice.month IS NOT NULL
+  )
+)
+OR (
+  (
+    SELECT MAX(invoice.month)
+    FROM `{table_path}`
+    WHERE invoice.month IS NOT NULL
+  ) IS NULL
+  AND usage_start_time >= TIMESTAMP_TRUNC(CURRENT_TIMESTAMP(), MONTH)
+)
 GROUP BY service_description
 ORDER BY net_cost DESC
 """

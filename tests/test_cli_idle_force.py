@@ -109,3 +109,56 @@ def test_show_force_bypasses_idle_time_and_recreates_state(
     refreshed_state = json.loads(config_module.IDLE_TIME_PATH.read_text(encoding="utf-8"))
     assert refreshed_state["last_success_timestamp"] >= stale_state.last_success_timestamp
     assert refreshed_state["idle_until_timestamp"] > refreshed_state["last_success_timestamp"]
+
+
+def test_show_geminiai_defaults_to_30d_when_window_is_omitted(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """
+    @brief Verify `show --provider geminiai` defaults to effective window `30d`.
+    @details Invokes `show` without `--window` and asserts GeminiAI fetch is called
+    with `WindowPeriod.DAY_30`.
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @param tmp_path {Path} Temporary path fixture.
+    @return {None} Function return value.
+    @satisfies REQ-060
+    """
+    _patch_config_paths(monkeypatch, tmp_path)
+    config_module.save_runtime_config(
+        config_module.RuntimeConfig(idle_delay_seconds=300, api_call_delay_seconds=20)
+    )
+
+    geminiai_result = ProviderResult(
+        provider=ProviderName.GEMINIAI,
+        window=WindowPeriod.DAY_30,
+        metrics=UsageMetrics(cost=0.207369, requests=19, input_tokens=19, currency_symbol="€"),
+        raw={"status_code": 200, "billing": {"services": []}},
+    )
+    provider = MagicMock()
+    provider.name = ProviderName.GEMINIAI
+    provider.is_configured.return_value = True
+    provider.fetch = AsyncMock(return_value=geminiai_result)
+
+    monkeypatch.setattr(
+        "aibar.cli.get_providers",
+        lambda: {ProviderName.GEMINIAI: provider},
+    )
+    monkeypatch.setattr("aibar.cli._apply_api_call_delay", lambda state: None)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        main,
+        [
+            "show",
+            "--provider",
+            "geminiai",
+            "--json",
+            "--force",
+        ],
+    )
+
+    assert result.exit_code == 0
+    provider.fetch.assert_awaited_once_with(WindowPeriod.DAY_30)
+    output_payload = json.loads(result.output)
+    assert output_payload["payload"]["geminiai"]["window"] == "30d"

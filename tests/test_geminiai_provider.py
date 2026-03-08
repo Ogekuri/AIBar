@@ -165,6 +165,76 @@ def test_geminiai_fetch_maps_monitoring_and_billing_metrics(monkeypatch) -> None
     assert result.raw["billing"]["services"][0]["service_description"] == "Generative Language API"
 
 
+def test_geminiai_fetch_supports_consumed_api_metric_series(monkeypatch) -> None:
+    """
+    @brief Verify GeminiAI fetch supports Monitoring `consumed_api` metric resource type.
+    @details Simulates Monitoring responses where request/token metrics are available
+    only under `resource.type=\"consumed_api\"` and asserts provider extraction still
+    populates requests and token metrics.
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @return {None} Function return value.
+    @satisfies REQ-057
+    @satisfies REQ-060
+    @satisfies TST-026
+    """
+    provider = GeminiAIProvider(
+        credential_store=_FakeCredentialStore(),
+        project_id="demo-project",
+    )
+
+    monkeypatch.setattr(provider, "_build_monitoring_service", lambda credentials: object())
+    monkeypatch.setattr(provider, "_build_bigquery_client", lambda credentials, project_id: object())
+    monkeypatch.setattr(
+        provider,
+        "_discover_billing_table_id",
+        lambda bigquery_client, project_id: "gcp_billing_export_v1_001",
+    )
+    monkeypatch.setattr(
+        provider,
+        "_query_current_month_billing_cost",
+        lambda bigquery_client, project_id, table_id: ([], 0.0),
+    )
+
+    def _fake_query(
+        monitoring_service,
+        project_id: str,
+        metric_filter: str,
+        start_time,
+        end_time,
+        allow_missing: bool,
+    ):
+        """
+        @brief Return deterministic metric payloads keyed by Monitoring filter string.
+        @return {tuple[float | None, dict]} Aggregated metric value and raw payload.
+        """
+        del monitoring_service, project_id, start_time, end_time, allow_missing
+        if (
+            'resource.type="consumed_api"' in metric_filter
+            and 'metric.type="serviceruntime.googleapis.com/api/request_count"' in metric_filter
+        ):
+            return 19.0, {"timeSeries": [{"points": [{"value": {"int64Value": "19"}}]}]}
+        if (
+            'resource.type="consumed_api"' in metric_filter
+            and 'metric.type="generativelanguage.googleapis.com/request/token_count"' in metric_filter
+        ):
+            return 19.0, {"timeSeries": [{"points": [{"value": {"int64Value": "19"}}]}]}
+        if 'metric.type="serviceruntime.googleapis.com/api/request_latencies"' in metric_filter:
+            return 1.0, {"timeSeries": [{"points": [{"value": {"doubleValue": 1.0}}]}]}
+        if 'metric.labels.response_code_class!="2xx"' in metric_filter:
+            return 0.0, {"timeSeries": [{"points": [{"value": {"int64Value": "0"}}]}]}
+        return None, {}
+
+    monkeypatch.setattr(provider, "_query_monitoring_metric", _fake_query)
+
+    result = asyncio.run(provider.fetch(WindowPeriod.DAY_7))
+    assert result.metrics.requests == 19
+    assert result.metrics.input_tokens == 19
+    assert result.raw["monitoring"]["request_metric_filter"] is not None
+    assert 'resource.type="consumed_api"' in result.raw["monitoring"]["request_metric_filter"]
+    assert result.raw["monitoring"]["token_metric_filter"] is not None
+    assert 'resource.type="consumed_api"' in result.raw["monitoring"]["token_metric_filter"]
+
+
 def test_geminiai_fetch_converts_http_429_to_rate_limit_error(monkeypatch) -> None:
     """
     @brief Verify GeminiAI provider maps Google API HTTP 429 to standard rate-limit error.
@@ -359,3 +429,68 @@ def test_geminiai_oauth_scopes_include_monitoring_bigquery_and_cloud_platform() 
         "https://www.googleapis.com/auth/monitoring.read",
         "https://www.googleapis.com/auth/cloud-platform",
     )
+
+
+def test_geminiai_billing_query_uses_latest_invoice_month_with_fallback() -> None:
+    """
+    @brief Verify GeminiAI billing SQL targets latest available invoice month.
+    @details Asserts generated query includes `MAX(invoice.month)` selection and
+    current-month `usage_start_time` fallback predicate.
+    @return {None} Function return value.
+    @satisfies REQ-065
+    @satisfies TST-026
+    """
+    provider = GeminiAIProvider(
+        credential_store=_FakeCredentialStore(),
+        project_id="demo-project",
+    )
+
+    class _FakeBigQueryClient:
+        """
+        @brief Minimal fake BigQuery client capturing submitted query text.
+        """
+
+        def __init__(self) -> None:
+            self.last_query: str | None = None
+
+        def query(self, query_text: str):
+            """
+            @brief Capture query text and return deterministic row iterator.
+            @param query_text {str} Submitted SQL query.
+            @return {list[dict[str, object]]} Deterministic billing aggregate rows.
+            """
+            self.last_query = query_text
+            return [
+                {
+                    "service_description": "AIStudio",
+                    "gross_cost": 0.210576,
+                    "credits": 0.0,
+                    "net_cost": 0.210576,
+                },
+                {
+                    "service_description": "tax",
+                    "gross_cost": -0.000576,
+                    "credits": 0.0,
+                    "net_cost": -0.000576,
+                },
+                {
+                    "service_description": "rounding_error",
+                    "gross_cost": -0.002631,
+                    "credits": 0.0,
+                    "net_cost": -0.002631,
+                },
+            ]
+
+    fake_client = _FakeBigQueryClient()
+    services, total_net = provider._query_current_month_billing_cost(
+        fake_client,
+        "demo-project",
+        "gcp_billing_export_v1_017F15_EC6BA0_8220E3",
+    )
+
+    assert fake_client.last_query is not None
+    assert "MAX(invoice.month)" in fake_client.last_query
+    assert "invoice.month = (" in fake_client.last_query
+    assert "usage_start_time >= TIMESTAMP_TRUNC(CURRENT_TIMESTAMP(), MONTH)" in fake_client.last_query
+    assert len(services) == 3
+    assert total_net == pytest.approx(0.207369)

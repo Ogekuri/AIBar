@@ -479,7 +479,7 @@ from typing import Any
 
 ---
 
-# cli.py | Python | 2099L | 54 symbols | 21 imports | 67 comments
+# cli.py | Python | 2106L | 54 symbols | 21 imports | 67 comments
 > Path: `src/aibar/aibar/cli.py`
 - @brief Command-line interface for aibar.
 - @details Defines command parsing, provider dispatch, formatted output, setup helpers, login flows, and UI launch hooks.
@@ -860,9 +860,9 @@ effective cache payload for downstream rendering without redundant reload.
 - @return {None} Function return value.
 - @satisfies REQ-068
 
-### fn `def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> None` (L1267-1359)
+### fn `def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> None` (L1267-1366)
 - @brief Execute `show` with idle-time cache gating and throttled provider refresh.
-- @details Delegates provider retrieval to a shared cache-based pipeline that applies force handling, idle-time gating, conditional cache refresh, and deterministic readback from `cache.json` before rendering.
+- @details Delegates provider retrieval to a shared cache-based pipeline that applies force handling, idle-time gating, conditional cache refresh, and deterministic readback from `cache.json` before rendering. When `--provider` is `geminiai` and `--window` is omitted, effective window defaults to `30d`.
 - @param provider {str} CLI provider selector string.
 - @param window {str} CLI window period string.
 - @param output_json {bool} When True, emit JSON output instead of formatted text.
@@ -878,14 +878,14 @@ effective cache payload for downstream rendering without redundant reload.
 - @satisfies REQ-043
 - @satisfies REQ-067
 
-### fn `def _provider_display_name(provider_name: ProviderName) -> str` `priv` (L1360-1373)
+### fn `def _provider_display_name(provider_name: ProviderName) -> str` `priv` (L1367-1380)
 - @brief Resolve human-facing provider title for terminal panel rendering.
 - @details Maps machine-readable provider keys to display names aligned with Textual and GNOME UI surfaces.
 - @param provider_name {ProviderName} Provider enum key.
 - @return {str} Human-facing provider display name.
 - @satisfies REQ-062
 
-### fn `def _emit_blue_panel(title: str, body_lines: list[str]) -> None` `priv` (L1374-1412)
+### fn `def _emit_blue_panel(title: str, body_lines: list[str]) -> None` `priv` (L1381-1419)
 - @brief Render blue ANSI bordered output panel with wrapped content lines.
 - @details Creates fixed-width terminal panels inspired by Textual/extension card layout, preserving deterministic borders and line wrapping behavior.
 - @param title {str} Panel header text.
@@ -893,7 +893,7 @@ effective cache payload for downstream rendering without redundant reload.
 - @return {None} Function return value.
 - @satisfies REQ-067
 
-### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L1413-1533)
+### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L1420-1540)
 - @brief Render CLI text output for one provider result.
 - @details Formats usage percentage, reset countdown, remaining credits, cost, requests, and token counts for one provider/window result. Cost is formatted using `metrics.currency_symbol` (never hardcoded `$`).
 - @param name {ProviderName} Provider name enum value.
@@ -905,15 +905,15 @@ effective cache payload for downstream rendering without redundant reload.
 - @satisfies REQ-051
 - @satisfies REQ-067
 
-### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L1534-1549)
+### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L1541-1556)
 - @brief Execute format reset duration.
 - @details Applies format reset duration logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param seconds {float} Input parameter `seconds`.
 - @return {str} Function return value.
 
-### fn `def _should_render_metrics_after_error(` `priv` (L1550-1552)
+### fn `def _should_render_metrics_after_error(` `priv` (L1557-1559)
 
-### fn `def _should_print_claude_reset_pending_hint(` `priv` (L1570-1572)
+### fn `def _should_print_claude_reset_pending_hint(` `priv` (L1577-1579)
 - @brief Check whether CLI output must render metrics after printing an error line.
 - @details Allows continuation only for Claude HTTP 429 partial-window state so the
 5h section can include `Error:` and still display usage/reset lines.
@@ -922,7 +922,7 @@ effective cache payload for downstream rendering without redundant reload.
 - @return {bool} True when metrics should still be rendered after error line.
 - @satisfies REQ-036
 
-### fn `def _is_displayed_zero_percent(percent: float | None) -> bool` `priv` (L1592-1608)
+### fn `def _is_displayed_zero_percent(percent: float | None) -> bool` `priv` (L1599-1615)
 - @brief Determine whether CLI output must render the reset-pending fallback hint.
 - @brief Check whether a percentage renders as `0.0%` in one-decimal UI output.
 - @details The hint is only valid for Claude windows when no reset timestamp is
@@ -938,29 +938,29 @@ providers other than Claude.
 - @satisfies REQ-002
 - @satisfies REQ-002
 
-### fn `def _progress_bar(percent: float, width: int = 20) -> str` `priv` (L1609-1622)
+### fn `def _progress_bar(percent: float, width: int = 20) -> str` `priv` (L1616-1629)
 - @brief Execute progress bar.
 - @details Applies progress bar logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param percent {float} Input parameter `percent`.
 - @param width {int} Input parameter `width`.
 - @return {str} Function return value.
 
-### fn `def doctor() -> None` (L1627-1679)
+### fn `def doctor() -> None` (L1634-1686)
 - @brief Execute doctor.
 - @details Applies doctor logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def ui() -> None` (L1684-1694)
+### fn `def ui() -> None` (L1691-1701)
 - @brief Execute ui.
 - @details Applies ui logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def env() -> None` (L1699-1707)
+### fn `def env() -> None` (L1706-1714)
 - @brief Execute env.
 - @details Applies env logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def setup() -> None` (L1712-1911)
+### fn `def setup() -> None` (L1719-1918)
 - @brief Execute setup.
 - @details Prompts for `idle_delay_seconds`, `api_call_delay_seconds`, and `gnome_refresh_interval_seconds` in order, then prompts for provider currency symbols including `geminiai` (choices: `$`, `£`, `€`, default `$`), then persists all values to `~/.config/aibar/config.json`. GeminiAI OAuth source supports `skip`, `file`, `paste`, and `login` (re-authorization with current scopes). Also prompts for provider API keys and writes them to `~/.config/aibar/env`.
 - @return {None} Function return value.
@@ -970,23 +970,23 @@ providers other than Claude.
 - @satisfies REQ-056
 - @satisfies REQ-059
 
-### fn `def login(provider: str) -> None` (L1965-1983)
+### fn `def login(provider: str) -> None` (L1972-1990)
 - @brief Execute login.
 - @details Applies login logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param provider {str} Input parameter `provider`.
 - @return {None} Function return value.
 
-### fn `def _login_claude() -> None` `priv` (L1984-2032)
+### fn `def _login_claude() -> None` `priv` (L1991-2039)
 - @brief Execute login claude.
 - @details Applies login claude logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_copilot() -> None` `priv` (L2033-2060)
+### fn `def _login_copilot() -> None` `priv` (L2040-2067)
 - @brief Execute login copilot.
 - @details Applies login copilot logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_geminiai() -> None` `priv` (L2061-2097)
+### fn `def _login_geminiai() -> None` `priv` (L2068-2104)
 - @brief Execute GeminiAI OAuth login flow.
 - @details Reuses persisted OAuth client configuration to launch browser-based authorization and persist refresh-capable Google credentials.
 - @return {None} Function return value.
@@ -1033,23 +1033,23 @@ providers other than Claude.
 |`retrieve_results_via_cache_pipeline`|fn|pub|1048-1052|def retrieve_results_via_cache_pipeline(|
 |`_build_cached_dual_window_results`|fn|priv|1148-1151|def _build_cached_dual_window_results(|
 |`main`|fn|pub|1224-1234|def main(ctx: click.Context) -> None|
-|`show`|fn|pub|1267-1359|def show(provider: str, window: str, output_json: bool, f...|
-|`_provider_display_name`|fn|priv|1360-1373|def _provider_display_name(provider_name: ProviderName) -...|
-|`_emit_blue_panel`|fn|priv|1374-1412|def _emit_blue_panel(title: str, body_lines: list[str]) -...|
-|`_print_result`|fn|priv|1413-1533|def _print_result(name: ProviderName, result, label: str ...|
-|`_format_reset_duration`|fn|priv|1534-1549|def _format_reset_duration(seconds: float) -> str|
-|`_should_render_metrics_after_error`|fn|priv|1550-1552|def _should_render_metrics_after_error(|
-|`_should_print_claude_reset_pending_hint`|fn|priv|1570-1572|def _should_print_claude_reset_pending_hint(|
-|`_is_displayed_zero_percent`|fn|priv|1592-1608|def _is_displayed_zero_percent(percent: float | None) -> ...|
-|`_progress_bar`|fn|priv|1609-1622|def _progress_bar(percent: float, width: int = 20) -> str|
-|`doctor`|fn|pub|1627-1679|def doctor() -> None|
-|`ui`|fn|pub|1684-1694|def ui() -> None|
-|`env`|fn|pub|1699-1707|def env() -> None|
-|`setup`|fn|pub|1712-1911|def setup() -> None|
-|`login`|fn|pub|1965-1983|def login(provider: str) -> None|
-|`_login_claude`|fn|priv|1984-2032|def _login_claude() -> None|
-|`_login_copilot`|fn|priv|2033-2060|def _login_copilot() -> None|
-|`_login_geminiai`|fn|priv|2061-2097|def _login_geminiai() -> None|
+|`show`|fn|pub|1267-1366|def show(provider: str, window: str, output_json: bool, f...|
+|`_provider_display_name`|fn|priv|1367-1380|def _provider_display_name(provider_name: ProviderName) -...|
+|`_emit_blue_panel`|fn|priv|1381-1419|def _emit_blue_panel(title: str, body_lines: list[str]) -...|
+|`_print_result`|fn|priv|1420-1540|def _print_result(name: ProviderName, result, label: str ...|
+|`_format_reset_duration`|fn|priv|1541-1556|def _format_reset_duration(seconds: float) -> str|
+|`_should_render_metrics_after_error`|fn|priv|1557-1559|def _should_render_metrics_after_error(|
+|`_should_print_claude_reset_pending_hint`|fn|priv|1577-1579|def _should_print_claude_reset_pending_hint(|
+|`_is_displayed_zero_percent`|fn|priv|1599-1615|def _is_displayed_zero_percent(percent: float | None) -> ...|
+|`_progress_bar`|fn|priv|1616-1629|def _progress_bar(percent: float, width: int = 20) -> str|
+|`doctor`|fn|pub|1634-1686|def doctor() -> None|
+|`ui`|fn|pub|1691-1701|def ui() -> None|
+|`env`|fn|pub|1706-1714|def env() -> None|
+|`setup`|fn|pub|1719-1918|def setup() -> None|
+|`login`|fn|pub|1972-1990|def login(provider: str) -> None|
+|`_login_claude`|fn|priv|1991-2039|def _login_claude() -> None|
+|`_login_copilot`|fn|priv|2040-2067|def _login_copilot() -> None|
+|`_login_geminiai`|fn|priv|2068-2104|def _login_geminiai() -> None|
 
 
 ---
@@ -1866,11 +1866,11 @@ import asyncio
 
 ---
 
-# geminiai.py | Python | 915L | 45 symbols | 19 imports | 38 comments
+# geminiai.py | Python | 963L | 45 symbols | 19 imports | 38 comments
 > Path: `src/aibar/aibar/providers/geminiai.py`
 - @brief GeminiAI provider with Google OAuth, Monitoring, and BigQuery billing integration.
 - @details Implements OAuth credential persistence, token refresh, usage retrieval from
-Cloud Monitoring and current-month billing retrieval from BigQuery, then normalizes
+Cloud Monitoring and latest-available billing-period retrieval from BigQuery, then normalizes
 results into AIBar provider result contracts.
 
 ## Imports
@@ -1994,60 +1994,60 @@ saves authorized-user token JSON to disk.
   - @throws {ValueError} When client config is invalid.
 - fn `def load_credentials(` (L333-335)
 
-### class `class GeminiAIProvider(BaseProvider)` : BaseProvider (L367-428)
+### class `class GeminiAIProvider(BaseProvider)` : BaseProvider (L367-443)
 - @brief GeminiAI usage provider backed by Monitoring and BigQuery APIs.
-- @details Retrieves Generative Language API usage counters and status telemetry from Cloud Monitoring, retrieves current-month billing costs from BigQuery export, then maps data into AIBar `ProviderResult` models.
-- var `SERVICE_FILTER = (` (L377)
+- @details Retrieves Generative Language API usage counters and status telemetry from Cloud Monitoring, retrieves latest-available billing-period costs from BigQuery export, then maps data into AIBar `ProviderResult` models.
+- var `SERVICE_FILTER = 'resource.labels.service="generativelanguage.googleapis.com"'` (L377)
   - @brief GeminiAI usage provider backed by Monitoring and BigQuery APIs.
   - @details Retrieves Generative Language API usage counters and status telemetry
-from Cloud Monitoring, retrieves current-month billing costs from BigQuery export,
+from Cloud Monitoring, retrieves latest-available billing-period costs from BigQuery export,
 then maps data into AIBar `ProviderResult` models.
-- var `REQUEST_COUNT_FILTER = (` (L380)
-- var `LATENCY_FILTER = (` (L388)
-- var `ERROR_FILTER = (` (L391)
-- fn `def __init__(` `priv` (L397-400)
-- fn `def is_configured(self) -> bool` (L411-420)
+- var `REQUEST_COUNT_FILTER = REQUEST_COUNT_FILTERS[0]` (L387)
+- var `LATENCY_FILTER = (` (L403)
+- var `ERROR_FILTER = (` (L406)
+- fn `def __init__(` `priv` (L412-415)
+- fn `def is_configured(self) -> bool` (L426-435)
   - @brief Initialize GeminiAI provider with optional overrides.
   - @brief Check whether GeminiAI provider has required auth and project metadata.
   - @param credential_store {GeminiAICredentialStore | None} Optional credential store.
   - @param project_id {str | None} Optional project id override.
   - @return {None} Function return value.
   - @return {bool} True when project id and OAuth token material are available.
-- fn `def get_config_help(self) -> str` (L421-428)
+- fn `def get_config_help(self) -> str` (L436-443)
   - @brief Return setup guidance for GeminiAI OAuth configuration.
   - @return {str} Provider-specific setup instructions.
 
-### fn `async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult` (L436-463)
+### fn `async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult` (L451-478)
 - @brief Fetch GeminiAI monitoring usage metrics for one window.
 - @details Executes synchronous Google API calls in a worker thread and returns normalized provider metrics. HTTP 429 responses are normalized as rate-limit provider error payloads with retry-after metadata.
 - @param window {WindowPeriod} Requested window period.
 - @return {ProviderResult} Provider result payload.
 - @throws {AuthenticationError} When OAuth credentials are invalid.
 
-### fn `def _fetch_sync(self, window: WindowPeriod) -> ProviderResult` `priv` (L464-617)
+### fn `def _fetch_sync(self, window: WindowPeriod) -> ProviderResult` `priv` (L479-641)
 - @brief Execute blocking Google API retrieval flow for GeminiAI metrics.
 - @param window {WindowPeriod} Requested window period.
 - @return {ProviderResult} Normalized provider result.
 - @throws {AuthenticationError} When credentials are missing/invalid.
 - @throws {ProviderError} On non-auth API failures.
 
-### fn `def _build_window_range(self, window: WindowPeriod) -> GeminiAIWindowRange` `priv` (L618-632)
+### fn `def _build_window_range(self, window: WindowPeriod) -> GeminiAIWindowRange` `priv` (L642-656)
 - @brief Build UTC time interval used for Monitoring queries.
 - @param window {WindowPeriod} Requested window period.
 - @return {GeminiAIWindowRange} Start/end UTC timestamps.
 
-### fn `def _resolve_project_id(self) -> str | None` `priv` (L633-654)
+### fn `def _resolve_project_id(self) -> str | None` `priv` (L657-678)
 - @brief Resolve project id from override, env, runtime config, or client JSON.
 - @return {str | None} Project id or None when unresolved.
 
-### fn `def _build_monitoring_service(self, credentials: Credentials) -> Any` `priv` (L655-662)
+### fn `def _build_monitoring_service(self, credentials: Credentials) -> Any` `priv` (L679-686)
 - @brief Build Google Cloud Monitoring API client.
 - @param credentials {Credentials} OAuth credentials.
 - @return {Any} Monitoring service client.
 
-### fn `def _build_bigquery_client(` `priv` (L663-666)
+### fn `def _build_bigquery_client(` `priv` (L687-690)
 
-### fn `def _discover_billing_table_id(` `priv` (L678-681)
+### fn `def _discover_billing_table_id(` `priv` (L702-705)
 - @brief Build BigQuery client for GeminiAI billing export queries.
 - @param credentials {Credentials} OAuth credentials with BigQuery read scope.
 - @param project_id {str} Google Cloud project id.
@@ -2055,7 +2055,7 @@ then maps data into AIBar `ProviderResult` models.
 - @satisfies REQ-056
 - @satisfies REQ-065
 
-### fn `def _query_current_month_billing_cost(` `priv` (L706-710)
+### fn `def _query_current_month_billing_cost(` `priv` (L730-734)
 - @brief Discover billing export table id in dataset `billing_data`.
 - @details Lists dataset tables and selects the first lexicographically sorted
 id that starts with `gcp_billing_export_v1_`.
@@ -2065,11 +2065,12 @@ id that starts with `gcp_billing_export_v1_`.
 - @throws {ProviderError} When billing export table is unavailable.
 - @satisfies REQ-064
 
-### fn `def _coerce_float(self, value: Any) -> float` `priv` (L761-780)
-- @brief Query current-month billing costs grouped by Google service.
+### fn `def _coerce_float(self, value: Any) -> float` `priv` (L809-828)
+- @brief Query latest-available invoice-month billing costs grouped by service.
 - @brief Convert numeric BigQuery row field values to float.
-- @details Uses explicit projection and month-partition filter to reduce scanned
-bytes while preserving per-service gross/credit/net billing aggregates.
+- @details Uses explicit projection and latest invoice-month selection
+(`MAX(invoice.month)`), with fallback to current-month `usage_start_time`
+filter when invoice month data is unavailable.
 - @param bigquery_client {bigquery.Client} BigQuery client.
 - @param project_id {str} Google Cloud project id.
 - @param table_id {str} Billing export table id.
@@ -2080,9 +2081,9 @@ total net monthly cost.
 - @satisfies REQ-057
 - @satisfies REQ-065
 
-### fn `def _query_monitoring_metric(` `priv` (L781-788)
+### fn `def _query_monitoring_metric(` `priv` (L829-836)
 
-### fn `def _sum_time_series_values(self, response: dict[str, Any]) -> float | None` `priv` (L827-879)
+### fn `def _sum_time_series_values(self, response: dict[str, Any]) -> float | None` `priv` (L875-927)
 - @brief Query Monitoring time-series metric and aggregate point values.
 - @brief Sum numeric point values in Monitoring `timeSeries` payload.
 - @details Returns None when metric is unavailable and `allow_missing=True`.
@@ -2097,7 +2098,7 @@ total net monthly cost.
 - @return {float | None} Aggregated numeric value or None when no points exist.
 - @throws {HttpError} For non-missing API errors.
 
-### fn `def _build_metrics(` `priv` (L880-885)
+### fn `def _build_metrics(` `priv` (L928-933)
 
 ## Symbol Index
 |Symbol|Kind|Vis|Lines|Sig|
@@ -2127,26 +2128,26 @@ total net monthly cost.
 |`GeminiAICredentialStore.authorize_interactively`|fn|pub|297-299|def authorize_interactively(|
 |`GeminiAICredentialStore.load_access_token`|fn|pub|315-332|def load_access_token(self) -> str | None|
 |`GeminiAICredentialStore.load_credentials`|fn|pub|333-335|def load_credentials(|
-|`GeminiAIProvider`|class|pub|367-428|class GeminiAIProvider(BaseProvider)|
+|`GeminiAIProvider`|class|pub|367-443|class GeminiAIProvider(BaseProvider)|
 |`GeminiAIProvider.SERVICE_FILTER`|var|pub|377||
-|`GeminiAIProvider.REQUEST_COUNT_FILTER`|var|pub|380||
-|`GeminiAIProvider.LATENCY_FILTER`|var|pub|388||
-|`GeminiAIProvider.ERROR_FILTER`|var|pub|391||
-|`GeminiAIProvider.__init__`|fn|priv|397-400|def __init__(|
-|`GeminiAIProvider.is_configured`|fn|pub|411-420|def is_configured(self) -> bool|
-|`GeminiAIProvider.get_config_help`|fn|pub|421-428|def get_config_help(self) -> str|
-|`fetch`|fn|pub|436-463|async def fetch(self, window: WindowPeriod = WindowPeriod...|
-|`_fetch_sync`|fn|priv|464-617|def _fetch_sync(self, window: WindowPeriod) -> ProviderRe...|
-|`_build_window_range`|fn|priv|618-632|def _build_window_range(self, window: WindowPeriod) -> Ge...|
-|`_resolve_project_id`|fn|priv|633-654|def _resolve_project_id(self) -> str | None|
-|`_build_monitoring_service`|fn|priv|655-662|def _build_monitoring_service(self, credentials: Credenti...|
-|`_build_bigquery_client`|fn|priv|663-666|def _build_bigquery_client(|
-|`_discover_billing_table_id`|fn|priv|678-681|def _discover_billing_table_id(|
-|`_query_current_month_billing_cost`|fn|priv|706-710|def _query_current_month_billing_cost(|
-|`_coerce_float`|fn|priv|761-780|def _coerce_float(self, value: Any) -> float|
-|`_query_monitoring_metric`|fn|priv|781-788|def _query_monitoring_metric(|
-|`_sum_time_series_values`|fn|priv|827-879|def _sum_time_series_values(self, response: dict[str, Any...|
-|`_build_metrics`|fn|priv|880-885|def _build_metrics(|
+|`GeminiAIProvider.REQUEST_COUNT_FILTER`|var|pub|387||
+|`GeminiAIProvider.LATENCY_FILTER`|var|pub|403||
+|`GeminiAIProvider.ERROR_FILTER`|var|pub|406||
+|`GeminiAIProvider.__init__`|fn|priv|412-415|def __init__(|
+|`GeminiAIProvider.is_configured`|fn|pub|426-435|def is_configured(self) -> bool|
+|`GeminiAIProvider.get_config_help`|fn|pub|436-443|def get_config_help(self) -> str|
+|`fetch`|fn|pub|451-478|async def fetch(self, window: WindowPeriod = WindowPeriod...|
+|`_fetch_sync`|fn|priv|479-641|def _fetch_sync(self, window: WindowPeriod) -> ProviderRe...|
+|`_build_window_range`|fn|priv|642-656|def _build_window_range(self, window: WindowPeriod) -> Ge...|
+|`_resolve_project_id`|fn|priv|657-678|def _resolve_project_id(self) -> str | None|
+|`_build_monitoring_service`|fn|priv|679-686|def _build_monitoring_service(self, credentials: Credenti...|
+|`_build_bigquery_client`|fn|priv|687-690|def _build_bigquery_client(|
+|`_discover_billing_table_id`|fn|priv|702-705|def _discover_billing_table_id(|
+|`_query_current_month_billing_cost`|fn|priv|730-734|def _query_current_month_billing_cost(|
+|`_coerce_float`|fn|priv|809-828|def _coerce_float(self, value: Any) -> float|
+|`_query_monitoring_metric`|fn|priv|829-836|def _query_monitoring_metric(|
+|`_sum_time_series_values`|fn|priv|875-927|def _sum_time_series_values(self, response: dict[str, Any...|
+|`_build_metrics`|fn|priv|928-933|def _build_metrics(|
 
 
 ---
