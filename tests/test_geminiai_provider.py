@@ -17,10 +17,17 @@ and Monitoring time-series aggregation behavior.
 import asyncio
 from pathlib import Path
 
+import pytest
+from google.api_core.exceptions import Forbidden
 from googleapiclient.errors import HttpError
 from httplib2 import Response
 
-from aibar.providers.base import ProviderError, ProviderName, WindowPeriod
+from aibar.providers.base import (
+    AuthenticationError,
+    ProviderError,
+    ProviderName,
+    WindowPeriod,
+)
 from aibar.providers.geminiai import GEMINIAI_OAUTH_SCOPES, GeminiAIProvider
 
 
@@ -215,6 +222,51 @@ def test_geminiai_fetch_missing_billing_table_sets_error_result(monkeypatch) -> 
     result = asyncio.run(provider.fetch(WindowPeriod.DAY_7))
     assert result.is_error
     assert "billing export table" in result.error
+
+
+def test_geminiai_fetch_raises_authentication_error_on_insufficient_scope(
+    monkeypatch,
+) -> None:
+    """
+    @brief Verify GeminiAI fetch maps BigQuery insufficient-scope failures to AuthenticationError.
+    @details Reproduces real BigQuery `ACCESS_TOKEN_SCOPE_INSUFFICIENT` 403 payload shape
+    and asserts fetch raises explicit AuthenticationError instead of generic unexpected
+    provider failure text.
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @return {None} Function return value.
+    @satisfies REQ-056
+    @satisfies REQ-060
+    """
+    provider = GeminiAIProvider(
+        credential_store=_FakeCredentialStore(),
+        project_id="demo-project",
+    )
+
+    monkeypatch.setattr(provider, "_build_monitoring_service", lambda credentials: object())
+    monkeypatch.setattr(provider, "_build_bigquery_client", lambda credentials, project_id: object())
+    monkeypatch.setattr(
+        provider,
+        "_query_monitoring_metric",
+        lambda *args, **kwargs: (
+            1.0,
+            {"timeSeries": [{"points": [{"value": {"int64Value": "1"}}]}]},
+        ),
+    )
+    scope_error = Forbidden(
+        "403 GET https://bigquery.googleapis.com/bigquery/v2/projects/demo-project/"
+        "datasets/billing_data/tables?prettyPrint=false: Request had insufficient "
+        "authentication scopes. [{'reason': 'ACCESS_TOKEN_SCOPE_INSUFFICIENT'}]"
+    )
+    monkeypatch.setattr(
+        provider,
+        "_discover_billing_table_id",
+        lambda bigquery_client, project_id: (_ for _ in ()).throw(scope_error),
+    )
+
+    with pytest.raises(AuthenticationError) as exc_info:
+        asyncio.run(provider.fetch(WindowPeriod.DAY_7))
+    assert "missing required Google API scopes" in str(exc_info.value)
+    assert "Unexpected error" not in str(exc_info.value)
 
 
 def test_geminiai_fetch_uses_runtime_config_currency_symbol(monkeypatch) -> None:

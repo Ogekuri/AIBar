@@ -16,6 +16,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, cast
 
+from google.api_core.exceptions import GoogleAPICallError  # pyright: ignore[reportMissingImports]
 from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
 from google.cloud import bigquery  # pyright: ignore[reportAttributeAccessIssue]
@@ -101,6 +102,51 @@ def _extract_retry_after_seconds(error: HttpError) -> float:
         return max(0.0, float(retry_after_raw))
     except (TypeError, ValueError):
         return 0.0
+
+
+def _extract_google_api_status(error: GoogleAPICallError) -> int:
+    """
+    @brief Extract HTTP-like status code from Google API Core exceptions.
+    @details Normalizes exception `code` payloads to integer status values and
+    returns `0` when status is unavailable.
+    @param error {GoogleAPICallError} Google API Core exception.
+    @return {int} Status code or `0`.
+    """
+    status = getattr(error, "code", None)
+    if isinstance(status, int):
+        return status
+    if status is None:
+        return 0
+    if not isinstance(status, (str, bytes, bytearray)):
+        return 0
+    try:
+        return int(status)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _is_scope_insufficient_error(error: Exception) -> bool:
+    """
+    @brief Determine whether exception payload indicates OAuth scope insufficiency.
+    @details Matches Google API error reason `ACCESS_TOKEN_SCOPE_INSUFFICIENT` and
+    equivalent human-readable messages.
+    @param error {Exception} Exception to inspect.
+    @return {bool} True when the error indicates insufficient OAuth scopes.
+    """
+    message = str(error).lower()
+    if "access_token_scope_insufficient" in message:
+        return True
+    if "insufficient authentication scopes" in message:
+        return True
+    errors = getattr(error, "errors", None)
+    if isinstance(errors, list):
+        for entry in errors:
+            if not isinstance(entry, dict):
+                continue
+            reason = entry.get("reason")
+            if isinstance(reason, str) and reason.lower() == "access_token_scope_insufficient":
+                return True
+    return False
 
 
 @dataclass(frozen=True)
@@ -542,6 +588,23 @@ class GeminiAIProvider(BaseProvider):
                     raw={
                         "status_code": 429,
                         "retry_after_seconds": retry_after_seconds,
+                        "body": str(exc),
+                    },
+                )
+            raise ProviderError(f"API error: HTTP {status_code}") from exc
+        except GoogleAPICallError as exc:
+            status_code = _extract_google_api_status(exc)
+            if status_code in {401, 403} or _is_scope_insufficient_error(exc):
+                raise AuthenticationError(
+                    "GeminiAI OAuth token is invalid or missing required Google API scopes."
+                ) from exc
+            if status_code == 429:
+                return self._make_error_result(
+                    window=window,
+                    error="Rate limited. Try again later.",
+                    raw={
+                        "status_code": 429,
+                        "retry_after_seconds": 0.0,
                         "body": str(exc),
                     },
                 )
