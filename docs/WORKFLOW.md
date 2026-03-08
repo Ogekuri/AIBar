@@ -153,7 +153,7 @@
       - `_build_result_panel(...)`: deterministic title/body builder for one provider result before panel emission [`src/aibar/aibar/cli.py`]
       - `_resolve_shared_panel_content_width(...)`: shared-width resolver selecting widest panel width across one `show` render cycle [`src/aibar/aibar/cli.py`]
       - `_print_result(...)`: ANSI provider-colored terminal panel rendering adapter for one provider/window result using `_build_result_panel(...)` and `metrics.currency_symbol` for costs [`src/aibar/aibar/cli.py`]
-        - `_provider_display_name(...)`: provider display-title resolver with GeminiAI title-case override [`src/aibar/aibar/cli.py`]
+        - `_provider_display_name(...)`: provider display-title resolver with GeminiAI uppercase override (`GEMINIAI`) [`src/aibar/aibar/cli.py`]
         - `_emit_provider_panel(...)`: provider-color border/padding/wrap renderer with ANSI-aware visible-width alignment and optional shared-width override [`src/aibar/aibar/cli.py`]
           - `_wrap_panel_lines(...)`: ANSI-aware line wrapping helper for panel rendering [`src/aibar/aibar/cli.py`]
           - `_panel_content_width(...)`: panel content-width calculator from wrapped visible lines [`src/aibar/aibar/cli.py`]

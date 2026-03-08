@@ -478,7 +478,7 @@ from typing import Any
 
 ---
 
-# cli.py | Python | 2262L | 61 symbols | 21 imports | 74 comments
+# cli.py | Python | 2263L | 61 symbols | 21 imports | 74 comments
 > Path: `src/aibar/aibar/cli.py`
 - @brief Command-line interface for aibar.
 - @details Defines command parsing, provider dispatch, formatted output, setup helpers, login flows, and UI launch hooks.
@@ -877,34 +877,34 @@ effective cache payload for downstream rendering without redundant reload.
 - @satisfies REQ-043
 - @satisfies REQ-067
 
-### fn `def _provider_display_name(provider_name: ProviderName) -> str` `priv` (L1395-1408)
+### fn `def _provider_display_name(provider_name: ProviderName) -> str` `priv` (L1395-1409)
 - @brief Resolve human-facing provider title for terminal panel rendering.
-- @details Maps machine-readable provider keys to display names aligned with CLI and GNOME extension output surfaces.
+- @details Maps machine-readable provider keys to display names aligned with CLI and GNOME extension output surfaces; applies uppercase `GEMINIAI` override for provider key `geminiai`.
 - @param provider_name {ProviderName} Provider enum key.
 - @return {str} Human-facing provider display name.
 - @satisfies REQ-062
 
-### fn `def _provider_panel_color_code(provider_name: ProviderName) -> str` `priv` (L1409-1418)
+### fn `def _provider_panel_color_code(provider_name: ProviderName) -> str` `priv` (L1410-1419)
 - @brief Resolve ANSI color code for one provider output surface.
 - @param provider_name {ProviderName} Provider enum key.
 - @return {str} ANSI foreground color code.
 - @satisfies REQ-067
 
-### fn `def _strip_ansi_sequences(value: str) -> str` `priv` (L1419-1430)
+### fn `def _strip_ansi_sequences(value: str) -> str` `priv` (L1420-1431)
 - @brief Remove ANSI SGR color escape sequences from terminal text.
 - @details Strips `\x1b[...m` segments so panel width calculations can use visible glyph length instead of byte length with hidden control codes.
 - @param value {str} Input string that may include ANSI color escapes.
 - @return {str} String with ANSI SGR escapes removed.
 - @satisfies REQ-067
 
-### fn `def _visible_text_length(value: str) -> int` `priv` (L1431-1442)
+### fn `def _visible_text_length(value: str) -> int` `priv` (L1432-1443)
 - @brief Compute visible text length for terminal panel alignment.
 - @details Calculates string length after ANSI SGR stripping to keep bordered-panel width deterministic for colored progress bar rows.
 - @param value {str} Input string potentially containing ANSI escapes.
 - @return {int} Visible glyph count used by panel width and padding logic.
 - @satisfies REQ-067
 
-### fn `def _ansi_ljust(value: str, width: int) -> str` `priv` (L1443-1455)
+### fn `def _ansi_ljust(value: str, width: int) -> str` `priv` (L1444-1456)
 - @brief Left-pad ANSI-colored text to one visible width.
 - @details Appends trailing spaces using visible-length semantics so rows that include ANSI escapes align with border columns exactly.
 - @param value {str} Source text rendered inside one panel cell.
@@ -912,7 +912,7 @@ effective cache payload for downstream rendering without redundant reload.
 - @return {str} Padded terminal text preserving existing ANSI sequences.
 - @satisfies REQ-067
 
-### fn `def _wrap_panel_lines(body_lines: list[str], wrap_width: int) -> list[str]` `priv` (L1456-1480)
+### fn `def _wrap_panel_lines(body_lines: list[str], wrap_width: int) -> list[str]` `priv` (L1457-1481)
 - @brief Wrap panel body lines to one deterministic visible width.
 - @details Applies ANSI-aware wrapping: lines containing ANSI SGR sequences are measured by visible glyph length and wrapped on stripped text only when needed.
 - @param body_lines {list[str]} Raw panel body lines.
@@ -920,7 +920,7 @@ effective cache payload for downstream rendering without redundant reload.
 - @return {list[str]} Wrapped panel lines ready for width calculation/rendering.
 - @satisfies REQ-067
 
-### fn `def _panel_content_width(title: str, body_lines: list[str]) -> int` `priv` (L1481-1500)
+### fn `def _panel_content_width(title: str, body_lines: list[str]) -> int` `priv` (L1482-1501)
 - @brief Resolve one panel visible content width from title and body lines.
 - @details Computes width from wrapped visible-line lengths and clamps to configured min/max panel boundaries.
 - @param title {str} Panel title string.
@@ -928,9 +928,9 @@ effective cache payload for downstream rendering without redundant reload.
 - @return {int} Content width used for bordered panel rendering.
 - @satisfies REQ-067
 
-### fn `def _resolve_shared_panel_content_width(` `priv` (L1501-1502)
+### fn `def _resolve_shared_panel_content_width(` `priv` (L1502-1503)
 
-### fn `def _emit_provider_panel(` `priv` (L1517-1521)
+### fn `def _emit_provider_panel(` `priv` (L1518-1522)
 - @brief Resolve shared panel width for one CLI show rendering cycle.
 - @details Selects the largest computed content width across all rendered
 provider panels, then applies that width to every panel in the cycle.
@@ -938,7 +938,7 @@ provider panels, then applies that width to every panel in the cycle.
 - @return {int} Shared content width used by all emitted panels.
 - @satisfies REQ-067
 
-### fn `def _build_result_panel(` `priv` (L1560-1563)
+### fn `def _build_result_panel(` `priv` (L1561-1564)
 - @brief Render provider-colored ANSI bordered output panel with wrapped content lines.
 - @details Creates fixed-width terminal panels aligned with GNOME extension
 card layout, preserving deterministic borders and line wrapping behavior.
@@ -950,7 +950,7 @@ Border and title color use provider-specific ANSI palette.
 - @return {None} Function return value.
 - @satisfies REQ-067
 
-### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L1683-1701)
+### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L1684-1702)
 - @brief Build one provider panel title/body payload for CLI text rendering.
 - @brief Render CLI text output for one provider result.
 - @details Formats deterministic panel lines for one provider/window result and
@@ -973,15 +973,15 @@ preserves provider-specific metrics/error rendering rules used by `show`.
 - @satisfies REQ-051
 - @satisfies REQ-067
 
-### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L1702-1717)
+### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L1703-1718)
 - @brief Execute format reset duration.
 - @details Applies format reset duration logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param seconds {float} Input parameter `seconds`.
 - @return {str} Function return value.
 
-### fn `def _should_render_metrics_after_error(` `priv` (L1718-1720)
+### fn `def _should_render_metrics_after_error(` `priv` (L1719-1721)
 
-### fn `def _should_print_claude_reset_pending_hint(` `priv` (L1738-1740)
+### fn `def _should_print_claude_reset_pending_hint(` `priv` (L1739-1741)
 - @brief Check whether CLI output must render metrics after printing an error line.
 - @details Allows continuation only for Claude HTTP 429 partial-window state so the
 5h section can include `Error:` and still display usage/reset lines.
@@ -990,7 +990,7 @@ preserves provider-specific metrics/error rendering rules used by `show`.
 - @return {bool} True when metrics should still be rendered after error line.
 - @satisfies REQ-036
 
-### fn `def _is_displayed_zero_percent(percent: float | None) -> bool` `priv` (L1760-1776)
+### fn `def _is_displayed_zero_percent(percent: float | None) -> bool` `priv` (L1761-1777)
 - @brief Determine whether CLI output must render the reset-pending fallback hint.
 - @brief Check whether a percentage renders as `0.0%` in one-decimal UI output.
 - @details The hint is only valid for Claude windows when no reset timestamp is
@@ -1006,7 +1006,7 @@ providers other than Claude.
 - @satisfies REQ-002
 - @satisfies REQ-002
 
-### fn `def _progress_bar(percent: float, provider_name: ProviderName, width: int = 20) -> str` `priv` (L1777-1792)
+### fn `def _progress_bar(percent: float, provider_name: ProviderName, width: int = 20) -> str` `priv` (L1778-1793)
 - @brief Execute progress bar.
 - @details Applies progress bar logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param percent {float} Input parameter `percent`.
@@ -1014,17 +1014,17 @@ providers other than Claude.
 - @param width {int} Input parameter `width`.
 - @return {str} Function return value.
 
-### fn `def doctor() -> None` (L1797-1849)
+### fn `def doctor() -> None` (L1798-1850)
 - @brief Execute doctor.
 - @details Applies doctor logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def env() -> None` (L1854-1862)
+### fn `def env() -> None` (L1855-1863)
 - @brief Execute env.
 - @details Applies env logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def setup() -> None` (L1867-2066)
+### fn `def setup() -> None` (L1868-2067)
 - @brief Execute setup.
 - @details Prompts for `idle_delay_seconds`, `api_call_delay_milliseconds`, `gnome_refresh_interval_seconds`, and `billing_data` in order, then prompts for provider currency symbols including `geminiai` (choices: `$`, `£`, `€`, default `$`), then persists all values to `~/.config/aibar/config.json`. GeminiAI OAuth source supports `skip`, `file`, `paste`, and `login` (re-authorization with current scopes). Also prompts for provider API keys and writes them to `~/.config/aibar/env`.
 - @return {None} Function return value.
@@ -1034,23 +1034,23 @@ providers other than Claude.
 - @satisfies REQ-056
 - @satisfies REQ-059
 
-### fn `def login(provider: str) -> None` (L2128-2146)
+### fn `def login(provider: str) -> None` (L2129-2147)
 - @brief Execute login.
 - @details Applies login logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param provider {str} Input parameter `provider`.
 - @return {None} Function return value.
 
-### fn `def _login_claude() -> None` `priv` (L2147-2195)
+### fn `def _login_claude() -> None` `priv` (L2148-2196)
 - @brief Execute login claude.
 - @details Applies login claude logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_copilot() -> None` `priv` (L2196-2223)
+### fn `def _login_copilot() -> None` `priv` (L2197-2224)
 - @brief Execute login copilot.
 - @details Applies login copilot logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_geminiai() -> None` `priv` (L2224-2260)
+### fn `def _login_geminiai() -> None` `priv` (L2225-2261)
 - @brief Execute GeminiAI OAuth login flow.
 - @details Reuses persisted OAuth client configuration to launch browser-based authorization and persist refresh-capable Google credentials.
 - @return {None} Function return value.
@@ -1098,29 +1098,29 @@ providers other than Claude.
 |`_build_cached_dual_window_results`|fn|priv|1160-1163|def _build_cached_dual_window_results(|
 |`main`|fn|pub|1235-1245|def main(ctx: click.Context) -> None|
 |`show`|fn|pub|1278-1394|def show(provider: str, window: str, output_json: bool, f...|
-|`_provider_display_name`|fn|priv|1395-1408|def _provider_display_name(provider_name: ProviderName) -...|
-|`_provider_panel_color_code`|fn|priv|1409-1418|def _provider_panel_color_code(provider_name: ProviderNam...|
-|`_strip_ansi_sequences`|fn|priv|1419-1430|def _strip_ansi_sequences(value: str) -> str|
-|`_visible_text_length`|fn|priv|1431-1442|def _visible_text_length(value: str) -> int|
-|`_ansi_ljust`|fn|priv|1443-1455|def _ansi_ljust(value: str, width: int) -> str|
-|`_wrap_panel_lines`|fn|priv|1456-1480|def _wrap_panel_lines(body_lines: list[str], wrap_width: ...|
-|`_panel_content_width`|fn|priv|1481-1500|def _panel_content_width(title: str, body_lines: list[str...|
-|`_resolve_shared_panel_content_width`|fn|priv|1501-1502|def _resolve_shared_panel_content_width(|
-|`_emit_provider_panel`|fn|priv|1517-1521|def _emit_provider_panel(|
-|`_build_result_panel`|fn|priv|1560-1563|def _build_result_panel(|
-|`_print_result`|fn|priv|1683-1701|def _print_result(name: ProviderName, result, label: str ...|
-|`_format_reset_duration`|fn|priv|1702-1717|def _format_reset_duration(seconds: float) -> str|
-|`_should_render_metrics_after_error`|fn|priv|1718-1720|def _should_render_metrics_after_error(|
-|`_should_print_claude_reset_pending_hint`|fn|priv|1738-1740|def _should_print_claude_reset_pending_hint(|
-|`_is_displayed_zero_percent`|fn|priv|1760-1776|def _is_displayed_zero_percent(percent: float | None) -> ...|
-|`_progress_bar`|fn|priv|1777-1792|def _progress_bar(percent: float, provider_name: Provider...|
-|`doctor`|fn|pub|1797-1849|def doctor() -> None|
-|`env`|fn|pub|1854-1862|def env() -> None|
-|`setup`|fn|pub|1867-2066|def setup() -> None|
-|`login`|fn|pub|2128-2146|def login(provider: str) -> None|
-|`_login_claude`|fn|priv|2147-2195|def _login_claude() -> None|
-|`_login_copilot`|fn|priv|2196-2223|def _login_copilot() -> None|
-|`_login_geminiai`|fn|priv|2224-2260|def _login_geminiai() -> None|
+|`_provider_display_name`|fn|priv|1395-1409|def _provider_display_name(provider_name: ProviderName) -...|
+|`_provider_panel_color_code`|fn|priv|1410-1419|def _provider_panel_color_code(provider_name: ProviderNam...|
+|`_strip_ansi_sequences`|fn|priv|1420-1431|def _strip_ansi_sequences(value: str) -> str|
+|`_visible_text_length`|fn|priv|1432-1443|def _visible_text_length(value: str) -> int|
+|`_ansi_ljust`|fn|priv|1444-1456|def _ansi_ljust(value: str, width: int) -> str|
+|`_wrap_panel_lines`|fn|priv|1457-1481|def _wrap_panel_lines(body_lines: list[str], wrap_width: ...|
+|`_panel_content_width`|fn|priv|1482-1501|def _panel_content_width(title: str, body_lines: list[str...|
+|`_resolve_shared_panel_content_width`|fn|priv|1502-1503|def _resolve_shared_panel_content_width(|
+|`_emit_provider_panel`|fn|priv|1518-1522|def _emit_provider_panel(|
+|`_build_result_panel`|fn|priv|1561-1564|def _build_result_panel(|
+|`_print_result`|fn|priv|1684-1702|def _print_result(name: ProviderName, result, label: str ...|
+|`_format_reset_duration`|fn|priv|1703-1718|def _format_reset_duration(seconds: float) -> str|
+|`_should_render_metrics_after_error`|fn|priv|1719-1721|def _should_render_metrics_after_error(|
+|`_should_print_claude_reset_pending_hint`|fn|priv|1739-1741|def _should_print_claude_reset_pending_hint(|
+|`_is_displayed_zero_percent`|fn|priv|1761-1777|def _is_displayed_zero_percent(percent: float | None) -> ...|
+|`_progress_bar`|fn|priv|1778-1793|def _progress_bar(percent: float, provider_name: Provider...|
+|`doctor`|fn|pub|1798-1850|def doctor() -> None|
+|`env`|fn|pub|1855-1863|def env() -> None|
+|`setup`|fn|pub|1868-2067|def setup() -> None|
+|`login`|fn|pub|2129-2147|def login(provider: str) -> None|
+|`_login_claude`|fn|priv|2148-2196|def _login_claude() -> None|
+|`_login_copilot`|fn|priv|2197-2224|def _login_copilot() -> None|
+|`_login_geminiai`|fn|priv|2225-2261|def _login_geminiai() -> None|
 
 
 ---

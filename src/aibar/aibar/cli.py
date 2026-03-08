@@ -1396,13 +1396,14 @@ def _provider_display_name(provider_name: ProviderName) -> str:
     """
     @brief Resolve human-facing provider title for terminal panel rendering.
     @details Maps machine-readable provider keys to display names aligned with
-    CLI and GNOME extension output surfaces.
+    CLI and GNOME extension output surfaces; applies uppercase `GEMINIAI`
+    override for provider key `geminiai`.
     @param provider_name {ProviderName} Provider enum key.
     @return {str} Human-facing provider display name.
     @satisfies REQ-062
     """
     if provider_name == ProviderName.GEMINIAI:
-        return "GeminiAI"
+        return "GEMINIAI"
     return provider_name.value.upper()
 
 

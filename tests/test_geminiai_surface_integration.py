@@ -41,6 +41,8 @@ def test_cli_registers_geminiai_provider_and_login_paths() -> None:
     assert 'help="Provider to query (claude, openai, openrouter, copilot, codex, geminiai, all)"' in source
     assert 'help="Provider to login to (claude, copilot, geminiai)"' in source
     assert "_login_geminiai()" in source
+    assert 'if provider_name == ProviderName.GEMINIAI:' in source
+    assert 'return "GEMINIAI"' in source
 
 
 def test_config_includes_geminiai_runtime_surfaces() -> None:
