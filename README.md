@@ -30,7 +30,7 @@ AIBar aggregates usage metrics for Claude, OpenAI, OpenRouter, GitHub Copilot, C
 
 
 ## Feature Highlights
-- Unified `show` command for multiple providers (`claude`, `openai`, `openrouter`, `copilot`, `codex`).
+- Unified `show` command for multiple providers (`claude`, `openai`, `openrouter`, `copilot`, `codex`, `geminiai`).
 - Human-readable output and JSON output (`--json`) for scripting/integration.
 - Provider diagnostics (`doctor`) and interactive setup (`setup`) for credentials.
 - Local cache of successful results under `~/.cache/aibar` to reduce repeated API calls.
@@ -151,6 +151,7 @@ uv pip uninstall aibar
 # Provider login helpers
 ./aibar login --provider claude
 ./aibar login --provider copilot
+./aibar login --provider geminiai
 
 ```
 
