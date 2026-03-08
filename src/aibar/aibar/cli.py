@@ -1340,16 +1340,19 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
         click.echo(json.dumps(output_doc, indent=2))
         return
 
+    rendered_panels: list[tuple[ProviderName, str, list[str]]] = []
     for name, prov in providers.items():
         if not prov.is_configured():
             if provider_filter is None or provider_filter == name:
-                _emit_provider_panel(
-                    provider_name=name,
-                    title=_provider_display_name(name),
-                    body_lines=[
+                rendered_panels.append(
+                    (
+                        name,
+                        _provider_display_name(name),
+                        [
                         "Status: NOT CONFIGURED",
                         f"Missing env: {config.ENV_VARS.get(name)}",
-                    ],
+                        ],
+                    )
                 )
 
     if provider_filter is not None and provider_filter.value not in retrieval.results:
@@ -1370,10 +1373,23 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
             )
             if dual_results is not None:
                 result_5h, result_7d = dual_results
-                _print_result(provider_name, result_5h, label="5h")
-                _print_result(provider_name, result_7d, label="7d")
+                rendered_panels.append(
+                    (provider_name, *_build_result_panel(provider_name, result_5h, label="5h"))
+                )
+                rendered_panels.append(
+                    (provider_name, *_build_result_panel(provider_name, result_7d, label="7d"))
+                )
                 continue
-        _print_result(provider_name, result)
+        rendered_panels.append((provider_name, *_build_result_panel(provider_name, result)))
+
+    shared_content_width = _resolve_shared_panel_content_width(rendered_panels)
+    for provider_name, title, body_lines in rendered_panels:
+        _emit_provider_panel(
+            provider_name=provider_name,
+            title=title,
+            body_lines=body_lines,
+            content_width=shared_content_width,
+        )
 
 
 def _provider_display_name(provider_name: ProviderName) -> str:
@@ -1437,25 +1453,17 @@ def _ansi_ljust(value: str, width: int) -> str:
     return value + (" " * max(0, width - _visible_text_length(value)))
 
 
-def _emit_provider_panel(
-    provider_name: ProviderName,
-    title: str,
-    body_lines: list[str],
-) -> None:
+def _wrap_panel_lines(body_lines: list[str], wrap_width: int) -> list[str]:
     """
-    @brief Render provider-colored ANSI bordered output panel with wrapped content lines.
-    @details Creates fixed-width terminal panels aligned with GNOME extension
-    card layout, preserving deterministic borders and line wrapping behavior.
-    Border and title color use provider-specific ANSI palette.
-    @param provider_name {ProviderName} Provider enum key.
-    @param title {str} Panel header text.
-    @param body_lines {list[str]} Content lines rendered in panel body.
-    @return {None} Function return value.
+    @brief Wrap panel body lines to one deterministic visible width.
+    @details Applies ANSI-aware wrapping: lines containing ANSI SGR sequences are
+    measured by visible glyph length and wrapped on stripped text only when needed.
+    @param body_lines {list[str]} Raw panel body lines.
+    @param wrap_width {int} Maximum visible width for one wrapped line.
+    @return {list[str]} Wrapped panel lines ready for width calculation/rendering.
     @satisfies REQ-067
     """
-    color_code = _provider_panel_color_code(provider_name)
     wrapped_lines: list[str] = []
-    wrap_width = _SHOW_PANEL_MAX_WIDTH - 4
     for body_line in body_lines:
         if "\033[" in body_line:
             visible_line = _strip_ansi_sequences(body_line)
@@ -1467,41 +1475,101 @@ def _emit_provider_panel(
         else:
             chunks = textwrap.wrap(body_line, width=wrap_width)
         wrapped_lines.extend(chunks or [""])
+    return wrapped_lines
 
+
+def _panel_content_width(title: str, body_lines: list[str]) -> int:
+    """
+    @brief Resolve one panel visible content width from title and body lines.
+    @details Computes width from wrapped visible-line lengths and clamps to
+    configured min/max panel boundaries.
+    @param title {str} Panel title string.
+    @param body_lines {list[str]} Raw body lines for the panel.
+    @return {int} Content width used for bordered panel rendering.
+    @satisfies REQ-067
+    """
+    wrap_width = _SHOW_PANEL_MAX_WIDTH - 4
+    wrapped_lines = _wrap_panel_lines(body_lines=body_lines, wrap_width=wrap_width)
     content_width = max(
         _SHOW_PANEL_MIN_WIDTH - 4,
         _visible_text_length(title),
         max((_visible_text_length(item) for item in wrapped_lines), default=0),
     )
-    content_width = min(content_width, _SHOW_PANEL_MAX_WIDTH - 4)
-    horizontal_border = "─" * (content_width + 2)
+    return min(content_width, wrap_width)
+
+
+def _resolve_shared_panel_content_width(
+    rendered_panels: list[tuple[ProviderName, str, list[str]]],
+) -> int:
+    """
+    @brief Resolve shared panel width for one CLI show rendering cycle.
+    @details Selects the largest computed content width across all rendered
+    provider panels, then applies that width to every panel in the cycle.
+    @param rendered_panels {list[tuple[ProviderName, str, list[str]]]} Render queue.
+    @return {int} Shared content width used by all emitted panels.
+    @satisfies REQ-067
+    """
+    if not rendered_panels:
+        return _SHOW_PANEL_MIN_WIDTH - 4
+    return max(_panel_content_width(title, body_lines) for _, title, body_lines in rendered_panels)
+
+
+def _emit_provider_panel(
+    provider_name: ProviderName,
+    title: str,
+    body_lines: list[str],
+    content_width: int | None = None,
+) -> None:
+    """
+    @brief Render provider-colored ANSI bordered output panel with wrapped content lines.
+    @details Creates fixed-width terminal panels aligned with GNOME extension
+    card layout, preserving deterministic borders and line wrapping behavior.
+    Border and title color use provider-specific ANSI palette.
+    @param provider_name {ProviderName} Provider enum key.
+    @param title {str} Panel header text.
+    @param body_lines {list[str]} Content lines rendered in panel body.
+    @param content_width {int | None} Shared content width override for this panel.
+    @return {None} Function return value.
+    @satisfies REQ-067
+    """
+    color_code = _provider_panel_color_code(provider_name)
+    wrap_width = _SHOW_PANEL_MAX_WIDTH - 4
+    wrapped_lines = _wrap_panel_lines(body_lines=body_lines, wrap_width=wrap_width)
+    if content_width is None:
+        panel_content_width = _panel_content_width(title=title, body_lines=body_lines)
+    else:
+        panel_content_width = min(max(_SHOW_PANEL_MIN_WIDTH - 4, content_width), wrap_width)
+    horizontal_border = "─" * (panel_content_width + 2)
     click.echo(f"{color_code}┌{horizontal_border}┐{_ANSI_RESET}")
     click.echo(
         f"{color_code}│{_ANSI_RESET} "
-        f"{color_code}{_ansi_ljust(title, content_width)}{_ANSI_RESET} "
+        f"{color_code}{_ansi_ljust(title, panel_content_width)}{_ANSI_RESET} "
         f"{color_code}│{_ANSI_RESET}"
     )
     click.echo(f"{color_code}├{horizontal_border}┤{_ANSI_RESET}")
     for body_line in wrapped_lines:
         click.echo(
             f"{color_code}│{_ANSI_RESET} "
-            f"{_ansi_ljust(body_line, content_width)} "
+            f"{_ansi_ljust(body_line, panel_content_width)} "
             f"{color_code}│{_ANSI_RESET}"
         )
     click.echo(f"{color_code}└{horizontal_border}┘{_ANSI_RESET}")
     click.echo()
 
 
-def _print_result(name: ProviderName, result, label: str | None = None) -> None:
+def _build_result_panel(
+    name: ProviderName,
+    result: ProviderResult,
+    label: str | None = None,
+) -> tuple[str, list[str]]:
     """
-    @brief Render CLI text output for one provider result.
-    @details Formats usage percentage, reset countdown, remaining credits, cost,
-    requests, and token counts for one provider/window result. Cost is formatted
-    using `metrics.currency_symbol` (never hardcoded `$`).
+    @brief Build one provider panel title/body payload for CLI text rendering.
+    @details Formats deterministic panel lines for one provider/window result and
+    preserves provider-specific metrics/error rendering rules used by `show`.
     @param name {ProviderName} Provider name enum value.
     @param result {ProviderResult} Provider result to render.
     @param label {str | None} Optional window label suffix (e.g. `"5h"`, `"7d"`).
-    @return {None} Function return value.
+    @return {tuple[str, list[str]]} Panel title and body lines.
     @satisfies REQ-034
     @satisfies REQ-035
     @satisfies REQ-051
@@ -1523,8 +1591,7 @@ def _print_result(name: ProviderName, result, label: str | None = None) -> None:
     if result.is_error:
         lines.append(f"Error: {result.error}")
         if not _should_render_metrics_after_error(name, result):
-            _emit_provider_panel(provider_name=name, title=title, body_lines=lines)
-            return
+            return title, lines
 
     m = result.metrics
     if m.usage_percent is not None:
@@ -1610,6 +1677,25 @@ def _print_result(name: ProviderName, result, label: str | None = None) -> None:
     if isinstance(retry_after, (int, float)) and retry_after > 0:
         lines.append(f"Retry after: {float(retry_after):.1f}s")
 
+    return title, lines
+
+
+def _print_result(name: ProviderName, result, label: str | None = None) -> None:
+    """
+    @brief Render CLI text output for one provider result.
+    @details Formats usage percentage, reset countdown, remaining credits, cost,
+    requests, and token counts for one provider/window result. Cost is formatted
+    using `metrics.currency_symbol` (never hardcoded `$`).
+    @param name {ProviderName} Provider name enum value.
+    @param result {ProviderResult} Provider result to render.
+    @param label {str | None} Optional window label suffix (e.g. `"5h"`, `"7d"`).
+    @return {None} Function return value.
+    @satisfies REQ-034
+    @satisfies REQ-035
+    @satisfies REQ-051
+    @satisfies REQ-067
+    """
+    title, lines = _build_result_panel(name, result, label)
     _emit_provider_panel(provider_name=name, title=title, body_lines=lines)
 
 

@@ -134,8 +134,8 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-018**: MUST set GNOME panel label to `Err` and truncate popup error text to 40 characters when command execution or JSON parsing fails.
 - **REQ-019**: SHOULD order extension provider tabs/cards by `claude`, `openrouter`, `copilot`, `codex`, with providers not listed in ordering array appended alphabetically.
 - **REQ-020**: MUST include each discovered source symbol in `docs/REFERENCES.md` with file path, symbol kind, line-range evidence, and parsed Doxygen fields (`@brief`, `@param`, `@return`, `@raises`) when present in source declarations.
-- **REQ-021**: MUST render GNOME panel status labels after the icon in this order: Claude 5h percentage, Claude 7d percentage, Claude cost, OpenRouter cost, Copilot 30d percentage, Codex 5h percentage, Codex 7d percentage, Codex cost, GeminiAI cost.
-- **REQ-022**: MUST style GNOME panel tab and label fonts with provider classes and bright colors: Claude red, OpenRouter orange, Copilot yellow, Codex green, OpenAI blue, GeminiAI purple; MUST render cost labels using the same font family and omit unavailable metrics.
+- **REQ-021**: MUST render GNOME panel status labels after the icon in this order: Claude 5h percentage, Claude 7d percentage, Claude cost, OpenRouter cost, Copilot 30d percentage, Codex 5h percentage, Codex 7d percentage, Codex cost, OpenAI cost, GeminiAI cost.
+- **REQ-022**: MUST style GNOME panel tab and label fonts with provider classes and bright colors: Claude red, OpenRouter orange, Copilot yellow, Codex green, OpenAI blue, GeminiAI purple; cost labels MUST use the same font family, render when numeric value is `0`, and hide only when cost metric is unavailable.
 - **REQ-023**: MUST declare a `[project.scripts]` entry `aibar = "aibar.cli:main"` in `pyproject.toml` so that `uv pip install` and `uvx` resolve the `aibar` console command.
 - **REQ-024**: MUST provide `src/aibar/aibar/__main__.py` that delegates to `aibar.cli:main` to enable `python -m aibar` execution.
 - **REQ-025**: MUST resolve the git project root via `git rev-parse --show-toplevel` in `scripts/install-gnome-extension.sh` so the script is invocable from any working directory.
@@ -179,7 +179,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-064**: GeminiAI billing fetch MUST read `<project_id>` from `~/.config/aibar/geminiai_oauth_client.json`, discover `<table_id>` by listing tables in dataset `RuntimeConfig.billing_data` (default `billing_data`), and fail with structured error when billing export table is unavailable.
 - **REQ-065**: GeminiAI billing fetch MUST query `<billing_dataset>.gcp_billing_export_v1_<table_id>` using explicit column projection and aggregate the latest available invoice month (`MAX(invoice.month)`); when invoice month is unavailable, implementation MUST fallback to `usage_start_time >= TIMESTAMP_TRUNC(CURRENT_TIMESTAMP(), MONTH)`.
 - **REQ-066**: MUST guard every read/write of `~/.cache/aibar/cache.json` and `~/.cache/aibar/idle-time.json` with blocking lock files in `~/.cache/aibar/`, polling lock release every 250 milliseconds before continuing.
-- **REQ-067**: CLI `show` text mode MUST render ANSI provider-colored bordered panels (Claude red, OpenRouter orange, Copilot yellow, Codex green, OpenAI blue, GeminiAI purple) with progress bars filled using the corresponding provider color.
+- **REQ-067**: CLI `show` text mode MUST render ANSI provider-colored bordered panels (Claude red, OpenRouter orange, Copilot yellow, Codex green, OpenAI blue, GeminiAI purple) with provider-colored progress bars; all panels in one `show` execution MUST use the same width equal to the widest rendered panel.
 - **REQ-068**: Bare `aibar` and `aibar --help` MUST print human-readable usage text listing all commands and global or command-specific options, including `show --force` and `show --json`, without Doxygen tags.
 - **REQ-069**: GNOME panel icon MUST be bright white when all percentages are <= 25, bright yellow when any percentage > 25, bright orange when any percentage > 50, bright red when any percentage > 75, and blinking bright-red/dim-red when any percentage > 90.
 
@@ -193,7 +193,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-004**: MUST verify GNOME extension error path sets panel text `Err`, caps displayed error string length to 40 characters, renders quota-only card labels as `Remaining credits: <remaining>/<limit>` with bold `<remaining>`, renders reset labels with `Reset in:` prefix, suppresses `Error: Rate limited. Try again later.` for rate-limit quota payloads, appends `⚠️ Limit reached!` after reset countdown at displayed `100.0%`, renders Copilot `30d` bar/reset placement before remaining-credits text, renders popup labels `AIBar` and `Open AIBar Report`, verifies popup `Refresh Now` executes with `--force`, verifies `scripts/test-gnome-extension.sh` includes `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800`, and verifies each provider card renders `Update at:` label bottom-right sourced from `updated_at`.
 - **TST-005**: MUST verify Copilot provider always returns `window=30d` regardless of requested window argument.
 - **TST-006**: MUST verify `req --here --references` reproduces `docs/REFERENCES.md` without missing symbol entries and preserves Doxygen field extraction for documented symbols.
-- **TST-007**: MUST verify GNOME panel status labels render in the REQ-021 order, enforce provider style classes and color mapping, verify dynamic icon color/blink thresholds, and omit unavailable labels when source metrics are unavailable.
+- **TST-007**: MUST verify GNOME panel status labels render in the REQ-021 order (including OpenAI cost), enforce provider style classes and color mapping, verify dynamic icon color/blink thresholds, render zero-cost labels with provider currency symbol, and omit unavailable labels when source metrics are unavailable.
 - **TST-008**: MUST verify `pyproject.toml` declares `[build-system]` with `hatchling`, `[project.scripts]` entry `aibar = "aibar.cli:main"`, runtime `dependencies` list, and `requires-python` constraint.
 - **TST-009**: MUST verify `scripts/install-gnome-extension.sh` is executable, passes `bash -n` syntax check, resolves git root correctly, validates source directory, and produces non-zero exit on missing source.
 - **TST-010**: MUST verify `Remaining credits: <remaining> / <limit>` appears for Claude, Codex, and Copilot when both quota values exist.
@@ -215,6 +215,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-027**: MUST verify GeminiAI HTTP `429`, quota-exhaustion, and missing billing-export-table failures preserve cached payload snapshots, mark status `FAIL`, and update `idle-time.json` according to existing rate-limit retry policy.
 - **TST-028**: MUST verify `setup` currency prompts exclude `geminiai` and GeminiAI rendering in CLI text and JSON payload includes latest-available billing-period monetary cost values when billing data exists.
 - **TST-029**: MUST verify GNOME extension renders GeminiAI provider tab/card with bright-purple style class assignment, provider title `GeminiAI`, provider ordering immediately after `codex`, and GeminiAI cost/error status propagation from cache payload.
+- **TST-030**: MUST verify CLI `show` renders all provider panels with identical visible width in one execution, where the shared width equals the widest rendered panel content width.
 
 ## 5. Evidence
 
@@ -267,8 +268,8 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-018 | `src/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_handleError` + `this._panelLabel.set_text('Err')` and `message.substring(0, 40)`. |
 | REQ-019 | `src/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_providerOrder` and `_updateUI` sorting + unknown providers rank `999` then lexical order. |
 | REQ-020 | `docs/REFERENCES.md` + per-symbol entries containing symbol identifier, file path, and line-range spans. |
-| REQ-021 | `src/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_buildPanelButton/_updateUI` + panel percentage labels inserted between icon and summary label in fixed Claude 5h, Claude 7d, Copilot, Codex 5h, Codex 7d order. |
-| REQ-022 | `src/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_buildPanelButton/_updateUI` + panel labels use provider color classes, primary percentages (Claude 5h/Copilot/Codex 5h) are bold, and labels hide when required metrics are unavailable. |
+| REQ-021 | `src/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_buildPanelButton/_updateUI` + panel labels inserted between icon and summary label in fixed order: Claude 5h, Claude 7d, Claude cost, OpenRouter cost, Copilot 30d, Codex 5h, Codex 7d, Codex cost, OpenAI cost, GeminiAI cost. |
+| REQ-022 | `src/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_buildPanelButton/_updateUI` + panel labels use provider classes/colors; cost labels render provider currency for numeric `0` values and hide only when cost metric is unavailable. |
 | REQ-023 | `pyproject.toml` + `[project.scripts]` + `aibar = "aibar.cli:main"` declaration. |
 | REQ-024 | `src/aibar/aibar/__main__.py` + `main()` import and invocation from `aibar.cli`. |
 | REQ-034 | `src/aibar/aibar/cli.py` + `_format_reset_duration/_print_result` + day-token reset countdown formatting in text output. |
@@ -291,7 +292,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | TST-004 | `tests/test_extension_quota_label.py` + popup-label assertions (`AIBar`, `Open AIBar Report`), reset-prefix and `⚠️ Limit reached!` assertions, rate-limit error-string suppression assertions, `Update at:` provider-card label assertions, and popup `Refresh Now` `--force` assertion; `tests/test_extension_dev_script.py` + `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800`; `src/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_handleError/_populateProviderCard/_buildPopupMenu` coverage. |
 | TST-005 | `src/aibar/aibar/providers/copilot.py` + `fetch` hard-codes `effective_window` to `WindowPeriod.DAY_30`. |
 | TST-006 | `docs/REFERENCES.md` + generated symbol coverage for tracked `src/` files validates documentation inventory completeness. |
-| TST-007 | `tests/test_extension_quota_label.py` + panel-segment assertions for five-label order, provider style classes, bold primary percentages, and missing-metric omission behavior. |
+| TST-007 | `tests/test_extension_quota_label.py` + panel-segment order assertions (including OpenAI cost), provider style classes, zero-cost currency-label visibility checks, bold primary percentages, and missing-metric omission behavior. |
 | TST-008 | `tests/test_pyproject_metadata.py` + assertions for `[build-system]` backend, `[project.scripts]` entry, `dependencies` list, and `requires-python` constraint in `pyproject.toml`. |
 | TST-010 | `tests/test_reset_pending_message.py` and `src/aibar/aibar/cli.py` + verify remaining-credits rendering path in text output for quota providers. |
 | TST-011 | `tests/test_cli_idle_time_429.py` + multi-429 scenarios verify `max(retry_after_seconds, idle_delay_seconds)` and largest `idle_until` persistence. |
@@ -318,3 +319,4 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-048 | `scripts/claude_token_refresh.sh` + `do_refresh()` + `> "$LOG_FILE"` truncation statement before first `log` call. |
 | TST-022 | `tests/test_claude_token_refresh_script.py` + source-level assertion that `do_refresh()` body contains `LOG_FILE` truncation before any `log` invocation. |
 | TST-023 | `tests/test_currency_symbol_flow.py` + assertions for `currency_symbol` field in `UsageMetrics`, CLI `_print_result` cost formatting, and GNOME extension panel label using metrics symbol. |
+| TST-030 | `tests/test_cli_show_panel_alignment.py` + CLI panel output assertions verify all rendered panels share identical visible width within one `show` execution. |

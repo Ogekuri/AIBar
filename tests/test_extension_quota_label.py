@@ -151,6 +151,7 @@ def test_panel_percentage_labels_use_fixed_order_provider_styles_and_primary_bol
     codex_5h_idx = source.index("this._panelPercentages.add_child(this._panelCodexPctLabel);")
     codex_7d_idx = source.index("this._panelPercentages.add_child(this._panelCodex7dPctLabel);")
     codex_cost_idx = source.index("this._panelPercentages.add_child(this._panelCodexCostLabel);")
+    openai_cost_idx = source.index("this._panelPercentages.add_child(this._panelOpenAICostLabel);")
     geminiai_cost_idx = source.index("this._panelPercentages.add_child(this._panelGeminiaiCostLabel);")
     assert (
         claude_idx
@@ -161,6 +162,7 @@ def test_panel_percentage_labels_use_fixed_order_provider_styles_and_primary_bol
         < codex_5h_idx
         < codex_7d_idx
         < codex_cost_idx
+        < openai_cost_idx
         < geminiai_cost_idx
     )
 
@@ -172,6 +174,7 @@ def test_panel_percentage_labels_use_fixed_order_provider_styles_and_primary_bol
     assert "style_class: 'aibar-panel-pct aibar-panel-pct-primary aibar-tab-label-codex'" in source
     assert "style_class: 'aibar-panel-pct aibar-panel-pct-secondary aibar-tab-label-codex'" in source
     assert "style_class: 'aibar-panel-pct aibar-panel-cost aibar-tab-label-codex'" in source
+    assert "style_class: 'aibar-panel-pct aibar-panel-cost aibar-tab-label-openai'" in source
     assert "style_class: 'aibar-panel-pct aibar-panel-cost aibar-tab-label-geminiai'" in source
 
 
@@ -208,7 +211,18 @@ def test_panel_percentage_labels_hide_when_metrics_are_unavailable() -> None:
     assert "this._panelCodexPctLabel.hide();" in source
     assert "this._panelCodex7dPctLabel.hide();" in source
     assert "this._panelCodexCostLabel.hide();" in source
+    assert "this._panelOpenAICostLabel.hide();" in source
     assert "this._panelGeminiaiCostLabel.hide();" in source
+
+
+def test_panel_cost_text_keeps_zero_values_visible_with_currency_symbol() -> None:
+    """
+    @brief Verify panel cost formatter returns currency-prefixed text for numeric zero.
+    @satisfies TST-007
+    """
+    source = EXTENSION_PATH.read_text(encoding="utf-8")
+    assert "if (metrics.cost === null || metrics.cost === undefined)" in source
+    assert "return `${currencySymbol}${numeric.toFixed(2)}`;" in source
 
 
 def test_extension_reads_gnome_refresh_interval_from_json_extension_section() -> None:

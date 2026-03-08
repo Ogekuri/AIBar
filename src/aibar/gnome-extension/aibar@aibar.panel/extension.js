@@ -268,6 +268,12 @@ class AIBarIndicator extends PanelMenu.Button {
             style_class: 'aibar-panel-pct aibar-panel-cost aibar-tab-label-codex',
         });
 
+        this._panelOpenAICostLabel = new St.Label({
+            text: '',
+            y_align: Clutter.ActorAlign.CENTER,
+            style_class: 'aibar-panel-pct aibar-panel-cost aibar-tab-label-openai',
+        });
+
         this._panelGeminiaiCostLabel = new St.Label({
             text: '',
             y_align: Clutter.ActorAlign.CENTER,
@@ -282,6 +288,7 @@ class AIBarIndicator extends PanelMenu.Button {
         this._panelCodexPctLabel.hide();
         this._panelCodex7dPctLabel.hide();
         this._panelCodexCostLabel.hide();
+        this._panelOpenAICostLabel.hide();
         this._panelGeminiaiCostLabel.hide();
         this._panelLabel.hide();
 
@@ -293,6 +300,7 @@ class AIBarIndicator extends PanelMenu.Button {
         this._panelPercentages.add_child(this._panelCodexPctLabel);
         this._panelPercentages.add_child(this._panelCodex7dPctLabel);
         this._panelPercentages.add_child(this._panelCodexCostLabel);
+        this._panelPercentages.add_child(this._panelOpenAICostLabel);
         this._panelPercentages.add_child(this._panelGeminiaiCostLabel);
 
         this._panelBox.add_child(this._icon);
@@ -1145,6 +1153,7 @@ class AIBarIndicator extends PanelMenu.Button {
             codex5h: this._panelCodexPctLabel,
             codex7d: this._panelCodex7dPctLabel,
             codexCost: this._panelCodexCostLabel,
+            openaiCost: this._panelOpenAICostLabel,
             geminiaiCost: this._panelGeminiaiCostLabel,
         };
 
@@ -1227,6 +1236,7 @@ class AIBarIndicator extends PanelMenu.Button {
             codex5h: codexUsage.primary,
             codex7d: codexUsage.secondary,
             codexCost: this._panelCostText(this._usageData.codex),
+            openaiCost: this._panelCostText(this._usageData.openai),
             geminiaiCost: this._panelCostText(this._usageData.geminiai),
         };
 
