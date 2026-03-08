@@ -14,7 +14,7 @@ persist granular `OK`/`FAIL` window statuses with error metadata, and avoid lega
 """
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -247,3 +247,60 @@ def test_refresh_flow_does_not_create_legacy_claude_snapshot_file(
     assert result.exit_code == 0
     legacy_path = tmp_path / ".cache" / "aibar" / "claude_dual_last_success.json"
     assert not legacy_path.exists()
+
+
+def test_geminiai_cached_fail_status_is_rendered_in_show_output(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """
+    @brief Verify GeminiAI cached FAIL status propagates to CLI text output.
+    @details Writes cache payload with successful GeminiAI metrics plus status FAIL
+    for 7d window, activates idle-time gating, and asserts `aibar show` prints the
+    cached status error message.
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @param tmp_path {Path} Temporary path fixture.
+    @return {None} Function return value.
+    @satisfies REQ-060
+    @satisfies TST-027
+    """
+    _patch_config_paths(monkeypatch, tmp_path)
+    config_module.save_runtime_config(
+        config_module.RuntimeConfig(idle_delay_seconds=300, api_call_delay_seconds=20)
+    )
+
+    cached_success = ProviderResult(
+        provider=ProviderName.GEMINIAI,
+        window=WindowPeriod.DAY_7,
+        metrics=UsageMetrics(cost=2.75, requests=120, input_tokens=1024, currency_symbol="€"),
+        raw={"project_id": "demo-project", "billing": {"table_id": "gcp_billing_export_v1_001"}},
+    )
+    config_module.save_cli_cache(
+        {
+            "payload": {"geminiai": cached_success.model_dump(mode="json")},
+            "status": {
+                "geminiai": {
+                    "7d": {
+                        "result": "FAIL",
+                        "error": "GeminiAI billing export table was not found in dataset 'billing_data'.",
+                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                        "status_code": None,
+                    }
+                }
+            },
+        }
+    )
+    now_utc = datetime.now(timezone.utc)
+    config_module.save_idle_time(now_utc, now_utc + timedelta(minutes=5))
+
+    provider = MagicMock()
+    provider.is_configured.return_value = True
+    monkeypatch.setattr(
+        "aibar.cli.get_providers",
+        lambda: {ProviderName.GEMINIAI: provider},
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["show", "--provider", "geminiai", "--window", "7d"])
+    assert result.exit_code == 0
+    assert "Error: GeminiAI billing export table was not found in dataset 'billing_data'." in result.output

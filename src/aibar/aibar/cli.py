@@ -331,6 +331,56 @@ def _is_failed_http_429_status(status_entry: dict[str, object] | None) -> bool:
     return status_entry.get("status_code") == 429
 
 
+def _overlay_cached_failure_status(
+    provider_key: str,
+    target_window: WindowPeriod,
+    projected_result: ProviderResult,
+    status_section: dict[str, object],
+) -> ProviderResult:
+    """
+    @brief Overlay cached failure status onto projected result for GeminiAI.
+    @details Reads `status[provider][window]`; when status marks `FAIL` with a
+    non-empty error string, returns a copy of projected result carrying the cached
+    error and optional status code while preserving payload metrics.
+    @param provider_key {str} Provider id in cache sections.
+    @param target_window {WindowPeriod} Requested window used for status lookup.
+    @param projected_result {ProviderResult} Cached payload result after projection.
+    @param status_section {dict[str, object]} Cache status section.
+    @return {ProviderResult} Result with overlaid cached error state when applicable.
+    @satisfies REQ-060
+    @satisfies REQ-061
+    """
+    if provider_key != ProviderName.GEMINIAI.value:
+        return projected_result
+
+    status_entry = _get_window_attempt_status(status_section, provider_key, target_window)
+    if not isinstance(status_entry, dict):
+        return projected_result
+    if status_entry.get("result") != _ATTEMPT_RESULT_FAIL:
+        return projected_result
+    status_error = status_entry.get("error")
+    if not isinstance(status_error, str) or not status_error.strip():
+        return projected_result
+
+    raw_update = dict(projected_result.raw)
+    status_code = status_entry.get("status_code")
+    if isinstance(status_code, int):
+        raw_update["status_code"] = status_code
+    raw_update["cache_status_error"] = status_error
+
+    updated_at = projected_result.updated_at
+    status_updated_at = status_entry.get("updated_at")
+    if isinstance(status_updated_at, str):
+        try:
+            updated_at = datetime.fromisoformat(status_updated_at)
+        except ValueError:
+            updated_at = projected_result.updated_at
+
+    return projected_result.model_copy(
+        update={"error": status_error, "raw": raw_update, "updated_at": updated_at}
+    )
+
+
 def _filter_cached_payload(
     cache_document: dict[str, object],
     provider_filter: ProviderName | None,
@@ -410,7 +460,8 @@ def _load_cached_results(
     @brief Decode cached JSON payload into ProviderResult mapping.
     @details Validates cached payload entries using `ProviderResult` schema, applies
     provider filtering, and projects cached windows to requested window when possible.
-    Invalid entries are skipped.
+    Invalid entries are skipped. GeminiAI cached FAIL status is overlaid from `status`
+    section onto projected payload result for surface-level error rendering.
     @param cache_document {dict[str, object]} Canonical cache document loaded from disk.
     @param provider_filter {ProviderName | None} Optional provider selector.
     @param target_window {WindowPeriod} Requested CLI window for projection.
@@ -420,6 +471,7 @@ def _load_cached_results(
     @satisfies REQ-042
     @satisfies REQ-044
     @satisfies REQ-046
+    @satisfies REQ-060
     """
     filtered_cache = _filter_cached_payload(cache_document, provider_filter)
     filtered_payload = _cache_payload_section(filtered_cache)
@@ -445,10 +497,16 @@ def _load_cached_results(
                     snapshot_payload=_normalize_claude_dual_payload(validated.raw),
                 )
                 continue
-        cached_results[provider_key] = _project_cached_window(
+        projected_result = _project_cached_window(
             validated,
             target_window,
             providers,
+        )
+        cached_results[provider_key] = _overlay_cached_failure_status(
+            provider_key=provider_key,
+            target_window=target_window,
+            projected_result=projected_result,
+            status_section=filtered_status,
         )
     return cached_results
 
@@ -1580,7 +1638,9 @@ def setup() -> None:
 
     click.echo()
     click.echo(click.style("GeminiAI (Google Cloud OAuth)", bold=True))
-    click.echo("  Configure OAuth desktop client JSON for Cloud Monitoring API access.")
+    click.echo(
+        "  Configure OAuth desktop client JSON for Cloud Monitoring and BigQuery billing access."
+    )
     oauth_source = click.prompt(
         "  geminiai oauth source",
         type=click.Choice(["skip", "file", "paste"]),

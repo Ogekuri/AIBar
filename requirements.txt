@@ -1,6 +1,7 @@
 # Runtime dependencies for src/aibar/aibar.
 click
 google-api-python-client
+google-cloud-bigquery
 google-auth-httplib2
 google-auth-oauthlib
 httpx

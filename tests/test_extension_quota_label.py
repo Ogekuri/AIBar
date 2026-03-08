@@ -42,7 +42,10 @@ def test_rate_limit_quota_payloads_do_not_render_error_banner() -> None:
     source = EXTENSION_PATH.read_text(encoding="utf-8")
     assert "const RATE_LIMIT_ERROR_MESSAGE = 'Rate limited. Try again later.';" in source
     assert "const isRateLimitQuotaError = (" in source
-    assert "const isError = data.error !== null && data.error !== undefined && !isRateLimitQuotaError;" in source
+    assert (
+        "const isError = effectiveError !== null && effectiveError !== undefined && !isRateLimitQuotaError;"
+        in source
+    )
 
 
 def test_limit_reached_suffix_is_appended_to_reset_labels_at_displayed_full_usage() -> None:
@@ -245,3 +248,18 @@ def test_geminiai_extension_tab_order_label_and_bright_pink_styles() -> None:
     assert ".aibar-tab-label-geminiai {" in stylesheet_source
     assert ".aibar-provider-geminiai {" in stylesheet_source
     assert "#FF1493" in stylesheet_source
+
+
+def test_extension_uses_cached_status_error_for_provider_cards() -> None:
+    """
+    @brief Verify extension card rendering consumes cache `status` failure entries.
+    @details Asserts update flow resolves window-specific status entries and uses
+    `statusEntry.error` fallback when payload data has no inline error.
+    @satisfies REQ-061
+    @satisfies TST-029
+    """
+    source = EXTENSION_PATH.read_text(encoding="utf-8")
+    assert "const providerStatus = this._statusData[providerName];" in source
+    assert "const statusEntry = (" in source
+    assert "const statusError = (" in source
+    assert "const effectiveError = statusError || data.error;" in source

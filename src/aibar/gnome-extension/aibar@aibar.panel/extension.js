@@ -429,9 +429,10 @@ class AIBarIndicator extends PanelMenu.Button {
      * @details Applies update provider card logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
      * @param {any} providerName Input parameter `providerName`.
      * @param {any} data Input parameter `data`.
+     * @param {any} statusEntry Window-specific cached status entry from `status` section.
      * @returns {any} Function return value.
      */
-    _updateProviderCard(providerName, data) {
+    _updateProviderCard(providerName, data, statusEntry = null) {
         let card = this._providerRows[providerName];
 
         if (!card) {
@@ -443,7 +444,7 @@ class AIBarIndicator extends PanelMenu.Button {
                 card.container.hide();
         }
 
-        this._populateProviderCard(card, providerName, data);
+        this._populateProviderCard(card, providerName, data, statusEntry);
     }
 
     /**
@@ -619,20 +620,30 @@ class AIBarIndicator extends PanelMenu.Button {
      * @param {any} card Input parameter `card`.
      * @param {any} providerName Input parameter `providerName`.
      * @param {any} data Input parameter `data`.
+     * @param {any} statusEntry Window-specific cached status entry.
      * @returns {any} Function return value.
      */
-    _populateProviderCard(card, providerName, data) {
+    _populateProviderCard(card, providerName, data, statusEntry = null) {
         const metrics = data.metrics || {};
         const raw = data.raw || {};
+        const statusError = (
+            statusEntry &&
+            statusEntry.result === 'FAIL' &&
+            typeof statusEntry.error === 'string' &&
+            statusEntry.error.length > 0
+        )
+            ? statusEntry.error
+            : null;
+        const effectiveError = statusError || data.error;
         const isRateLimitQuotaError = (
-            data.error === RATE_LIMIT_ERROR_MESSAGE &&
+            effectiveError === RATE_LIMIT_ERROR_MESSAGE &&
             metrics.limit !== null && metrics.limit !== undefined &&
             metrics.remaining !== null && metrics.remaining !== undefined
         );
-        const isError = data.error !== null && data.error !== undefined && !isRateLimitQuotaError;
+        const isError = effectiveError !== null && effectiveError !== undefined && !isRateLimitQuotaError;
 
         if (isError) {
-            card.errorLabel.text = `⚠️ ${data.error}`;
+            card.errorLabel.text = `⚠️ ${effectiveError}`;
             card.errorLabel.show();
             card.costLabel.text = '';
             card.byokLabel.text = '';
@@ -1009,6 +1020,8 @@ class AIBarIndicator extends PanelMenu.Button {
      * @brief Execute update u i.
      * @details Applies update u i logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
      * Uses `metrics.currency_symbol` from the first cost-bearing provider for the panel summary label.
+     * Resolves provider-window failure metadata from cache `status` section and forwards
+     * it to card renderers.
      * @returns {any} Function return value.
      * @satisfies REQ-053
      */
@@ -1139,7 +1152,19 @@ class AIBarIndicator extends PanelMenu.Button {
             if (!firstProvider)
                 firstProvider = providerName;
 
-            this._updateProviderCard(providerName, data);
+            const providerStatus = this._statusData[providerName];
+            const windowKey = typeof data.window === 'string' ? data.window : null;
+            const statusEntry = (
+                providerStatus &&
+                typeof providerStatus === 'object' &&
+                !Array.isArray(providerStatus) &&
+                windowKey &&
+                providerStatus[windowKey] &&
+                typeof providerStatus[windowKey] === 'object'
+            )
+                ? providerStatus[windowKey]
+                : null;
+            this._updateProviderCard(providerName, data, statusEntry);
 
             if (data.metrics && data.metrics.cost !== null && data.metrics.cost !== undefined) {
                 totalCost += data.metrics.cost;

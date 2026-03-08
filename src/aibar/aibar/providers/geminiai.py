@@ -1,8 +1,9 @@
 """
 @file
-@brief GeminiAI provider with Google OAuth and Cloud Monitoring integration.
+@brief GeminiAI provider with Google OAuth, Monitoring, and BigQuery billing integration.
 @details Implements OAuth credential persistence, token refresh, usage retrieval from
-Cloud Monitoring, and normalization into AIBar provider result contracts.
+Cloud Monitoring and current-month billing retrieval from BigQuery, then normalizes
+results into AIBar provider result contracts.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from typing import Any, cast
 
 from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
+from google.cloud import bigquery  # pyright: ignore[reportAttributeAccessIssue]
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow  # pyright: ignore[reportMissingImports]
 from googleapiclient.discovery import build
@@ -32,11 +34,16 @@ from aibar.providers.base import (
     WindowPeriod,
 )
 
-GEMINIAI_OAUTH_SCOPES: tuple[str, ...] = ("https://www.googleapis.com/auth/monitoring.read",)
+GEMINIAI_OAUTH_SCOPES: tuple[str, ...] = (
+    "https://www.googleapis.com/auth/monitoring.read",
+    "https://www.googleapis.com/auth/bigquery.readonly",
+)
 GEMINIAI_OAUTH_CLIENT_PATH = Path.home() / ".config" / "aibar" / "geminiai_oauth_client.json"
 GEMINIAI_OAUTH_TOKEN_PATH = Path.home() / ".config" / "aibar" / "geminiai_oauth_token.json"
 GEMINIAI_PROJECT_ID_ENV_VAR = "GEMINIAI_PROJECT_ID"
 GEMINIAI_ACCESS_TOKEN_ENV_VAR = "GEMINIAI_OAUTH_ACCESS_TOKEN"
+BILLING_DATASET_ID = "billing_data"
+BILLING_TABLE_PREFIX = "gcp_billing_export_v1_"
 
 
 def _to_rfc3339_utc(value: datetime) -> str:
@@ -312,9 +319,10 @@ class GeminiAICredentialStore:
 
 class GeminiAIProvider(BaseProvider):
     """
-    @brief GeminiAI usage provider backed by Google Cloud Monitoring API.
+    @brief GeminiAI usage provider backed by Monitoring and BigQuery APIs.
     @details Retrieves Generative Language API usage counters and status telemetry
-    from Cloud Monitoring, then maps data into AIBar `ProviderResult` models.
+    from Cloud Monitoring, retrieves current-month billing costs from BigQuery export,
+    then maps data into AIBar `ProviderResult` models.
     """
 
     name = ProviderName.GEMINIAI
@@ -368,12 +376,13 @@ class GeminiAIProvider(BaseProvider):
         @brief Return setup guidance for GeminiAI OAuth configuration.
         @return {str} Provider-specific setup instructions.
         """
+        scope_lines = "\n".join([f"   - {scope}" for scope in GEMINIAI_OAUTH_SCOPES])
         return f"""GeminiAI Provider Configuration:
 
 1. Run: aibar setup
 2. Configure GeminiAI OAuth client JSON (file or paste).
 3. Authorize scopes:
-   - {GEMINIAI_OAUTH_SCOPES[0]}
+{scope_lines}
 4. Ensure project id is configured via setup or {GEMINIAI_PROJECT_ID_ENV_VAR}.
 """
 
@@ -473,6 +482,13 @@ class GeminiAIProvider(BaseProvider):
                 end_time=time_range.end_time,
                 allow_missing=True,
             )
+            bigquery_client = self._build_bigquery_client(credentials, project_id)
+            billing_table_id = self._discover_billing_table_id(bigquery_client, project_id)
+            billing_services, billing_cost_total = self._query_current_month_billing_cost(
+                bigquery_client,
+                project_id,
+                billing_table_id,
+            )
 
             raw_payload: dict[str, Any] = {
                 "project_id": project_id,
@@ -488,6 +504,13 @@ class GeminiAIProvider(BaseProvider):
                     "latency_total": latency_total,
                     "error_total": error_total,
                 },
+                "billing": {
+                    "dataset_id": BILLING_DATASET_ID,
+                    "table_id": billing_table_id,
+                    "table_path": f"{project_id}.{BILLING_DATASET_ID}.{billing_table_id}",
+                    "current_month_cost_net": billing_cost_total,
+                    "services": billing_services,
+                },
                 "window_start": _to_rfc3339_utc(time_range.start_time),
                 "window_end": _to_rfc3339_utc(time_range.end_time),
             }
@@ -495,6 +518,7 @@ class GeminiAIProvider(BaseProvider):
                 raw_payload=raw_payload,
                 request_total=request_total,
                 token_total=token_total,
+                billing_cost_total=billing_cost_total,
             )
             return ProviderResult(
                 provider=self.name,
@@ -571,6 +595,124 @@ class GeminiAIProvider(BaseProvider):
         @return {Any} Monitoring service client.
         """
         return build("monitoring", "v3", credentials=credentials, cache_discovery=False)
+
+    def _build_bigquery_client(
+        self,
+        credentials: Credentials,
+        project_id: str,
+    ) -> bigquery.Client:
+        """
+        @brief Build BigQuery client for GeminiAI billing export queries.
+        @param credentials {Credentials} OAuth credentials with BigQuery read scope.
+        @param project_id {str} Google Cloud project id.
+        @return {bigquery.Client} BigQuery API client.
+        @satisfies REQ-056
+        @satisfies REQ-065
+        """
+        return bigquery.Client(project=project_id, credentials=credentials)
+
+    def _discover_billing_table_id(
+        self,
+        bigquery_client: bigquery.Client,
+        project_id: str,
+    ) -> str:
+        """
+        @brief Discover billing export table id in dataset `billing_data`.
+        @details Lists dataset tables and selects the first lexicographically sorted
+        id that starts with `gcp_billing_export_v1_`.
+        @param bigquery_client {bigquery.Client} BigQuery client.
+        @param project_id {str} Google Cloud project id.
+        @return {str} Billing export table id.
+        @throws {ProviderError} When billing export table is unavailable.
+        @satisfies REQ-064
+        """
+        dataset_ref = bigquery_client.dataset(BILLING_DATASET_ID, project=project_id)
+        table_ids = sorted(
+            table.table_id
+            for table in bigquery_client.list_tables(dataset_ref)
+            if table.table_id.startswith(BILLING_TABLE_PREFIX)
+        )
+
+        if not table_ids:
+            raise ProviderError(
+                f"GeminiAI billing export table was not found in dataset '{BILLING_DATASET_ID}'."
+            )
+        return table_ids[0]
+
+    def _query_current_month_billing_cost(
+        self,
+        bigquery_client: bigquery.Client,
+        project_id: str,
+        table_id: str,
+    ) -> tuple[list[dict[str, float | str]], float]:
+        """
+        @brief Query current-month billing costs grouped by Google service.
+        @details Uses explicit projection and month-partition filter to reduce scanned
+        bytes while preserving per-service gross/credit/net billing aggregates.
+        @param bigquery_client {bigquery.Client} BigQuery client.
+        @param project_id {str} Google Cloud project id.
+        @param table_id {str} Billing export table id.
+        @return {tuple[list[dict[str, float | str]], float]} Per-service aggregates and
+            total net monthly cost.
+        @satisfies REQ-057
+        @satisfies REQ-065
+        """
+        table_path = f"{project_id}.{BILLING_DATASET_ID}.{table_id}"
+        query = f"""
+SELECT
+  service.description AS service_description,
+  SUM(cost) AS gross_cost,
+  SUM(IFNULL((SELECT SUM(c.amount) FROM UNNEST(credits) c), 0)) AS credits,
+  SUM(cost + IFNULL((SELECT SUM(c.amount) FROM UNNEST(credits) c), 0)) AS net_cost
+FROM `{table_path}`
+WHERE usage_start_time >= TIMESTAMP_TRUNC(CURRENT_TIMESTAMP(), MONTH)
+GROUP BY service_description
+ORDER BY net_cost DESC
+"""
+        query_job = bigquery_client.query(query)
+        services: list[dict[str, float | str]] = []
+        total_net = 0.0
+        for row in query_job:
+            row_data = dict(row.items())
+            service_name_raw = row_data.get("service_description")
+            service_name = (
+                service_name_raw.strip()
+                if isinstance(service_name_raw, str) and service_name_raw.strip()
+                else "unknown"
+            )
+            gross_cost = self._coerce_float(row_data.get("gross_cost"))
+            credits = self._coerce_float(row_data.get("credits"))
+            net_cost = self._coerce_float(row_data.get("net_cost"))
+            total_net += net_cost
+            services.append(
+                {
+                    "service_description": service_name,
+                    "gross_cost": gross_cost,
+                    "credits": credits,
+                    "net_cost": net_cost,
+                }
+            )
+        return services, total_net
+
+    def _coerce_float(self, value: Any) -> float:
+        """
+        @brief Convert numeric BigQuery row field values to float.
+        @param value {Any} Numeric row value.
+        @return {float} Parsed float value or `0.0` when value is invalid.
+        """
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str):
+            try:
+                return float(value)
+            except ValueError:
+                return 0.0
+        if value is None:
+            return 0.0
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return 0.0
 
     def _query_monitoring_metric(
         self,
@@ -676,25 +818,28 @@ class GeminiAIProvider(BaseProvider):
         raw_payload: dict[str, Any],
         request_total: float | None,
         token_total: float | None,
+        billing_cost_total: float,
     ) -> UsageMetrics:
         """
         @brief Build normalized UsageMetrics from aggregated API values.
         @param raw_payload {dict[str, Any]} Combined raw payload placeholder.
         @param request_total {float | None} Aggregated request count.
         @param token_total {float | None} Aggregated token count.
+        @param billing_cost_total {float} Current-month net billing total.
         @return {UsageMetrics} Normalized metrics object.
         @satisfies REQ-050
+        @satisfies REQ-060
         """
         del raw_payload
         requests_value = int(request_total) if request_total is not None else None
         input_tokens_value = int(token_total) if token_total is not None else None
         return UsageMetrics(
-            cost=None,
+            cost=billing_cost_total,
             requests=requests_value,
             input_tokens=input_tokens_value,
             output_tokens=None,
             remaining=None,
             limit=None,
             reset_at=None,
-            currency_symbol="$",
+            currency_symbol="€",
         )

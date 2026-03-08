@@ -67,8 +67,10 @@ def test_extension_and_dependencies_include_geminiai_support() -> None:
     assert "this._providerOrder = ['claude', 'openrouter', 'copilot', 'codex', 'geminiai'];" in extension_source
     assert "geminiai: 'GeminiAI'" in extension_source
     assert "google-api-python-client" in pyproject_source
+    assert "google-cloud-bigquery" in pyproject_source
     assert "google-auth-oauthlib" in pyproject_source
     assert "google-auth-httplib2" in pyproject_source
     assert "google-api-python-client" in requirements_source
+    assert "google-cloud-bigquery" in requirements_source
     assert "google-auth-oauthlib" in requirements_source
     assert "google-auth-httplib2" in requirements_source

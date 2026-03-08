@@ -12,6 +12,7 @@ requires-python = ">= 3.11"
 dependencies = [
     "click",
     "google-api-python-client",
+    "google-cloud-bigquery",
     "google-auth-httplib2",
     "google-auth-oauthlib",
     "httpx",
