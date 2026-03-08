@@ -15,7 +15,7 @@ import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
-const REFRESH_INTERVAL_SECONDS = 300;
+const REFRESH_INTERVAL_SECONDS = 60;
 const ENV_FILE_PATH = GLib.get_home_dir() + '/.config/aibar/env';
 const RESET_PENDING_MESSAGE = 'Starts when the first message is sent';
 const RATE_LIMIT_ERROR_MESSAGE = 'Rate limited. Try again later.';
@@ -156,7 +156,7 @@ class AIBarIndicator extends PanelMenu.Button {
         this._statusData = {};
         this._providerRows = {};
         this._providerTabs = {};
-        this._lastUpdated = null;
+        this._refreshIntervalSeconds = REFRESH_INTERVAL_SECONDS;
         this._activeProvider = null;
         this._providerOrder = ['claude', 'openrouter', 'copilot', 'codex'];
 
@@ -307,14 +307,6 @@ class AIBarIndicator extends PanelMenu.Button {
             this._openTerminalWithCommand(`${_getAiBarPath()} ui`);
         });
         this.menu.addMenuItem(openUiItem);
-
-        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-
-        this._lastUpdatedItem = new PopupMenu.PopupMenuItem('Last updated: Never, next update: Pending', {
-            reactive: false,
-        });
-        this._lastUpdatedItem.label.style_class = 'aibar-last-updated';
-        this.menu.addMenuItem(this._lastUpdatedItem);
 
         this.menu.connect('open-state-changed', (_menu, isOpen) => {
             if (isOpen)
@@ -570,6 +562,22 @@ class AIBarIndicator extends PanelMenu.Button {
 
         container.add_child(statsGrid);
 
+        let updateAtRow = new St.BoxLayout({
+            vertical: false,
+            x_expand: true,
+            style_class: 'aibar-update-at-row',
+        });
+
+        let updateAtSpacer = new St.Widget({x_expand: true});
+        let updateAtLabel = new St.Label({
+            text: '',
+            style_class: 'aibar-update-at-label',
+        });
+
+        updateAtRow.add_child(updateAtSpacer);
+        updateAtRow.add_child(updateAtLabel);
+        container.add_child(updateAtRow);
+
         return {
             container,
             header,
@@ -586,6 +594,7 @@ class AIBarIndicator extends PanelMenu.Button {
             tokensLabel,
             resetsLabel,
             errorLabel,
+            updateAtLabel,
             _barData: {},
         };
     }
@@ -844,12 +853,27 @@ class AIBarIndicator extends PanelMenu.Button {
         } else {
             card.resetsLabel.text = '';
         }
+
+        if (data.updated_at) {
+            try {
+                const updatedDate = new Date(data.updated_at);
+                card.updateAtLabel.text = `Update at: ${updatedDate.toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                })}`;
+            } catch (_e) {
+                card.updateAtLabel.text = '';
+            }
+        } else {
+            card.updateAtLabel.text = '';
+        }
     }
 
     /**
      * @brief Execute start auto refresh.
      * @details Applies start auto refresh logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
      * @returns {any} Function return value.
+     * @satisfies DES-006
      */
     _startAutoRefresh() {
         if (this._timeout)
@@ -857,7 +881,7 @@ class AIBarIndicator extends PanelMenu.Button {
 
         this._timeout = GLib.timeout_add_seconds(
             GLib.PRIORITY_DEFAULT,
-            REFRESH_INTERVAL_SECONDS,
+            this._refreshIntervalSeconds,
             () => {
                 this._refreshData();
                 return GLib.SOURCE_CONTINUE;
@@ -909,26 +933,14 @@ class AIBarIndicator extends PanelMenu.Button {
     }
 
     /**
-     * @brief Format popup status timestamp with local hour and minute fields.
-     * @details Generates a deterministic short-form time string reused by
-     * `Last updated` and `next update` popup status fragments.
-     * @param {Date} dateValue Input timestamp object to format.
-     * @returns {string} Localized `HH:MM` time string.
-     * @satisfies REQ-017
-     */
-    _formatStatusTime(dateValue) {
-        return dateValue.toLocaleTimeString('en-US', {
-            hour: '2-digit',
-            minute: '2-digit',
-        });
-    }
-
-    /**
      * @brief Execute parse output.
-     * @details Parses CLI JSON output and supports canonical cache schema
-     * sections (`payload`, `status`) while preserving legacy direct provider maps.
+     * @details Parses CLI JSON output supporting canonical cache schema sections
+     * (`payload`, `status`, `extension`). Reads `extension.gnome_refresh_interval_seconds`
+     * to update the auto-refresh interval and reschedules the timer when the value changes.
      * @param {any} output Input parameter `output`.
      * @returns {any} Function return value.
+     * @satisfies DES-006
+     * @satisfies REQ-003
      */
     _parseOutput(output) {
         console.debug('aibar: Parsing output');
@@ -953,11 +965,22 @@ class AIBarIndicator extends PanelMenu.Button {
                 } else {
                     this._statusData = {};
                 }
+                if (
+                    json.extension &&
+                    typeof json.extension === 'object' &&
+                    typeof json.extension.gnome_refresh_interval_seconds === 'number' &&
+                    json.extension.gnome_refresh_interval_seconds >= 1
+                ) {
+                    const newInterval = json.extension.gnome_refresh_interval_seconds;
+                    if (newInterval !== this._refreshIntervalSeconds) {
+                        this._refreshIntervalSeconds = newInterval;
+                        this._startAutoRefresh();
+                    }
+                }
             } else {
                 this._usageData = json;
                 this._statusData = {};
             }
-            this._lastUpdated = new Date();
             console.debug(`aibar: Parsed ${Object.keys(this._usageData).length} providers`);
         } catch (e) {
             console.debug(`aibar: JSON parse error: ${e.message}`);
@@ -1116,22 +1139,15 @@ class AIBarIndicator extends PanelMenu.Button {
             this._panelLabel.set_text(`${configuredProviders} active`);
         else
             this._panelLabel.set_text('N/A');
-
-        if (this._lastUpdated) {
-            let timeString = this._formatStatusTime(this._lastUpdated);
-            const nextUpdate = new Date(this._lastUpdated.getTime() + (REFRESH_INTERVAL_SECONDS * 1000));
-            let nextUpdateString = this._formatStatusTime(nextUpdate);
-            this._lastUpdatedItem.label.set_text(
-                `Last updated: ${timeString}, next update: ${nextUpdateString}`
-            );
-        }
     }
 
     /**
      * @brief Execute handle error.
-     * @details Applies handle error logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
+     * @details Sets panel label to `Err`, hides all percentage labels, clears panel
+     * summary label, and caps displayed error text to 40 characters.
      * @param {any} message Input parameter `message`.
      * @returns {any} Function return value.
+     * @satisfies REQ-018
      */
     _handleError(message) {
         console.debug(`aibar Error: ${message}`);
@@ -1146,7 +1162,6 @@ class AIBarIndicator extends PanelMenu.Button {
         this._panelCodexPctLabel.hide();
         this._panelCodex7dPctLabel.hide();
         this._panelLabel.set_text('Err');
-        this._lastUpdatedItem.label.set_text(`Error: ${message.substring(0, 40)}`);
     }
 
     /**

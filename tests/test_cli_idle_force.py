@@ -101,7 +101,9 @@ def test_show_force_bypasses_idle_time_and_recreates_state(
     provider.fetch.assert_awaited_once_with(WindowPeriod.DAY_7)
     output_payload = json.loads(result.output)
     persisted_cache = json.loads(config_module.CACHE_FILE_PATH.read_text(encoding="utf-8"))
-    assert output_payload == persisted_cache
+    output_without_extension = {k: v for k, v in output_payload.items() if k != "extension"}
+    assert output_without_extension == persisted_cache
+    assert "extension" in output_payload
     assert output_payload["payload"]["openrouter"]["raw"]["source"] == "live"
 
     refreshed_state = json.loads(config_module.IDLE_TIME_PATH.read_text(encoding="utf-8"))

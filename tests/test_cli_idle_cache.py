@@ -84,5 +84,7 @@ def test_show_uses_cache_payload_when_idle_time_is_active(
     runner = CliRunner()
     result = runner.invoke(main, ["show", "--json"])
 
+    expected_output = dict(cached_payload)
+    expected_output["extension"] = {"gnome_refresh_interval_seconds": 60}
     assert result.exit_code == 0
-    assert json.loads(result.output) == cached_payload
+    assert json.loads(result.output) == expected_output

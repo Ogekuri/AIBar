@@ -25,19 +25,22 @@ IDLE_TIME_PATH = APP_CACHE_DIR / "idle-time.json"
 
 DEFAULT_IDLE_DELAY_SECONDS = 300
 DEFAULT_API_CALL_DELAY_SECONDS = 20
+DEFAULT_GNOME_REFRESH_INTERVAL_SECONDS = 60
 
 
 class RuntimeConfig(BaseModel):
     """
     @brief Define runtime configuration component for refresh throttling controls.
-    @details Encodes persisted CLI runtime controls used by `show` refresh logic.
-    Fields are validated as positive integers and default to conservative values
-    that reduce rate-limit pressure while preserving configurability.
+    @details Encodes persisted CLI runtime controls used by `show` refresh logic
+    and GNOME extension scheduling. Fields are validated as positive integers and
+    default to conservative values that reduce rate-limit pressure while preserving
+    configurability.
     @satisfies CTN-008
     """
 
     idle_delay_seconds: int = Field(default=DEFAULT_IDLE_DELAY_SECONDS, ge=1)
     api_call_delay_seconds: int = Field(default=DEFAULT_API_CALL_DELAY_SECONDS, ge=1)
+    gnome_refresh_interval_seconds: int = Field(default=DEFAULT_GNOME_REFRESH_INTERVAL_SECONDS, ge=1)
 
 
 class IdleTimeState(BaseModel):

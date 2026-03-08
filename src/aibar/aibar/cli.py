@@ -51,6 +51,7 @@ _WINDOW_PERIOD_TIMEDELTA: dict[WindowPeriod, timedelta] = {
 _RESET_PENDING_MESSAGE = "Starts when the first message is sent"
 _CACHE_PAYLOAD_SECTION_KEY = "payload"
 _CACHE_STATUS_SECTION_KEY = "status"
+_CACHE_EXTENSION_SECTION_KEY = "extension"
 _ATTEMPT_RESULT_OK = "OK"
 _ATTEMPT_RESULT_FAIL = "FAIL"
 
@@ -1223,7 +1224,12 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
         return
 
     if output_json:
-        click.echo(json.dumps(retrieval.payload, indent=2))
+        output_doc = dict(retrieval.payload)
+        runtime_cfg = load_runtime_config()
+        output_doc[_CACHE_EXTENSION_SECTION_KEY] = {
+            "gnome_refresh_interval_seconds": runtime_cfg.gnome_refresh_interval_seconds,
+        }
+        click.echo(json.dumps(output_doc, indent=2))
         return
 
     for name, prov in providers.items():
@@ -1486,8 +1492,12 @@ def env() -> None:
 def setup() -> None:
     """
     @brief Execute setup.
-    @details Applies setup logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
+    @details Prompts for `idle_delay_seconds`, `api_call_delay_seconds`, and
+    `gnome_refresh_interval_seconds` in order, then persists all three values
+    to `~/.config/aibar/config.json`. Also prompts for provider API keys and
+    writes them to `~/.config/aibar/env`.
     @return {None} Function return value.
+    @satisfies REQ-005
     """
     from aibar.config import (
         ENV_FILE_PATH,
@@ -1511,6 +1521,7 @@ def setup() -> None:
     click.echo(click.style("Runtime throttling", bold=True))
     click.echo("  idle-delay controls cache-only mode duration after successful refresh.")
     click.echo("  api-call delay controls minimum spacing between API calls.")
+    click.echo("  gnome-refresh-interval controls GNOME extension auto-refresh rate.")
     idle_delay_seconds = click.prompt(
         "  idle-delay seconds",
         type=int,
@@ -1521,9 +1532,15 @@ def setup() -> None:
         type=int,
         default=runtime_config.api_call_delay_seconds,
     )
+    gnome_refresh_interval_seconds = click.prompt(
+        "  gnome-refresh-interval seconds",
+        type=int,
+        default=runtime_config.gnome_refresh_interval_seconds,
+    )
     configured_runtime = RuntimeConfig(
         idle_delay_seconds=idle_delay_seconds,
         api_call_delay_seconds=api_call_delay_seconds,
+        gnome_refresh_interval_seconds=gnome_refresh_interval_seconds,
     )
     save_runtime_config(configured_runtime)
     click.echo("  -> Saved")

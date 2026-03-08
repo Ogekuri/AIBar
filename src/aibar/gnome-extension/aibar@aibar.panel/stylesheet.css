@@ -242,3 +242,13 @@
     font-size: 0.85em;
     color: #666;
 }
+
+/* Per-card update timestamp row */
+.aibar-update-at-row {
+    margin-top: 4px;
+}
+
+.aibar-update-at-label {
+    font-size: 0.8em;
+    color: #888;
+}

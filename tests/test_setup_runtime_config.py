@@ -53,8 +53,9 @@ def test_default_cache_and_idle_time_paths_use_home_cache_directory() -> None:
 def test_setup_prompts_runtime_config_before_credentials(monkeypatch, tmp_path: Path) -> None:
     """
     @brief Verify setup prompt order and runtime-config persistence.
-    @details Ensures setup asks `idle-delay` first and `api-call delay` second,
-    then writes selected values to runtime config JSON.
+    @details Ensures setup asks `idle-delay` first, `api-call delay` second, and
+    `gnome-refresh-interval` third, then writes all three selected values to
+    runtime config JSON.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
     @param tmp_path {Path} Temporary path fixture.
     @return {None} Function return value.
@@ -63,7 +64,7 @@ def test_setup_prompts_runtime_config_before_credentials(monkeypatch, tmp_path: 
     """
     config_dir = _patch_config_paths(monkeypatch, tmp_path)
     prompts: list[str] = []
-    responses = iter([450, 25, "", "", ""])
+    responses = iter([450, 25, 90, "", "", ""])
 
     def _fake_prompt(
         text: str,
@@ -91,7 +92,9 @@ def test_setup_prompts_runtime_config_before_credentials(monkeypatch, tmp_path: 
     assert result.exit_code == 0
     assert prompts[0] == "  idle-delay seconds"
     assert prompts[1] == "  api-call delay seconds"
+    assert prompts[2] == "  gnome-refresh-interval seconds"
 
     runtime_config = json.loads((config_dir / "config.json").read_text(encoding="utf-8"))
     assert runtime_config["idle_delay_seconds"] == 450
     assert runtime_config["api_call_delay_seconds"] == 25
+    assert runtime_config["gnome_refresh_interval_seconds"] == 90

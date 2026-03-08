@@ -112,21 +112,21 @@ def test_refresh_now_popup_action_executes_forced_cli_refresh() -> None:
     assert "commandArgs.push('--force');" in source
 
 
-def test_popup_status_line_renders_last_and_next_update_times() -> None:
+def test_provider_card_renders_update_at_label_bottom_right() -> None:
     """
-    @brief Verify popup status line includes scheduler-derived next-update text.
-    @details Asserts extension source renders `Last updated` and `next update`
-    segments and computes next-update from refresh interval seconds.
+    @brief Verify provider card contains bottom-right Update at label sourced from updated_at.
+    @details Asserts extension source creates an `updateAtLabel` in the card and populates
+    it from `data.updated_at` using `HH:MM` formatted output, with right-aligned row layout.
     @satisfies REQ-017
     @satisfies TST-004
     """
     source = EXTENSION_PATH.read_text(encoding="utf-8")
-    assert "PopupMenu.PopupMenuItem('Last updated: Never, next update: Pending'" in source
-    assert "_formatStatusTime(dateValue)" in source
-    assert "let timeString = this._formatStatusTime(this._lastUpdated);" in source
-    assert "const nextUpdate = new Date(this._lastUpdated.getTime() + (REFRESH_INTERVAL_SECONDS * 1000));" in source
-    assert "let nextUpdateString = this._formatStatusTime(nextUpdate);" in source
-    assert "`Last updated: ${timeString}, next update: ${nextUpdateString}`" in source
+    assert "updateAtLabel" in source
+    assert "aibar-update-at-label" in source
+    assert "aibar-update-at-row" in source
+    assert "updateAtSpacer" in source
+    assert "data.updated_at" in source
+    assert "Update at:" in source
 
 
 def test_panel_percentage_labels_use_fixed_order_provider_styles_and_primary_bold() -> None:
@@ -182,3 +182,40 @@ def test_panel_percentage_labels_hide_when_metrics_are_unavailable() -> None:
     assert "this._panelCopilotPctLabel.hide();" in source
     assert "this._panelCodexPctLabel.hide();" in source
     assert "this._panelCodex7dPctLabel.hide();" in source
+
+
+def test_extension_reads_gnome_refresh_interval_from_json_extension_section() -> None:
+    """
+    @brief Verify extension reads gnome_refresh_interval_seconds from JSON extension section.
+    @details Asserts extension source parses `json.extension.gnome_refresh_interval_seconds`,
+    validates it is a number >= 1, updates `this._refreshIntervalSeconds` when changed,
+    and reschedules the auto-refresh timer.
+    @satisfies DES-006
+    @satisfies REQ-003
+    @satisfies TST-004
+    """
+    source = EXTENSION_PATH.read_text(encoding="utf-8")
+    assert "json.extension" in source
+    assert "gnome_refresh_interval_seconds" in source
+    assert "this._refreshIntervalSeconds" in source
+    assert "_startAutoRefresh()" in source
+    assert "this._refreshIntervalSeconds = newInterval;" in source
+
+
+def test_extension_default_refresh_interval_is_60_seconds() -> None:
+    """
+    @brief Verify GNOME extension default refresh interval constant is 60 seconds.
+    @satisfies DES-006
+    """
+    source = EXTENSION_PATH.read_text(encoding="utf-8")
+    assert "const REFRESH_INTERVAL_SECONDS = 60;" in source
+
+
+def test_extension_auto_refresh_uses_configurable_interval() -> None:
+    """
+    @brief Verify auto-refresh timer uses `this._refreshIntervalSeconds` not a hard-coded constant.
+    @satisfies DES-006
+    """
+    source = EXTENSION_PATH.read_text(encoding="utf-8")
+    assert "this._refreshIntervalSeconds," in source
+    assert "REFRESH_INTERVAL_SECONDS," not in source
