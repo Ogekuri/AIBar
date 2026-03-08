@@ -7,6 +7,7 @@
 import asyncio
 import json
 import math
+import re
 import sys
 import textwrap
 import time
@@ -60,6 +61,7 @@ _ATTEMPT_RESULT_FAIL = "FAIL"
 _SHOW_PANEL_MIN_WIDTH = 72
 _SHOW_PANEL_MAX_WIDTH = 110
 _ANSI_RESET = "\033[0m"
+_ANSI_ESCAPE_SEQUENCE_PATTERN = re.compile(r"\x1b\[[0-9;]*m")
 _PROVIDER_PANEL_COLOR_CODES: dict[ProviderName, str] = {
     ProviderName.CLAUDE: "\033[91m",
     ProviderName.OPENROUTER: "\033[38;5;208m",
@@ -1398,6 +1400,43 @@ def _provider_panel_color_code(provider_name: ProviderName) -> str:
     return _PROVIDER_PANEL_COLOR_CODES.get(provider_name, "\033[94m")
 
 
+def _strip_ansi_sequences(value: str) -> str:
+    """
+    @brief Remove ANSI SGR color escape sequences from terminal text.
+    @details Strips `\x1b[...m` segments so panel width calculations can use
+    visible glyph length instead of byte length with hidden control codes.
+    @param value {str} Input string that may include ANSI color escapes.
+    @return {str} String with ANSI SGR escapes removed.
+    @satisfies REQ-067
+    """
+    return _ANSI_ESCAPE_SEQUENCE_PATTERN.sub("", value)
+
+
+def _visible_text_length(value: str) -> int:
+    """
+    @brief Compute visible text length for terminal panel alignment.
+    @details Calculates string length after ANSI SGR stripping to keep
+    bordered-panel width deterministic for colored progress bar rows.
+    @param value {str} Input string potentially containing ANSI escapes.
+    @return {int} Visible glyph count used by panel width and padding logic.
+    @satisfies REQ-067
+    """
+    return len(_strip_ansi_sequences(value))
+
+
+def _ansi_ljust(value: str, width: int) -> str:
+    """
+    @brief Left-pad ANSI-colored text to one visible width.
+    @details Appends trailing spaces using visible-length semantics so rows that
+    include ANSI escapes align with border columns exactly.
+    @param value {str} Source text rendered inside one panel cell.
+    @param width {int} Target visible width for the panel cell.
+    @return {str} Padded terminal text preserving existing ANSI sequences.
+    @satisfies REQ-067
+    """
+    return value + (" " * max(0, width - _visible_text_length(value)))
+
+
 def _emit_provider_panel(
     provider_name: ProviderName,
     title: str,
@@ -1416,28 +1455,37 @@ def _emit_provider_panel(
     """
     color_code = _provider_panel_color_code(provider_name)
     wrapped_lines: list[str] = []
+    wrap_width = _SHOW_PANEL_MAX_WIDTH - 4
     for body_line in body_lines:
-        chunks = textwrap.wrap(body_line, width=_SHOW_PANEL_MAX_WIDTH - 4)
+        if "\033[" in body_line:
+            visible_line = _strip_ansi_sequences(body_line)
+            chunks = (
+                [body_line]
+                if len(visible_line) <= wrap_width
+                else textwrap.wrap(visible_line, width=wrap_width)
+            )
+        else:
+            chunks = textwrap.wrap(body_line, width=wrap_width)
         wrapped_lines.extend(chunks or [""])
 
     content_width = max(
         _SHOW_PANEL_MIN_WIDTH - 4,
-        len(title),
-        max((len(item) for item in wrapped_lines), default=0),
+        _visible_text_length(title),
+        max((_visible_text_length(item) for item in wrapped_lines), default=0),
     )
     content_width = min(content_width, _SHOW_PANEL_MAX_WIDTH - 4)
     horizontal_border = "─" * (content_width + 2)
     click.echo(f"{color_code}┌{horizontal_border}┐{_ANSI_RESET}")
     click.echo(
         f"{color_code}│{_ANSI_RESET} "
-        f"{color_code}{title.ljust(content_width)}{_ANSI_RESET} "
+        f"{color_code}{_ansi_ljust(title, content_width)}{_ANSI_RESET} "
         f"{color_code}│{_ANSI_RESET}"
     )
     click.echo(f"{color_code}├{horizontal_border}┤{_ANSI_RESET}")
     for body_line in wrapped_lines:
         click.echo(
             f"{color_code}│{_ANSI_RESET} "
-            f"{body_line.ljust(content_width)} "
+            f"{_ansi_ljust(body_line, content_width)} "
             f"{color_code}│{_ANSI_RESET}"
         )
     click.echo(f"{color_code}└{horizontal_border}┘{_ANSI_RESET}")
