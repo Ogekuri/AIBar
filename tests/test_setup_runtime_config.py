@@ -56,7 +56,7 @@ def test_setup_prompts_runtime_config_before_credentials(monkeypatch, tmp_path: 
     @brief Verify setup prompt order and runtime-config persistence.
     @details Ensures setup asks `idle-delay` first, `api-call delay` second,
     `gnome-refresh-interval` third, then per-provider currency symbols (one prompt
-    per provider: claude, openai, openrouter, copilot, codex, geminiai in ProviderName order),
+    per cost-enabled provider: claude, openai, openrouter, copilot, codex),
     then GeminiAI OAuth source prompt, then writes all selected values to runtime config JSON.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
     @param tmp_path {Path} Temporary path fixture.
@@ -67,8 +67,8 @@ def test_setup_prompts_runtime_config_before_credentials(monkeypatch, tmp_path: 
     """
     config_dir = _patch_config_paths(monkeypatch, tmp_path)
     prompts: list[str] = []
-    # 3 timeout values + 6 currency symbols + OAuth source + empty credentials
-    responses = iter([450, 25, 90, "$", "$", "$", "$", "$", "$", "skip", "", "", ""])
+    # 3 timeout values + 5 currency symbols + OAuth source + empty credentials
+    responses = iter([450, 25, 90, "$", "$", "$", "$", "$", "skip", "", "", ""])
 
     def _fake_prompt(
         text: str,
@@ -102,8 +102,7 @@ def test_setup_prompts_runtime_config_before_credentials(monkeypatch, tmp_path: 
     assert prompts[5] == "  openrouter currency symbol"
     assert prompts[6] == "  copilot currency symbol"
     assert prompts[7] == "  codex currency symbol"
-    assert prompts[8] == "  geminiai currency symbol"
-    assert prompts[9] == "  geminiai oauth source"
+    assert prompts[8] == "  geminiai oauth source"
 
     runtime_config = json.loads((config_dir / "config.json").read_text(encoding="utf-8"))
     assert runtime_config["idle_delay_seconds"] == 450
@@ -115,10 +114,9 @@ def test_setup_prompts_runtime_config_before_credentials(monkeypatch, tmp_path: 
         "openrouter": "$",
         "copilot": "$",
         "codex": "$",
-        "geminiai": "$",
     }
     assert runtime_config["geminiai_project_id"] is None
-    assert runtime_config["geminiai_billing_account"] is None
+    assert "geminiai_billing_account" not in runtime_config
 
 
 def test_setup_accepts_geminiai_oauth_json_paste_and_persists_runtime_fields(
@@ -128,8 +126,7 @@ def test_setup_accepts_geminiai_oauth_json_paste_and_persists_runtime_fields(
     """
     @brief Verify setup persists GeminiAI OAuth client JSON and runtime identifiers.
     @details Simulates paste-mode OAuth client input, skips browser authorization,
-    and asserts persisted client config plus `geminiai_project_id` /
-    `geminiai_billing_account` runtime config fields.
+    and asserts persisted client config plus `geminiai_project_id` runtime config field.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
     @param tmp_path {Path} Temporary path fixture.
     @return {None} Function return value.
@@ -169,11 +166,9 @@ def test_setup_accepts_geminiai_oauth_json_paste_and_persists_runtime_fields(
             "$",
             "$",
             "$",
-            "$",
             "paste",
             oauth_payload,
             "gen-lang-client-0834428245",
-            "billingAccounts/111111-222222-333333",
             "",
             "",
             "",
@@ -213,4 +208,4 @@ def test_setup_accepts_geminiai_oauth_json_paste_and_persists_runtime_fields(
 
     runtime_doc = json.loads((config_dir / "config.json").read_text(encoding="utf-8"))
     assert runtime_doc["geminiai_project_id"] == "gen-lang-client-0834428245"
-    assert runtime_doc["geminiai_billing_account"] == "billingAccounts/111111-222222-333333"
+    assert "geminiai_billing_account" not in runtime_doc

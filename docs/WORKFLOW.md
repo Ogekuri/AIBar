@@ -108,7 +108,7 @@
         - `OpenRouterUsageProvider.__init__(...)`: resolve OpenRouter token source [`src/aibar/aibar/providers/openrouter.py`]
         - `CopilotProvider.__init__(...)`: resolve Copilot token source [`src/aibar/aibar/providers/copilot.py`]
         - `CodexProvider.__init__(...)`: resolve Codex credential source [`src/aibar/aibar/providers/codex.py`]
-        - `GeminiAIProvider.__init__(...)`: resolve GeminiAI OAuth token/client/project/billing sources [`src/aibar/aibar/providers/geminiai.py`]
+        - `GeminiAIProvider.__init__(...)`: resolve GeminiAI OAuth token/client/project sources [`src/aibar/aibar/providers/geminiai.py`]
       - `retrieve_results_via_cache_pipeline(...)`: shared retrieval order (`force` -> idle-time gate -> conditional refresh -> cache readback) using canonical cache sections `payload`/`status` [`src/aibar/aibar/cli.py`]
         - `remove_idle_time_file(...)`: clear persisted idle-time state on forced refresh [`src/aibar/aibar/config.py`]
         - `load_cli_cache(...)`: load persisted provider dataset from `~/.cache/aibar/cache.json` [`src/aibar/aibar/config.py`]
@@ -135,8 +135,7 @@
               - `resolve_currency_symbol(...)`: resolve ISO code or symbol from API raw → configured default → `"$"` [`src/aibar/aibar/config.py`]
             - `CodexProvider.fetch(...)`: Codex usage retrieval with `resolve_currency_symbol` for `currency_symbol` [`src/aibar/aibar/providers/codex.py`]
               - `resolve_currency_symbol(...)`: resolve ISO code or symbol from API raw → configured default → `"$"` [`src/aibar/aibar/config.py`]
-            - `GeminiAIProvider.fetch(...)`: GeminiAI usage/cost retrieval via Cloud Monitoring + Cloud Billing with `resolve_currency_symbol` for `currency_symbol` [`src/aibar/aibar/providers/geminiai.py`]
-              - `resolve_currency_symbol(...)`: resolve ISO code or symbol from API raw → configured default → `"$"` [`src/aibar/aibar/config.py`]
+            - `GeminiAIProvider.fetch(...)`: GeminiAI monitoring-only retrieval (request count, token count, latency, errors) via Cloud Monitoring [`src/aibar/aibar/providers/geminiai.py`]
           - `_record_attempt_status(...)`: persist per-provider/window attempt result (`OK`/`FAIL`) in cache `status` section [`src/aibar/aibar/cli.py`]
           - `_serialize_results_payload(...)`: serialize refreshed provider results [`src/aibar/aibar/cli.py`]
           - `save_cli_cache(...)`: persist sanitized cache document (`payload` + `status`) to `cache.json` [`src/aibar/aibar/config.py`]
@@ -183,7 +182,7 @@
     - `env(...)`: environment-help route [`src/aibar/aibar/cli.py`]
       - `Config.get_env_var_help(...)`: provider help block synthesis [`src/aibar/aibar/config.py`]
         - `Config.is_provider_configured(...)`: provider probe via provider class [`src/aibar/aibar/config.py`]
-    - `setup(...)`: interactive setup route for runtime throttling (idle delay, API call delay, gnome refresh interval), per-provider currency symbol defaults, provider credentials, and GeminiAI OAuth/project/billing configuration [`src/aibar/aibar/cli.py`]
+    - `setup(...)`: interactive setup route for runtime throttling (idle delay, API call delay, gnome refresh interval), cost-provider currency symbol defaults, provider credentials, and GeminiAI OAuth/project configuration [`src/aibar/aibar/cli.py`]
       - `load_runtime_config(...)`: load persisted runtime throttling and currency defaults [`src/aibar/aibar/config.py`]
       - `RuntimeConfig(...)`: validate user-provided idle delay, API call delay, gnome_refresh_interval_seconds, and currency_symbols values [`src/aibar/aibar/config.py`]
       - `GeminiAICredentialStore.save_client_config(...)`: persist validated GeminiAI OAuth desktop-client JSON [`src/aibar/aibar/providers/geminiai.py`]
@@ -219,7 +218,7 @@
   - Python threadpool scheduling via `asyncio.to_thread(...)` in Text UI refresh.
   - HTTP network interactions through provider endpoints.
   - Browser-based OAuth consent flow and loopback callback for GeminiAI Google credentials.
-  - Google Cloud Monitoring API and Cloud Billing API HTTPS endpoints.
+  - Google Cloud Monitoring API HTTPS endpoints.
   - Local filesystem reads/writes under user home for env, credentials, runtime config, CLI cache, and idle-time state.
   - Process environment and terminal stdout/stderr streams.
 

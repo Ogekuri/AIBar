@@ -479,7 +479,7 @@ from typing import Any
 
 ---
 
-# cli.py | Python | 1886L | 51 symbols | 21 imports | 69 comments
+# cli.py | Python | 1878L | 51 symbols | 21 imports | 69 comments
 > Path: `src/aibar/aibar/cli.py`
 - @brief Command-line interface for aibar.
 - @details Defines command parsing, provider dispatch, formatted output, setup helpers, login flows, and UI launch hooks.
@@ -927,7 +927,7 @@ providers other than Claude.
 
 ### fn `def setup() -> None` `@main.command()` (L1505-1704)
 - @brief Execute setup.
-- @details Prompts for `idle_delay_seconds`, `api_call_delay_seconds`, and `gnome_refresh_interval_seconds` in order, then prompts for per-provider currency symbols (choices: `$`, `£`, `€`, default `$`), then persists all values to `~/.config/aibar/config.json`. Also prompts for provider API keys and writes them to `~/.config/aibar/env`.
+- @details Prompts for `idle_delay_seconds`, `api_call_delay_seconds`, and `gnome_refresh_interval_seconds` in order, then prompts for cost-enabled providers currency symbols (choices: `$`, `£`, `€`, default `$`), then persists all values to `~/.config/aibar/config.json`. Also prompts for provider API keys and writes them to `~/.config/aibar/env`.
 - @return {None} Function return value.
 - @satisfies REQ-005
 - @satisfies REQ-049
@@ -935,23 +935,23 @@ providers other than Claude.
 - @satisfies REQ-056
 - @satisfies REQ-059
 
-### fn `def login(provider: str) -> None` (L1752-1770)
+### fn `def login(provider: str) -> None` (L1744-1762)
 - @brief Execute login.
 - @details Applies login logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param provider {str} Input parameter `provider`.
 - @return {None} Function return value.
 
-### fn `def _login_claude() -> None` `priv` (L1771-1819)
+### fn `def _login_claude() -> None` `priv` (L1763-1811)
 - @brief Execute login claude.
 - @details Applies login claude logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_copilot() -> None` `priv` (L1820-1847)
+### fn `def _login_copilot() -> None` `priv` (L1812-1839)
 - @brief Execute login copilot.
 - @details Applies login copilot logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_geminiai() -> None` `priv` (L1848-1884)
+### fn `def _login_geminiai() -> None` `priv` (L1840-1876)
 - @brief Execute GeminiAI OAuth login flow.
 - @details Reuses persisted OAuth client configuration to launch browser-based authorization and persist refresh-capable Google credentials.
 - @return {None} Function return value.
@@ -1008,15 +1008,15 @@ providers other than Claude.
 |`ui`|fn|pub|1483-1493|def ui() -> None|
 |`env`|fn|pub|1495-1503|def env() -> None|
 |`setup`|fn|pub|1505-1704|def setup() -> None|
-|`login`|fn|pub|1752-1770|def login(provider: str) -> None|
-|`_login_claude`|fn|priv|1771-1819|def _login_claude() -> None|
-|`_login_copilot`|fn|priv|1820-1847|def _login_copilot() -> None|
-|`_login_geminiai`|fn|priv|1848-1884|def _login_geminiai() -> None|
+|`login`|fn|pub|1744-1762|def login(provider: str) -> None|
+|`_login_claude`|fn|priv|1763-1811|def _login_claude() -> None|
+|`_login_copilot`|fn|priv|1812-1839|def _login_copilot() -> None|
+|`_login_geminiai`|fn|priv|1840-1876|def _login_geminiai() -> None|
 
 
 ---
 
-# config.py | Python | 548L | 35 symbols | 12 imports | 33 comments
+# config.py | Python | 547L | 35 symbols | 12 imports | 33 comments
 > Path: `src/aibar/aibar/config.py`
 - @brief Configuration and credential resolution for aibar.
 - @details Provides environment-file parsing, token precedence resolution, and provider configuration status reporting.
@@ -1049,35 +1049,35 @@ from aibar.providers import (
 - var `DEFAULT_API_CALL_DELAY_SECONDS = 20` (L27)
 - var `DEFAULT_GNOME_REFRESH_INTERVAL_SECONDS = 60` (L28)
 - var `DEFAULT_CURRENCY_SYMBOL = "$"` (L29)
-### class `class RuntimeConfig(BaseModel)` : BaseModel (L39-60)
+### class `class RuntimeConfig(BaseModel)` : BaseModel (L39-59)
 - @brief Define runtime configuration component for refresh throttling and currency controls.
-- @details Encodes persisted CLI runtime controls used by `show` refresh logic, GNOME extension scheduling, and per-provider currency symbol resolution. Fields are validated with defaults that reduce rate-limit pressure. `currency_symbols` maps provider name strings to currency symbols (`$`, `£`, `€`); missing entries default to `DEFAULT_CURRENCY_SYMBOL` at resolution time. Optional GeminiAI fields persist Google Cloud project/billing identifiers used by OAuth-backed Monitoring/Billing API fetch execution.
+- @details Encodes persisted CLI runtime controls used by `show` refresh logic, GNOME extension scheduling, and per-provider currency symbol resolution. Fields are validated with defaults that reduce rate-limit pressure. `currency_symbols` maps provider name strings to currency symbols (`$`, `£`, `€`); missing entries default to `DEFAULT_CURRENCY_SYMBOL` at resolution time. Optional GeminiAI field persists Google Cloud project identifier used by OAuth-backed Monitoring API fetch execution.
 - @satisfies CTN-008
 - @satisfies REQ-049
 
-### class `class IdleTimeState(BaseModel)` : BaseModel (L61-74)
+### class `class IdleTimeState(BaseModel)` : BaseModel (L60-73)
 - @brief Define persisted idle-time state component.
 - @details Stores last successful refresh timestamp and computed idle-until timestamp in both epoch and human-readable ISO-8601 UTC formats.
 - @satisfies CTN-009
 
-### fn `def _ensure_app_config_dir() -> None` `priv` (L75-84)
+### fn `def _ensure_app_config_dir() -> None` `priv` (L74-83)
 - @brief Ensure AIBar configuration directory exists before file persistence.
 - @details Creates `~/.config/aibar` recursively when missing. This function is called by env-file and runtime-config persistence helpers.
 - @return {None} Function return value.
 
-### fn `def _ensure_app_cache_dir() -> None` `priv` (L85-94)
+### fn `def _ensure_app_cache_dir() -> None` `priv` (L84-93)
 - @brief Ensure AIBar cache directory exists before cache and idle-time persistence.
 - @details Creates `~/.cache/aibar` recursively when missing. This function is called by CLI cache and idle-time persistence helpers.
 - @return {None} Function return value.
 
-### fn `def _sanitize_cache_payload(payload: dict[str, Any]) -> dict[str, Any]` `priv` (L95-129)
+### fn `def _sanitize_cache_payload(payload: dict[str, Any]) -> dict[str, Any]` `priv` (L94-128)
 - @brief Redact sensitive keys from cache payload before disk persistence.
 - @details Recursively traverses dictionaries/lists and replaces values for case-insensitive key matches in `{token,key,secret,password,authorization}` with deterministic placeholder string `[REDACTED]`.
 - @param payload {dict[str, Any]} Cache document containing `payload` and `status` sections.
 - @return {dict[str, Any]} Sanitized deep-copy structure safe for persistence.
 - @satisfies DES-004
 
-### fn `def clean(value: Any) -> Any` (L107-126)
+### fn `def clean(value: Any) -> Any` (L106-125)
 - @brief Redact sensitive keys from cache payload before disk persistence.
 - @brief Apply recursive redaction to one JSON-compatible node.
 - @details Recursively traverses dictionaries/lists and replaces values for
@@ -1090,27 +1090,27 @@ with deterministic placeholder string `[REDACTED]`.
 - @return {Any} Sanitized node.
 - @satisfies DES-004
 
-### fn `def load_runtime_config() -> RuntimeConfig` (L130-146)
+### fn `def load_runtime_config() -> RuntimeConfig` (L129-145)
 - @brief Load runtime refresh configuration from disk with schema validation.
 - @details Reads `~/.config/aibar/config.json`, validates fields against `RuntimeConfig`, and returns defaults when file is missing or invalid.
 - @return {RuntimeConfig} Validated runtime configuration payload.
 - @satisfies CTN-008
 
-### fn `def save_runtime_config(runtime_config: RuntimeConfig) -> None` (L147-162)
+### fn `def save_runtime_config(runtime_config: RuntimeConfig) -> None` (L146-161)
 - @brief Persist runtime refresh configuration to disk.
 - @details Serializes `RuntimeConfig` to `~/.config/aibar/config.json` using stable pretty-printed JSON (`indent=2`) for deterministic readability.
 - @param runtime_config {RuntimeConfig} Validated runtime configuration model.
 - @return {None} Function return value.
 - @satisfies CTN-008
 
-### fn `def load_cli_cache() -> dict[str, Any] | None` (L163-180)
+### fn `def load_cli_cache() -> dict[str, Any] | None` (L162-179)
 - @brief Load CLI cache payload from disk.
 - @details Reads `~/.cache/aibar/cache.json` and returns parsed object only when payload root is a JSON object with canonical cache sections.
 - @return {dict[str, Any] | None} Parsed cache payload or None if unavailable.
 - @satisfies CTN-004
 - @satisfies REQ-047
 
-### fn `def resolve_currency_symbol(raw: dict[str, Any], provider_name: str) -> str` (L181-210)
+### fn `def resolve_currency_symbol(raw: dict[str, Any], provider_name: str) -> str` (L180-209)
 - @brief Resolve currency symbol for a provider result from API response or config.
 - @details Extraction priority: 1. `raw["currency"]` field: if a recognized symbol (`$`, `£`, `€`) → use directly; if an ISO-4217 code (`USD`, `GBP`, `EUR`) → map to symbol. 2. `RuntimeConfig.currency_symbols[provider_name]` configured default. 3. `DEFAULT_CURRENCY_SYMBOL` (`"$"`) as final fallback.
 - @param raw {dict[str, Any]} Raw API response dict from the provider fetch call.
@@ -1118,7 +1118,7 @@ with deterministic placeholder string `[REDACTED]`.
 - @return {str} Resolved currency symbol; always a member of `VALID_CURRENCY_SYMBOLS`.
 - @satisfies REQ-050
 
-### fn `def save_cli_cache(payload: dict[str, Any]) -> None` (L211-233)
+### fn `def save_cli_cache(payload: dict[str, Any]) -> None` (L210-232)
 - @brief Persist canonical cache document to disk.
 - @details Redacts sensitive keys from nested raw payload objects, then writes sanitized cache document to `~/.cache/aibar/cache.json` using pretty-printed JSON (`indent=2`) preserving `payload` and `status` sections.
 - @param payload {dict[str, Any]} Canonical cache document.
@@ -1130,13 +1130,13 @@ with deterministic placeholder string `[REDACTED]`.
 - @satisfies REQ-046
 - @satisfies REQ-047
 
-### fn `def load_idle_time() -> IdleTimeState | None` (L234-250)
+### fn `def load_idle_time() -> IdleTimeState | None` (L233-249)
 - @brief Load idle-time control state from disk.
 - @details Reads and validates `~/.cache/aibar/idle-time.json`. Invalid or unreadable payloads return None and are treated as missing state.
 - @return {IdleTimeState | None} Validated idle-time state or None.
 - @satisfies CTN-009
 
-### fn `def save_idle_time(last_success_at: datetime, idle_until: datetime) -> IdleTimeState` (L251-276)
+### fn `def save_idle_time(last_success_at: datetime, idle_until: datetime) -> IdleTimeState` (L250-275)
 - @brief Persist idle-time state using epoch and human-readable timestamp fields.
 - @details Normalizes timestamps to UTC, serializes both epoch and ISO strings, and writes `~/.cache/aibar/idle-time.json` in pretty-printed JSON.
 - @param last_success_at {datetime} Last successful refresh timestamp.
@@ -1144,53 +1144,53 @@ with deterministic placeholder string `[REDACTED]`.
 - @return {IdleTimeState} Persisted idle-time model.
 - @satisfies CTN-009
 
-### fn `def remove_idle_time_file() -> None` (L277-290)
+### fn `def remove_idle_time_file() -> None` (L276-289)
 - @brief Remove persisted idle-time state file if present.
 - @details Deletes `~/.cache/aibar/idle-time.json` to force immediate refresh behavior on subsequent `show` execution.
 - @return {None} Function return value.
 - @satisfies REQ-039
 
-### fn `def load_env_file() -> dict[str, str]` (L291-309)
+### fn `def load_env_file() -> dict[str, str]` (L290-308)
 - @brief Execute load env file.
 - @details Applies load env file logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {dict[str, str]} Function return value.
 
-### fn `def write_env_file(updates: dict[str, str]) -> None` (L310-349)
+### fn `def write_env_file(updates: dict[str, str]) -> None` (L309-348)
 - @brief Execute write env file.
 - @details Applies write env file logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param updates {dict[str, str]} Input parameter `updates`.
 - @return {None} Function return value.
 
-### class `class Config` (L350-546)
+### class `class Config` (L349-545)
 - @brief Define config component.
 - @details Encapsulates config state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
-- var `ENV_VARS =` (L357)
-- var `PROVIDER_INFO =` (L367)
-- fn `def get_token(self, provider: ProviderName) -> str | None` (L406-449)
+- var `ENV_VARS =` (L356)
+- var `PROVIDER_INFO =` (L366)
+- fn `def get_token(self, provider: ProviderName) -> str | None` (L405-448)
   - @brief Execute get token.
   - @details Applies get token logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param provider {ProviderName} Input parameter `provider`.
   - @return {str | None} Function return value.
-- fn `def is_provider_configured(self, provider: ProviderName) -> bool` (L450-481)
+- fn `def is_provider_configured(self, provider: ProviderName) -> bool` (L449-480)
   - @brief Execute is provider configured.
   - @details Applies is provider configured logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param provider {ProviderName} Input parameter `provider`.
   - @return {bool} Function return value.
-- fn `def get_provider_status(self, provider: ProviderName) -> dict[str, Any]` (L482-503)
+- fn `def get_provider_status(self, provider: ProviderName) -> dict[str, Any]` (L481-502)
   - @brief Execute get provider status.
   - @details Applies get provider status logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param provider {ProviderName} Input parameter `provider`.
   - @return {dict[str, Any]} Function return value.
-- fn `def get_all_provider_status(self) -> list[dict[str, Any]]` (L504-511)
+- fn `def get_all_provider_status(self) -> list[dict[str, Any]]` (L503-510)
   - @brief Execute get all provider status.
   - @details Applies get all provider status logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {list[dict[str, Any]]} Function return value.
-- fn `def _get_token_preview(self, provider: ProviderName) -> str | None` `priv` (L512-523)
+- fn `def _get_token_preview(self, provider: ProviderName) -> str | None` `priv` (L511-522)
   - @brief Execute get token preview.
   - @details Applies get token preview logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param provider {ProviderName} Input parameter `provider`.
   - @return {str | None} Function return value.
-- fn `def get_env_var_help(self) -> str` (L524-546)
+- fn `def get_env_var_help(self) -> str` (L523-545)
   - @brief Execute get env var help.
   - @details Applies get env var help logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {str} Function return value.
@@ -1208,31 +1208,31 @@ with deterministic placeholder string `[REDACTED]`.
 |`DEFAULT_API_CALL_DELAY_SECONDS`|var|pub|27||
 |`DEFAULT_GNOME_REFRESH_INTERVAL_SECONDS`|var|pub|28||
 |`DEFAULT_CURRENCY_SYMBOL`|var|pub|29||
-|`RuntimeConfig`|class|pub|39-60|class RuntimeConfig(BaseModel)|
-|`IdleTimeState`|class|pub|61-74|class IdleTimeState(BaseModel)|
-|`_ensure_app_config_dir`|fn|priv|75-84|def _ensure_app_config_dir() -> None|
-|`_ensure_app_cache_dir`|fn|priv|85-94|def _ensure_app_cache_dir() -> None|
-|`_sanitize_cache_payload`|fn|priv|95-129|def _sanitize_cache_payload(payload: dict[str, Any]) -> d...|
-|`clean`|fn|pub|107-126|def clean(value: Any) -> Any|
-|`load_runtime_config`|fn|pub|130-146|def load_runtime_config() -> RuntimeConfig|
-|`save_runtime_config`|fn|pub|147-162|def save_runtime_config(runtime_config: RuntimeConfig) ->...|
-|`load_cli_cache`|fn|pub|163-180|def load_cli_cache() -> dict[str, Any] | None|
-|`resolve_currency_symbol`|fn|pub|181-210|def resolve_currency_symbol(raw: dict[str, Any], provider...|
-|`save_cli_cache`|fn|pub|211-233|def save_cli_cache(payload: dict[str, Any]) -> None|
-|`load_idle_time`|fn|pub|234-250|def load_idle_time() -> IdleTimeState | None|
-|`save_idle_time`|fn|pub|251-276|def save_idle_time(last_success_at: datetime, idle_until:...|
-|`remove_idle_time_file`|fn|pub|277-290|def remove_idle_time_file() -> None|
-|`load_env_file`|fn|pub|291-309|def load_env_file() -> dict[str, str]|
-|`write_env_file`|fn|pub|310-349|def write_env_file(updates: dict[str, str]) -> None|
-|`Config`|class|pub|350-546|class Config|
-|`Config.ENV_VARS`|var|pub|357||
-|`Config.PROVIDER_INFO`|var|pub|367||
-|`Config.get_token`|fn|pub|406-449|def get_token(self, provider: ProviderName) -> str | None|
-|`Config.is_provider_configured`|fn|pub|450-481|def is_provider_configured(self, provider: ProviderName) ...|
-|`Config.get_provider_status`|fn|pub|482-503|def get_provider_status(self, provider: ProviderName) -> ...|
-|`Config.get_all_provider_status`|fn|pub|504-511|def get_all_provider_status(self) -> list[dict[str, Any]]|
-|`Config._get_token_preview`|fn|priv|512-523|def _get_token_preview(self, provider: ProviderName) -> s...|
-|`Config.get_env_var_help`|fn|pub|524-546|def get_env_var_help(self) -> str|
+|`RuntimeConfig`|class|pub|39-59|class RuntimeConfig(BaseModel)|
+|`IdleTimeState`|class|pub|60-73|class IdleTimeState(BaseModel)|
+|`_ensure_app_config_dir`|fn|priv|74-83|def _ensure_app_config_dir() -> None|
+|`_ensure_app_cache_dir`|fn|priv|84-93|def _ensure_app_cache_dir() -> None|
+|`_sanitize_cache_payload`|fn|priv|94-128|def _sanitize_cache_payload(payload: dict[str, Any]) -> d...|
+|`clean`|fn|pub|106-125|def clean(value: Any) -> Any|
+|`load_runtime_config`|fn|pub|129-145|def load_runtime_config() -> RuntimeConfig|
+|`save_runtime_config`|fn|pub|146-161|def save_runtime_config(runtime_config: RuntimeConfig) ->...|
+|`load_cli_cache`|fn|pub|162-179|def load_cli_cache() -> dict[str, Any] | None|
+|`resolve_currency_symbol`|fn|pub|180-209|def resolve_currency_symbol(raw: dict[str, Any], provider...|
+|`save_cli_cache`|fn|pub|210-232|def save_cli_cache(payload: dict[str, Any]) -> None|
+|`load_idle_time`|fn|pub|233-249|def load_idle_time() -> IdleTimeState | None|
+|`save_idle_time`|fn|pub|250-275|def save_idle_time(last_success_at: datetime, idle_until:...|
+|`remove_idle_time_file`|fn|pub|276-289|def remove_idle_time_file() -> None|
+|`load_env_file`|fn|pub|290-308|def load_env_file() -> dict[str, str]|
+|`write_env_file`|fn|pub|309-348|def write_env_file(updates: dict[str, str]) -> None|
+|`Config`|class|pub|349-545|class Config|
+|`Config.ENV_VARS`|var|pub|356||
+|`Config.PROVIDER_INFO`|var|pub|366||
+|`Config.get_token`|fn|pub|405-448|def get_token(self, provider: ProviderName) -> str | None|
+|`Config.is_provider_configured`|fn|pub|449-480|def is_provider_configured(self, provider: ProviderName) ...|
+|`Config.get_provider_status`|fn|pub|481-502|def get_provider_status(self, provider: ProviderName) -> ...|
+|`Config.get_all_provider_status`|fn|pub|503-510|def get_all_provider_status(self) -> list[dict[str, Any]]|
+|`Config._get_token_preview`|fn|priv|511-522|def _get_token_preview(self, provider: ProviderName) -> s...|
+|`Config.get_env_var_help`|fn|pub|523-545|def get_env_var_help(self) -> str|
 
 
 ---
@@ -1803,12 +1803,11 @@ import asyncio
 
 ---
 
-# geminiai.py | Python | 802L | 41 symbols | 18 imports | 36 comments
+# geminiai.py | Python | 700L | 37 symbols | 16 imports | 31 comments
 > Path: `src/aibar/aibar/providers/geminiai.py`
-- @brief GeminiAI provider with Google OAuth, Cloud Monitoring, and Cloud Billing integration.
+- @brief GeminiAI provider with Google OAuth and Cloud Monitoring integration.
 - @details Implements OAuth credential persistence, token refresh, usage retrieval from
-Cloud Monitoring, billing metadata retrieval from Cloud Billing, and normalization into
-AIBar provider result contracts.
+Cloud Monitoring, and normalization into AIBar provider result contracts.
 
 ## Imports
 ```
@@ -1828,85 +1827,82 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from aibar.providers.base import (
 from aibar.config import load_runtime_config
-from aibar.config import load_runtime_config
-from aibar.config import resolve_currency_symbol
 ```
 
 ## Definitions
 
-- var `GEMINIAI_OAUTH_CLIENT_PATH = Path.home() / ".config" / "aibar" / "geminiai_oauth_client.json"` (L40)
-- var `GEMINIAI_OAUTH_TOKEN_PATH = Path.home() / ".config" / "aibar" / "geminiai_oauth_token.json"` (L41)
-- var `GEMINIAI_PROJECT_ID_ENV_VAR = "GEMINIAI_PROJECT_ID"` (L42)
-- var `GEMINIAI_BILLING_ACCOUNT_ENV_VAR = "GEMINIAI_BILLING_ACCOUNT"` (L43)
-- var `GEMINIAI_ACCESS_TOKEN_ENV_VAR = "GEMINIAI_OAUTH_ACCESS_TOKEN"` (L44)
-### fn `def _to_rfc3339_utc(value: datetime) -> str` `priv` (L47-58)
+- var `GEMINIAI_OAUTH_CLIENT_PATH = Path.home() / ".config" / "aibar" / "geminiai_oauth_client.json"` (L36)
+- var `GEMINIAI_OAUTH_TOKEN_PATH = Path.home() / ".config" / "aibar" / "geminiai_oauth_token.json"` (L37)
+- var `GEMINIAI_PROJECT_ID_ENV_VAR = "GEMINIAI_PROJECT_ID"` (L38)
+- var `GEMINIAI_ACCESS_TOKEN_ENV_VAR = "GEMINIAI_OAUTH_ACCESS_TOKEN"` (L39)
+### fn `def _to_rfc3339_utc(value: datetime) -> str` `priv` (L42-53)
 - @brief Convert datetime to RFC3339 UTC string accepted by Google APIs.
 - @details Normalizes timezone awareness and strips microseconds to produce stable API query timestamps.
 - @param value {datetime} Input datetime value.
 - @return {str} RFC3339 UTC timestamp (e.g. `2026-03-08T11:00:00Z`).
 
-### fn `def _extract_http_status(error: HttpError) -> int` `priv` (L59-79)
+### fn `def _extract_http_status(error: HttpError) -> int` `priv` (L54-74)
 - @brief Extract integer HTTP status from Google API HttpError.
 - @details Returns `0` when status is unavailable to preserve deterministic error payload shape.
 - @param error {HttpError} Google API exception.
 - @return {int} HTTP status code or `0`.
 
-### fn `def _extract_retry_after_seconds(error: HttpError) -> float` `priv` (L80-103)
+### fn `def _extract_retry_after_seconds(error: HttpError) -> float` `priv` (L75-98)
 - @brief Extract retry-after seconds from HttpError response headers.
 - @details Reads `retry-after` case-insensitively and normalizes invalid values to `0.0`.
 - @param error {HttpError} Google API exception.
 - @return {float} Non-negative retry-after delay in seconds.
 
-### class `class GeminiAIWindowRange` `@dataclass(frozen=True)` (L105-114)
+### class `class GeminiAIWindowRange` `@dataclass(frozen=True)` (L100-109)
 - @brief Immutable time-range descriptor for one GeminiAI fetch window.
 - @details Encodes start and end UTC timestamps used for Monitoring API queries.
 
-### class `class GeminiAICredentialStore` (L115-314)
+### class `class GeminiAICredentialStore` (L110-309)
 - @brief OAuth credential persistence and validation helper for GeminiAI.
 - @details Manages client-secret JSON validation, token-file persistence, and interactive InstalledAppFlow authorization.
-- fn `def __init__(` `priv` (L122-125)
+- fn `def __init__(` `priv` (L117-120)
   - @brief OAuth credential persistence and validation helper for GeminiAI.
   - @details Manages client-secret JSON validation, token-file persistence, and
 interactive InstalledAppFlow authorization.
-- fn `def _ensure_config_dir(self) -> None` `priv` (L136-143)
+- fn `def _ensure_config_dir(self) -> None` `priv` (L131-138)
   - @brief Initialize credential store with optional custom file paths.
   - @brief Create parent directories for OAuth files when missing.
   - @param client_config_path {Path | None} Optional OAuth client config path.
   - @param token_path {Path | None} Optional OAuth token path.
   - @return {None} Function return value.
   - @return {None} Function return value.
-- fn `def has_client_config(self) -> bool` (L144-150)
+- fn `def has_client_config(self) -> bool` (L139-145)
   - @brief Check whether GeminiAI client config JSON exists.
   - @return {bool} True when client config file exists.
-- fn `def has_authorized_credentials(self) -> bool` (L151-161)
+- fn `def has_authorized_credentials(self) -> bool` (L146-156)
   - @brief Check whether GeminiAI authorized token material exists.
   - @details Environment access-token override is treated as configured token material.
   - @return {bool} True when token file or env token is available.
-- fn `def validate_client_config(self, payload: dict[str, Any]) -> dict[str, Any]` (L162-191)
+- fn `def validate_client_config(self, payload: dict[str, Any]) -> dict[str, Any]` (L157-186)
   - @brief Validate Google InstalledApp OAuth client-secret payload.
   - @details Enforces required `installed` section fields used by `InstalledAppFlow.from_client_config`.
   - @param payload {dict[str, Any]} Decoded JSON payload to validate.
   - @return {dict[str, Any]} Normalized payload.
   - @throws {ValueError} When required fields are missing or malformed.
-- fn `def save_client_config(self, payload: dict[str, Any]) -> None` (L192-204)
+- fn `def save_client_config(self, payload: dict[str, Any]) -> None` (L187-199)
   - @brief Persist validated OAuth client config JSON to disk.
   - @param payload {dict[str, Any]} Validated client payload.
   - @return {None} Function return value.
-- fn `def load_client_config(self) -> dict[str, Any]` (L205-223)
+- fn `def load_client_config(self) -> dict[str, Any]` (L200-218)
   - @brief Load and validate persisted OAuth client config JSON.
   - @return {dict[str, Any]} Validated OAuth client payload.
   - @throws {FileNotFoundError} When client config file is missing.
   - @throws {ValueError} When payload is invalid JSON or fails validation.
-- fn `def extract_project_id(self, payload: dict[str, Any]) -> str | None` (L224-237)
+- fn `def extract_project_id(self, payload: dict[str, Any]) -> str | None` (L219-232)
   - @brief Extract project_id from validated OAuth payload.
   - @param payload {dict[str, Any]} Validated OAuth payload.
   - @return {str | None} Project identifier or None when absent.
-- fn `def save_authorized_credentials(self, credentials: Credentials) -> None` (L238-247)
+- fn `def save_authorized_credentials(self, credentials: Credentials) -> None` (L233-242)
   - @brief Persist authorized-user OAuth credentials JSON.
   - @param credentials {Credentials} Google OAuth credentials object.
   - @return {None} Function return value.
-- fn `def authorize_interactively(` (L248-250)
-- fn `def load_access_token(self) -> str | None` (L266-283)
+- fn `def authorize_interactively(` (L243-245)
+- fn `def load_access_token(self) -> str | None` (L261-278)
   - @brief Execute OAuth browser flow and persist refresh-capable credentials.
   - @brief Load access token from env override or token file.
   - @details Uses InstalledAppFlow local-server flow (`http://localhost`) and
@@ -1915,72 +1911,61 @@ saves authorized-user token JSON to disk.
   - @return {Credentials} Authorized credentials.
   - @return {str | None} Access token or None when unavailable.
   - @throws {ValueError} When client config is invalid.
-- fn `def load_credentials(` (L284-286)
+- fn `def load_credentials(` (L279-281)
 
-### class `class GeminiAIProvider(BaseProvider)` : BaseProvider (L318-368)
-- @brief GeminiAI usage provider backed by Google Cloud APIs.
-- @details Retrieves usage counters from Cloud Monitoring and billing metadata from Cloud Billing, then maps data into AIBar `ProviderResult` models.
-- var `REQUEST_COUNT_FILTER = 'metric.type="serviceruntime.googleapis.com/api/request_count"'` (L327)
-  - @brief GeminiAI usage provider backed by Google Cloud APIs.
-  - @details Retrieves usage counters from Cloud Monitoring and billing metadata from
-Cloud Billing, then maps data into AIBar `ProviderResult` models.
-- var `COST_FILTER = 'metric.type="billing.googleapis.com/billing/account/cost"'` (L333)
-- fn `def __init__(` `priv` (L335-339)
-- fn `def is_configured(self) -> bool` (L352-361)
+### class `class GeminiAIProvider(BaseProvider)` : BaseProvider (L313-372)
+- @brief GeminiAI usage provider backed by Google Cloud Monitoring API.
+- @details Retrieves Generative Language API usage counters and status telemetry from Cloud Monitoring, then maps data into AIBar `ProviderResult` models.
+- var `SERVICE_FILTER = (` (L322)
+  - @brief GeminiAI usage provider backed by Google Cloud Monitoring API.
+  - @details Retrieves Generative Language API usage counters and status telemetry
+from Cloud Monitoring, then maps data into AIBar `ProviderResult` models.
+- var `REQUEST_COUNT_FILTER = (` (L325)
+- var `LATENCY_FILTER = (` (L333)
+- var `ERROR_FILTER = (` (L336)
+- fn `def __init__(` `priv` (L342-345)
+- fn `def is_configured(self) -> bool` (L356-365)
   - @brief Initialize GeminiAI provider with optional overrides.
   - @brief Check whether GeminiAI provider has required auth and project metadata.
   - @param credential_store {GeminiAICredentialStore | None} Optional credential store.
   - @param project_id {str | None} Optional project id override.
-  - @param billing_account {str | None} Optional billing account override.
   - @return {None} Function return value.
   - @return {bool} True when project id and OAuth token material are available.
-- fn `def get_config_help(self) -> str` (L362-368)
+- fn `def get_config_help(self) -> str` (L366-372)
   - @brief Return setup guidance for GeminiAI OAuth configuration.
   - @return {str} Provider-specific setup instructions.
 
-### fn `async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult` (L377-404)
-- @brief Fetch GeminiAI usage/cost metrics for one window.
+### fn `async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult` (L380-407)
+- @brief Fetch GeminiAI monitoring usage metrics for one window.
 - @details Executes synchronous Google API calls in a worker thread and returns normalized provider metrics. HTTP 429 responses are normalized as rate-limit provider error payloads with retry-after metadata.
 - @param window {WindowPeriod} Requested window period.
 - @return {ProviderResult} Provider result payload.
 - @throws {AuthenticationError} When OAuth credentials are invalid.
 
-### fn `def _fetch_sync(self, window: WindowPeriod) -> ProviderResult` `priv` (L405-538)
+### fn `def _fetch_sync(self, window: WindowPeriod) -> ProviderResult` `priv` (L408-529)
 - @brief Execute blocking Google API retrieval flow for GeminiAI metrics.
 - @param window {WindowPeriod} Requested window period.
 - @return {ProviderResult} Normalized provider result.
 - @throws {AuthenticationError} When credentials are missing/invalid.
 - @throws {ProviderError} On non-auth API failures.
 
-### fn `def _build_window_range(self, window: WindowPeriod) -> GeminiAIWindowRange` `priv` (L539-553)
+### fn `def _build_window_range(self, window: WindowPeriod) -> GeminiAIWindowRange` `priv` (L530-544)
 - @brief Build UTC time interval used for Monitoring queries.
 - @param window {WindowPeriod} Requested window period.
 - @return {GeminiAIWindowRange} Start/end UTC timestamps.
 
-### fn `def _resolve_project_id(self) -> str | None` `priv` (L554-575)
+### fn `def _resolve_project_id(self) -> str | None` `priv` (L545-566)
 - @brief Resolve project id from override, env, runtime config, or client JSON.
 - @return {str | None} Project id or None when unresolved.
 
-### fn `def _resolve_billing_account(` `priv` (L576-579)
-
-### fn `def _normalize_billing_account(self, value: str) -> str | None` `priv` (L615-627)
-- @brief Normalize billing account identifier to canonical path format.
-- @param value {str} Candidate billing account identifier.
-- @return {str | None} Canonical `billingAccounts/<id>` or None.
-
-### fn `def _build_monitoring_service(self, credentials: Credentials) -> Any` `priv` (L628-635)
+### fn `def _build_monitoring_service(self, credentials: Credentials) -> Any` `priv` (L567-574)
 - @brief Build Google Cloud Monitoring API client.
 - @param credentials {Credentials} OAuth credentials.
 - @return {Any} Monitoring service client.
 
-### fn `def _build_billing_service(self, credentials: Credentials) -> Any` `priv` (L636-643)
-- @brief Build Google Cloud Billing API client.
-- @param credentials {Credentials} OAuth credentials.
-- @return {Any} Billing service client.
+### fn `def _query_monitoring_metric(` `priv` (L575-582)
 
-### fn `def _query_monitoring_metric(` `priv` (L644-651)
-
-### fn `def _sum_time_series_values(self, response: dict[str, Any]) -> float | None` `priv` (L690-733)
+### fn `def _sum_time_series_values(self, response: dict[str, Any]) -> float | None` `priv` (L621-673)
 - @brief Query Monitoring time-series metric and aggregate point values.
 - @brief Sum numeric point values in Monitoring `timeSeries` payload.
 - @details Returns None when metric is unavailable and `allow_missing=True`.
@@ -1995,63 +1980,48 @@ Cloud Billing, then maps data into AIBar `ProviderResult` models.
 - @return {float | None} Aggregated numeric value or None when no points exist.
 - @throws {HttpError} For non-missing API errors.
 
-### fn `def _list_billing_accounts(self, billing_service: Any) -> list[dict[str, Any]]` `priv` (L734-745)
-- @brief List billing accounts visible to current OAuth identity.
-- @param billing_service {Any} Cloud Billing client.
-- @return {list[dict[str, Any]]} Billing account payload list.
-
-### fn `def _get_project_billing_info(` `priv` (L746-749)
-
-### fn `def _build_metrics(` `priv` (L772-777)
-- @brief Retrieve billing-account linkage metadata for one project.
-- @param billing_service {Any} Cloud Billing client.
-- @param project_id {str} Google Cloud project id.
-- @return {dict[str, Any]} Billing info payload or empty object.
+### fn `def _build_metrics(` `priv` (L674-678)
 
 ## Symbol Index
 |Symbol|Kind|Vis|Lines|Sig|
 |---|---|---|---|---|
-|`GEMINIAI_OAUTH_CLIENT_PATH`|var|pub|40||
-|`GEMINIAI_OAUTH_TOKEN_PATH`|var|pub|41||
-|`GEMINIAI_PROJECT_ID_ENV_VAR`|var|pub|42||
-|`GEMINIAI_BILLING_ACCOUNT_ENV_VAR`|var|pub|43||
-|`GEMINIAI_ACCESS_TOKEN_ENV_VAR`|var|pub|44||
-|`_to_rfc3339_utc`|fn|priv|47-58|def _to_rfc3339_utc(value: datetime) -> str|
-|`_extract_http_status`|fn|priv|59-79|def _extract_http_status(error: HttpError) -> int|
-|`_extract_retry_after_seconds`|fn|priv|80-103|def _extract_retry_after_seconds(error: HttpError) -> float|
-|`GeminiAIWindowRange`|class|pub|105-114|class GeminiAIWindowRange|
-|`GeminiAICredentialStore`|class|pub|115-314|class GeminiAICredentialStore|
-|`GeminiAICredentialStore.__init__`|fn|priv|122-125|def __init__(|
-|`GeminiAICredentialStore._ensure_config_dir`|fn|priv|136-143|def _ensure_config_dir(self) -> None|
-|`GeminiAICredentialStore.has_client_config`|fn|pub|144-150|def has_client_config(self) -> bool|
-|`GeminiAICredentialStore.has_authorized_credentials`|fn|pub|151-161|def has_authorized_credentials(self) -> bool|
-|`GeminiAICredentialStore.validate_client_config`|fn|pub|162-191|def validate_client_config(self, payload: dict[str, Any])...|
-|`GeminiAICredentialStore.save_client_config`|fn|pub|192-204|def save_client_config(self, payload: dict[str, Any]) -> ...|
-|`GeminiAICredentialStore.load_client_config`|fn|pub|205-223|def load_client_config(self) -> dict[str, Any]|
-|`GeminiAICredentialStore.extract_project_id`|fn|pub|224-237|def extract_project_id(self, payload: dict[str, Any]) -> ...|
-|`GeminiAICredentialStore.save_authorized_credentials`|fn|pub|238-247|def save_authorized_credentials(self, credentials: Creden...|
-|`GeminiAICredentialStore.authorize_interactively`|fn|pub|248-250|def authorize_interactively(|
-|`GeminiAICredentialStore.load_access_token`|fn|pub|266-283|def load_access_token(self) -> str | None|
-|`GeminiAICredentialStore.load_credentials`|fn|pub|284-286|def load_credentials(|
-|`GeminiAIProvider`|class|pub|318-368|class GeminiAIProvider(BaseProvider)|
-|`GeminiAIProvider.REQUEST_COUNT_FILTER`|var|pub|327||
-|`GeminiAIProvider.COST_FILTER`|var|pub|333||
-|`GeminiAIProvider.__init__`|fn|priv|335-339|def __init__(|
-|`GeminiAIProvider.is_configured`|fn|pub|352-361|def is_configured(self) -> bool|
-|`GeminiAIProvider.get_config_help`|fn|pub|362-368|def get_config_help(self) -> str|
-|`fetch`|fn|pub|377-404|async def fetch(self, window: WindowPeriod = WindowPeriod...|
-|`_fetch_sync`|fn|priv|405-538|def _fetch_sync(self, window: WindowPeriod) -> ProviderRe...|
-|`_build_window_range`|fn|priv|539-553|def _build_window_range(self, window: WindowPeriod) -> Ge...|
-|`_resolve_project_id`|fn|priv|554-575|def _resolve_project_id(self) -> str | None|
-|`_resolve_billing_account`|fn|priv|576-579|def _resolve_billing_account(|
-|`_normalize_billing_account`|fn|priv|615-627|def _normalize_billing_account(self, value: str) -> str |...|
-|`_build_monitoring_service`|fn|priv|628-635|def _build_monitoring_service(self, credentials: Credenti...|
-|`_build_billing_service`|fn|priv|636-643|def _build_billing_service(self, credentials: Credentials...|
-|`_query_monitoring_metric`|fn|priv|644-651|def _query_monitoring_metric(|
-|`_sum_time_series_values`|fn|priv|690-733|def _sum_time_series_values(self, response: dict[str, Any...|
-|`_list_billing_accounts`|fn|priv|734-745|def _list_billing_accounts(self, billing_service: Any) ->...|
-|`_get_project_billing_info`|fn|priv|746-749|def _get_project_billing_info(|
-|`_build_metrics`|fn|priv|772-777|def _build_metrics(|
+|`GEMINIAI_OAUTH_CLIENT_PATH`|var|pub|36||
+|`GEMINIAI_OAUTH_TOKEN_PATH`|var|pub|37||
+|`GEMINIAI_PROJECT_ID_ENV_VAR`|var|pub|38||
+|`GEMINIAI_ACCESS_TOKEN_ENV_VAR`|var|pub|39||
+|`_to_rfc3339_utc`|fn|priv|42-53|def _to_rfc3339_utc(value: datetime) -> str|
+|`_extract_http_status`|fn|priv|54-74|def _extract_http_status(error: HttpError) -> int|
+|`_extract_retry_after_seconds`|fn|priv|75-98|def _extract_retry_after_seconds(error: HttpError) -> float|
+|`GeminiAIWindowRange`|class|pub|100-109|class GeminiAIWindowRange|
+|`GeminiAICredentialStore`|class|pub|110-309|class GeminiAICredentialStore|
+|`GeminiAICredentialStore.__init__`|fn|priv|117-120|def __init__(|
+|`GeminiAICredentialStore._ensure_config_dir`|fn|priv|131-138|def _ensure_config_dir(self) -> None|
+|`GeminiAICredentialStore.has_client_config`|fn|pub|139-145|def has_client_config(self) -> bool|
+|`GeminiAICredentialStore.has_authorized_credentials`|fn|pub|146-156|def has_authorized_credentials(self) -> bool|
+|`GeminiAICredentialStore.validate_client_config`|fn|pub|157-186|def validate_client_config(self, payload: dict[str, Any])...|
+|`GeminiAICredentialStore.save_client_config`|fn|pub|187-199|def save_client_config(self, payload: dict[str, Any]) -> ...|
+|`GeminiAICredentialStore.load_client_config`|fn|pub|200-218|def load_client_config(self) -> dict[str, Any]|
+|`GeminiAICredentialStore.extract_project_id`|fn|pub|219-232|def extract_project_id(self, payload: dict[str, Any]) -> ...|
+|`GeminiAICredentialStore.save_authorized_credentials`|fn|pub|233-242|def save_authorized_credentials(self, credentials: Creden...|
+|`GeminiAICredentialStore.authorize_interactively`|fn|pub|243-245|def authorize_interactively(|
+|`GeminiAICredentialStore.load_access_token`|fn|pub|261-278|def load_access_token(self) -> str | None|
+|`GeminiAICredentialStore.load_credentials`|fn|pub|279-281|def load_credentials(|
+|`GeminiAIProvider`|class|pub|313-372|class GeminiAIProvider(BaseProvider)|
+|`GeminiAIProvider.SERVICE_FILTER`|var|pub|322||
+|`GeminiAIProvider.REQUEST_COUNT_FILTER`|var|pub|325||
+|`GeminiAIProvider.LATENCY_FILTER`|var|pub|333||
+|`GeminiAIProvider.ERROR_FILTER`|var|pub|336||
+|`GeminiAIProvider.__init__`|fn|priv|342-345|def __init__(|
+|`GeminiAIProvider.is_configured`|fn|pub|356-365|def is_configured(self) -> bool|
+|`GeminiAIProvider.get_config_help`|fn|pub|366-372|def get_config_help(self) -> str|
+|`fetch`|fn|pub|380-407|async def fetch(self, window: WindowPeriod = WindowPeriod...|
+|`_fetch_sync`|fn|priv|408-529|def _fetch_sync(self, window: WindowPeriod) -> ProviderRe...|
+|`_build_window_range`|fn|priv|530-544|def _build_window_range(self, window: WindowPeriod) -> Ge...|
+|`_resolve_project_id`|fn|priv|545-566|def _resolve_project_id(self) -> str | None|
+|`_build_monitoring_service`|fn|priv|567-574|def _build_monitoring_service(self, credentials: Credenti...|
+|`_query_monitoring_metric`|fn|priv|575-582|def _query_monitoring_metric(|
+|`_sum_time_series_values`|fn|priv|621-673|def _sum_time_series_values(self, response: dict[str, Any...|
+|`_build_metrics`|fn|priv|674-678|def _build_metrics(|
 
 
 ---

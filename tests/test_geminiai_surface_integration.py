@@ -51,7 +51,6 @@ def test_config_and_ui_include_geminiai_runtime_surfaces() -> None:
     assert 'ProviderName.GEMINIAI: "GEMINIAI_OAUTH_ACCESS_TOKEN"' in config_source
     assert '"name": "GeminiAI"' in config_source
     assert "geminiai_project_id: str | None = Field(default=None)" in config_source
-    assert "geminiai_billing_account: str | None = Field(default=None)" in config_source
 
     assert "ProviderName.GEMINIAI: GeminiAIProvider()," in ui_source
     assert 'ProviderCard(ProviderName.GEMINIAI, id="card-geminiai")' in ui_source

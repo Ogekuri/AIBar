@@ -44,8 +44,8 @@ class RuntimeConfig(BaseModel):
     Fields are validated with defaults that reduce rate-limit pressure.
     `currency_symbols` maps provider name strings to currency symbols (`$`, `£`, `€`);
     missing entries default to `DEFAULT_CURRENCY_SYMBOL` at resolution time.
-    Optional GeminiAI fields persist Google Cloud project/billing identifiers used
-    by OAuth-backed Monitoring/Billing API fetch execution.
+    Optional GeminiAI field persists Google Cloud project identifier used by
+    OAuth-backed Monitoring API fetch execution.
     @satisfies CTN-008
     @satisfies REQ-049
     """
@@ -55,7 +55,6 @@ class RuntimeConfig(BaseModel):
     gnome_refresh_interval_seconds: int = Field(default=DEFAULT_GNOME_REFRESH_INTERVAL_SECONDS, ge=1)
     currency_symbols: dict[str, str] = Field(default_factory=dict)
     geminiai_project_id: str | None = Field(default=None)
-    geminiai_billing_account: str | None = Field(default=None)
 
 
 class IdleTimeState(BaseModel):
@@ -397,9 +396,9 @@ class Config:
         },
         ProviderName.GEMINIAI: {
             "name": "GeminiAI",
-            "description": "Google Gemini API usage and billing via OAuth",
+            "description": "Google Gemini API usage via OAuth",
             "official": True,
-            "note": "Uses Google Cloud Monitoring + Cloud Billing APIs",
+            "note": "Uses Google Cloud Monitoring API",
         },
     }
 

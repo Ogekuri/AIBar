@@ -1506,7 +1506,7 @@ def setup() -> None:
     """
     @brief Execute setup.
     @details Prompts for `idle_delay_seconds`, `api_call_delay_seconds`, and
-    `gnome_refresh_interval_seconds` in order, then prompts for per-provider
+    `gnome_refresh_interval_seconds` in order, then prompts for cost-enabled providers
     currency symbols (choices: `$`, `£`, `€`, default `$`), then persists
     all values to `~/.config/aibar/config.json`. Also prompts for provider
     API keys and writes them to `~/.config/aibar/env`.
@@ -1561,7 +1561,9 @@ def setup() -> None:
     click.echo(click.style("Currency symbols", bold=True))
     click.echo("  Configure the default currency symbol for cost display per provider.")
     click.echo(f"  Valid choices: {', '.join(VALID_CURRENCY_SYMBOLS)}")
-    _currency_provider_names = [p.value for p in ProviderName]
+    _currency_provider_names = [
+        p.value for p in ProviderName if p is not ProviderName.GEMINIAI
+    ]
     currency_symbols: dict[str, str] = {}
     for _provider_name in _currency_provider_names:
         _current_symbol = runtime_config.currency_symbols.get(_provider_name, "$")
@@ -1574,12 +1576,11 @@ def setup() -> None:
         currency_symbols[_provider_name] = _chosen
 
     geminiai_project_id = runtime_config.geminiai_project_id
-    geminiai_billing_account = runtime_config.geminiai_billing_account
     credential_store = GeminiAICredentialStore()
 
     click.echo()
     click.echo(click.style("GeminiAI (Google Cloud OAuth)", bold=True))
-    click.echo("  Configure OAuth desktop client JSON for Monitoring/Billing API access.")
+    click.echo("  Configure OAuth desktop client JSON for Cloud Monitoring API access.")
     oauth_source = click.prompt(
         "  geminiai oauth source",
         type=click.Choice(["skip", "file", "paste"]),
@@ -1639,21 +1640,12 @@ def setup() -> None:
         ).strip()
         geminiai_project_id = project_input or None
 
-        billing_default = geminiai_billing_account or ""
-        billing_input = click.prompt(
-            "  geminiai billing account (optional)",
-            default=billing_default,
-            show_default=bool(billing_default),
-        ).strip()
-        geminiai_billing_account = billing_input or None
-
     configured_runtime = RuntimeConfig(
         idle_delay_seconds=idle_delay_seconds,
         api_call_delay_seconds=api_call_delay_seconds,
         gnome_refresh_interval_seconds=gnome_refresh_interval_seconds,
         currency_symbols=currency_symbols,
         geminiai_project_id=geminiai_project_id,
-        geminiai_billing_account=geminiai_billing_account,
     )
     save_runtime_config(configured_runtime)
     click.echo("  -> Saved")

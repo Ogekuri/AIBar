@@ -1,9 +1,8 @@
 """
 @file
-@brief GeminiAI provider with Google OAuth, Cloud Monitoring, and Cloud Billing integration.
+@brief GeminiAI provider with Google OAuth and Cloud Monitoring integration.
 @details Implements OAuth credential persistence, token refresh, usage retrieval from
-Cloud Monitoring, billing metadata retrieval from Cloud Billing, and normalization into
-AIBar provider result contracts.
+Cloud Monitoring, and normalization into AIBar provider result contracts.
 """
 
 from __future__ import annotations
@@ -33,14 +32,10 @@ from aibar.providers.base import (
     WindowPeriod,
 )
 
-GEMINIAI_OAUTH_SCOPES: tuple[str, str] = (
-    "https://www.googleapis.com/auth/monitoring.read",
-    "https://www.googleapis.com/auth/cloud-billing.readonly",
-)
+GEMINIAI_OAUTH_SCOPES: tuple[str, ...] = ("https://www.googleapis.com/auth/monitoring.read",)
 GEMINIAI_OAUTH_CLIENT_PATH = Path.home() / ".config" / "aibar" / "geminiai_oauth_client.json"
 GEMINIAI_OAUTH_TOKEN_PATH = Path.home() / ".config" / "aibar" / "geminiai_oauth_token.json"
 GEMINIAI_PROJECT_ID_ENV_VAR = "GEMINIAI_PROJECT_ID"
-GEMINIAI_BILLING_ACCOUNT_ENV_VAR = "GEMINIAI_BILLING_ACCOUNT"
 GEMINIAI_ACCESS_TOKEN_ENV_VAR = "GEMINIAI_OAUTH_ACCESS_TOKEN"
 
 
@@ -317,37 +312,46 @@ class GeminiAICredentialStore:
 
 class GeminiAIProvider(BaseProvider):
     """
-    @brief GeminiAI usage provider backed by Google Cloud APIs.
-    @details Retrieves usage counters from Cloud Monitoring and billing metadata from
-    Cloud Billing, then maps data into AIBar `ProviderResult` models.
+    @brief GeminiAI usage provider backed by Google Cloud Monitoring API.
+    @details Retrieves Generative Language API usage counters and status telemetry
+    from Cloud Monitoring, then maps data into AIBar `ProviderResult` models.
     """
 
     name = ProviderName.GEMINIAI
 
-    REQUEST_COUNT_FILTER = 'metric.type="serviceruntime.googleapis.com/api/request_count"'
+    SERVICE_FILTER = (
+        'resource.type="api" AND resource.labels.service="generativelanguage.googleapis.com"'
+    )
+    REQUEST_COUNT_FILTER = (
+        SERVICE_FILTER + ' AND metric.type="serviceruntime.googleapis.com/api/request_count"'
+    )
     TOKEN_COUNT_FILTERS: tuple[str, ...] = (
-        'metric.type="generativelanguage.googleapis.com/request/token_count"',
-        'metric.type="aiplatform.googleapis.com/prediction/token_count"',
+        SERVICE_FILTER + ' AND metric.type="generativelanguage.googleapis.com/request/token_count"',
+        SERVICE_FILTER + ' AND metric.type="aiplatform.googleapis.com/prediction/token_count"',
         REQUEST_COUNT_FILTER,
     )
-    COST_FILTER = 'metric.type="billing.googleapis.com/billing/account/cost"'
+    LATENCY_FILTER = (
+        SERVICE_FILTER + ' AND metric.type="serviceruntime.googleapis.com/api/request_latencies"'
+    )
+    ERROR_FILTER = (
+        SERVICE_FILTER
+        + ' AND metric.type="serviceruntime.googleapis.com/api/request_count"'
+        + ' AND metric.labels.response_code_class!="2xx"'
+    )
 
     def __init__(
         self,
         credential_store: GeminiAICredentialStore | None = None,
         project_id: str | None = None,
-        billing_account: str | None = None,
     ) -> None:
         """
         @brief Initialize GeminiAI provider with optional overrides.
         @param credential_store {GeminiAICredentialStore | None} Optional credential store.
         @param project_id {str | None} Optional project id override.
-        @param billing_account {str | None} Optional billing account override.
         @return {None} Function return value.
         """
         self._store = credential_store or GeminiAICredentialStore()
         self._project_id = project_id
-        self._billing_account = billing_account
 
     def is_configured(self) -> bool:
         """
@@ -370,13 +374,12 @@ class GeminiAIProvider(BaseProvider):
 2. Configure GeminiAI OAuth client JSON (file or paste).
 3. Authorize scopes:
    - {GEMINIAI_OAUTH_SCOPES[0]}
-   - {GEMINIAI_OAUTH_SCOPES[1]}
 4. Ensure project id is configured via setup or {GEMINIAI_PROJECT_ID_ENV_VAR}.
 """
 
     async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult:
         """
-        @brief Fetch GeminiAI usage/cost metrics for one window.
+        @brief Fetch GeminiAI monitoring usage metrics for one window.
         @details Executes synchronous Google API calls in a worker thread and returns
         normalized provider metrics. HTTP 429 responses are normalized as rate-limit
         provider error payloads with retry-after metadata.
@@ -424,7 +427,6 @@ class GeminiAIProvider(BaseProvider):
 
         try:
             monitoring_service = self._build_monitoring_service(credentials)
-            billing_service = self._build_billing_service(credentials)
             time_range = self._build_window_range(window)
 
             request_total, request_payload = self._query_monitoring_metric(
@@ -454,28 +456,19 @@ class GeminiAIProvider(BaseProvider):
                     token_payload = metric_payload
                     break
 
-            billing_accounts = self._list_billing_accounts(billing_service)
-            project_billing_info = self._get_project_billing_info(
-                billing_service=billing_service,
-                project_id=project_id,
-            )
-            resolved_billing_account = self._resolve_billing_account(
-                billing_accounts=billing_accounts,
-                project_billing_info=project_billing_info,
-            )
-
-            cost_filter = self.COST_FILTER
-            if resolved_billing_account is not None:
-                billing_account_id = resolved_billing_account.split("/", maxsplit=1)[-1]
-                cost_filter = (
-                    f'{self.COST_FILTER} AND '
-                    f'metric.labels.billing_account_id="{billing_account_id}"'
-                )
-
-            cost_total, cost_payload = self._query_monitoring_metric(
+            latency_total, latency_payload = self._query_monitoring_metric(
                 monitoring_service=monitoring_service,
                 project_id=project_id,
-                metric_filter=cost_filter,
+                metric_filter=self.LATENCY_FILTER,
+                start_time=time_range.start_time,
+                end_time=time_range.end_time,
+                allow_missing=True,
+            )
+
+            error_total, error_payload = self._query_monitoring_metric(
+                monitoring_service=monitoring_service,
+                project_id=project_id,
+                metric_filter=self.ERROR_FILTER,
                 start_time=time_range.start_time,
                 end_time=time_range.end_time,
                 allow_missing=True,
@@ -483,18 +476,17 @@ class GeminiAIProvider(BaseProvider):
 
             raw_payload: dict[str, Any] = {
                 "project_id": project_id,
-                "billing_account": resolved_billing_account,
                 "monitoring": {
                     "request_metric_filter": self.REQUEST_COUNT_FILTER,
                     "token_metric_filter": token_filter_used,
-                    "cost_metric_filter": cost_filter,
+                    "latency_metric_filter": self.LATENCY_FILTER,
+                    "error_metric_filter": self.ERROR_FILTER,
                     "request_metric_payload": request_payload,
                     "token_metric_payload": token_payload,
-                    "cost_metric_payload": cost_payload,
-                },
-                "billing": {
-                    "project_billing_info": project_billing_info,
-                    "billing_accounts": billing_accounts,
+                    "latency_metric_payload": latency_payload,
+                    "error_metric_payload": error_payload,
+                    "latency_total": latency_total,
+                    "error_total": error_total,
                 },
                 "window_start": _to_rfc3339_utc(time_range.start_time),
                 "window_end": _to_rfc3339_utc(time_range.end_time),
@@ -503,7 +495,6 @@ class GeminiAIProvider(BaseProvider):
                 raw_payload=raw_payload,
                 request_total=request_total,
                 token_total=token_total,
-                cost_total=cost_total,
             )
             return ProviderResult(
                 provider=self.name,
@@ -573,58 +564,6 @@ class GeminiAIProvider(BaseProvider):
         client_payload = self._store.load_client_config()
         return self._store.extract_project_id(client_payload)
 
-    def _resolve_billing_account(
-        self,
-        billing_accounts: list[dict[str, Any]],
-        project_billing_info: dict[str, Any],
-    ) -> str | None:
-        """
-        @brief Resolve billing account from overrides, runtime config, or API metadata.
-        @param billing_accounts {list[dict[str, Any]]} Accounts returned by Cloud Billing API.
-        @param project_billing_info {dict[str, Any]} Project billing metadata payload.
-        @return {str | None} Canonical `billingAccounts/<id>` string or None.
-        """
-        candidates: list[str] = []
-        if self._billing_account:
-            candidates.append(self._billing_account)
-
-        if env_value := os.environ.get(GEMINIAI_BILLING_ACCOUNT_ENV_VAR):
-            candidates.append(env_value)
-
-        from aibar.config import load_runtime_config
-
-        runtime_config = load_runtime_config()
-        if runtime_config.geminiai_billing_account:
-            candidates.append(runtime_config.geminiai_billing_account)
-
-        project_billing_name = project_billing_info.get("billingAccountName")
-        if isinstance(project_billing_name, str) and project_billing_name.strip():
-            candidates.append(project_billing_name)
-
-        for account in billing_accounts:
-            name_value = account.get("name")
-            if isinstance(name_value, str) and name_value.strip():
-                candidates.append(name_value)
-
-        for candidate in candidates:
-            normalized = self._normalize_billing_account(candidate)
-            if normalized is not None:
-                return normalized
-        return None
-
-    def _normalize_billing_account(self, value: str) -> str | None:
-        """
-        @brief Normalize billing account identifier to canonical path format.
-        @param value {str} Candidate billing account identifier.
-        @return {str | None} Canonical `billingAccounts/<id>` or None.
-        """
-        stripped = value.strip()
-        if not stripped:
-            return None
-        if stripped.startswith("billingAccounts/"):
-            return stripped
-        return f"billingAccounts/{stripped}"
-
     def _build_monitoring_service(self, credentials: Credentials) -> Any:
         """
         @brief Build Google Cloud Monitoring API client.
@@ -632,14 +571,6 @@ class GeminiAIProvider(BaseProvider):
         @return {Any} Monitoring service client.
         """
         return build("monitoring", "v3", credentials=credentials, cache_discovery=False)
-
-    def _build_billing_service(self, credentials: Credentials) -> Any:
-        """
-        @brief Build Google Cloud Billing API client.
-        @param credentials {Credentials} OAuth credentials.
-        @return {Any} Billing service client.
-        """
-        return build("cloudbilling", "v1", credentials=credentials, cache_discovery=False)
 
     def _query_monitoring_metric(
         self,
@@ -722,6 +653,15 @@ class GeminiAIProvider(BaseProvider):
                         numeric = float(value_node["int64Value"])
                     except (TypeError, ValueError):
                         numeric = None
+                elif "distributionValue" in value_node:
+                    distribution_node = value_node["distributionValue"]
+                    if isinstance(distribution_node, dict):
+                        mean_value = distribution_node.get("mean")
+                        if mean_value is not None:
+                            try:
+                                numeric = float(mean_value)
+                            except (TypeError, ValueError):
+                                numeric = None
                 if numeric is None:
                     continue
                 has_points = True
@@ -731,72 +671,30 @@ class GeminiAIProvider(BaseProvider):
             return None
         return total
 
-    def _list_billing_accounts(self, billing_service: Any) -> list[dict[str, Any]]:
-        """
-        @brief List billing accounts visible to current OAuth identity.
-        @param billing_service {Any} Cloud Billing client.
-        @return {list[dict[str, Any]]} Billing account payload list.
-        """
-        response = billing_service.billingAccounts().list().execute()
-        accounts = response.get("billingAccounts")
-        if isinstance(accounts, list):
-            return [item for item in accounts if isinstance(item, dict)]
-        return []
-
-    def _get_project_billing_info(
-        self,
-        billing_service: Any,
-        project_id: str,
-    ) -> dict[str, Any]:
-        """
-        @brief Retrieve billing-account linkage metadata for one project.
-        @param billing_service {Any} Cloud Billing client.
-        @param project_id {str} Google Cloud project id.
-        @return {dict[str, Any]} Billing info payload or empty object.
-        """
-        try:
-            response = (
-                billing_service.projects()
-                .getBillingInfo(name=f"projects/{project_id}")
-                .execute()
-            )
-        except HttpError as exc:
-            status_code = _extract_http_status(exc)
-            if status_code in {403, 404}:
-                return {}
-            raise
-        if isinstance(response, dict):
-            return response
-        return {}
-
     def _build_metrics(
         self,
         raw_payload: dict[str, Any],
         request_total: float | None,
         token_total: float | None,
-        cost_total: float | None,
     ) -> UsageMetrics:
         """
         @brief Build normalized UsageMetrics from aggregated API values.
-        @param raw_payload {dict[str, Any]} Combined raw payload for currency resolution.
+        @param raw_payload {dict[str, Any]} Combined raw payload placeholder.
         @param request_total {float | None} Aggregated request count.
         @param token_total {float | None} Aggregated token count.
-        @param cost_total {float | None} Aggregated cost value.
         @return {UsageMetrics} Normalized metrics object.
         @satisfies REQ-050
         """
-        from aibar.config import resolve_currency_symbol
-
+        del raw_payload
         requests_value = int(request_total) if request_total is not None else None
         input_tokens_value = int(token_total) if token_total is not None else None
-        cost_value = round(cost_total, 4) if cost_total is not None else None
         return UsageMetrics(
-            cost=cost_value,
+            cost=None,
             requests=requests_value,
             input_tokens=input_tokens_value,
             output_tokens=None,
             remaining=None,
             limit=None,
             reset_at=None,
-            currency_symbol=resolve_currency_symbol(raw_payload, self.name.value),
+            currency_symbol="$",
         )

@@ -1,8 +1,9 @@
 """
 @file
 @brief GeminiAI provider integration tests.
-@details Verifies GeminiAI provider metric normalization, OAuth-backed fetch flow
-error handling for HTTP 429, and Monitoring time-series aggregation behavior.
+@details Verifies GeminiAI provider monitoring-only metric normalization,
+OAuth-backed fetch flow error handling for HTTP 429, and Monitoring
+time-series aggregation behavior.
 @satisfies REQ-054
 @satisfies REQ-057
 @satisfies REQ-058
@@ -68,11 +69,11 @@ class _FakeCredentialStore:
         return object()
 
 
-def test_geminiai_fetch_maps_monitoring_and_billing_metrics(monkeypatch) -> None:
+def test_geminiai_fetch_maps_monitoring_only_metrics(monkeypatch) -> None:
     """
-    @brief Verify GeminiAI provider maps Monitoring/Billing values into UsageMetrics.
+    @brief Verify GeminiAI provider maps monitoring values into UsageMetrics.
     @details Mocks Google API adapters so no network calls occur; asserts requests,
-    token usage, and cost metrics are propagated to ProviderResult.
+    token usage, and telemetry metrics are propagated to ProviderResult.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
     @return {None} Function return value.
     @satisfies REQ-057
@@ -85,25 +86,13 @@ def test_geminiai_fetch_maps_monitoring_and_billing_metrics(monkeypatch) -> None
     )
 
     monkeypatch.setattr(provider, "_build_monitoring_service", lambda credentials: object())
-    monkeypatch.setattr(provider, "_build_billing_service", lambda credentials: object())
-    monkeypatch.setattr(
-        provider,
-        "_list_billing_accounts",
-        lambda billing_service: [{"name": "billingAccounts/111111-222222-333333"}],
-    )
-    monkeypatch.setattr(
-        provider,
-        "_get_project_billing_info",
-        lambda billing_service, project_id: {
-            "billingAccountName": "billingAccounts/111111-222222-333333"
-        },
-    )
 
     responses = iter(
         [
             (42.0, {"timeSeries": [{"points": [{"value": {"int64Value": "42"}}]}]}),
             (314.0, {"timeSeries": [{"points": [{"value": {"doubleValue": 314.0}}]}]}),
-            (12.5, {"timeSeries": [{"points": [{"value": {"doubleValue": 12.5}}]}]}),
+            (8.75, {"timeSeries": [{"points": [{"value": {"doubleValue": 8.75}}]}]}),
+            (3.0, {"timeSeries": [{"points": [{"value": {"int64Value": "3"}}]}]}),
         ]
     )
 
@@ -129,9 +118,11 @@ def test_geminiai_fetch_maps_monitoring_and_billing_metrics(monkeypatch) -> None
     assert result.window == WindowPeriod.DAY_7
     assert result.metrics.requests == 42
     assert result.metrics.input_tokens == 314
-    assert result.metrics.cost == 12.5
+    assert result.metrics.cost is None
     assert result.raw["project_id"] == "demo-project"
-    assert result.raw["billing_account"] == "billingAccounts/111111-222222-333333"
+    assert result.raw["monitoring"]["latency_total"] == 8.75
+    assert result.raw["monitoring"]["error_total"] == 3.0
+    assert "billing" not in result.raw
 
 
 def test_geminiai_fetch_converts_http_429_to_rate_limit_error(monkeypatch) -> None:
@@ -150,7 +141,6 @@ def test_geminiai_fetch_converts_http_429_to_rate_limit_error(monkeypatch) -> No
     )
 
     monkeypatch.setattr(provider, "_build_monitoring_service", lambda credentials: object())
-    monkeypatch.setattr(provider, "_build_billing_service", lambda credentials: object())
 
     response = Response({"status": "429", "retry-after": "120"})
     http_error = HttpError(resp=response, content=b'{"error":"rate limit"}')
@@ -183,6 +173,7 @@ def test_geminiai_sum_time_series_values_aggregates_numeric_points() -> None:
                 "points": [
                     {"value": {"int64Value": "3"}},
                     {"value": {"doubleValue": 2.5}},
+                    {"value": {"distributionValue": {"mean": 1.5}}},
                 ]
             },
             {
@@ -192,18 +183,14 @@ def test_geminiai_sum_time_series_values_aggregates_numeric_points() -> None:
             },
         ]
     }
-    assert provider._sum_time_series_values(response) == 9.5
+    assert provider._sum_time_series_values(response) == 11.0
 
 
-def test_geminiai_oauth_scopes_include_monitoring_and_billing_readonly() -> None:
+def test_geminiai_oauth_scopes_include_only_monitoring_read() -> None:
     """
-    @brief Verify GeminiAI OAuth scopes include Monitoring and Cloud Billing read permissions.
+    @brief Verify GeminiAI OAuth scopes include only Monitoring read permission.
     @return {None} Function return value.
     @satisfies REQ-056
     @satisfies TST-025
     """
-    assert "https://www.googleapis.com/auth/monitoring.read" in GEMINIAI_OAUTH_SCOPES
-    assert (
-        "https://www.googleapis.com/auth/cloud-billing.readonly"
-        in GEMINIAI_OAUTH_SCOPES
-    )
+    assert GEMINIAI_OAUTH_SCOPES == ("https://www.googleapis.com/auth/monitoring.read",)
