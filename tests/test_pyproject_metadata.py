@@ -84,8 +84,8 @@ class TestProjectMetadata:
     def test_dependencies_include_runtime_packages(self, pyproject_data: dict) -> None:
         """
         @brief Verify runtime dependencies are declared.
-        @details Asserts [project].dependencies contains click, httpx, pydantic,
-        and textual as required by the application imports.
+        @details Asserts [project].dependencies contains click, httpx, and pydantic
+        as required by the application imports.
         @param pyproject_data {dict} Parsed pyproject.toml.
         """
         project = pyproject_data.get("project", {})
@@ -100,7 +100,7 @@ class TestProjectMetadata:
             .lower()
             for d in deps
         ]
-        for required in ("click", "httpx", "pydantic", "textual"):
+        for required in ("click", "httpx", "pydantic"):
             assert required in dep_names, f"Missing runtime dependency: {required}"
 
 

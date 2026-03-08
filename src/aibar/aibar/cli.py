@@ -1215,8 +1215,7 @@ def _build_cached_dual_window_results(
         "  aibar show\n"
         "  aibar show --json\n"
         "  aibar show --force\n"
-        "  aibar setup\n"
-        "  aibar ui"
+        "  aibar setup"
     ),
 )
 @click.version_option()
@@ -1368,7 +1367,7 @@ def _provider_display_name(provider_name: ProviderName) -> str:
     """
     @brief Resolve human-facing provider title for terminal panel rendering.
     @details Maps machine-readable provider keys to display names aligned with
-    Textual and GNOME UI surfaces.
+    CLI and GNOME extension output surfaces.
     @param provider_name {ProviderName} Provider enum key.
     @return {str} Human-facing provider display name.
     @satisfies REQ-062
@@ -1381,7 +1380,7 @@ def _provider_display_name(provider_name: ProviderName) -> str:
 def _emit_blue_panel(title: str, body_lines: list[str]) -> None:
     """
     @brief Render blue ANSI bordered output panel with wrapped content lines.
-    @details Creates fixed-width terminal panels inspired by Textual/extension
+    @details Creates fixed-width terminal panels aligned with GNOME extension
     card layout, preserving deterministic borders and line wrapping behavior.
     @param title {str} Panel header text.
     @param body_lines {list[str]} Content lines rendered in panel body.
@@ -1685,21 +1684,6 @@ def doctor() -> None:
 
 
 @main.command(
-    short_help="Launch the terminal UI.",
-    help="Launch the Textual UI with refresh controls and provider cards.",
-)
-def ui() -> None:
-    """
-    @brief Execute ui.
-    @details Applies ui logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
-    @return {None} Function return value.
-    """
-    from aibar.ui import run_ui
-
-    run_ui()
-
-
-@main.command(
     short_help="Show environment variable guidance.",
     help="Print provider environment-variable configuration guidance.",
 )
@@ -1956,7 +1940,6 @@ def setup() -> None:
     click.echo("  aibar show --json")
     click.echo("  aibar show")
     click.echo("  aibar doctor")
-    click.echo("  aibar ui")
 
 
 @main.command(

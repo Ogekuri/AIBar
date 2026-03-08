@@ -316,9 +316,9 @@ class AIBarIndicator extends PanelMenu.Button {
         });
         this.menu.addMenuItem(refreshItem);
 
-        let openUiItem = new PopupMenu.PopupMenuItem('Open AIBar UI');
+        let openUiItem = new PopupMenu.PopupMenuItem('Open AIBar Report');
         openUiItem.connect('activate', () => {
-            this._openTerminalWithCommand(`${_getAiBarPath()} ui`);
+            this._openTerminalWithCommand(`${_getAiBarPath()} show`);
         });
         this.menu.addMenuItem(openUiItem);
 

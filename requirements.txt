@@ -6,7 +6,6 @@ google-auth-httplib2
 google-auth-oauthlib
 httpx
 pydantic
-textual
 
 # Build/test tooling used by repository scripts.
 build

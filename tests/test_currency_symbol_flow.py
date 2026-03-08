@@ -2,12 +2,11 @@
 @file
 @brief Currency symbol resolution and display tests.
 @details Verifies UsageMetrics.currency_symbol default, resolve_currency_symbol
-ISO-code and symbol-passthrough logic, and that CLI / TUI cost rendering
+ISO-code and symbol-passthrough logic, and that CLI / GNOME cost rendering
 uses metrics.currency_symbol instead of a hardcoded `$`.
 @satisfies REQ-049
 @satisfies REQ-050
 @satisfies REQ-051
-@satisfies REQ-052
 @satisfies TST-023
 """
 

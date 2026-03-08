@@ -77,7 +77,8 @@ def test_popup_labels_use_aibar_brand_casing() -> None:
     """
     source = EXTENSION_PATH.read_text(encoding="utf-8")
     assert "text: 'AIBar'," in source
-    assert "PopupMenu.PopupMenuItem('Open AIBar UI')" in source
+    assert "PopupMenu.PopupMenuItem('Open AIBar Report')" in source
+    assert "PopupMenu.PopupMenuItem('Open AIBar UI')" not in source
     assert "PopupMenu.PopupMenuItem('Open aibar UI')" not in source
 
 

@@ -349,7 +349,7 @@ class AIBarIndicator extends PanelMenu.Button {
         // Open UI button
         let openUiItem = new PopupMenu.PopupMenuItem('📊  Open aibar UI');
         openUiItem.connect('activate', () => {
-            this._openTerminalWithCommand('aibar ui');
+            this._openTerminalWithCommand('aibar show');
         });
         this.menu.addMenuItem(openUiItem);
         

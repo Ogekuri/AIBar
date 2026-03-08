@@ -3,18 +3,10 @@
 - `id: PROC:main`
   - `type: Process`
   - `parent_process: null`
-  - `role: aibar CLI and Textual UI runtime process`
-  - `entrypoint_symbols: main(...), run_ui(...)`
-  - `defining_files: src/aibar/aibar/cli.py, src/aibar/aibar/ui.py, src/aibar/aibar/__main__.py`
-  - `thread_model: explicit worker thread used by Text UI refresh via asyncio.to_thread(...)`
-
-- `id: THR:main#cache-retrieval-worker`
-  - `type: Thread`
-  - `parent_process: PROC:main`
-  - `role: execute shared cache-retrieval pipeline for Text UI refresh`
-  - `entrypoint_symbols: retrieve_results_via_cache_pipeline(...)`
-  - `defining_files: src/aibar/aibar/ui.py, src/aibar/aibar/cli.py`
-  - `thread_model: no child threads detected`
+  - `role: aibar CLI runtime process`
+  - `entrypoint_symbols: main(...)`
+  - `defining_files: src/aibar/aibar/cli.py, src/aibar/aibar/__main__.py`
+  - `thread_model: no explicit threads detected`
 
 - `id: PROC:gnome-shell`
   - `type: Process`
@@ -92,11 +84,10 @@
 ### PROC:main
 - `Entrypoints`
   - `main(...)`: Click command-group entrypoint (prints usage/help when invoked without subcommand) [`src/aibar/aibar/cli.py`]
-  - `run_ui(...)`: Textual application runner entrypoint [`src/aibar/aibar/ui.py`]
 - `Lifecycle/Trigger`
   - Starts when `aibar` is invoked by a user shell or by subprocess spawn from `PROC:gnome-shell`.
-  - Executes one command route (`show`, `doctor`, `ui`, `env`, `setup`, `login`) per invocation.
-  - Blocks in Textual event loop only for UI route; otherwise exits after command completion.
+  - Executes one command route (`show`, `doctor`, `env`, `setup`, `login`) per invocation.
+  - Exits after command completion.
 - `Internal Call-Trace Tree`
   - `main(...)`: CLI command router [`src/aibar/aibar/cli.py`]
     - `show(...)`: usage fetch/report route with shared cache pipeline [`src/aibar/aibar/cli.py`]
@@ -175,27 +166,6 @@
       - `Config.get_provider_status(...)`: provider status synthesis [`src/aibar/aibar/config.py`]
         - `Config.is_provider_configured(...)`: provider probe via provider class [`src/aibar/aibar/config.py`]
       - `_fetch_result(...)`: provider fetch execution wrapper [`src/aibar/aibar/cli.py`]
-    - `ui(...)`: Textual UI launch route [`src/aibar/aibar/cli.py`]
-      - `run_ui(...)`: app bootstrap [`src/aibar/aibar/ui.py`]
-        - `AIBarUI.__init__(...)`: provider registry initialization [`src/aibar/aibar/ui.py`]
-        - `AIBarUI.on_mount(...)`: first-refresh trigger [`src/aibar/aibar/ui.py`]
-          - `AIBarUI._update_window_buttons(...)`: active-window control state update [`src/aibar/aibar/ui.py`]
-          - `AIBarUI.action_refresh(...)`: refresh loop over configured providers using shared cache pipeline [`src/aibar/aibar/ui.py`]
-            - `AIBarUI._get_card(...)`: provider-card lookup [`src/aibar/aibar/ui.py`]
-            - External boundary: `asyncio.to_thread(...)` dispatch to `THR:main#cache-retrieval-worker`.
-            - `AIBarUI._update_json_view(...)`: raw JSON tab state update [`src/aibar/aibar/ui.py`]
-          - `AIBarUI.action_window_5h(...)`: 5h window route [`src/aibar/aibar/ui.py`]
-            - `AIBarUI._update_window_buttons(...)`: button-class update [`src/aibar/aibar/ui.py`]
-            - `AIBarUI.action_refresh(...)`: refresh loop reuse [`src/aibar/aibar/ui.py`]
-          - `AIBarUI.action_window_7d(...)`: 7d window route [`src/aibar/aibar/ui.py`]
-            - `AIBarUI._update_window_buttons(...)`: button-class update [`src/aibar/aibar/ui.py`]
-            - `AIBarUI.action_refresh(...)`: refresh loop reuse [`src/aibar/aibar/ui.py`]
-          - `AIBarUI.action_toggle_json(...)`: tab switch route [`src/aibar/aibar/ui.py`]
-        - `ProviderCard.watch_result(...)`: per-provider card rendering update with rate-limit quota suppression (`Error: Rate limited. Try again later.` not rendered), `Resets in: ... ⚠️ Limit reached!` suffix at displayed `100.0%` for Claude/Codex/Copilot windows, and cost label using `metrics.currency_symbol` [`src/aibar/aibar/ui.py`]
-          - `ProviderCard._format_age(...)`: age formatter [`src/aibar/aibar/ui.py`]
-          - `ProviderCard._format_duration(...)`: reset-duration formatter [`src/aibar/aibar/ui.py`]
-        - `ProviderCard.watch_is_loading(...)`: loading state update [`src/aibar/aibar/ui.py`]
-        - `RawJsonView.watch_data(...)`: JSON text render update [`src/aibar/aibar/ui.py`]
     - `env(...)`: environment-help route [`src/aibar/aibar/cli.py`]
       - `Config.get_env_var_help(...)`: provider help block synthesis [`src/aibar/aibar/config.py`]
         - `Config.is_provider_configured(...)`: provider probe via provider class [`src/aibar/aibar/config.py`]
@@ -223,53 +193,15 @@
       - `_login_geminiai(...)`: GeminiAI OAuth browser-flow route [`src/aibar/aibar/cli.py`]
         - `GeminiAICredentialStore.has_client_config(...)`: OAuth desktop client-file availability check [`src/aibar/aibar/providers/geminiai.py`]
         - `GeminiAICredentialStore.authorize_interactively(...)`: browser authorization + token persistence using `GEMINIAI_OAUTH_SCOPES` (`bigquery.readonly`, `monitoring.read`, `cloud-platform`) [`src/aibar/aibar/providers/geminiai.py`]
-  - `run_ui(...)`: standalone module entrypoint path [`src/aibar/aibar/ui.py`]
-    - `AIBarUI.__init__(...)`: provider registry initialization [`src/aibar/aibar/ui.py`]
-    - `AIBarUI.on_mount(...)`: first-refresh trigger [`src/aibar/aibar/ui.py`]
-    - `AIBarUI.action_refresh(...)`: refresh loop over configured providers [`src/aibar/aibar/ui.py`]
   - `__main__` module: `python -m aibar` entrypoint, delegates to `main(...)` [`src/aibar/aibar/__main__.py`]
     - `main(...)`: CLI command router [`src/aibar/aibar/cli.py`]
 - `External Boundaries`
   - Click command parsing and dispatch.
-  - Textual event loop, rendering, and widget runtime.
-  - Python threadpool scheduling via `asyncio.to_thread(...)` in Text UI refresh.
   - HTTP network interactions through provider endpoints.
   - Browser-based OAuth consent flow and loopback callback for GeminiAI Google credentials.
   - Google Cloud Monitoring API HTTPS endpoints.
   - Local filesystem reads/writes under user home for env, credentials, runtime config, CLI cache, and idle-time state.
   - Process environment and terminal stdout/stderr streams.
-
-### THR:main#cache-retrieval-worker
-- `Entrypoints`
-  - `retrieve_results_via_cache_pipeline(...)`: shared cache retrieval execution invoked by Text UI refresh with sectioned cache document output [`src/aibar/aibar/cli.py`]
-- `Lifecycle/Trigger`
-  - Spawned from `PROC:main` via `asyncio.to_thread(...)` inside `AIBarUI.action_refresh(...)`.
-  - Executes one retrieval cycle and returns `RetrievalPipelineOutput` to the caller thread.
-- `Internal Call-Trace Tree`
-  - `retrieve_results_via_cache_pipeline(...)`: shared retrieval order (`force` -> idle-time gate -> conditional refresh -> effective payload projection) using cache `payload`/`status` sections [`src/aibar/aibar/cli.py`]
-    - `remove_idle_time_file(...)`: clear persisted idle-time state on forced refresh with blocking lock-file coordination [`src/aibar/aibar/config.py`]
-      - `_blocking_file_lock(...)`: poll lock-file release at 250ms and own lock lifecycle for `idle-time.json` mutation [`src/aibar/aibar/config.py`]
-    - `load_cli_cache(...)`: load persisted provider dataset from `~/.cache/aibar/cache.json` with blocking lock-file coordination [`src/aibar/aibar/config.py`]
-      - `_blocking_file_lock(...)`: poll lock-file release at 250ms and own lock lifecycle for `cache.json` read [`src/aibar/aibar/config.py`]
-      - `_lock_file_path(...)`: resolve lock-file name `<cache-file>.lock` under `~/.cache/aibar/` [`src/aibar/aibar/config.py`]
-    - `_normalize_cache_document(...)`: normalize decoded cache payload to canonical sectioned schema [`src/aibar/aibar/cli.py`]
-    - `load_idle_time(...)`: load persisted idle-time gate state from `~/.cache/aibar/idle-time.json` with blocking lock-file coordination [`src/aibar/aibar/config.py`]
-      - `_blocking_file_lock(...)`: poll lock-file release at 250ms and own lock lifecycle for `idle-time.json` read [`src/aibar/aibar/config.py`]
-    - `_filter_cached_payload(...)`: provider-filter selector for cache `payload`/`status` sections [`src/aibar/aibar/cli.py`]
-    - `_load_cached_results(...)`: cached payload decode/project helper with status-aware overlays for Claude 429 and GeminiAI cached `FAIL` status propagation [`src/aibar/aibar/cli.py`]
-      - `_project_cached_window(...)`: provider parser projection to requested window [`src/aibar/aibar/cli.py`]
-      - `_overlay_cached_failure_status(...)`: GeminiAI cached status overlay onto projected payload results [`src/aibar/aibar/cli.py`]
-    - `load_runtime_config(...)`: runtime throttling settings loader [`src/aibar/aibar/config.py`]
-    - `_refresh_and_persist_cache_payload(...)`: conditional live refresh + status/payload merge write into `cache.json` [`src/aibar/aibar/cli.py`]
-      - `_extract_claude_snapshot_from_cache_document(...)`: read last-success Claude dual-window payload from cache `payload` section [`src/aibar/aibar/cli.py`]
-      - `_fetch_result(...)`: throttled provider fetch wrapper [`src/aibar/aibar/cli.py`]
-      - `_record_attempt_status(...)`: persist per-provider/window attempt result (`OK`/`FAIL`) in cache `status` section [`src/aibar/aibar/cli.py`]
-      - `_serialize_results_payload(...)`: serialize refreshed provider results [`src/aibar/aibar/cli.py`]
-      - `save_cli_cache(...)`: persist sanitized cache document (`payload` + `status`) to `cache.json` only when merged payload content changed [`src/aibar/aibar/config.py`]
-        - `_blocking_file_lock(...)`: poll lock-file release at 250ms and own lock lifecycle for `cache.json` write [`src/aibar/aibar/config.py`]
-      - `_update_idle_time_after_refresh(...)`: persist idle-time metadata from success/429 outcomes [`src/aibar/aibar/cli.py`]
-- `External Boundaries`
-  - Python `asyncio` threadpool worker scheduling.
 
 ### PROC:gnome-shell
 - `Entrypoints`
@@ -286,7 +218,7 @@
       - `AIBarIndicator._buildPanelButton(...)`: panel icon/percentage/summary-label setup with five ordered percentage labels (Claude 5h, Claude 7d, Copilot, Codex 5h, Codex 7d) and primary/secondary style classes [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
       - `AIBarIndicator._buildPopupMenu(...)`: popup structure and actions setup including tab container scaffold and `Refresh Now` forced-refresh action wiring [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
         - `AIBarIndicator._refreshData(...)`: refresh action handler with forced CLI path (`aibar show --json --force`) for popup `Refresh Now` [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
-        - `AIBarIndicator._openTerminalWithCommand(...)`: UI-launch action handler [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+        - `AIBarIndicator._openTerminalWithCommand(...)`: terminal report-launch action handler [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
         - menu `open-state-changed` callback -> `AIBarIndicator._applyBarWidths(...)`: re-apply progress bar fill widths on popup open using cached `_barData` [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
       - `AIBarIndicator._refreshData(forceRefresh = false)`: subprocess-based JSON refresh with optional `--force` argument injection [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
         - `_loadEnvFromFile(...)`: extension env map parse [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
@@ -344,15 +276,6 @@
 
 ## Communication Edges
 
-- `id: EDGE-005`
-  - `source: PROC:main`
-  - `destination: THR:main#cache-retrieval-worker`
-  - `direction: request-response`
-  - `mechanism: asyncio.to_thread(...) threadpool dispatch`
-  - `endpoint_or_channel: AIBarUI.action_refresh(...) -> retrieve_results_via_cache_pipeline(...)`
-  - `payload_data_shape: request {provider_filter, target_window, force_refresh, providers}; response RetrievalPipelineOutput {payload {payload:{provider->ProviderResult}, status:{provider->{window->{result,error,updated_at,status_code}}}}, results, idle_active, cache_available}`
-  - `declaration_files: src/aibar/aibar/ui.py, src/aibar/aibar/cli.py, src/aibar/aibar/providers/base.py`
-
 - `id: EDGE-004`
   - `source: PROC:test-ext`
   - `destination: PROC:install-ext`
@@ -378,7 +301,7 @@
   - `mechanism: terminal subprocess spawn`
   - `endpoint_or_channel: shell command string passed to gnome-terminal bash -c`
   - `payload_data_shape: UTF-8 command text (no structured return payload to source unit)`
-  - `declaration_files: src/aibar/gnome-extension/aibar@aibar.panel/extension.js, src/aibar/aibar/cli.py, src/aibar/aibar/ui.py`
+  - `declaration_files: src/aibar/gnome-extension/aibar@aibar.panel/extension.js, src/aibar/aibar/cli.py`
 
 - `id: EDGE-003`
   - `source: PROC:gnome-shell`

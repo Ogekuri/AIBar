@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "aibar"
 version = "0.1.0"
-description = "CLI/TUI usage monitor for Claude, OpenAI, OpenRouter, GitHub Copilot, Codex, and GeminiAI."
+description = "CLI usage monitor for Claude, OpenAI, OpenRouter, GitHub Copilot, Codex, and GeminiAI."
 readme = "README.md"
 license = "GPL-3.0-only"
 requires-python = ">= 3.11"
@@ -17,7 +17,6 @@ dependencies = [
     "google-auth-oauthlib",
     "httpx",
     "pydantic",
-    "textual",
 ]
 
 [project.scripts]

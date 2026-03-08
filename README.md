@@ -9,8 +9,8 @@
 </p>
 
 <p align="center">
-<strong>Monitor AI usage and quota in one CLI/TUI.</strong><br>
-AIBar aggregates usage metrics for Claude, OpenAI, OpenRouter, GitHub Copilot, and Codex, with both terminal output and a GNOME panel extension.
+<strong>Monitor AI usage and quota in one CLI.</strong><br>
+AIBar aggregates usage metrics for Claude, OpenAI, OpenRouter, GitHub Copilot, Codex, and GeminiAI, with terminal output and a GNOME panel extension.
 </p>
 
 <p align="center">
@@ -32,7 +32,6 @@ AIBar aggregates usage metrics for Claude, OpenAI, OpenRouter, GitHub Copilot, a
 ## Feature Highlights
 - Unified `show` command for multiple providers (`claude`, `openai`, `openrouter`, `copilot`, `codex`).
 - Human-readable output and JSON output (`--json`) for scripting/integration.
-- Interactive Textual UI (`ui`) with refresh controls and 5h/7d window switching.
 - Provider diagnostics (`doctor`) and interactive setup (`setup`) for credentials.
 - Local cache of successful results under `~/.cache/aibar` to reduce repeated API calls.
 - GNOME Shell extension support via `aibar show --json`.
@@ -131,8 +130,6 @@ uv pip uninstall aibar
 ./aibar login --provider claude
 ./aibar login --provider copilot
 
-# Launch terminal UI
-./aibar ui
 ```
 
 
