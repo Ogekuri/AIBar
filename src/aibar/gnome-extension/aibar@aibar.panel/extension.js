@@ -174,6 +174,7 @@ class AIBarIndicator extends PanelMenu.Button {
 
         this._timeout = null;
         this._usageData = {};
+        this._statusData = {};
         this._providerRows = {};
         this._providerTabs = {};
         this._lastUpdated = null;
@@ -945,7 +946,8 @@ class AIBarIndicator extends PanelMenu.Button {
 
     /**
      * @brief Execute parse output.
-     * @details Applies parse output logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
+     * @details Parses CLI JSON output and supports canonical cache schema
+     * sections (`payload`, `status`) while preserving legacy direct provider maps.
      * @param {any} output Input parameter `output`.
      * @returns {any} Function return value.
      */
@@ -954,9 +956,30 @@ class AIBarIndicator extends PanelMenu.Button {
 
         try {
             let json = JSON.parse(output);
-            this._usageData = json;
+            if (
+                json &&
+                typeof json === 'object' &&
+                !Array.isArray(json) &&
+                json.payload &&
+                typeof json.payload === 'object' &&
+                !Array.isArray(json.payload)
+            ) {
+                this._usageData = json.payload;
+                if (
+                    json.status &&
+                    typeof json.status === 'object' &&
+                    !Array.isArray(json.status)
+                ) {
+                    this._statusData = json.status;
+                } else {
+                    this._statusData = {};
+                }
+            } else {
+                this._usageData = json;
+                this._statusData = {};
+            }
             this._lastUpdated = new Date();
-            console.debug(`aibar: Parsed ${Object.keys(json).length} providers`);
+            console.debug(`aibar: Parsed ${Object.keys(this._usageData).length} providers`);
         } catch (e) {
             console.debug(`aibar: JSON parse error: ${e.message}`);
             this._handleError(`Parse error: ${e.message}`);

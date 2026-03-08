@@ -71,7 +71,12 @@ def test_ui_refresh_uses_cache_payload_when_idle_time_is_active(
     """
     _patch_config_paths(monkeypatch, tmp_path)
     cached_result = _make_result(source="cached")
-    config_module.save_cli_cache({"openrouter": cached_result.model_dump(mode="json")})
+    config_module.save_cli_cache(
+        {
+            "payload": {"openrouter": cached_result.model_dump(mode="json")},
+            "status": {},
+        }
+    )
     config_module.save_idle_time(
         last_success_at=datetime.now(timezone.utc),
         idle_until=datetime.now(timezone.utc) + timedelta(minutes=20),
@@ -128,7 +133,7 @@ def test_ui_refresh_fetches_and_persists_cache_when_idle_state_missing(
 
     provider.fetch.assert_awaited_once_with(WindowPeriod.DAY_7)
     persisted = json.loads(config_module.CACHE_FILE_PATH.read_text(encoding="utf-8"))
-    assert persisted["openrouter"]["raw"]["source"] == "live"
+    assert persisted["payload"]["openrouter"]["raw"]["source"] == "live"
     assert ui.results[ProviderName.OPENROUTER].raw["source"] == "live"
 
 

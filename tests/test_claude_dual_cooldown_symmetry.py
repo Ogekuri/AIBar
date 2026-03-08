@@ -6,7 +6,6 @@ never falls back to Claude TTL cache/cooldown artifacts.
 @satisfies CTN-004, REQ-002
 """
 
-import json
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -81,9 +80,13 @@ class TestClaudeDualFetchBypass:
         assert result_5h.metrics.remaining == 55.0
         assert result_7d.metrics.remaining == 44.0
 
-    def test_dual_fetch_persists_claude_snapshot_on_success(self, tmp_path: Path) -> None:
+    def test_dual_fetch_does_not_write_legacy_snapshot_file(
+        self,
+        tmp_path: Path,
+    ) -> None:
         """
-        @brief Verify successful dual-window fetch writes Claude snapshot payload for 429 fallback.
+        @brief Verify successful dual-window fetch does not write legacy snapshot file.
+        @satisfies REQ-047
         """
         from aibar.cli import _fetch_claude_dual
 
@@ -119,13 +122,12 @@ class TestClaudeDualFetchBypass:
                 "fetch_all_windows",
                 new=AsyncMock(return_value=fresh),
             ):
-                _fetch_claude_dual(provider)
+                result_5h, result_7d = _fetch_claude_dual(provider)
 
             snapshot_path = tmp_path / "aibar" / "claude_dual_last_success.json"
-            assert snapshot_path.exists()
-            persisted = json.loads(snapshot_path.read_text(encoding="utf-8"))
-            assert persisted["five_hour"]["utilization"] == 22.0
-            assert persisted["seven_day"]["utilization"] == 40.0
+            assert not snapshot_path.exists()
+            assert result_5h.metrics.remaining == 78.0
+            assert result_7d.metrics.remaining == 60.0
 
     def test_dual_fetch_returns_live_errors_without_cache_fallback(
         self,

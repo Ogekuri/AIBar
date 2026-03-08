@@ -80,7 +80,7 @@ def _sanitize_cache_payload(payload: dict[str, Any]) -> dict[str, Any]:
     @details Recursively traverses dictionaries/lists and replaces values for
     case-insensitive key matches in `{token,key,secret,password,authorization}`
     with deterministic placeholder string `[REDACTED]`.
-    @param payload {dict[str, Any]} Provider payload in `show --json` schema.
+    @param payload {dict[str, Any]} Cache document containing `payload` and `status` sections.
     @return {dict[str, Any]} Sanitized deep-copy structure safe for persistence.
     @satisfies DES-004
     """
@@ -146,9 +146,10 @@ def load_cli_cache() -> dict[str, Any] | None:
     """
     @brief Load CLI cache payload from disk.
     @details Reads `~/.cache/aibar/cache.json` and returns parsed object only
-    when payload root is a JSON object.
+    when payload root is a JSON object with canonical cache sections.
     @return {dict[str, Any] | None} Parsed cache payload or None if unavailable.
     @satisfies CTN-004
+    @satisfies REQ-047
     """
     try:
         decoded = json.loads(CACHE_FILE_PATH.read_text(encoding="utf-8"))
@@ -161,14 +162,18 @@ def load_cli_cache() -> dict[str, Any] | None:
 
 def save_cli_cache(payload: dict[str, Any]) -> None:
     """
-    @brief Persist CLI cache payload in the canonical `show --json` schema.
-    @details Redacts sensitive keys from provider raw payloads, then writes
-    sanitized payload to `~/.cache/aibar/cache.json` using pretty-printed JSON
-    (`indent=2`) so the file matches CLI JSON rendering format exactly.
-    @param payload {dict[str, Any]} Cache payload in `show --json` shape.
+    @brief Persist canonical cache document to disk.
+    @details Redacts sensitive keys from nested raw payload objects, then writes
+    sanitized cache document to `~/.cache/aibar/cache.json` using pretty-printed
+    JSON (`indent=2`) preserving `payload` and `status` sections.
+    @param payload {dict[str, Any]} Canonical cache document.
     @return {None} Function return value.
     @satisfies CTN-004
     @satisfies DES-004
+    @satisfies REQ-044
+    @satisfies REQ-045
+    @satisfies REQ-046
+    @satisfies REQ-047
     """
     sanitized_payload = _sanitize_cache_payload(payload)
     _ensure_app_cache_dir()

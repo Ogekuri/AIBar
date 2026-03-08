@@ -59,7 +59,10 @@ def test_show_uses_cache_payload_when_idle_time_is_active(
         metrics=UsageMetrics(cost=1.75, remaining=72.0, limit=100.0),
         raw={"status_code": 200, "source": "cached"},
     )
-    cached_payload = {"openrouter": cached_result.model_dump(mode="json")}
+    cached_payload = {
+        "payload": {"openrouter": cached_result.model_dump(mode="json")},
+        "status": {},
+    }
     config_module.save_cli_cache(cached_payload)
     config_module.save_idle_time(
         last_success_at=datetime.now(timezone.utc),

@@ -100,29 +100,30 @@
         - `OpenRouterUsageProvider.__init__(...)`: resolve OpenRouter token source [`src/aibar/aibar/providers/openrouter.py`]
         - `CopilotProvider.__init__(...)`: resolve Copilot token source [`src/aibar/aibar/providers/copilot.py`]
         - `CodexProvider.__init__(...)`: resolve Codex credential source [`src/aibar/aibar/providers/codex.py`]
-      - `retrieve_results_via_cache_pipeline(...)`: shared retrieval order (`force` -> idle-time gate -> conditional refresh -> cache readback) [`src/aibar/aibar/cli.py`]
+      - `retrieve_results_via_cache_pipeline(...)`: shared retrieval order (`force` -> idle-time gate -> conditional refresh -> cache readback) using canonical cache sections `payload`/`status` [`src/aibar/aibar/cli.py`]
         - `remove_idle_time_file(...)`: clear persisted idle-time state on forced refresh [`src/aibar/aibar/config.py`]
         - `load_cli_cache(...)`: load persisted provider dataset from `~/.cache/aibar/cache.json` [`src/aibar/aibar/config.py`]
+        - `_normalize_cache_document(...)`: normalize decoded cache payload to canonical sectioned schema [`src/aibar/aibar/cli.py`]
         - `load_idle_time(...)`: load persisted idle-time gate state from `~/.cache/aibar/idle-time.json` [`src/aibar/aibar/config.py`]
-        - `_filter_cached_payload(...)`: provider-filter payload selector [`src/aibar/aibar/cli.py`]
-        - `_load_cached_results(...)`: cached payload decode/project helper [`src/aibar/aibar/cli.py`]
+        - `_filter_cached_payload(...)`: provider-filter selector for cache `payload`/`status` sections [`src/aibar/aibar/cli.py`]
+        - `_load_cached_results(...)`: cached payload decode/project helper with status-aware Claude 429 overlay [`src/aibar/aibar/cli.py`]
           - `_project_cached_window(...)`: provider parser projection to requested window [`src/aibar/aibar/cli.py`]
         - `load_runtime_config(...)`: runtime throttling settings loader [`src/aibar/aibar/config.py`]
-        - `_refresh_and_persist_cache_payload(...)`: conditional live refresh + merge write into `cache.json` [`src/aibar/aibar/cli.py`]
+        - `_refresh_and_persist_cache_payload(...)`: conditional live refresh + status/payload merge write into `cache.json` [`src/aibar/aibar/cli.py`]
+          - `_extract_claude_snapshot_from_cache_document(...)`: read last-success Claude dual-window payload from cache `payload` section [`src/aibar/aibar/cli.py`]
           - `_fetch_result(...)`: throttled provider fetch wrapper without legacy ResultCache reuse [`src/aibar/aibar/cli.py`]
             - `_fetch_claude_dual(...)`: Claude single-call dual-window fetch and 429 normalization [`src/aibar/aibar/cli.py`]
               - `_apply_api_call_delay(...)`: inter-call throttling gate [`src/aibar/aibar/cli.py`]
               - `ClaudeOAuthProvider.fetch_all_windows(...)`: dual-window provider call [`src/aibar/aibar/providers/claude_oauth.py`]
-              - `_persist_claude_dual_snapshot(...)`: persist last-success Claude dual payload [`src/aibar/aibar/cli.py`]
-              - `_load_claude_dual_snapshot(...)`: load persisted Claude dual payload for 429 restoration [`src/aibar/aibar/cli.py`]
               - `_build_claude_rate_limited_partial_result(...)`: normalized Claude partial-window payload builder [`src/aibar/aibar/cli.py`]
             - `_apply_api_call_delay(...)`: inter-call throttling gate [`src/aibar/aibar/cli.py`]
             - `OpenAIUsageProvider.fetch(...)`: OpenAI usage/cost retrieval [`src/aibar/aibar/providers/openai_usage.py`]
             - `OpenRouterUsageProvider.fetch(...)`: OpenRouter usage retrieval [`src/aibar/aibar/providers/openrouter.py`]
             - `CopilotProvider.fetch(...)`: Copilot usage retrieval [`src/aibar/aibar/providers/copilot.py`]
             - `CodexProvider.fetch(...)`: Codex usage retrieval [`src/aibar/aibar/providers/codex.py`]
+          - `_record_attempt_status(...)`: persist per-provider/window attempt result (`OK`/`FAIL`) in cache `status` section [`src/aibar/aibar/cli.py`]
           - `_serialize_results_payload(...)`: serialize refreshed provider results [`src/aibar/aibar/cli.py`]
-          - `save_cli_cache(...)`: persist sanitized merged payload to `cache.json` [`src/aibar/aibar/config.py`]
+          - `save_cli_cache(...)`: persist sanitized cache document (`payload` + `status`) to `cache.json` [`src/aibar/aibar/config.py`]
           - `_update_idle_time_after_refresh(...)`: persist idle-time metadata from success/429 outcomes [`src/aibar/aibar/cli.py`]
             - `_extract_retry_after_seconds(...)`: normalized retry-after parser [`src/aibar/aibar/cli.py`]
             - `save_idle_time(...)`: persist idle-time timestamps [`src/aibar/aibar/config.py`]
@@ -200,23 +201,26 @@
 
 ### THR:main#cache-retrieval-worker
 - `Entrypoints`
-  - `retrieve_results_via_cache_pipeline(...)`: shared cache retrieval execution invoked by Text UI refresh [`src/aibar/aibar/cli.py`]
+  - `retrieve_results_via_cache_pipeline(...)`: shared cache retrieval execution invoked by Text UI refresh with sectioned cache document output [`src/aibar/aibar/cli.py`]
 - `Lifecycle/Trigger`
   - Spawned from `PROC:main` via `asyncio.to_thread(...)` inside `AIBarUI.action_refresh(...)`.
   - Executes one retrieval cycle and returns `RetrievalPipelineOutput` to the caller thread.
 - `Internal Call-Trace Tree`
-  - `retrieve_results_via_cache_pipeline(...)`: shared retrieval order (`force` -> idle-time gate -> conditional refresh -> cache readback) [`src/aibar/aibar/cli.py`]
+  - `retrieve_results_via_cache_pipeline(...)`: shared retrieval order (`force` -> idle-time gate -> conditional refresh -> cache readback) using cache `payload`/`status` sections [`src/aibar/aibar/cli.py`]
     - `remove_idle_time_file(...)`: clear persisted idle-time state on forced refresh [`src/aibar/aibar/config.py`]
     - `load_cli_cache(...)`: load persisted provider dataset from `~/.cache/aibar/cache.json` [`src/aibar/aibar/config.py`]
+    - `_normalize_cache_document(...)`: normalize decoded cache payload to canonical sectioned schema [`src/aibar/aibar/cli.py`]
     - `load_idle_time(...)`: load persisted idle-time gate state from `~/.cache/aibar/idle-time.json` [`src/aibar/aibar/config.py`]
-    - `_filter_cached_payload(...)`: provider-filter payload selector [`src/aibar/aibar/cli.py`]
-    - `_load_cached_results(...)`: cached payload decode/project helper [`src/aibar/aibar/cli.py`]
+    - `_filter_cached_payload(...)`: provider-filter selector for cache `payload`/`status` sections [`src/aibar/aibar/cli.py`]
+    - `_load_cached_results(...)`: cached payload decode/project helper with status-aware Claude 429 overlay [`src/aibar/aibar/cli.py`]
       - `_project_cached_window(...)`: provider parser projection to requested window [`src/aibar/aibar/cli.py`]
     - `load_runtime_config(...)`: runtime throttling settings loader [`src/aibar/aibar/config.py`]
-    - `_refresh_and_persist_cache_payload(...)`: conditional live refresh + merge write into `cache.json` [`src/aibar/aibar/cli.py`]
+    - `_refresh_and_persist_cache_payload(...)`: conditional live refresh + status/payload merge write into `cache.json` [`src/aibar/aibar/cli.py`]
+      - `_extract_claude_snapshot_from_cache_document(...)`: read last-success Claude dual-window payload from cache `payload` section [`src/aibar/aibar/cli.py`]
       - `_fetch_result(...)`: throttled provider fetch wrapper [`src/aibar/aibar/cli.py`]
+      - `_record_attempt_status(...)`: persist per-provider/window attempt result (`OK`/`FAIL`) in cache `status` section [`src/aibar/aibar/cli.py`]
       - `_serialize_results_payload(...)`: serialize refreshed provider results [`src/aibar/aibar/cli.py`]
-      - `save_cli_cache(...)`: persist sanitized merged payload to `cache.json` [`src/aibar/aibar/config.py`]
+      - `save_cli_cache(...)`: persist sanitized cache document (`payload` + `status`) to `cache.json` [`src/aibar/aibar/config.py`]
       - `_update_idle_time_after_refresh(...)`: persist idle-time metadata from success/429 outcomes [`src/aibar/aibar/cli.py`]
 - `External Boundaries`
   - Python `asyncio` threadpool worker scheduling.
@@ -241,7 +245,7 @@
         - `_loadEnvFromFile(...)`: extension env map parse [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
         - `_getAiBarPath(...)`: executable path resolution [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
         - callback chain
-          - `AIBarIndicator._parseOutput(...)`: JSON decode + state update [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+          - `AIBarIndicator._parseOutput(...)`: JSON decode + state update supporting canonical `payload`/`status` schema and legacy direct provider maps [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
           - `AIBarIndicator._updateUI(...)`: provider tab/card rendering update plus ordered panel percentage-label projection (`claude5h`, `claude7d`, `copilot`, `codex5h`, `codex7d`) with hidden-label fallback for missing metrics and status-line render `Last updated: <time>, next update: <time>` [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
             - `AIBarIndicator._formatStatusTime(...)`: localized `HH:MM` formatting for popup status timestamps [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
             - `AIBarIndicator._createTab(...)`: provider tab creation [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
@@ -269,7 +273,7 @@
   - `direction: request-response`
   - `mechanism: asyncio.to_thread(...) threadpool dispatch`
   - `endpoint_or_channel: AIBarUI.action_refresh(...) -> retrieve_results_via_cache_pipeline(...)`
-  - `payload_data_shape: request {provider_filter, target_window, force_refresh, providers}; response RetrievalPipelineOutput {payload, results, idle_active, cache_available}`
+  - `payload_data_shape: request {provider_filter, target_window, force_refresh, providers}; response RetrievalPipelineOutput {payload {payload:{provider->ProviderResult}, status:{provider->{window->{result,error,updated_at,status_code}}}}, results, idle_active, cache_available}`
   - `declaration_files: src/aibar/aibar/ui.py, src/aibar/aibar/cli.py, src/aibar/aibar/providers/base.py`
 
 - `id: EDGE-004`
@@ -287,7 +291,7 @@
   - `direction: request-response`
   - `mechanism: subprocess spawn + async stdio`
   - `endpoint_or_channel: argv [aibar, show, --json] for scheduled/initial refresh and argv [aibar, show, --json, --force] for popup `Refresh Now` + child stdout`
-  - `payload_data_shape: JSON object keyed by provider name to ProviderResult JSON payload`
+  - `payload_data_shape: JSON object {payload:{provider->ProviderResult}, status:{provider->{window->{result,error,updated_at,status_code}}}}`
   - `declaration_files: src/aibar/gnome-extension/aibar@aibar.panel/extension.js, src/aibar/aibar/cli.py, src/aibar/aibar/providers/base.py`
 
 - `id: EDGE-002`

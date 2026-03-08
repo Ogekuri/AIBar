@@ -44,25 +44,28 @@ def test_save_cli_cache_redacts_sensitive_payload_keys(monkeypatch, tmp_path: Pa
     """
     _patch_config_paths(monkeypatch, tmp_path)
     payload = {
-        "openai": {
-            "raw": {
-                "token": "secret-token",
-                "nested": {
-                    "authorization": "Bearer abc",
-                    "key": "inner-key",
-                    "keep": "value",
-                },
+        "payload": {
+            "openai": {
+                "raw": {
+                    "token": "secret-token",
+                    "nested": {
+                        "authorization": "Bearer abc",
+                        "key": "inner-key",
+                        "keep": "value",
+                    },
+                }
             }
-        }
+        },
+        "status": {},
     }
 
     config_module.save_cli_cache(payload)
 
     persisted = json.loads(config_module.CACHE_FILE_PATH.read_text(encoding="utf-8"))
-    assert persisted["openai"]["raw"]["token"] == "[REDACTED]"
-    assert persisted["openai"]["raw"]["nested"]["authorization"] == "[REDACTED]"
-    assert persisted["openai"]["raw"]["nested"]["key"] == "[REDACTED]"
-    assert persisted["openai"]["raw"]["nested"]["keep"] == "value"
+    assert persisted["payload"]["openai"]["raw"]["token"] == "[REDACTED]"
+    assert persisted["payload"]["openai"]["raw"]["nested"]["authorization"] == "[REDACTED]"
+    assert persisted["payload"]["openai"]["raw"]["nested"]["key"] == "[REDACTED]"
+    assert persisted["payload"]["openai"]["raw"]["nested"]["keep"] == "value"
 
 
 def test_load_cli_cache_returns_sanitized_persisted_payload(
@@ -80,17 +83,20 @@ def test_load_cli_cache_returns_sanitized_persisted_payload(
     _patch_config_paths(monkeypatch, tmp_path)
     config_module.save_cli_cache(
         {
-            "openrouter": {
-                "raw": {
-                    "password": "private",
-                    "usage": 1.5,
+            "payload": {
+                "openrouter": {
+                    "raw": {
+                        "password": "private",
+                        "usage": 1.5,
+                    }
                 }
-            }
+            },
+            "status": {},
         }
     )
 
     loaded = config_module.load_cli_cache()
 
     assert loaded is not None
-    assert loaded["openrouter"]["raw"]["password"] == "[REDACTED]"
-    assert loaded["openrouter"]["raw"]["usage"] == 1.5
+    assert loaded["payload"]["openrouter"]["raw"]["password"] == "[REDACTED]"
+    assert loaded["payload"]["openrouter"]["raw"]["usage"] == 1.5

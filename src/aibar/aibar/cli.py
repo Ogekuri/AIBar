@@ -7,12 +7,10 @@
 import asyncio
 import json
 import math
-import os
 import sys
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 
 import click
 from click.core import ParameterSource
@@ -51,7 +49,10 @@ _WINDOW_PERIOD_TIMEDELTA: dict[WindowPeriod, timedelta] = {
     WindowPeriod.DAY_30: timedelta(days=30),
 }
 _RESET_PENDING_MESSAGE = "Starts when the first message is sent"
-_CLAUDE_DUAL_SNAPSHOT_FILENAME = "claude_dual_last_success.json"
+_CACHE_PAYLOAD_SECTION_KEY = "payload"
+_CACHE_STATUS_SECTION_KEY = "status"
+_ATTEMPT_RESULT_OK = "OK"
+_ATTEMPT_RESULT_FAIL = "FAIL"
 
 
 @dataclass(frozen=True)
@@ -62,7 +63,7 @@ class RetrievalPipelineOutput:
     cache-based pipeline used by `show` and Text UI refresh execution.
     The pipeline enforces force-flag handling, idle-time gating, conditional
     refresh into `cache.json`, and post-refresh readback from `cache.json`.
-    @note `payload` contains serialized provider results keyed by provider id.
+    @note `payload` contains cache JSON sections: `payload` and `status`.
     @note `results` contains validated ProviderResult objects keyed by provider id.
     @note `idle_active` indicates that idle-time gating blocked refresh.
     @note `cache_available` indicates `cache.json` was readable for this run.
@@ -70,6 +71,10 @@ class RetrievalPipelineOutput:
     @satisfies REQ-039
     @satisfies REQ-042
     @satisfies REQ-043
+    @satisfies REQ-044
+    @satisfies REQ-045
+    @satisfies REQ-046
+    @satisfies REQ-047
     """
 
     payload: dict[str, object]
@@ -165,24 +170,197 @@ def _serialize_results_payload(
     return {provider_key: result.model_dump(mode="json") for provider_key, result in results.items()}
 
 
+def _empty_cache_document() -> dict[str, object]:
+    """
+    @brief Build empty cache document in canonical sectioned schema.
+    @details Returns deterministic cache shape with top-level `payload` and `status`
+    objects so downstream consumers can parse stable keys without null checks.
+    @return {dict[str, object]} Empty cache document.
+    @satisfies CTN-004
+    @satisfies REQ-003
+    """
+    return {
+        _CACHE_PAYLOAD_SECTION_KEY: {},
+        _CACHE_STATUS_SECTION_KEY: {},
+    }
+
+
+def _normalize_cache_document(cache_document: dict[str, object] | None) -> dict[str, object]:
+    """
+    @brief Normalize decoded cache payload to canonical sectioned schema.
+    @details Accepts decoded cache document and enforces object-typed `payload` and
+    `status` sections. Missing or invalid sections normalize to empty objects.
+    @param cache_document {dict[str, object] | None} Decoded cache payload from disk.
+    @return {dict[str, object]} Canonical cache document with `payload`/`status`.
+    @satisfies CTN-004
+    @satisfies REQ-003
+    """
+    normalized = _empty_cache_document()
+    if not isinstance(cache_document, dict):
+        return normalized
+    payload = cache_document.get(_CACHE_PAYLOAD_SECTION_KEY)
+    status = cache_document.get(_CACHE_STATUS_SECTION_KEY)
+    if isinstance(payload, dict):
+        normalized[_CACHE_PAYLOAD_SECTION_KEY] = payload
+    if isinstance(status, dict):
+        normalized[_CACHE_STATUS_SECTION_KEY] = status
+    return normalized
+
+
+def _cache_payload_section(cache_document: dict[str, object]) -> dict[str, object]:
+    """
+    @brief Extract payload section from canonical cache document.
+    @details Returns mutable provider-result mapping from normalized document.
+    @param cache_document {dict[str, object]} Canonical cache document.
+    @return {dict[str, object]} Provider payload section.
+    """
+    payload = cache_document.get(_CACHE_PAYLOAD_SECTION_KEY)
+    if isinstance(payload, dict):
+        return payload
+    return {}
+
+
+def _cache_status_section(cache_document: dict[str, object]) -> dict[str, object]:
+    """
+    @brief Extract status section from canonical cache document.
+    @details Returns mutable provider/window status mapping from normalized document.
+    @param cache_document {dict[str, object]} Canonical cache document.
+    @return {dict[str, object]} Provider/window status section.
+    """
+    status = cache_document.get(_CACHE_STATUS_SECTION_KEY)
+    if isinstance(status, dict):
+        return status
+    return {}
+
+
+def _serialize_attempt_status(result: ProviderResult) -> dict[str, object]:
+    """
+    @brief Serialize one provider/window fetch attempt status for cache persistence.
+    @details Converts ProviderResult error state to status object using `OK`/`FAIL`,
+    preserving error text, update timestamp, and optional HTTP status code.
+    @param result {ProviderResult} Provider result from current refresh attempt.
+    @return {dict[str, object]} Attempt-status payload.
+    @satisfies REQ-044
+    """
+    status_code_raw = result.raw.get("status_code")
+    status_code = status_code_raw if isinstance(status_code_raw, int) else None
+    return {
+        "result": _ATTEMPT_RESULT_FAIL if result.is_error else _ATTEMPT_RESULT_OK,
+        "error": result.error,
+        "updated_at": _normalize_utc(result.updated_at).isoformat(),
+        "status_code": status_code,
+    }
+
+
+def _record_attempt_status(
+    status_section: dict[str, object],
+    result: ProviderResult,
+) -> None:
+    """
+    @brief Persist one provider/window attempt status into cache status section.
+    @details Upserts `status[provider][window]` with serialized attempt metadata and
+    preserves statuses for untouched providers/windows.
+    @param status_section {dict[str, object]} Mutable cache status section.
+    @param result {ProviderResult} Provider result to encode.
+    @return {None} Function return value.
+    @satisfies REQ-044
+    @satisfies REQ-046
+    """
+    provider_key = result.provider.value
+    provider_status = status_section.get(provider_key)
+    if not isinstance(provider_status, dict):
+        provider_status = {}
+        status_section[provider_key] = provider_status
+    provider_status[result.window.value] = _serialize_attempt_status(result)
+
+
+def _extract_claude_snapshot_from_cache_document(
+    cache_document: dict[str, object],
+) -> dict[str, object] | None:
+    """
+    @brief Extract persisted Claude dual-window payload from cache document.
+    @details Reads Claude entry from cache `payload` section and normalizes it into
+    a dual-window raw payload (`five_hour`, `seven_day`) for HTTP 429 restoration.
+    @param cache_document {dict[str, object]} Canonical cache document.
+    @return {dict[str, object] | None} Normalized dual-window payload or None.
+    @satisfies REQ-047
+    """
+    payload_section = _cache_payload_section(cache_document)
+    claude_payload = payload_section.get(ProviderName.CLAUDE.value)
+    return _normalize_claude_dual_payload(claude_payload)
+
+
+def _get_window_attempt_status(
+    status_section: dict[str, object],
+    provider_key: str,
+    window: WindowPeriod,
+) -> dict[str, object] | None:
+    """
+    @brief Read provider/window attempt status from cache status section.
+    @details Resolves nested `status[provider][window]` object and validates mapping
+    shape before returning it to projection helpers.
+    @param status_section {dict[str, object]} Cache status section.
+    @param provider_key {str} Provider identifier.
+    @param window {WindowPeriod} Window identifier.
+    @return {dict[str, object] | None} Attempt status object or None.
+    """
+    provider_status = status_section.get(provider_key)
+    if not isinstance(provider_status, dict):
+        return None
+    window_status = provider_status.get(window.value)
+    if not isinstance(window_status, dict):
+        return None
+    return window_status
+
+
+def _is_failed_http_429_status(status_entry: dict[str, object] | None) -> bool:
+    """
+    @brief Check whether status entry represents failed HTTP 429 attempt.
+    @details Requires `result=FAIL` and integer `status_code=429` in the window
+    status object to trigger Claude partial-window overlay rendering.
+    @param status_entry {dict[str, object] | None} Provider/window status object.
+    @return {bool} True when status marks failed HTTP 429 attempt.
+    """
+    if not isinstance(status_entry, dict):
+        return False
+    if status_entry.get("result") != _ATTEMPT_RESULT_FAIL:
+        return False
+    return status_entry.get("status_code") == 429
+
+
 def _filter_cached_payload(
-    payload: dict[str, object],
+    cache_document: dict[str, object],
     provider_filter: ProviderName | None,
 ) -> dict[str, object]:
     """
-    @brief Filter cached JSON payload by CLI provider selector.
-    @details Returns all providers when filter is None; otherwise returns only
-    selected provider payload when present.
-    @param payload {dict[str, object]} Cached JSON payload mapping provider keys to result dicts.
+    @brief Filter canonical cache document by optional provider selector.
+    @details Filters both cache sections (`payload`, `status`) so selected-provider
+    output contains only relevant provider nodes while preserving schema keys.
+    @param cache_document {dict[str, object]} Canonical cache document.
     @param provider_filter {ProviderName | None} Optional provider selector.
-    @return {dict[str, object]} Filtered payload subset.
+    @return {dict[str, object]} Filtered cache document with canonical sections.
     """
+    payload_section = _cache_payload_section(cache_document)
+    status_section = _cache_status_section(cache_document)
     if provider_filter is None:
-        return payload
-    selected = payload.get(provider_filter.value)
-    if isinstance(selected, dict):
-        return {provider_filter.value: selected}
-    return {}
+        return {
+            _CACHE_PAYLOAD_SECTION_KEY: payload_section,
+            _CACHE_STATUS_SECTION_KEY: status_section,
+        }
+
+    provider_key = provider_filter.value
+    selected_payload = payload_section.get(provider_key)
+    selected_status = status_section.get(provider_key)
+    filtered_payload: dict[str, object] = {}
+    filtered_status: dict[str, object] = {}
+    if isinstance(selected_payload, dict):
+        filtered_payload[provider_key] = selected_payload
+    if isinstance(selected_status, dict):
+        filtered_status[provider_key] = selected_status
+    return {
+        _CACHE_PAYLOAD_SECTION_KEY: filtered_payload,
+        _CACHE_STATUS_SECTION_KEY: filtered_status,
+    }
 
 
 def _project_cached_window(
@@ -220,7 +398,7 @@ def _project_cached_window(
 
 
 def _load_cached_results(
-    payload: dict[str, object],
+    cache_document: dict[str, object],
     provider_filter: ProviderName | None,
     target_window: WindowPeriod,
     providers: dict[ProviderName, BaseProvider],
@@ -230,15 +408,19 @@ def _load_cached_results(
     @details Validates cached payload entries using `ProviderResult` schema, applies
     provider filtering, and projects cached windows to requested window when possible.
     Invalid entries are skipped.
-    @param payload {dict[str, object]} Cached JSON payload loaded from disk.
+    @param cache_document {dict[str, object]} Canonical cache document loaded from disk.
     @param provider_filter {ProviderName | None} Optional provider selector.
     @param target_window {WindowPeriod} Requested CLI window for projection.
     @param providers {dict[ProviderName, BaseProvider]} Provider registry.
     @return {dict[str, ProviderResult]} Validated cached results keyed by provider id.
     @satisfies REQ-009
     @satisfies REQ-042
+    @satisfies REQ-044
+    @satisfies REQ-046
     """
-    filtered_payload = _filter_cached_payload(payload, provider_filter)
+    filtered_cache = _filter_cached_payload(cache_document, provider_filter)
+    filtered_payload = _cache_payload_section(filtered_cache)
+    filtered_status = _cache_status_section(filtered_cache)
     cached_results: dict[str, ProviderResult] = {}
     for provider_key, raw_result in filtered_payload.items():
         if not isinstance(raw_result, dict):
@@ -247,6 +429,19 @@ def _load_cached_results(
             validated = ProviderResult.model_validate(raw_result)
         except ValidationError:
             continue
+        if provider_key == ProviderName.CLAUDE.value:
+            status_entry = _get_window_attempt_status(
+                filtered_status,
+                provider_key,
+                target_window,
+            )
+            if _is_failed_http_429_status(status_entry):
+                cached_results[provider_key] = _build_claude_rate_limited_partial_result(
+                    window=target_window,
+                    include_error=target_window == WindowPeriod.HOUR_5,
+                    snapshot_payload=_normalize_claude_dual_payload(validated.raw),
+                )
+                continue
         cached_results[provider_key] = _project_cached_window(
             validated,
             target_window,
@@ -304,20 +499,6 @@ def _update_idle_time_after_refresh(
         )
         idle_until = max(base_idle_until, retry_idle_until)
     save_idle_time(last_success_at, idle_until)
-
-
-def _claude_snapshot_path() -> Path:
-    """
-    @brief Resolve file path for persisted Claude dual-window success payload.
-    @details Uses `XDG_CACHE_HOME` when defined; otherwise falls back to
-    `~/.cache/aibar`. Returned path is used only for Claude HTTP 429 fallback
-    rendering and does not participate in generic ResultCache TTL reads.
-    @return {Path} Absolute snapshot path for Claude dual-window payload.
-    @satisfies CTN-004
-    """
-    xdg_cache = os.environ.get("XDG_CACHE_HOME")
-    base = Path(xdg_cache) if xdg_cache else Path.home() / ".cache"
-    return base / "aibar" / _CLAUDE_DUAL_SNAPSHOT_FILENAME
 
 
 def _project_next_reset(resets_at_str: str, window: WindowPeriod) -> datetime | None:
@@ -485,6 +666,7 @@ def _fetch_result(
 def _fetch_claude_dual(
     provider: ClaudeOAuthProvider,
     throttle_state: dict[str, float | int] | None = None,
+    snapshot_payload: dict[str, object] | None = None,
 ) -> tuple[ProviderResult, ProviderResult]:
     """
     @brief Fetch Claude 5h and 7d results via a single API call.
@@ -495,8 +677,10 @@ def _fetch_claude_dual(
     @param provider {ClaudeOAuthProvider} Claude provider instance.
     @param throttle_state {dict[str, float | int] | None} Mutable throttling state
         used to enforce inter-call spacing for live API requests.
+    @param snapshot_payload {dict[str, object] | None} Last successful Claude
+        dual-window payload loaded from `cache.json`.
     @return {tuple[ProviderResult, ProviderResult]} (5h_result, 7d_result).
-    @satisfies REQ-002, REQ-036, REQ-037, CTN-004, REQ-040, REQ-043
+    @satisfies REQ-002, REQ-036, REQ-037, CTN-004, REQ-040, REQ-043, REQ-047
     """
     _apply_api_call_delay(throttle_state)
     windows = [WindowPeriod.HOUR_5, WindowPeriod.DAY_7]
@@ -519,13 +703,9 @@ def _fetch_claude_dual(
         window=WindowPeriod.DAY_7, error="Missing 7d result"
     )
 
-    if not result_5h.is_error and not result_7d.is_error:
-        _persist_claude_dual_snapshot(result_5h, result_7d)
-
     if _is_claude_rate_limited_result(result_5h) and _is_claude_rate_limited_result(
         result_7d
     ):
-        snapshot_payload = _load_claude_dual_snapshot()
         return (
             _build_claude_rate_limited_partial_result(
                 WindowPeriod.HOUR_5,
@@ -542,33 +722,6 @@ def _fetch_claude_dual(
     return result_5h, result_7d
 
 
-def _persist_claude_dual_snapshot(
-    result_5h: ProviderResult,
-    result_7d: ProviderResult,
-) -> None:
-    """
-    @brief Persist latest successful Claude dual-window payload for 429 restoration.
-    @details Extracts a valid dual-window raw payload (`five_hour` and `seven_day`)
-    from successful Claude results and writes it to disk under cache home. Errors
-    during serialization or I/O are ignored to keep fetch path non-fatal.
-    @param result_5h {ProviderResult} Claude five-hour successful result.
-    @param result_7d {ProviderResult} Claude seven-day successful result.
-    @return {None} Function return value.
-    @satisfies CTN-004
-    @satisfies REQ-036
-    """
-    payload = _extract_claude_dual_payload(result_5h, result_7d)
-    if payload is None:
-        return
-
-    path = _claude_snapshot_path()
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(payload), encoding="utf-8")
-    except (OSError, ValueError, TypeError):
-        return
-
-
 def _extract_claude_dual_payload(
     result_5h: ProviderResult,
     result_7d: ProviderResult,
@@ -581,6 +734,7 @@ def _extract_claude_dual_payload(
     @param result_7d {ProviderResult} Claude seven-day result.
     @return {dict[str, object] | None} Serializable payload or None.
     @satisfies CTN-004
+    @satisfies REQ-047
     """
     for payload in (result_7d.raw, result_5h.raw):
         if not isinstance(payload, dict):
@@ -588,36 +742,6 @@ def _extract_claude_dual_payload(
         if isinstance(payload.get("five_hour"), dict) and isinstance(
             payload.get("seven_day"), dict
         ):
-            return payload
-    return None
-
-
-def _load_claude_dual_snapshot() -> dict[str, object] | None:
-    """
-    @brief Load persisted Claude dual-window payload for HTTP 429 fallback.
-    @details Reads prioritized snapshot candidates from cache home, validates
-    required keys, and returns parsed payload when both `five_hour` and
-    `seven_day` objects exist. Supports direct raw payload files and serialized
-    ProviderResult files (`raw` field). Invalid/missing files return None.
-    @return {dict[str, object] | None} Parsed payload or None.
-    @satisfies REQ-036
-    @satisfies REQ-037
-    """
-    primary = _claude_snapshot_path()
-    candidates = [
-        primary,
-        primary.with_name("claude_7d.json"),
-        primary.with_name("claude_5h.json"),
-    ]
-    for path in candidates:
-        if not path.exists():
-            continue
-        try:
-            decoded = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            continue
-        payload = _normalize_claude_dual_payload(decoded)
-        if payload is not None:
             return payload
     return None
 
@@ -772,42 +896,85 @@ def _refresh_and_persist_cache_payload(
 ) -> dict[str, object]:
     """
     @brief Refresh provider data and persist updates into `cache.json`.
-    @details Executes provider fetches for configured providers only, updates
-    idle-time metadata, merges refreshed provider payloads with existing
-    persisted payload, and writes canonical JSON output to `cache.json`.
+    @details Executes provider fetches for configured providers only, records
+    per-provider/window attempt status, updates payload only for successful
+    provider/window outcomes, writes canonical cache document, and updates
+    idle-time metadata.
     @param providers {dict[ProviderName, BaseProvider]} Provider scope for refresh.
     @param target_window {WindowPeriod} Requested window for refresh execution.
     @param runtime_config {RuntimeConfig} Runtime throttling configuration.
-    @return {dict[str, object]} Persisted payload after merge.
+    @return {dict[str, object]} Persisted cache document after merge.
     @satisfies CTN-004
     @satisfies REQ-009
     @satisfies REQ-038
     @satisfies REQ-041
     @satisfies REQ-043
+    @satisfies REQ-044
+    @satisfies REQ-045
+    @satisfies REQ-046
+    @satisfies REQ-047
     """
+    cache_document = _normalize_cache_document(load_cli_cache())
+    payload_section = _cache_payload_section(cache_document)
+    status_section = _cache_status_section(cache_document)
+
     fetched_results: list[ProviderResult] = []
-    refreshed_results: dict[str, ProviderResult] = {}
+    successful_payload_results: dict[str, ProviderResult] = {}
     throttle_state: dict[str, float | int] = {
         "delay_seconds": runtime_config.api_call_delay_seconds
     }
     for provider_name, provider in providers.items():
         if not provider.is_configured():
             continue
+
+        if isinstance(provider, ClaudeOAuthProvider) and target_window in {
+            WindowPeriod.HOUR_5,
+            WindowPeriod.DAY_7,
+        }:
+            claude_snapshot_payload = _extract_claude_snapshot_from_cache_document(
+                cache_document
+            )
+            result_5h, result_7d = _fetch_claude_dual(
+                provider=provider,
+                throttle_state=throttle_state,
+                snapshot_payload=claude_snapshot_payload,
+            )
+            fetched_results.extend([result_5h, result_7d])
+            _record_attempt_status(status_section, result_5h)
+            _record_attempt_status(status_section, result_7d)
+
+            preferred_success: ProviderResult | None = None
+            if target_window == WindowPeriod.HOUR_5:
+                if not result_5h.is_error:
+                    preferred_success = result_5h
+                elif not result_7d.is_error:
+                    preferred_success = result_7d
+            else:
+                if not result_7d.is_error:
+                    preferred_success = result_7d
+                elif not result_5h.is_error:
+                    preferred_success = result_5h
+
+            if preferred_success is not None:
+                successful_payload_results[provider_name.value] = preferred_success
+            continue
+
         result = _fetch_result(
             provider,
             target_window,
             throttle_state=throttle_state,
         )
         fetched_results.append(result)
-        refreshed_results[provider_name.value] = result
+        _record_attempt_status(status_section, result)
+        if not result.is_error:
+            successful_payload_results[provider_name.value] = result
 
-    persisted_payload = load_cli_cache() or {}
-    if refreshed_results:
-        refreshed_payload = _serialize_results_payload(refreshed_results)
-        persisted_payload = {**persisted_payload, **refreshed_payload}
-        save_cli_cache(persisted_payload)
+    if successful_payload_results:
+        payload_section.update(_serialize_results_payload(successful_payload_results))
+    if fetched_results:
+        save_cli_cache(cache_document)
     _update_idle_time_after_refresh(fetched_results, runtime_config)
-    return persisted_payload
+    return cache_document
 
 
 def retrieve_results_via_cache_pipeline(
@@ -830,11 +997,16 @@ def retrieve_results_via_cache_pipeline(
     @satisfies REQ-039
     @satisfies REQ-042
     @satisfies REQ-043
+    @satisfies REQ-044
+    @satisfies REQ-045
+    @satisfies REQ-046
+    @satisfies REQ-047
     """
     if force_refresh:
         remove_idle_time_file()
 
-    cached_payload = load_cli_cache()
+    cached_payload_raw = load_cli_cache()
+    cached_document = _normalize_cache_document(cached_payload_raw)
     idle_state = load_idle_time()
     now_utc = datetime.now(timezone.utc)
     idle_active = (
@@ -843,17 +1015,18 @@ def retrieve_results_via_cache_pipeline(
         and idle_state.idle_until_timestamp > int(now_utc.timestamp())
     )
     if idle_active:
-        if cached_payload is None:
+        if cached_payload_raw is None:
             return RetrievalPipelineOutput(
-                payload={},
+                payload=_empty_cache_document(),
                 results={},
                 idle_active=True,
                 cache_available=False,
             )
+        filtered_cached_document = _filter_cached_payload(cached_document, provider_filter)
         return RetrievalPipelineOutput(
-            payload=_filter_cached_payload(cached_payload, provider_filter),
+            payload=filtered_cached_document,
             results=_load_cached_results(
-                payload=cached_payload,
+                cache_document=filtered_cached_document,
                 provider_filter=provider_filter,
                 target_window=target_window,
                 providers=providers,
@@ -878,20 +1051,27 @@ def retrieve_results_via_cache_pipeline(
         target_window=target_window,
         runtime_config=runtime_config,
     )
-    reloaded_payload = load_cli_cache()
-    effective_payload = reloaded_payload or persisted_payload
-    cache_available = reloaded_payload is not None or bool(persisted_payload)
+    reloaded_payload_raw = load_cli_cache()
+    effective_payload = (
+        _normalize_cache_document(reloaded_payload_raw)
+        if reloaded_payload_raw is not None
+        else persisted_payload
+    )
+    cache_available = reloaded_payload_raw is not None or bool(
+        _cache_payload_section(effective_payload)
+    ) or bool(_cache_status_section(effective_payload))
     if not cache_available:
         return RetrievalPipelineOutput(
-            payload={},
+            payload=_empty_cache_document(),
             results={},
             idle_active=False,
             cache_available=False,
         )
+    filtered_effective_payload = _filter_cached_payload(effective_payload, provider_filter)
     return RetrievalPipelineOutput(
-        payload=_filter_cached_payload(effective_payload, provider_filter),
+        payload=filtered_effective_payload,
         results=_load_cached_results(
-            payload=effective_payload,
+            cache_document=filtered_effective_payload,
             provider_filter=provider_filter,
             target_window=target_window,
             providers=providers,
@@ -1037,7 +1217,7 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
     )
     if retrieval.idle_active and not retrieval.cache_available:
         if output_json:
-            click.echo(json.dumps({}, indent=2))
+            click.echo(json.dumps(_empty_cache_document(), indent=2))
         else:
             click.echo("Cache unavailable while idle-time is active.")
         return

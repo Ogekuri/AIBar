@@ -59,7 +59,12 @@ def test_show_force_bypasses_idle_time_and_recreates_state(
         last_success_at=datetime.now(timezone.utc) - timedelta(hours=1),
         idle_until=datetime.now(timezone.utc) + timedelta(hours=2),
     )
-    config_module.save_cli_cache({"openrouter": {"stale": True}})
+    config_module.save_cli_cache(
+        {
+            "payload": {"openrouter": {"stale": True}},
+            "status": {},
+        }
+    )
 
     fresh_result = ProviderResult(
         provider=ProviderName.OPENROUTER,
@@ -97,7 +102,7 @@ def test_show_force_bypasses_idle_time_and_recreates_state(
     output_payload = json.loads(result.output)
     persisted_cache = json.loads(config_module.CACHE_FILE_PATH.read_text(encoding="utf-8"))
     assert output_payload == persisted_cache
-    assert output_payload["openrouter"]["raw"]["source"] == "live"
+    assert output_payload["payload"]["openrouter"]["raw"]["source"] == "live"
 
     refreshed_state = json.loads(config_module.IDLE_TIME_PATH.read_text(encoding="utf-8"))
     assert refreshed_state["last_success_timestamp"] >= stale_state.last_success_timestamp
