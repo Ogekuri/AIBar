@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.3.0](https://github.com/Ogekuri/AIBar/compare/v0.2.0..v0.3.0) - 2026-03-08
+### 🐛  Bug Fixes
+- Fix images.
+
 ## [0.2.0](https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0) - 2026-03-08
 ### ⛰️  Features
 - add GeminiAI provider across all surfaces [useReq] *(geminiai)*
@@ -479,6 +483,8 @@
 
 - \[0.1.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 - \[0.2.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.2.0
+- \[0.3.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.3.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
+[0.3.0]: https://github.com/Ogekuri/AIBar/compare/v0.2.0..v0.3.0
