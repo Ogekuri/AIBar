@@ -99,7 +99,9 @@ Note: Must be an organization/admin key with usage permissions."""
                 usage_data = await self._fetch_usage(client, headers, start_time, end_time)
                 from aibar.config import load_runtime_config
 
-                await asyncio.sleep(load_runtime_config().api_call_delay_seconds)
+                await asyncio.sleep(
+                    load_runtime_config().api_call_delay_milliseconds / 1000.0
+                )
                 costs_data = await self._fetch_costs(client, headers, start_time, end_time)
 
                 return self._build_result(window, usage_data, costs_data)

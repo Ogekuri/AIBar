@@ -111,7 +111,9 @@ Note: Token must start with 'sk-ant-' prefix."""
                 retry_after = 0.0
             from aibar.config import load_runtime_config
 
-            min_api_delay_seconds = float(load_runtime_config().api_call_delay_seconds)
+            min_api_delay_seconds = (
+                float(load_runtime_config().api_call_delay_milliseconds) / 1000.0
+            )
             jitter = random.uniform(0, self.RETRY_JITTER_MAX)
             delay = max(
                 retry_after,

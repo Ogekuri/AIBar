@@ -1,8 +1,9 @@
 """
 @file
 @brief Setup runtime-config prompt and persistence tests.
-@details Verifies setup prompt order for idle-delay, API-call delay, gnome-refresh-interval,
-and per-provider currency symbol fields; persists selected values to `~/.config/aibar/config.json`.
+@details Verifies setup prompt order for idle-delay, API-call delay milliseconds,
+gnome-refresh-interval, billing dataset, and per-provider currency symbol fields;
+persists selected values to `~/.config/aibar/config.json`.
 @satisfies REQ-005
 @satisfies REQ-049
 @satisfies TST-013
@@ -55,7 +56,7 @@ def test_setup_prompts_runtime_config_before_credentials(monkeypatch, tmp_path: 
     """
     @brief Verify setup prompt order and runtime-config persistence.
     @details Ensures setup asks `idle-delay` first, `api-call delay` second,
-    `gnome-refresh-interval` third, then per-provider currency symbols (one prompt
+    `gnome-refresh-interval` third, `billing_data` fourth, then per-provider currency symbols (one prompt
     per provider: claude, openai, openrouter, copilot, codex, geminiai),
     then GeminiAI OAuth source prompt, then writes all selected values to runtime config JSON.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
@@ -67,8 +68,10 @@ def test_setup_prompts_runtime_config_before_credentials(monkeypatch, tmp_path: 
     """
     config_dir = _patch_config_paths(monkeypatch, tmp_path)
     prompts: list[str] = []
-    # 3 timeout values + 6 currency symbols + OAuth source + empty credentials
-    responses = iter([450, 25, 90, "$", "$", "$", "$", "$", "$", "skip", "", "", ""])
+    # 4 runtime values + 6 currency symbols + OAuth source + empty credentials
+    responses = iter(
+        [450, 2500, 90, "billing_data", "$", "$", "$", "$", "$", "$", "skip", "", "", ""]
+    )
 
     def _fake_prompt(
         text: str,
@@ -95,20 +98,22 @@ def test_setup_prompts_runtime_config_before_credentials(monkeypatch, tmp_path: 
 
     assert result.exit_code == 0
     assert prompts[0] == "  idle-delay seconds"
-    assert prompts[1] == "  api-call delay seconds"
+    assert prompts[1] == "  api-call delay milliseconds"
     assert prompts[2] == "  gnome-refresh-interval seconds"
-    assert prompts[3] == "  claude currency symbol"
-    assert prompts[4] == "  openai currency symbol"
-    assert prompts[5] == "  openrouter currency symbol"
-    assert prompts[6] == "  copilot currency symbol"
-    assert prompts[7] == "  codex currency symbol"
-    assert prompts[8] == "  geminiai currency symbol"
-    assert prompts[9] == "  geminiai oauth source"
+    assert prompts[3] == "  billing_data"
+    assert prompts[4] == "  claude currency symbol"
+    assert prompts[5] == "  openai currency symbol"
+    assert prompts[6] == "  openrouter currency symbol"
+    assert prompts[7] == "  copilot currency symbol"
+    assert prompts[8] == "  codex currency symbol"
+    assert prompts[9] == "  geminiai currency symbol"
+    assert prompts[10] == "  geminiai oauth source"
 
     runtime_config = json.loads((config_dir / "config.json").read_text(encoding="utf-8"))
     assert runtime_config["idle_delay_seconds"] == 450
-    assert runtime_config["api_call_delay_seconds"] == 25
+    assert runtime_config["api_call_delay_milliseconds"] == 2500
     assert runtime_config["gnome_refresh_interval_seconds"] == 90
+    assert runtime_config["billing_data"] == "billing_data"
     assert runtime_config["currency_symbols"] == {
         "claude": "$",
         "openai": "$",
@@ -161,8 +166,9 @@ def test_setup_accepts_geminiai_oauth_json_paste_and_persists_runtime_fields(
     responses = iter(
         [
             300,
-            20,
+            1000,
             60,
+            "billing_data",
             "$",
             "$",
             "$",
@@ -211,6 +217,7 @@ def test_setup_accepts_geminiai_oauth_json_paste_and_persists_runtime_fields(
 
     runtime_doc = json.loads((config_dir / "config.json").read_text(encoding="utf-8"))
     assert runtime_doc["geminiai_project_id"] == "gen-lang-client-0834428245"
+    assert runtime_doc["billing_data"] == "billing_data"
     assert "geminiai_billing_account" not in runtime_doc
 
 
@@ -277,8 +284,9 @@ def test_setup_geminiai_oauth_login_source_reauthorizes_with_current_scopes(
     responses = iter(
         [
             300,
-            20,
+            1000,
             60,
+            "billing_data",
             "$",
             "$",
             "$",

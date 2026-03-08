@@ -71,7 +71,7 @@ def test_429_idle_time_uses_idle_delay_when_retry_after_is_lower(
     """
     _patch_config_paths(monkeypatch, tmp_path)
     config_module.save_runtime_config(
-        config_module.RuntimeConfig(idle_delay_seconds=300, api_call_delay_seconds=20)
+        config_module.RuntimeConfig(idle_delay_seconds=300, api_call_delay_milliseconds=20)
     )
 
     openrouter = MagicMock()
@@ -120,7 +120,7 @@ def test_429_idle_time_uses_largest_retry_after_across_multiple_results(
     """
     _patch_config_paths(monkeypatch, tmp_path)
     config_module.save_runtime_config(
-        config_module.RuntimeConfig(idle_delay_seconds=300, api_call_delay_seconds=20)
+        config_module.RuntimeConfig(idle_delay_seconds=300, api_call_delay_milliseconds=20)
     )
 
     openrouter = MagicMock()

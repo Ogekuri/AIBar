@@ -35,6 +35,7 @@ def test_cli_registers_geminiai_provider_and_login_paths() -> None:
     source = CLI_PATH.read_text(encoding="utf-8")
     assert "ProviderName.GEMINIAI: GeminiAIProvider()," in source
     assert "geminiai oauth source" in source
+    assert "billing_data" in source
     assert 'click.Choice(["skip", "file", "paste", "login"])' in source
     assert "_currency_provider_names = [p.value for p in ProviderName]" in source
     assert 'help="Provider to query (claude, openai, openrouter, copilot, codex, geminiai, all)"' in source
@@ -51,6 +52,7 @@ def test_config_includes_geminiai_runtime_surfaces() -> None:
     assert 'ProviderName.GEMINIAI: "GEMINIAI_OAUTH_ACCESS_TOKEN"' in config_source
     assert '"name": "GeminiAI"' in config_source
     assert "geminiai_project_id: str | None = Field(default=None)" in config_source
+    assert "billing_data: str = Field(default=DEFAULT_BILLING_DATASET, min_length=1)" in config_source
 
 
 def test_extension_and_dependencies_include_geminiai_support() -> None:

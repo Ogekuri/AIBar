@@ -102,12 +102,12 @@ def test_geminiai_fetch_maps_monitoring_and_billing_metrics(monkeypatch) -> None
     monkeypatch.setattr(
         provider,
         "_discover_billing_table_id",
-        lambda bigquery_client, project_id: "gcp_billing_export_v1_001",
+        lambda bigquery_client, project_id, dataset_id: "gcp_billing_export_v1_001",
     )
     monkeypatch.setattr(
         provider,
         "_query_current_month_billing_cost",
-        lambda bigquery_client, project_id, table_id: (
+        lambda bigquery_client, project_id, billing_dataset, table_id: (
             [
                 {
                     "service_description": "Generative Language API",
@@ -147,7 +147,7 @@ def test_geminiai_fetch_maps_monitoring_and_billing_metrics(monkeypatch) -> None
     monkeypatch.setattr(provider, "_query_monitoring_metric", _fake_query)
     monkeypatch.setattr(
         "aibar.config.load_runtime_config",
-        lambda: RuntimeConfig(currency_symbols={"geminiai": "$"}),
+        lambda: RuntimeConfig(currency_symbols={"geminiai": "$"}, billing_data="custom_billing"),
     )
 
     result = asyncio.run(provider.fetch(WindowPeriod.DAY_7))
@@ -161,6 +161,7 @@ def test_geminiai_fetch_maps_monitoring_and_billing_metrics(monkeypatch) -> None
     assert result.raw["monitoring"]["latency_total"] == 8.75
     assert result.raw["monitoring"]["error_total"] == 3.0
     assert result.raw["billing"]["table_id"] == "gcp_billing_export_v1_001"
+    assert result.raw["billing"]["dataset_id"] == "custom_billing"
     assert result.raw["billing"]["current_month_cost_net"] == 3.2
     assert result.raw["billing"]["services"][0]["service_description"] == "Generative Language API"
 
@@ -187,12 +188,12 @@ def test_geminiai_fetch_supports_consumed_api_metric_series(monkeypatch) -> None
     monkeypatch.setattr(
         provider,
         "_discover_billing_table_id",
-        lambda bigquery_client, project_id: "gcp_billing_export_v1_001",
+        lambda bigquery_client, project_id, dataset_id: "gcp_billing_export_v1_001",
     )
     monkeypatch.setattr(
         provider,
         "_query_current_month_billing_cost",
-        lambda bigquery_client, project_id, table_id: ([], 0.0),
+        lambda bigquery_client, project_id, billing_dataset, table_id: ([], 0.0),
     )
 
     def _fake_query(
@@ -336,7 +337,7 @@ def test_geminiai_fetch_raises_authentication_error_on_insufficient_scope(
     monkeypatch.setattr(
         provider,
         "_discover_billing_table_id",
-        lambda bigquery_client, project_id: (_ for _ in ()).throw(scope_error),
+        lambda bigquery_client, project_id, dataset_id: (_ for _ in ()).throw(scope_error),
     )
 
     with pytest.raises(AuthenticationError) as exc_info:
@@ -366,12 +367,12 @@ def test_geminiai_fetch_uses_runtime_config_currency_symbol(monkeypatch) -> None
     monkeypatch.setattr(
         provider,
         "_discover_billing_table_id",
-        lambda bigquery_client, project_id: "gcp_billing_export_v1_001",
+        lambda bigquery_client, project_id, dataset_id: "gcp_billing_export_v1_001",
     )
     monkeypatch.setattr(
         provider,
         "_query_current_month_billing_cost",
-        lambda bigquery_client, project_id, table_id: ([], 1.25),
+        lambda bigquery_client, project_id, billing_dataset, table_id: ([], 1.25),
     )
     metric_payload = {"timeSeries": [{"points": [{"value": {"int64Value": "2"}}]}]}
     monkeypatch.setattr(
@@ -381,7 +382,7 @@ def test_geminiai_fetch_uses_runtime_config_currency_symbol(monkeypatch) -> None
     )
     monkeypatch.setattr(
         "aibar.config.load_runtime_config",
-        lambda: RuntimeConfig(currency_symbols={"geminiai": "€"}),
+        lambda: RuntimeConfig(currency_symbols={"geminiai": "€"}, billing_data="billing_data"),
     )
 
     result = asyncio.run(provider.fetch(WindowPeriod.DAY_7))
@@ -485,6 +486,7 @@ def test_geminiai_billing_query_uses_latest_invoice_month_with_fallback() -> Non
     services, total_net = provider._query_current_month_billing_cost(
         fake_client,
         "demo-project",
+        "billing_data",
         "gcp_billing_export_v1_017F15_EC6BA0_8220E3",
     )
 

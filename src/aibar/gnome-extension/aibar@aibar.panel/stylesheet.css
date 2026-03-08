@@ -4,7 +4,7 @@
 }
 
 .aibar-panel-percentages {
-    spacing: 6px;
+    spacing: 5px;
     margin-left: 6px;
 }
 
@@ -17,6 +17,10 @@
 }
 
 .aibar-panel-pct-secondary {
+    font-weight: normal;
+}
+
+.aibar-panel-cost {
     font-weight: normal;
 }
 
@@ -52,27 +56,27 @@
 }
 
 .aibar-tab-active-claude {
-    border-bottom: 2px solid #D4A574;
+    border-bottom: 2px solid #FF3B30;
 }
 
 .aibar-tab-active-openai {
-    border-bottom: 2px solid #74AA9C;
+    border-bottom: 2px solid #0A84FF;
 }
 
 .aibar-tab-active-openrouter {
-    border-bottom: 2px solid #FF6B35;
+    border-bottom: 2px solid #FF8C00;
 }
 
 .aibar-tab-active-copilot {
-    border-bottom: 2px solid #6E40C9;
+    border-bottom: 2px solid #FFD60A;
 }
 
 .aibar-tab-active-codex {
-    border-bottom: 2px solid #FF6B35;
+    border-bottom: 2px solid #32D74B;
 }
 
 .aibar-tab-active-geminiai {
-    border-bottom: 2px solid #FF1493;
+    border-bottom: 2px solid #BF5AF2;
 }
 
 /* Tab label (base + per-provider color) */
@@ -83,27 +87,27 @@
 }
 
 .aibar-tab-label-claude {
-    color: #D4A574;
+    color: #FF3B30;
 }
 
 .aibar-tab-label-openai {
-    color: #74AA9C;
+    color: #0A84FF;
 }
 
 .aibar-tab-label-openrouter {
-    color: #FF6B35;
+    color: #FF8C00;
 }
 
 .aibar-tab-label-copilot {
-    color: #6E40C9;
+    color: #FFD60A;
 }
 
 .aibar-tab-label-codex {
-    color: #FF6B35;
+    color: #32D74B;
 }
 
 .aibar-tab-label-geminiai {
-    color: #FF1493;
+    color: #BF5AF2;
 }
 
 /* Separator */
@@ -126,27 +130,27 @@
 }
 
 .aibar-provider-claude {
-    border-left: 3px solid #D4A574;
+    border-left: 3px solid #FF3B30;
 }
 
 .aibar-provider-openai {
-    border-left: 3px solid #74AA9C;
+    border-left: 3px solid #0A84FF;
 }
 
 .aibar-provider-openrouter {
-    border-left: 3px solid #FF6B35;
+    border-left: 3px solid #FF8C00;
 }
 
 .aibar-provider-copilot {
-    border-left: 3px solid #6E40C9;
+    border-left: 3px solid #FFD60A;
 }
 
 .aibar-provider-codex {
-    border-left: 3px solid #FF6B35;
+    border-left: 3px solid #32D74B;
 }
 
 .aibar-provider-geminiai {
-    border-left: 3px solid #FF1493;
+    border-left: 3px solid #BF5AF2;
 }
 
 /* Progress bars */
@@ -166,12 +170,28 @@
     height: 6px;
 }
 
-.aibar-progress-ok {
-    background-color: #4CAF50;
+.aibar-progress-provider-claude {
+    background-color: #FF3B30;
 }
 
-.aibar-progress-warning {
-    background-color: #ff9800;
+.aibar-progress-provider-openrouter {
+    background-color: #FF8C00;
+}
+
+.aibar-progress-provider-copilot {
+    background-color: #FFD60A;
+}
+
+.aibar-progress-provider-codex {
+    background-color: #32D74B;
+}
+
+.aibar-progress-provider-openai {
+    background-color: #0A84FF;
+}
+
+.aibar-progress-provider-geminiai {
+    background-color: #BF5AF2;
 }
 
 .aibar-progress-danger {

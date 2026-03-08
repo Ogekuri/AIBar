@@ -53,7 +53,7 @@ def test_show_force_bypasses_idle_time_and_recreates_state(
     """
     _patch_config_paths(monkeypatch, tmp_path)
     config_module.save_runtime_config(
-        config_module.RuntimeConfig(idle_delay_seconds=300, api_call_delay_seconds=20)
+        config_module.RuntimeConfig(idle_delay_seconds=300, api_call_delay_milliseconds=20)
     )
     stale_state = config_module.save_idle_time(
         last_success_at=datetime.now(timezone.utc) - timedelta(hours=1),
@@ -126,7 +126,7 @@ def test_show_geminiai_defaults_to_30d_when_window_is_omitted(
     """
     _patch_config_paths(monkeypatch, tmp_path)
     config_module.save_runtime_config(
-        config_module.RuntimeConfig(idle_delay_seconds=300, api_call_delay_seconds=20)
+        config_module.RuntimeConfig(idle_delay_seconds=300, api_call_delay_milliseconds=20)
     )
 
     geminiai_result = ProviderResult(

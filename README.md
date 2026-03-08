@@ -132,6 +132,19 @@ uv pip uninstall aibar
 
 ```
 
+## GeminiAI prerequisites
+
+To enable GeminiAI features, configure Google Cloud before running `aibar setup`:
+
+1. Enable **Desktop Client OAuth 2.0** credentials in the target Google Cloud application.
+2. Create a BigQuery dataset in Google Cloud Console and provide its name in setup prompt `billing_data` (default: `billing_data`).
+3. Enable API access for the OAuth client project:
+   - Cloud Monitoring API
+   - Dataform API
+   - Generative Language API
+   - Cloud Dataplex API
+   - BigQuery API
+
 
 
 ## Acknowledgments

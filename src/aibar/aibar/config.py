@@ -26,8 +26,9 @@ CACHE_FILE_PATH = APP_CACHE_DIR / "cache.json"
 IDLE_TIME_PATH = APP_CACHE_DIR / "idle-time.json"
 
 DEFAULT_IDLE_DELAY_SECONDS = 300
-DEFAULT_API_CALL_DELAY_SECONDS = 20
+DEFAULT_API_CALL_DELAY_MILLISECONDS = 1000
 DEFAULT_GNOME_REFRESH_INTERVAL_SECONDS = 60
+DEFAULT_BILLING_DATASET = "billing_data"
 DEFAULT_CURRENCY_SYMBOL = "$"
 VALID_CURRENCY_SYMBOLS: tuple[str, ...] = ("$", "£", "€")
 LOCK_POLL_INTERVAL_SECONDS = 0.25
@@ -47,6 +48,8 @@ class RuntimeConfig(BaseModel):
     Fields are validated with defaults that reduce rate-limit pressure.
     `currency_symbols` maps provider name strings to currency symbols (`$`, `£`, `€`);
     missing entries default to `DEFAULT_CURRENCY_SYMBOL` at resolution time.
+    `billing_data` stores the Google BigQuery dataset name used for GeminiAI
+    billing export table discovery.
     Optional GeminiAI field persists Google Cloud project identifier used by
     OAuth-backed Monitoring API fetch execution.
     @satisfies CTN-008
@@ -54,8 +57,9 @@ class RuntimeConfig(BaseModel):
     """
 
     idle_delay_seconds: int = Field(default=DEFAULT_IDLE_DELAY_SECONDS, ge=1)
-    api_call_delay_seconds: int = Field(default=DEFAULT_API_CALL_DELAY_SECONDS, ge=1)
+    api_call_delay_milliseconds: int = Field(default=DEFAULT_API_CALL_DELAY_MILLISECONDS, ge=1)
     gnome_refresh_interval_seconds: int = Field(default=DEFAULT_GNOME_REFRESH_INTERVAL_SECONDS, ge=1)
+    billing_data: str = Field(default=DEFAULT_BILLING_DATASET, min_length=1)
     currency_symbols: dict[str, str] = Field(default_factory=dict)
     geminiai_project_id: str | None = Field(default=None)
 

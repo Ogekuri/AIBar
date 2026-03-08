@@ -19,6 +19,21 @@ const REFRESH_INTERVAL_SECONDS = 60;
 const ENV_FILE_PATH = GLib.get_home_dir() + '/.config/aibar/env';
 const RESET_PENDING_MESSAGE = 'Starts when the first message is sent';
 const RATE_LIMIT_ERROR_MESSAGE = 'Rate limited. Try again later.';
+const PROVIDER_PROGRESS_CLASSES = {
+    claude: 'aibar-progress-provider-claude',
+    openrouter: 'aibar-progress-provider-openrouter',
+    copilot: 'aibar-progress-provider-copilot',
+    codex: 'aibar-progress-provider-codex',
+    openai: 'aibar-progress-provider-openai',
+    geminiai: 'aibar-progress-provider-geminiai',
+};
+const PANEL_ICON_COLORS = {
+    white: '#FFFFFF',
+    yellow: '#FFD60A',
+    orange: '#FF8C00',
+    red: '#FF3B30',
+    redDim: '#8A1B16',
+};
 const PROVIDER_DISPLAY_NAMES = {
     geminiai: 'GEMINIAI',
 };
@@ -115,12 +130,8 @@ function _loadEnvFromFile() {
  * @param {number} pct Usage percentage.
  * @returns {string} CSS class suffix for progress state.
  */
-function _getProgressClass(pct) {
-    if (pct < 50)
-        return 'aibar-progress-ok';
-    if (pct < 80)
-        return 'aibar-progress-warning';
-    return 'aibar-progress-danger';
+function _getProviderProgressClass(providerName) {
+    return PROVIDER_PROGRESS_CLASSES[providerName] || 'aibar-progress-provider-openai';
 }
 
 /**
@@ -173,6 +184,8 @@ class AIBarIndicator extends PanelMenu.Button {
         this._refreshIntervalSeconds = REFRESH_INTERVAL_SECONDS;
         this._activeProvider = null;
         this._providerOrder = ['claude', 'openrouter', 'copilot', 'codex', 'geminiai'];
+        this._iconBlinkTimeout = null;
+        this._iconBlinkOn = false;
 
         this._buildPanelButton();
         this._buildPopupMenu();
@@ -194,6 +207,7 @@ class AIBarIndicator extends PanelMenu.Button {
             icon_name: 'utilities-system-monitor-symbolic',
             style_class: 'system-status-icon',
         });
+        this._icon.set_style(`color: ${PANEL_ICON_COLORS.white};`);
 
         this._panelLabel = new St.Label({
             text: '...',
@@ -218,6 +232,18 @@ class AIBarIndicator extends PanelMenu.Button {
             style_class: 'aibar-panel-pct aibar-panel-pct-secondary aibar-tab-label-claude',
         });
 
+        this._panelClaudeCostLabel = new St.Label({
+            text: '',
+            y_align: Clutter.ActorAlign.CENTER,
+            style_class: 'aibar-panel-pct aibar-panel-cost aibar-tab-label-claude',
+        });
+
+        this._panelOpenRouterCostLabel = new St.Label({
+            text: '',
+            y_align: Clutter.ActorAlign.CENTER,
+            style_class: 'aibar-panel-pct aibar-panel-cost aibar-tab-label-openrouter',
+        });
+
         this._panelCopilotPctLabel = new St.Label({
             text: '',
             y_align: Clutter.ActorAlign.CENTER,
@@ -236,17 +262,38 @@ class AIBarIndicator extends PanelMenu.Button {
             style_class: 'aibar-panel-pct aibar-panel-pct-secondary aibar-tab-label-codex',
         });
 
+        this._panelCodexCostLabel = new St.Label({
+            text: '',
+            y_align: Clutter.ActorAlign.CENTER,
+            style_class: 'aibar-panel-pct aibar-panel-cost aibar-tab-label-codex',
+        });
+
+        this._panelGeminiaiCostLabel = new St.Label({
+            text: '',
+            y_align: Clutter.ActorAlign.CENTER,
+            style_class: 'aibar-panel-pct aibar-panel-cost aibar-tab-label-geminiai',
+        });
+
         this._panelClaudePctLabel.hide();
         this._panelClaude7dPctLabel.hide();
+        this._panelClaudeCostLabel.hide();
+        this._panelOpenRouterCostLabel.hide();
         this._panelCopilotPctLabel.hide();
         this._panelCodexPctLabel.hide();
         this._panelCodex7dPctLabel.hide();
+        this._panelCodexCostLabel.hide();
+        this._panelGeminiaiCostLabel.hide();
+        this._panelLabel.hide();
 
         this._panelPercentages.add_child(this._panelClaudePctLabel);
         this._panelPercentages.add_child(this._panelClaude7dPctLabel);
+        this._panelPercentages.add_child(this._panelClaudeCostLabel);
+        this._panelPercentages.add_child(this._panelOpenRouterCostLabel);
         this._panelPercentages.add_child(this._panelCopilotPctLabel);
         this._panelPercentages.add_child(this._panelCodexPctLabel);
         this._panelPercentages.add_child(this._panelCodex7dPctLabel);
+        this._panelPercentages.add_child(this._panelCodexCostLabel);
+        this._panelPercentages.add_child(this._panelGeminiaiCostLabel);
 
         this._panelBox.add_child(this._icon);
         this._panelBox.add_child(this._panelPercentages);
@@ -676,7 +723,7 @@ class AIBarIndicator extends PanelMenu.Button {
 
         const updateWindowBar = (bar, pct, resetTime, useDays) => {
             bar.pctLabel.text = `${pct.toFixed(1)}%`;
-            bar.barFill.style_class = `aibar-progress-fill ${_getProgressClass(pct)}`;
+            bar.barFill.style_class = `aibar-progress-fill ${_getProviderProgressClass(providerName)}`;
             const shouldShowResetPending = _isDisplayedZeroPercent(pct);
             const shouldShowLimitReached = allowLimitReached && _isDisplayedFullPercent(pct);
 
@@ -798,7 +845,7 @@ class AIBarIndicator extends PanelMenu.Button {
                 let pct = usagePercent;
                 card._barData.progress = {pct};
                 card.progressLabel.text = `${pct.toFixed(1)}%`;
-                card.progressFill.style_class = `aibar-progress-fill ${_getProgressClass(pct)}`;
+                card.progressFill.style_class = `aibar-progress-fill ${_getProviderProgressClass(providerName)}`;
 
                 GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
                     let barBgWidth = card.progressBg ? card.progressBg.get_width() : 0;
@@ -925,6 +972,7 @@ class AIBarIndicator extends PanelMenu.Button {
      */
     _refreshData(forceRefresh = false) {
         this._panelLabel.set_text('...');
+        this._panelLabel.hide();
 
         try {
             let launcher = new Gio.SubprocessLauncher({
@@ -1017,25 +1065,87 @@ class AIBarIndicator extends PanelMenu.Button {
     }
 
     /**
+     * @brief Build short cost label text for panel status row.
+     * @param {Object<string, any> | null} data Provider payload object.
+     * @returns {string | null} Formatted cost label or null when unavailable.
+     */
+    _panelCostText(data) {
+        if (!data || !data.metrics)
+            return null;
+        const metrics = data.metrics;
+        if (metrics.cost === null || metrics.cost === undefined)
+            return null;
+        const numeric = Number(metrics.cost);
+        if (!Number.isFinite(numeric))
+            return null;
+        const currencySymbol = metrics.currency_symbol || '$';
+        return `${currencySymbol}${numeric.toFixed(2)}`;
+    }
+
+    /**
+     * @brief Update panel icon color and blink behavior from max usage percentage.
+     * @param {number} maxPercent Maximum percentage rendered in panel status labels.
+     * @returns {void}
+     * @satisfies REQ-069
+     */
+    _updateIconColor(maxPercent) {
+        const numeric = Number(maxPercent);
+        const safePercent = Number.isFinite(numeric) ? numeric : 0;
+        const shouldBlink = safePercent > 90;
+        let color = PANEL_ICON_COLORS.white;
+        if (safePercent > 75)
+            color = PANEL_ICON_COLORS.red;
+        else if (safePercent > 50)
+            color = PANEL_ICON_COLORS.orange;
+        else if (safePercent > 25)
+            color = PANEL_ICON_COLORS.yellow;
+
+        if (shouldBlink) {
+            if (!this._iconBlinkTimeout) {
+                this._iconBlinkOn = true;
+                this._iconBlinkTimeout = GLib.timeout_add_seconds(
+                    GLib.PRIORITY_DEFAULT,
+                    1,
+                    () => {
+                        this._iconBlinkOn = !this._iconBlinkOn;
+                        const nextColor = this._iconBlinkOn ? PANEL_ICON_COLORS.red : PANEL_ICON_COLORS.redDim;
+                        this._icon.set_style(`color: ${nextColor};`);
+                        return GLib.SOURCE_CONTINUE;
+                    }
+                );
+            }
+            this._icon.set_style(`color: ${PANEL_ICON_COLORS.red};`);
+            return;
+        }
+
+        if (this._iconBlinkTimeout) {
+            GLib.source_remove(this._iconBlinkTimeout);
+            this._iconBlinkTimeout = null;
+        }
+        this._icon.set_style(`color: ${color};`);
+    }
+
+    /**
      * @brief Execute update u i.
      * @details Applies update u i logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
-     * Uses `metrics.currency_symbol` from the first cost-bearing provider for the panel summary label.
-     * Resolves provider-window failure metadata from cache `status` section and forwards
-     * it to card renderers.
+     * Resolves provider-window failure metadata from cache `status` section and forwards it
+     * to card renderers. Panel status row renders fixed-order percentages and per-provider costs.
      * @returns {any} Function return value.
+     * @satisfies REQ-021
      * @satisfies REQ-053
+     * @satisfies REQ-069
      */
     _updateUI() {
-        let totalCost = 0;
-        let hasCostData = false;
-        let panelCurrencySymbol = '$';
-        let configuredProviders = 0;
         const usageLabels = {
             claude5h: this._panelClaudePctLabel,
             claude7d: this._panelClaude7dPctLabel,
+            claudeCost: this._panelClaudeCostLabel,
+            openrouterCost: this._panelOpenRouterCostLabel,
             copilot: this._panelCopilotPctLabel,
             codex5h: this._panelCodexPctLabel,
             codex7d: this._panelCodex7dPctLabel,
+            codexCost: this._panelCodexCostLabel,
+            geminiaiCost: this._panelGeminiaiCostLabel,
         };
 
         const toPercent = (value) => {
@@ -1111,23 +1221,40 @@ class AIBarIndicator extends PanelMenu.Button {
         const panelValues = {
             claude5h: claudeUsage.primary,
             claude7d: claudeUsage.secondary,
+            claudeCost: this._panelCostText(this._usageData.claude),
+            openrouterCost: this._panelCostText(this._usageData.openrouter),
             copilot: copilotUsage.primary,
             codex5h: codexUsage.primary,
             codex7d: codexUsage.secondary,
+            codexCost: this._panelCostText(this._usageData.codex),
+            geminiaiCost: this._panelCostText(this._usageData.geminiai),
         };
 
         for (let [labelKey, value] of Object.entries(panelValues)) {
             const label = usageLabels[labelKey];
             if (!label)
                 continue;
-            if (value !== null) {
+            if (typeof value === 'number' && Number.isFinite(value)) {
                 label.set_text(`${value.toFixed(1)}%`);
+                label.show();
+            } else if (typeof value === 'string' && value.length > 0) {
+                label.set_text(value);
                 label.show();
             } else {
                 label.set_text('');
                 label.hide();
             }
         }
+
+        const panelPercents = [
+            panelValues.claude5h,
+            panelValues.claude7d,
+            panelValues.copilot,
+            panelValues.codex5h,
+            panelValues.codex7d,
+        ].filter(value => typeof value === 'number' && Number.isFinite(value));
+        const maxPanelPercent = panelPercents.length > 0 ? Math.max(...panelPercents) : 0;
+        this._updateIconColor(maxPanelPercent);
 
         const entries = Object.entries(this._usageData).sort((a, b) => {
             const aIndex = this._providerOrder.indexOf(a[0]);
@@ -1166,26 +1293,12 @@ class AIBarIndicator extends PanelMenu.Button {
                 : null;
             this._updateProviderCard(providerName, data, statusEntry);
 
-            if (data.metrics && data.metrics.cost !== null && data.metrics.cost !== undefined) {
-                totalCost += data.metrics.cost;
-                if (!hasCostData)
-                    panelCurrencySymbol = data.metrics.currency_symbol || '$';
-                hasCostData = true;
-                configuredProviders++;
-            } else if (data.metrics && (data.metrics.remaining !== null || data.metrics.limit !== null)) {
-                configuredProviders++;
-            }
         }
 
         if (!this._activeProvider && firstProvider)
             this._switchToProvider(firstProvider);
-
-        if (hasCostData)
-            this._panelLabel.set_text(`${panelCurrencySymbol}${totalCost.toFixed(2)}`);
-        else if (configuredProviders > 0)
-            this._panelLabel.set_text(`${configuredProviders} active`);
-        else
-            this._panelLabel.set_text('N/A');
+        this._panelLabel.set_text('');
+        this._panelLabel.hide();
     }
 
     /**
@@ -1200,15 +1313,29 @@ class AIBarIndicator extends PanelMenu.Button {
         console.debug(`aibar Error: ${message}`);
         this._panelClaudePctLabel.set_text('');
         this._panelClaude7dPctLabel.set_text('');
+        this._panelClaudeCostLabel.set_text('');
+        this._panelOpenRouterCostLabel.set_text('');
         this._panelCopilotPctLabel.set_text('');
         this._panelCodexPctLabel.set_text('');
         this._panelCodex7dPctLabel.set_text('');
+        this._panelCodexCostLabel.set_text('');
+        this._panelGeminiaiCostLabel.set_text('');
         this._panelClaudePctLabel.hide();
         this._panelClaude7dPctLabel.hide();
+        this._panelClaudeCostLabel.hide();
+        this._panelOpenRouterCostLabel.hide();
         this._panelCopilotPctLabel.hide();
         this._panelCodexPctLabel.hide();
         this._panelCodex7dPctLabel.hide();
+        this._panelCodexCostLabel.hide();
+        this._panelGeminiaiCostLabel.hide();
+        if (this._iconBlinkTimeout) {
+            GLib.source_remove(this._iconBlinkTimeout);
+            this._iconBlinkTimeout = null;
+        }
+        this._icon.set_style(`color: ${PANEL_ICON_COLORS.red};`);
         this._panelLabel.set_text('Err');
+        this._panelLabel.show();
     }
 
     /**
@@ -1237,6 +1364,10 @@ class AIBarIndicator extends PanelMenu.Button {
         if (this._timeout) {
             GLib.source_remove(this._timeout);
             this._timeout = null;
+        }
+        if (this._iconBlinkTimeout) {
+            GLib.source_remove(this._iconBlinkTimeout);
+            this._iconBlinkTimeout = null;
         }
 
         super.destroy();

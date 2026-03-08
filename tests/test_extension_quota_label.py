@@ -145,16 +145,34 @@ def test_panel_percentage_labels_use_fixed_order_provider_styles_and_primary_bol
 
     claude_idx = source.index("this._panelPercentages.add_child(this._panelClaudePctLabel);")
     claude_7d_idx = source.index("this._panelPercentages.add_child(this._panelClaude7dPctLabel);")
+    claude_cost_idx = source.index("this._panelPercentages.add_child(this._panelClaudeCostLabel);")
+    openrouter_cost_idx = source.index("this._panelPercentages.add_child(this._panelOpenRouterCostLabel);")
     copilot_idx = source.index("this._panelPercentages.add_child(this._panelCopilotPctLabel);")
     codex_5h_idx = source.index("this._panelPercentages.add_child(this._panelCodexPctLabel);")
     codex_7d_idx = source.index("this._panelPercentages.add_child(this._panelCodex7dPctLabel);")
-    assert claude_idx < claude_7d_idx < copilot_idx < codex_5h_idx < codex_7d_idx
+    codex_cost_idx = source.index("this._panelPercentages.add_child(this._panelCodexCostLabel);")
+    geminiai_cost_idx = source.index("this._panelPercentages.add_child(this._panelGeminiaiCostLabel);")
+    assert (
+        claude_idx
+        < claude_7d_idx
+        < claude_cost_idx
+        < openrouter_cost_idx
+        < copilot_idx
+        < codex_5h_idx
+        < codex_7d_idx
+        < codex_cost_idx
+        < geminiai_cost_idx
+    )
 
     assert "style_class: 'aibar-panel-pct aibar-panel-pct-primary aibar-tab-label-claude'" in source
     assert "style_class: 'aibar-panel-pct aibar-panel-pct-secondary aibar-tab-label-claude'" in source
+    assert "style_class: 'aibar-panel-pct aibar-panel-cost aibar-tab-label-claude'" in source
+    assert "style_class: 'aibar-panel-pct aibar-panel-cost aibar-tab-label-openrouter'" in source
     assert "style_class: 'aibar-panel-pct aibar-panel-pct-primary aibar-tab-label-copilot'" in source
     assert "style_class: 'aibar-panel-pct aibar-panel-pct-primary aibar-tab-label-codex'" in source
     assert "style_class: 'aibar-panel-pct aibar-panel-pct-secondary aibar-tab-label-codex'" in source
+    assert "style_class: 'aibar-panel-pct aibar-panel-cost aibar-tab-label-codex'" in source
+    assert "style_class: 'aibar-panel-pct aibar-panel-cost aibar-tab-label-geminiai'" in source
 
 
 def test_popup_open_triggers_bar_width_reapply() -> None:
@@ -184,9 +202,13 @@ def test_panel_percentage_labels_hide_when_metrics_are_unavailable() -> None:
     assert "label.hide();" in source
     assert "this._panelClaudePctLabel.hide();" in source
     assert "this._panelClaude7dPctLabel.hide();" in source
+    assert "this._panelClaudeCostLabel.hide();" in source
+    assert "this._panelOpenRouterCostLabel.hide();" in source
     assert "this._panelCopilotPctLabel.hide();" in source
     assert "this._panelCodexPctLabel.hide();" in source
     assert "this._panelCodex7dPctLabel.hide();" in source
+    assert "this._panelCodexCostLabel.hide();" in source
+    assert "this._panelGeminiaiCostLabel.hide();" in source
 
 
 def test_extension_reads_gnome_refresh_interval_from_json_extension_section() -> None:
@@ -230,7 +252,7 @@ def test_geminiai_extension_tab_order_label_and_bright_pink_styles() -> None:
     """
     @brief Verify GeminiAI extension integration uses expected order, label, and colors.
     @details Asserts provider ordering array places `geminiai` after `codex`,
-    display-name mapping renders `GEMINIAI`, and stylesheet defines bright-pink
+    display-name mapping renders `GEMINIAI`, and stylesheet defines bright-purple
     tab/card classes for GeminiAI.
     @satisfies REQ-061
     @satisfies REQ-062
@@ -248,7 +270,44 @@ def test_geminiai_extension_tab_order_label_and_bright_pink_styles() -> None:
     assert ".aibar-tab-active-geminiai {" in stylesheet_source
     assert ".aibar-tab-label-geminiai {" in stylesheet_source
     assert ".aibar-provider-geminiai {" in stylesheet_source
-    assert "#FF1493" in stylesheet_source
+    assert "#BF5AF2" in stylesheet_source
+
+
+def test_panel_icon_color_thresholds_and_blink_logic_are_defined() -> None:
+    """
+    @brief Verify panel icon threshold and blink behavior is implemented in source.
+    @satisfies REQ-069
+    @satisfies TST-007
+    """
+    source = EXTENSION_PATH.read_text(encoding="utf-8")
+    assert "const PANEL_ICON_COLORS = {" in source
+    assert "if (safePercent > 75)" in source
+    assert "else if (safePercent > 50)" in source
+    assert "else if (safePercent > 25)" in source
+    assert "const shouldBlink = safePercent > 90;" in source
+    assert "GLib.timeout_add_seconds(" in source
+    assert "PANEL_ICON_COLORS.redDim" in source
+
+
+def test_provider_color_palette_is_applied_to_tabs_cards_and_progress_fills() -> None:
+    """
+    @brief Verify provider bright color palette is applied consistently in stylesheet.
+    @satisfies REQ-022
+    @satisfies REQ-067
+    """
+    stylesheet_source = STYLESHEET_PATH.read_text(encoding="utf-8")
+    assert ".aibar-tab-label-claude {" in stylesheet_source and "#FF3B30" in stylesheet_source
+    assert ".aibar-tab-label-openrouter {" in stylesheet_source and "#FF8C00" in stylesheet_source
+    assert ".aibar-tab-label-copilot {" in stylesheet_source and "#FFD60A" in stylesheet_source
+    assert ".aibar-tab-label-codex {" in stylesheet_source and "#32D74B" in stylesheet_source
+    assert ".aibar-tab-label-openai {" in stylesheet_source and "#0A84FF" in stylesheet_source
+    assert ".aibar-tab-label-geminiai {" in stylesheet_source and "#BF5AF2" in stylesheet_source
+    assert ".aibar-progress-provider-claude {" in stylesheet_source
+    assert ".aibar-progress-provider-openrouter {" in stylesheet_source
+    assert ".aibar-progress-provider-copilot {" in stylesheet_source
+    assert ".aibar-progress-provider-codex {" in stylesheet_source
+    assert ".aibar-progress-provider-openai {" in stylesheet_source
+    assert ".aibar-progress-provider-geminiai {" in stylesheet_source
 
 
 def test_extension_uses_cached_status_error_for_provider_cards() -> None:

@@ -44,7 +44,7 @@ GEMINIAI_OAUTH_CLIENT_PATH = Path.home() / ".config" / "aibar" / "geminiai_oauth
 GEMINIAI_OAUTH_TOKEN_PATH = Path.home() / ".config" / "aibar" / "geminiai_oauth_token.json"
 GEMINIAI_PROJECT_ID_ENV_VAR = "GEMINIAI_PROJECT_ID"
 GEMINIAI_ACCESS_TOKEN_ENV_VAR = "GEMINIAI_OAUTH_ACCESS_TOKEN"
-BILLING_DATASET_ID = "billing_data"
+DEFAULT_BILLING_DATASET_ID = "billing_data"
 BILLING_TABLE_PREFIX = "gcp_billing_export_v1_"
 
 
@@ -446,6 +446,7 @@ class GeminiAIProvider(BaseProvider):
 3. Authorize scopes:
 {scope_lines}
 4. Ensure project id is configured via setup or {GEMINIAI_PROJECT_ID_ENV_VAR}.
+5. Ensure setup `billing_data` matches the BigQuery dataset containing billing export tables.
 """
 
     async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult:
@@ -554,10 +555,16 @@ class GeminiAIProvider(BaseProvider):
                 allow_missing=True,
             )
             bigquery_client = self._build_bigquery_client(credentials, project_id)
-            billing_table_id = self._discover_billing_table_id(bigquery_client, project_id)
+            billing_dataset = self._resolve_billing_dataset()
+            billing_table_id = self._discover_billing_table_id(
+                bigquery_client,
+                project_id,
+                billing_dataset,
+            )
             billing_services, billing_cost_total = self._query_current_month_billing_cost(
                 bigquery_client,
                 project_id,
+                billing_dataset,
                 billing_table_id,
             )
 
@@ -576,9 +583,9 @@ class GeminiAIProvider(BaseProvider):
                     "error_total": error_total,
                 },
                 "billing": {
-                    "dataset_id": BILLING_DATASET_ID,
+                    "dataset_id": billing_dataset,
                     "table_id": billing_table_id,
-                    "table_path": f"{project_id}.{BILLING_DATASET_ID}.{billing_table_id}",
+                    "table_path": f"{project_id}.{billing_dataset}.{billing_table_id}",
                     "current_month_cost_net": billing_cost_total,
                     "services": billing_services,
                 },
@@ -676,6 +683,23 @@ class GeminiAIProvider(BaseProvider):
         client_payload = self._store.load_client_config()
         return self._store.extract_project_id(client_payload)
 
+    def _resolve_billing_dataset(self) -> str:
+        """
+        @brief Resolve billing dataset id from runtime configuration.
+        @details Uses `RuntimeConfig.billing_data` and falls back to
+        `DEFAULT_BILLING_DATASET_ID` when configuration is empty.
+        @return {str} BigQuery billing dataset id.
+        @satisfies REQ-005
+        @satisfies REQ-064
+        """
+        from aibar.config import load_runtime_config
+
+        runtime_config = load_runtime_config()
+        configured = runtime_config.billing_data.strip()
+        if configured:
+            return configured
+        return DEFAULT_BILLING_DATASET_ID
+
     def _build_monitoring_service(self, credentials: Credentials) -> Any:
         """
         @brief Build Google Cloud Monitoring API client.
@@ -703,18 +727,20 @@ class GeminiAIProvider(BaseProvider):
         self,
         bigquery_client: bigquery.Client,
         project_id: str,
+        dataset_id: str,
     ) -> str:
         """
-        @brief Discover billing export table id in dataset `billing_data`.
+        @brief Discover billing export table id in configured billing dataset.
         @details Lists dataset tables and selects the first lexicographically sorted
         id that starts with `gcp_billing_export_v1_`.
         @param bigquery_client {bigquery.Client} BigQuery client.
         @param project_id {str} Google Cloud project id.
+        @param dataset_id {str} BigQuery dataset id configured by setup.
         @return {str} Billing export table id.
         @throws {ProviderError} When billing export table is unavailable.
         @satisfies REQ-064
         """
-        dataset_ref = bigquery_client.dataset(BILLING_DATASET_ID, project=project_id)
+        dataset_ref = bigquery_client.dataset(dataset_id, project=project_id)
         table_ids = sorted(
             table.table_id
             for table in bigquery_client.list_tables(dataset_ref)
@@ -723,7 +749,7 @@ class GeminiAIProvider(BaseProvider):
 
         if not table_ids:
             raise ProviderError(
-                f"GeminiAI billing export table was not found in dataset '{BILLING_DATASET_ID}'."
+                f"GeminiAI billing export table was not found in dataset '{dataset_id}'."
             )
         return table_ids[0]
 
@@ -731,6 +757,7 @@ class GeminiAIProvider(BaseProvider):
         self,
         bigquery_client: bigquery.Client,
         project_id: str,
+        billing_dataset: str,
         table_id: str,
     ) -> tuple[list[dict[str, float | str]], float]:
         """
@@ -740,13 +767,14 @@ class GeminiAIProvider(BaseProvider):
         filter when invoice month data is unavailable.
         @param bigquery_client {bigquery.Client} BigQuery client.
         @param project_id {str} Google Cloud project id.
+        @param billing_dataset {str} BigQuery dataset id configured by setup.
         @param table_id {str} Billing export table id.
         @return {tuple[list[dict[str, float | str]], float]} Per-service aggregates and
             total net monthly cost.
         @satisfies REQ-057
         @satisfies REQ-065
         """
-        table_path = f"{project_id}.{BILLING_DATASET_ID}.{table_id}"
+        table_path = f"{project_id}.{billing_dataset}.{table_id}"
         query = f"""
 SELECT
   COALESCE(

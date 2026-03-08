@@ -126,7 +126,7 @@ def test_failed_refresh_preserves_previous_payload_and_records_fail_status(
     """
     _patch_config_paths(monkeypatch, tmp_path)
     config_module.save_runtime_config(
-        config_module.RuntimeConfig(idle_delay_seconds=300, api_call_delay_seconds=20)
+        config_module.RuntimeConfig(idle_delay_seconds=300, api_call_delay_milliseconds=20)
     )
     cached_success = _make_openrouter_success(source="cached-success")
     config_module.save_cli_cache(
@@ -174,7 +174,7 @@ def test_partial_claude_refresh_records_mixed_window_statuses(
     """
     _patch_config_paths(monkeypatch, tmp_path)
     config_module.save_runtime_config(
-        config_module.RuntimeConfig(idle_delay_seconds=300, api_call_delay_seconds=20)
+        config_module.RuntimeConfig(idle_delay_seconds=300, api_call_delay_milliseconds=20)
     )
     initial_claude = _make_claude_success(WindowPeriod.DAY_7, utilization_7d=30.0)
     config_module.save_cli_cache(
@@ -222,7 +222,7 @@ def test_refresh_flow_does_not_create_legacy_claude_snapshot_file(
     """
     _patch_config_paths(monkeypatch, tmp_path)
     config_module.save_runtime_config(
-        config_module.RuntimeConfig(idle_delay_seconds=300, api_call_delay_seconds=20)
+        config_module.RuntimeConfig(idle_delay_seconds=300, api_call_delay_milliseconds=20)
     )
     provider = ClaudeOAuthProvider(token="sk-ant-test-token")
     successful = {
@@ -266,7 +266,7 @@ def test_geminiai_cached_fail_status_is_rendered_in_show_output(
     """
     _patch_config_paths(monkeypatch, tmp_path)
     config_module.save_runtime_config(
-        config_module.RuntimeConfig(idle_delay_seconds=300, api_call_delay_seconds=20)
+        config_module.RuntimeConfig(idle_delay_seconds=300, api_call_delay_milliseconds=20)
     )
 
     cached_success = ProviderResult(

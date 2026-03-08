@@ -219,9 +219,9 @@ class TestCliPrintResultUsesCurrencySymbol:
         captured = capsys.readouterr()
         assert "$0.5000" in captured.out
 
-    def test_print_result_uses_blue_panel_and_progress_bar(self, capsys) -> None:
+    def test_print_result_uses_provider_colored_panel_and_progress_bar(self, capsys) -> None:
         """
-        @brief Verify `_print_result` renders panel borders and progress bar in text mode.
+        @brief Verify `_print_result` renders provider-colored panel and progress bar in text mode.
         @param capsys {pytest.CaptureFixture} Pytest stdout/stderr capture fixture.
         @return {None} Function return value.
         @satisfies REQ-067

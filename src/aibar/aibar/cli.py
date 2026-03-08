@@ -59,6 +59,15 @@ _ATTEMPT_RESULT_OK = "OK"
 _ATTEMPT_RESULT_FAIL = "FAIL"
 _SHOW_PANEL_MIN_WIDTH = 72
 _SHOW_PANEL_MAX_WIDTH = 110
+_ANSI_RESET = "\033[0m"
+_PROVIDER_PANEL_COLOR_CODES: dict[ProviderName, str] = {
+    ProviderName.CLAUDE: "\033[91m",
+    ProviderName.OPENROUTER: "\033[38;5;208m",
+    ProviderName.COPILOT: "\033[93m",
+    ProviderName.CODEX: "\033[92m",
+    ProviderName.OPENAI: "\033[94m",
+    ProviderName.GEMINIAI: "\033[95m",
+}
 
 
 @dataclass(frozen=True)
@@ -108,18 +117,19 @@ def _apply_api_call_delay(throttle_state: dict[str, float | int] | None) -> None
     @details Uses monotonic clock values in `throttle_state` to sleep before a live
     API request when elapsed time is below configured delay.
     @param throttle_state {dict[str, float | int] | None} Mutable state containing
-        `delay_seconds` and `last_call_started`.
+        `delay_milliseconds` and `last_call_started`.
     @return {None} Function return value.
     @satisfies REQ-040
     """
     if throttle_state is None:
         return
 
-    delay_seconds_raw = throttle_state.get("delay_seconds", 0)
+    delay_milliseconds_raw = throttle_state.get("delay_milliseconds", 0)
     try:
-        delay_seconds = max(0.0, float(delay_seconds_raw))
+        delay_milliseconds = max(0.0, float(delay_milliseconds_raw))
     except (TypeError, ValueError):
-        delay_seconds = 0.0
+        delay_milliseconds = 0.0
+    delay_seconds = delay_milliseconds / 1000.0
 
     last_call_raw = throttle_state.get("last_call_started")
     now = time.monotonic()
@@ -988,7 +998,7 @@ def _refresh_and_persist_cache_payload(
     fetched_results: list[ProviderResult] = []
     successful_payload_results: dict[str, ProviderResult] = {}
     throttle_state: dict[str, float | int] = {
-        "delay_seconds": runtime_config.api_call_delay_seconds
+        "delay_milliseconds": runtime_config.api_call_delay_milliseconds
     }
     for provider_name, provider in providers.items():
         if not provider.is_configured():
@@ -1331,7 +1341,8 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
     for name, prov in providers.items():
         if not prov.is_configured():
             if provider_filter is None or provider_filter == name:
-                _emit_blue_panel(
+                _emit_provider_panel(
+                    provider_name=name,
                     title=_provider_display_name(name),
                     body_lines=[
                         "Status: NOT CONFIGURED",
@@ -1377,16 +1388,33 @@ def _provider_display_name(provider_name: ProviderName) -> str:
     return provider_name.value.upper()
 
 
-def _emit_blue_panel(title: str, body_lines: list[str]) -> None:
+def _provider_panel_color_code(provider_name: ProviderName) -> str:
     """
-    @brief Render blue ANSI bordered output panel with wrapped content lines.
+    @brief Resolve ANSI color code for one provider output surface.
+    @param provider_name {ProviderName} Provider enum key.
+    @return {str} ANSI foreground color code.
+    @satisfies REQ-067
+    """
+    return _PROVIDER_PANEL_COLOR_CODES.get(provider_name, "\033[94m")
+
+
+def _emit_provider_panel(
+    provider_name: ProviderName,
+    title: str,
+    body_lines: list[str],
+) -> None:
+    """
+    @brief Render provider-colored ANSI bordered output panel with wrapped content lines.
     @details Creates fixed-width terminal panels aligned with GNOME extension
     card layout, preserving deterministic borders and line wrapping behavior.
+    Border and title color use provider-specific ANSI palette.
+    @param provider_name {ProviderName} Provider enum key.
     @param title {str} Panel header text.
     @param body_lines {list[str]} Content lines rendered in panel body.
     @return {None} Function return value.
     @satisfies REQ-067
     """
+    color_code = _provider_panel_color_code(provider_name)
     wrapped_lines: list[str] = []
     for body_line in body_lines:
         chunks = textwrap.wrap(body_line, width=_SHOW_PANEL_MAX_WIDTH - 4)
@@ -1399,20 +1427,20 @@ def _emit_blue_panel(title: str, body_lines: list[str]) -> None:
     )
     content_width = min(content_width, _SHOW_PANEL_MAX_WIDTH - 4)
     horizontal_border = "─" * (content_width + 2)
-    click.echo(click.style(f"┌{horizontal_border}┐", fg="blue"))
+    click.echo(f"{color_code}┌{horizontal_border}┐{_ANSI_RESET}")
     click.echo(
-        f"{click.style('│', fg='blue')} "
-        f"{click.style(title.ljust(content_width), fg='blue', bold=True)} "
-        f"{click.style('│', fg='blue')}"
+        f"{color_code}│{_ANSI_RESET} "
+        f"{color_code}{title.ljust(content_width)}{_ANSI_RESET} "
+        f"{color_code}│{_ANSI_RESET}"
     )
-    click.echo(click.style(f"├{horizontal_border}┤", fg="blue"))
+    click.echo(f"{color_code}├{horizontal_border}┤{_ANSI_RESET}")
     for body_line in wrapped_lines:
         click.echo(
-            f"{click.style('│', fg='blue')} "
+            f"{color_code}│{_ANSI_RESET} "
             f"{body_line.ljust(content_width)} "
-            f"{click.style('│', fg='blue')}"
+            f"{color_code}│{_ANSI_RESET}"
         )
-    click.echo(click.style(f"└{horizontal_border}┘", fg="blue"))
+    click.echo(f"{color_code}└{horizontal_border}┘{_ANSI_RESET}")
     click.echo()
 
 
@@ -1447,13 +1475,13 @@ def _print_result(name: ProviderName, result, label: str | None = None) -> None:
     if result.is_error:
         lines.append(f"Error: {result.error}")
         if not _should_render_metrics_after_error(name, result):
-            _emit_blue_panel(title=title, body_lines=lines)
+            _emit_provider_panel(provider_name=name, title=title, body_lines=lines)
             return
 
     m = result.metrics
     if m.usage_percent is not None:
         pct = m.usage_percent
-        lines.append(f"Usage: {pct:.1f}% {_progress_bar(pct)}")
+        lines.append(f"Usage: {pct:.1f}% {_progress_bar(pct, name)}")
 
     if m.reset_at:
         delta = m.reset_at - datetime.now(timezone.utc)
@@ -1534,7 +1562,7 @@ def _print_result(name: ProviderName, result, label: str | None = None) -> None:
     if isinstance(retry_after, (int, float)) and retry_after > 0:
         lines.append(f"Retry after: {float(retry_after):.1f}s")
 
-    _emit_blue_panel(title=title, body_lines=lines)
+    _emit_provider_panel(provider_name=name, title=title, body_lines=lines)
 
 
 def _format_reset_duration(seconds: float) -> str:
@@ -1612,18 +1640,20 @@ def _is_displayed_zero_percent(percent: float | None) -> bool:
     return round(percent, 1) == 0.0
 
 
-def _progress_bar(percent: float, width: int = 20) -> str:
+def _progress_bar(percent: float, provider_name: ProviderName, width: int = 20) -> str:
     """
     @brief Execute progress bar.
     @details Applies progress bar logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
     @param percent {float} Input parameter `percent`.
+    @param provider_name {ProviderName} Provider enum key for color mapping.
     @param width {int} Input parameter `width`.
     @return {str} Function return value.
     """
     normalized_percent = max(0.0, min(100.0, percent))
     filled = int(width * normalized_percent / 100)
     empty = width - filled
-    return f"[{'█' * filled}{'░' * empty}]"
+    color_code = _provider_panel_color_code(provider_name)
+    return f"[{color_code}{'█' * filled}{_ANSI_RESET}{'░' * empty}]"
 
 
 @main.command(
@@ -1703,8 +1733,8 @@ def env() -> None:
 def setup() -> None:
     """
     @brief Execute setup.
-    @details Prompts for `idle_delay_seconds`, `api_call_delay_seconds`, and
-    `gnome_refresh_interval_seconds` in order, then prompts for provider
+    @details Prompts for `idle_delay_seconds`, `api_call_delay_milliseconds`,
+    `gnome_refresh_interval_seconds`, and `billing_data` in order, then prompts for provider
     currency symbols including `geminiai` (choices: `$`, `£`, `€`, default `$`), then persists
     all values to `~/.config/aibar/config.json`. GeminiAI OAuth source supports
     `skip`, `file`, `paste`, and `login` (re-authorization with current scopes).
@@ -1739,23 +1769,28 @@ def setup() -> None:
     runtime_config = load_runtime_config()
     click.echo(click.style("Runtime throttling", bold=True))
     click.echo("  idle-delay controls cache-only mode duration after successful refresh.")
-    click.echo("  api-call delay controls minimum spacing between API calls.")
+    click.echo("  api-call delay controls minimum spacing between API calls in milliseconds.")
     click.echo("  gnome-refresh-interval controls GNOME extension auto-refresh rate.")
     idle_delay_seconds = click.prompt(
         "  idle-delay seconds",
         type=int,
         default=runtime_config.idle_delay_seconds,
     )
-    api_call_delay_seconds = click.prompt(
-        "  api-call delay seconds",
+    api_call_delay_milliseconds = click.prompt(
+        "  api-call delay milliseconds",
         type=int,
-        default=runtime_config.api_call_delay_seconds,
+        default=runtime_config.api_call_delay_milliseconds,
     )
     gnome_refresh_interval_seconds = click.prompt(
         "  gnome-refresh-interval seconds",
         type=int,
         default=runtime_config.gnome_refresh_interval_seconds,
     )
+    billing_data = click.prompt(
+        "  billing_data",
+        default=runtime_config.billing_data,
+        show_default=True,
+    ).strip() or runtime_config.billing_data
     click.echo()
     click.echo(click.style("Currency symbols", bold=True))
     click.echo("  Configure the default currency symbol for cost display per provider.")
@@ -1779,6 +1814,9 @@ def setup() -> None:
     click.echo(click.style("GeminiAI (Google Cloud OAuth)", bold=True))
     click.echo(
         "  Configure OAuth desktop client JSON for Cloud Monitoring and BigQuery billing access."
+    )
+    click.echo(
+        "  billing_data must be the dataset name created in Google BigQuery console."
     )
     oauth_source = click.prompt(
         "  geminiai oauth source",
@@ -1851,8 +1889,9 @@ def setup() -> None:
 
     configured_runtime = RuntimeConfig(
         idle_delay_seconds=idle_delay_seconds,
-        api_call_delay_seconds=api_call_delay_seconds,
+        api_call_delay_milliseconds=api_call_delay_milliseconds,
         gnome_refresh_interval_seconds=gnome_refresh_interval_seconds,
+        billing_data=billing_data,
         currency_symbols=currency_symbols,
         geminiai_project_id=geminiai_project_id,
     )
