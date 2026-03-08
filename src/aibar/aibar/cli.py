@@ -1264,12 +1264,17 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
 
 def _print_result(name: ProviderName, result, label: str | None = None) -> None:
     """
-    @brief Execute print result.
-    @details Applies print result logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
-    @param name {ProviderName} Input parameter `name`.
-    @param result {None} Input parameter `result`.
-    @param label {str | None} Input parameter `label`.
+    @brief Render CLI text output for one provider result.
+    @details Formats usage percentage, reset countdown, remaining credits, cost,
+    requests, and token counts for one provider/window result. Cost is formatted
+    using `metrics.currency_symbol` (never hardcoded `$`).
+    @param name {ProviderName} Provider name enum value.
+    @param result {ProviderResult} Provider result to render.
+    @param label {str | None} Optional window label suffix (e.g. `"5h"`, `"7d"`).
     @return {None} Function return value.
+    @satisfies REQ-034
+    @satisfies REQ-035
+    @satisfies REQ-051
     """
     title = name.value.upper()
     if label:
@@ -1310,7 +1315,7 @@ def _print_result(name: ProviderName, result, label: str | None = None) -> None:
 
     # Cost
     if m.cost is not None:
-        click.echo(f"Cost:     ${m.cost:.4f}")
+        click.echo(f"Cost:     {m.currency_symbol}{m.cost:.4f}")
 
     # Requests
     if m.requests is not None:
@@ -1493,16 +1498,19 @@ def setup() -> None:
     """
     @brief Execute setup.
     @details Prompts for `idle_delay_seconds`, `api_call_delay_seconds`, and
-    `gnome_refresh_interval_seconds` in order, then persists all three values
-    to `~/.config/aibar/config.json`. Also prompts for provider API keys and
-    writes them to `~/.config/aibar/env`.
+    `gnome_refresh_interval_seconds` in order, then prompts for per-provider
+    currency symbols (choices: `$`, `£`, `€`, default `$`), then persists
+    all values to `~/.config/aibar/config.json`. Also prompts for provider
+    API keys and writes them to `~/.config/aibar/env`.
     @return {None} Function return value.
     @satisfies REQ-005
+    @satisfies REQ-049
     """
     from aibar.config import (
         ENV_FILE_PATH,
         RUNTIME_CONFIG_PATH,
         RuntimeConfig,
+        VALID_CURRENCY_SYMBOLS,
         load_runtime_config,
         save_runtime_config,
         write_env_file,
@@ -1537,10 +1545,26 @@ def setup() -> None:
         type=int,
         default=runtime_config.gnome_refresh_interval_seconds,
     )
+    click.echo()
+    click.echo(click.style("Currency symbols", bold=True))
+    click.echo("  Configure the default currency symbol for cost display per provider.")
+    click.echo(f"  Valid choices: {', '.join(VALID_CURRENCY_SYMBOLS)}")
+    _currency_provider_names = [p.value for p in ProviderName]
+    currency_symbols: dict[str, str] = {}
+    for _provider_name in _currency_provider_names:
+        _current_symbol = runtime_config.currency_symbols.get(_provider_name, "$")
+        _chosen = click.prompt(
+            f"  {_provider_name} currency symbol",
+            type=click.Choice(list(VALID_CURRENCY_SYMBOLS)),
+            default=_current_symbol,
+            show_choices=True,
+        )
+        currency_symbols[_provider_name] = _chosen
     configured_runtime = RuntimeConfig(
         idle_delay_seconds=idle_delay_seconds,
         api_call_delay_seconds=api_call_delay_seconds,
         gnome_refresh_interval_seconds=gnome_refresh_interval_seconds,
+        currency_symbols=currency_symbols,
     )
     save_runtime_config(configured_runtime)
     click.echo("  -> Saved")

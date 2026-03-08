@@ -196,7 +196,10 @@ Note: Must be an organization/admin key with usage permissions."""
         @param usage_data {dict} Input parameter `usage_data`.
         @param costs_data {dict} Input parameter `costs_data`.
         @return {ProviderResult} Function return value.
+        @satisfies REQ-050
         """
+        from aibar.config import resolve_currency_symbol
+
         # Aggregate usage from buckets
         total_input_tokens = 0
         total_output_tokens = 0
@@ -216,6 +219,9 @@ Note: Must be an organization/admin key with usage permissions."""
                 amount_cents = result.get("amount", {}).get("value", 0)
                 total_cost += amount_cents / 100.0
 
+        raw_combined: dict = {"usage": usage_data, "costs": costs_data}
+        currency_symbol = resolve_currency_symbol(raw_combined, self.name.value)
+
         metrics = UsageMetrics(
             cost=round(total_cost, 4),
             requests=total_requests,
@@ -225,11 +231,12 @@ Note: Must be an organization/admin key with usage permissions."""
             remaining=None,
             limit=None,
             reset_at=None,
+            currency_symbol=currency_symbol,
         )
 
         return ProviderResult(
             provider=self.name,
             window=window,
             metrics=metrics,
-            raw={"usage": usage_data, "costs": costs_data},
+            raw=raw_combined,
         )

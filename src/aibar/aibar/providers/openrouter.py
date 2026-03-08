@@ -137,11 +137,16 @@ class OpenRouterUsageProvider(BaseProvider):
         @param data {dict} Input parameter `data`.
         @param window {WindowPeriod} Input parameter `window`.
         @return {ProviderResult} Function return value.
+        @satisfies REQ-050
         """
+        from aibar.config import resolve_currency_symbol
+
         payload = data.get("data", {})
 
         usage = self._get_usage(payload, window)
         cost = usage
+
+        currency_symbol = resolve_currency_symbol(data, self.name.value)
 
         metrics = UsageMetrics(
             cost=cost,
@@ -151,6 +156,7 @@ class OpenRouterUsageProvider(BaseProvider):
             remaining=payload.get("limit_remaining"),
             limit=payload.get("limit"),
             reset_at=None,
+            currency_symbol=currency_symbol,
         )
 
         return ProviderResult(

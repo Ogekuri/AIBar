@@ -1,7 +1,7 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.3.17"
+version: "0.3.18"
 date: "2026-03-08"
 author: "req-change"
 scope:
@@ -94,13 +94,13 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 
 ### 2.2 Project Constraints
 - **CTN-001**: MUST resolve provider credentials with precedence: environment variable, then `~/.config/aibar/env`, then provider-specific local credential stores.
-- **CTN-002**: MUST represent provider fetch output with `ProviderResult` containing `provider`, `window`, `metrics`, `updated_at`, `raw`, and optional `error`.
+- **CTN-002**: MUST represent provider fetch output with `ProviderResult` containing `provider`, `window`, `metrics`, `updated_at`, `raw`, and optional `error`; `UsageMetrics` MUST include `currency_symbol: str` (default `"$"`) annotating all monetary fields (`cost`, `remaining`, `limit`).
 - **CTN-003**: MUST perform external HTTP API calls with `httpx.AsyncClient(timeout=30.0)` for provider integrations.
 - **CTN-004**: MUST persist `~/.cache/aibar/cache.json` as the canonical store for per-provider, per-window last-success payload snapshots and last-attempt status metadata.
 - **CTN-005**: MAY depend on unofficial/internal endpoints when official usage APIs are unavailable for Claude, Copilot, or Codex integrations.
 - **CTN-006**: MUST keep `docs/REFERENCES.md` synchronized with symbols defined under `src/` and `.github/workflows/`.
 - **CTN-007**: MUST declare `hatchling` as `[build-system]` backend in `pyproject.toml` with `[project]` metadata including `name`, `version`, `requires-python`, `dependencies`, and `[project.scripts]` console entry point.
-- **CTN-008**: MUST persist runtime throttling configuration in `~/.config/aibar/config.json` with keys `idle_delay_seconds`, `api_call_delay_seconds`, and `gnome_refresh_interval_seconds`.
+- **CTN-008**: MUST persist runtime configuration in `~/.config/aibar/config.json` with keys `idle_delay_seconds`, `api_call_delay_seconds`, `gnome_refresh_interval_seconds`, and `currency_symbols` (mapping provider name → currency symbol string; default `"$"` per provider when key is absent).
 - **CTN-009**: MUST persist idle-time state in `~/.cache/aibar/idle-time.json` with epoch and human-readable fields for `last_success_at` and `idle_until`.
 - **CTN-010**: MUST update `cache.json` payload fields only after successful fetch for the same provider/window and MUST preserve previous payload fields on failed fetch attempts, including HTTP `429`.
 
@@ -119,7 +119,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-002**: MUST print both 5-hour and 7-day outputs for Claude and Codex when `show` runs with default window and non-JSON mode.
 - **REQ-003**: MUST emit pretty-printed JSON (`indent=2`) for `show --json` with top-level sections `payload` (per-provider/window data), `status` (last-attempt state), and `extension` (GNOME extension runtime config including `gnome_refresh_interval_seconds`).
 - **REQ-004**: MUST run provider health checks in `doctor` using the 5-hour window and report per-provider configuration and test status.
-- **REQ-005**: MUST prompt `setup` for `idle_delay_seconds` (default `300`) first, `api_call_delay_seconds` (default `20`) second, and `gnome_refresh_interval_seconds` (default `60`) third, then persist all three values in `~/.config/aibar/config.json`.
+- **REQ-005**: MUST prompt `setup` for `idle_delay_seconds` (default `300`) first, `api_call_delay_seconds` (default `20`) second, `gnome_refresh_interval_seconds` (default `60`) third, then persist values in `~/.config/aibar/config.json`.
 - **REQ-006**: MUST fail Claude login when CLI credentials are missing or expired and MUST print `claude setup-token` remediation guidance.
 - **REQ-007**: MUST execute GitHub device-flow login for Copilot and save the token in `~/.config/aibar/copilot.json`.
 - **REQ-008**: MUST render Textual provider cards for all providers, support refresh, support 5h/7d switching, support JSON-tab toggling, suppress `Error: Rate limited. Try again later.`, and append `⚠️ Limit reached!` after `Resets in:` at displayed `100.0%`.
@@ -163,6 +163,11 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-046**: MUST preserve the previous provider/window payload in `cache.json` when the current fetch for that provider/window fails, including HTTP `429`.
 - **REQ-047**: MUST store and load all last-success fallback payloads from `~/.cache/aibar/cache.json` and MUST NOT require `~/.cache/aibar/claude_dual_last_success.json`.
 - **REQ-048**: `scripts/claude_token_refresh.sh` `do_refresh()` MUST truncate `LOG_FILE` to zero bytes before writing any log entries, so each `once` invocation and each daemon refresh cycle produces a standalone log containing only entries from that cycle.
+- **REQ-049**: `setup` MUST prompt for per-provider default currency symbol (choices: `$`, `£`, `€`; default `$`) for providers `claude`, `openai`, `openrouter`, `copilot`, `codex` in a dedicated section placed after the timeout configuration section, then persist selections into `currency_symbols` in `~/.config/aibar/config.json`.
+- **REQ-050**: Provider `fetch` MUST attempt to extract `currency_symbol` from the raw API JSON response (field `currency`); when absent, MUST resolve `currency_symbol` from `RuntimeConfig.currency_symbols[provider_name]` with fallback `"$"`.
+- **REQ-051**: CLI `show` text output MUST format cost values using `metrics.currency_symbol` from the fetched result; MUST NOT use hardcoded `$` for cost lines.
+- **REQ-052**: Textual UI provider cards MUST format cost values using `metrics.currency_symbol` from the loaded provider result; MUST NOT use hardcoded `$` for cost display.
+- **REQ-053**: GNOME extension panel summary label MUST use `metrics.currency_symbol` from the JSON payload for cost aggregation display; provider card cost label MUST use `metrics.currency_symbol` per-provider instead of hardcoded `$`.
 
 ## 4. Test Requirements
 
@@ -180,7 +185,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-010**: MUST verify `Remaining credits: <remaining> / <limit>` appears for Claude, Codex, and Copilot when both quota values exist.
 - **TST-011**: MUST verify HTTP `429` handling persists idle-time using `max(retry_after_seconds, idle_delay_seconds)` and keeps the largest computed `idle_until` when multiple rate-limit responses occur in one refresh run.
 - **TST-012**: MUST verify Textual provider cards suppress `Error: Rate limited. Try again later.` and append `⚠️ Limit reached!` after `Resets in:` when displayed usage is `100.0%`.
-- **TST-013**: MUST verify `setup` prompts idle-delay first, API-call delay second, and gnome_refresh_interval_seconds third, applies defaults `300`, `20`, and `60`, and persists all three values into `~/.config/aibar/config.json`.
+- **TST-013**: MUST verify `setup` prompts idle-delay first, API-call delay second, `gnome_refresh_interval_seconds` third, then per-provider currency symbol (choices `$`/`£`/`€`, default `$`) after the timeout section, applies all defaults, and persists all values into `~/.config/aibar/config.json`.
 - **TST-014**: MUST verify `show` and Text UI refresh skip provider API calls and serve `~/.cache/aibar/cache.json` when `idle_until` is in the future, and refresh providers when idle-time state is missing or expired.
 - **TST-015**: MUST verify force-refresh handling removes `~/.cache/aibar/idle-time.json`, bypasses idle-time gating for current execution, refreshes providers, and recreates idle-time metadata before loading `~/.cache/aibar/cache.json`.
 - **TST-016**: MUST verify refresh execution enforces configured inter-call delay between provider API requests, using `20` seconds when `api_call_delay_seconds` is absent.
@@ -190,6 +195,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-020**: MUST verify refresh and fallback logic do not read or write `~/.cache/aibar/claude_dual_last_success.json`.
 - **TST-021**: Tests that mock `httpx.AsyncClient` transport and invoke provider `fetch` or `fetch_all_windows` execution path MUST restrict assertions to success/error state (`is_error`, `error` fields), result-dict window key presence, HTTP call count, and cache/filesystem side effects; MUST NOT assert specific numeric metric field values (`usage_percent`, `remaining`, `cost`) derived from the parsed HTTP response.
 - **TST-022**: MUST verify `scripts/claude_token_refresh.sh` `do_refresh()` truncates `LOG_FILE` before writing any log entries (source-level pattern assertion).
+- **TST-023**: MUST verify `currency_symbol` in `UsageMetrics` flows through provider fetch and cache serialization to CLI text output (`_print_result`) and Textual UI cost label using the symbol from metrics, not a hardcoded `$`.
 
 ## 5. Evidence
 
@@ -203,13 +209,13 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | PRJ-006 | `pyproject.toml` + `[build-system]`/`[project]`/`[project.scripts]` sections + `aibar = "aibar.cli:main"` console entry point enabling `uv pip install` and `uvx` execution. |
 | PRJ-007 | `README.md` + `## Installation (uv)` section + `uv pip install`, `uv pip uninstall`, `uvx --from` commands. |
 | CTN-001 | `src/aibar/aibar/config.py` + `Config.get_token` + env var -> env file -> provider-specific stores (`ClaudeCLIAuth`, `CodexCredentialStore`, `CopilotCredentialStore`). |
-| CTN-002 | `src/aibar/aibar/providers/base.py` + `ProviderResult` model + fields `provider/window/metrics/updated_at/raw/error`. |
+| CTN-002 | `src/aibar/aibar/providers/base.py` + `ProviderResult` model + fields `provider/window/metrics/updated_at/raw/error`; `UsageMetrics` + `currency_symbol` field. |
 | CTN-003 | `src/aibar/aibar/providers/*.py` + `fetch` methods + `httpx.AsyncClient(timeout=30.0)` in Claude/OpenAI/OpenRouter/Copilot/Codex providers. |
 | CTN-004 | `src/aibar/aibar/cache.py` + cache schema helpers and `src/aibar/aibar/cli.py` + `src/aibar/aibar/ui.py` + `cache.json` as canonical store for payload snapshots and attempt statuses. |
 | CTN-005 | `src/aibar/aibar/config.py` + `PROVIDER_INFO` notes + entries describing unofficial/internal usage for Claude, Copilot, and Codex. |
 | CTN-006 | `docs/REFERENCES.md` + full symbol index grouped by source file, regenerated from repository code. |
 | CTN-007 | `pyproject.toml` + `[build-system] requires = ["hatchling"]` + `[project]` metadata fields `name`, `version`, `requires-python`, `dependencies`, `[project.scripts]`. |
-| CTN-008 | `src/aibar/aibar/config.py` + runtime throttle config load/save helpers using `~/.config/aibar/config.json` keys `idle_delay_seconds`, `api_call_delay_seconds`, and `gnome_refresh_interval_seconds`. |
+| CTN-008 | `src/aibar/aibar/config.py` + `RuntimeConfig` model + `idle_delay_seconds`, `api_call_delay_seconds`, `gnome_refresh_interval_seconds`, and `currency_symbols` fields persisted in `~/.config/aibar/config.json`. |
 | CTN-009 | `src/aibar/aibar/config.py` + `load_idle_time/save_idle_time` and `src/aibar/aibar/cli.py` + idle-time lifecycle handling in `~/.cache/aibar/idle-time.json`. |
 | CTN-010 | `src/aibar/aibar/cache.py` + conditional payload-write helpers guarantee payload replacement only on successful provider/window fetch and payload preservation on failed attempts including HTTP `429`. |
 | DES-001 | `src/aibar/aibar/providers/base.py` + `class BaseProvider(ABC)` + abstract methods `fetch`, `is_configured`, `get_config_help`. |
@@ -223,6 +229,13 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-003 | `src/aibar/aibar/cli.py` + `show` JSON renderer emits `indent=2` with `payload`, `status`, and `extension` (containing `gnome_refresh_interval_seconds`) sections. |
 | REQ-004 | `src/aibar/aibar/cli.py` + `doctor` + configuration status and `_fetch_result(provider, WindowPeriod.HOUR_5)` health check. |
 | REQ-005 | `src/aibar/aibar/cli.py` + `setup` prompts `idle_delay_seconds`, `api_call_delay_seconds`, and `gnome_refresh_interval_seconds` with defaults `300`, `20`, and `60`, then persists `~/.config/aibar/config.json`. |
+| REQ-049 | `src/aibar/aibar/cli.py` + `setup` + per-provider currency symbol section after timeout section; prompts each provider with choices `$`/`£`/`€` default `$`; persists `currency_symbols` map in `~/.config/aibar/config.json`. |
+| REQ-050 | `src/aibar/aibar/providers/*.py` + `_parse_response`/`_build_result` + `_resolve_currency_symbol` helper resolves currency from raw API response `currency` field; fallback to `RuntimeConfig.currency_symbols[provider_name]`. |
+| REQ-051 | `src/aibar/aibar/cli.py` + `_print_result` + cost line uses `m.currency_symbol` instead of hardcoded `$`. |
+| REQ-052 | `src/aibar/aibar/ui.py` + `ProviderCard.watch_result` + cost label uses `metrics.currency_symbol` instead of hardcoded `$`. |
+| REQ-053 | `src/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_updateUI/_populateProviderCard` + panel summary cost uses `metrics.currency_symbol`; card cost label uses per-provider `metrics.currency_symbol`. |
+| TST-013 | `tests/test_setup_runtime_config.py` + setup prompt-order/default assertions extended with currency symbol prompt section and `currency_symbols` persistence checks. |
+| TST-023 | `tests/test_currency_symbol_flow.py` + `currency_symbol` field in `UsageMetrics`, provider fetch pass-through, CLI `_print_result` and Textual UI cost label use metrics symbol. |
 | REQ-006 | `src/aibar/aibar/cli.py` + `_login_claude` + missing/expired flows print `claude setup-token` then `sys.exit(1)`. |
 | REQ-007 | `src/aibar/aibar/providers/copilot.py` + `CopilotDeviceFlow` and `CopilotProvider.login` + device-code request/poll and `save_token`. |
 | REQ-008 | `src/aibar/aibar/ui.py` + `AIBarUI.compose/BINDINGS` and `ProviderCard.watch_result` + provider cards, refresh/window/json controls, rate-limit error-string suppression, and `Resets in: ... ⚠️ Limit reached!` rendering at displayed `100.0%`. |
@@ -289,3 +302,4 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | TST-021 | `tests/test_claude_retry_and_cli_cache.py` + `TestClaudeRetryOn429::test_retries_on_429_then_succeeds` and `TestFetchAllWindows::test_single_call_returns_both_windows` + metric-value assertions on parsed HTTP responses removed; assertions restricted to `is_error` state, window key presence in results dict, and `mock_get.call_count`. |
 | REQ-048 | `scripts/claude_token_refresh.sh` + `do_refresh()` + `> "$LOG_FILE"` truncation statement before first `log` call. |
 | TST-022 | `tests/test_claude_token_refresh_script.py` + source-level assertion that `do_refresh()` body contains `LOG_FILE` truncation before any `log` invocation. |
+| TST-023 | `tests/test_currency_symbol_flow.py` + assertions for `currency_symbol` field in `UsageMetrics`, CLI `_print_result` cost formatting, Textual UI cost label, and GNOME extension panel label using metrics symbol. |

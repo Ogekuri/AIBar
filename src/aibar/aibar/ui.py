@@ -162,10 +162,14 @@ class ProviderCard(Static):
 
     def watch_result(self, result: ProviderResult | None) -> None:
         """
-        @brief Execute watch result.
-        @details Applies watch result logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
-        @param result {ProviderResult | None} Input parameter `result`.
+        @brief Render provider metrics into the TUI card widget.
+        @details Triggered when the reactive `result` attribute changes.
+        Builds usage bar, cost, requests, and token rows. Cost label uses
+        `metrics.currency_symbol` (never hardcoded `$`).
+        @param result {ProviderResult | None} Updated provider result; no-op when `None`.
         @return {None} Function return value.
+        @satisfies REQ-043
+        @satisfies REQ-052
         """
         if result is None:
             return
@@ -225,7 +229,7 @@ class ProviderCard(Static):
             metrics_container.mount(
                 Horizontal(
                     Label("Cost:", classes="metric-label"),
-                    Label(f"${metrics.cost:.4f}", classes="metric-value"),
+                    Label(f"{metrics.currency_symbol}{metrics.cost:.4f}", classes="metric-value"),
                     classes="metric-row",
                 )
             )

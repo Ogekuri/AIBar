@@ -1,9 +1,10 @@
 """
 @file
 @brief Setup runtime-config prompt and persistence tests.
-@details Verifies setup prompt order for idle-delay and API-call delay fields and
-persists selected values to `~/.config/aibar/config.json`.
+@details Verifies setup prompt order for idle-delay, API-call delay, gnome-refresh-interval,
+and per-provider currency symbol fields; persists selected values to `~/.config/aibar/config.json`.
 @satisfies REQ-005
+@satisfies REQ-049
 @satisfies TST-013
 """
 
@@ -53,18 +54,21 @@ def test_default_cache_and_idle_time_paths_use_home_cache_directory() -> None:
 def test_setup_prompts_runtime_config_before_credentials(monkeypatch, tmp_path: Path) -> None:
     """
     @brief Verify setup prompt order and runtime-config persistence.
-    @details Ensures setup asks `idle-delay` first, `api-call delay` second, and
-    `gnome-refresh-interval` third, then writes all three selected values to
-    runtime config JSON.
+    @details Ensures setup asks `idle-delay` first, `api-call delay` second,
+    `gnome-refresh-interval` third, then per-provider currency symbols (one prompt
+    per provider: claude, openai, openrouter, copilot, codex in ProviderName order),
+    then writes all selected values to runtime config JSON.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
     @param tmp_path {Path} Temporary path fixture.
     @return {None} Function return value.
     @satisfies REQ-005
+    @satisfies REQ-049
     @satisfies TST-013
     """
     config_dir = _patch_config_paths(monkeypatch, tmp_path)
     prompts: list[str] = []
-    responses = iter([450, 25, 90, "", "", ""])
+    # 3 timeout values + 5 currency symbols (one per provider) + empty credentials
+    responses = iter([450, 25, 90, "$", "$", "$", "$", "$", "", "", ""])
 
     def _fake_prompt(
         text: str,
@@ -93,8 +97,20 @@ def test_setup_prompts_runtime_config_before_credentials(monkeypatch, tmp_path: 
     assert prompts[0] == "  idle-delay seconds"
     assert prompts[1] == "  api-call delay seconds"
     assert prompts[2] == "  gnome-refresh-interval seconds"
+    assert prompts[3] == "  claude currency symbol"
+    assert prompts[4] == "  openai currency symbol"
+    assert prompts[5] == "  openrouter currency symbol"
+    assert prompts[6] == "  copilot currency symbol"
+    assert prompts[7] == "  codex currency symbol"
 
     runtime_config = json.loads((config_dir / "config.json").read_text(encoding="utf-8"))
     assert runtime_config["idle_delay_seconds"] == 450
     assert runtime_config["api_call_delay_seconds"] == 25
     assert runtime_config["gnome_refresh_interval_seconds"] == 90
+    assert runtime_config["currency_symbols"] == {
+        "claude": "$",
+        "openai": "$",
+        "openrouter": "$",
+        "copilot": "$",
+        "codex": "$",
+    }

@@ -21,6 +21,19 @@ from aibar.providers.base import (
 )
 
 
+def _resolve_provider_currency(raw: dict, provider_name: str) -> str:
+    """
+    @brief Resolve currency symbol from raw API response or configured provider default.
+    @details Delegates to `resolve_currency_symbol` in `aibar.config` (lazy import).
+    @param raw {dict} Raw API response dict.
+    @param provider_name {str} Provider name key.
+    @return {str} Resolved currency symbol.
+    @satisfies REQ-050
+    """
+    from aibar.config import resolve_currency_symbol
+    return resolve_currency_symbol(raw, provider_name)
+
+
 class CodexCredentials:
     """
     @brief Define codex credentials component.
@@ -419,6 +432,7 @@ Note: Token is refreshed automatically when needed."""
             requests=None,
             input_tokens=None,
             output_tokens=None,
+            currency_symbol=_resolve_provider_currency(data, ProviderName.CODEX.value),
         )
 
         return ProviderResult(

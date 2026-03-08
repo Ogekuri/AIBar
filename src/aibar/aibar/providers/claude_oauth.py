@@ -23,6 +23,20 @@ from aibar.providers.base import (
 )
 
 
+def _resolve_provider_currency(raw: dict, provider_name: str) -> str:
+    """
+    @brief Resolve currency symbol for a provider from raw API response or config.
+    @details Delegates to `resolve_currency_symbol` from `aibar.config`. Imported
+    lazily inside the function to avoid circular import at module load time.
+    @param raw {dict} Raw API response dict.
+    @param provider_name {str} Provider name key.
+    @return {str} Resolved currency symbol.
+    @satisfies REQ-050
+    """
+    from aibar.config import resolve_currency_symbol
+    return resolve_currency_symbol(raw, provider_name)
+
+
 class ClaudeOAuthProvider(BaseProvider):
     """
     @brief Define claude o auth provider component.
@@ -313,6 +327,7 @@ Note: Token must start with 'sk-ant-' prefix."""
             requests=None,
             input_tokens=None,
             output_tokens=None,
+            currency_symbol=_resolve_provider_currency(data, ProviderName.CLAUDE.value),
         )
 
         return ProviderResult(

@@ -39,7 +39,14 @@ class ProviderName(str, Enum):
 class UsageMetrics(BaseModel):
     """
     @brief Define usage metrics component.
-    @details Encapsulates usage metrics state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
+    @details Encapsulates normalized provider usage metrics for AIBar runtime flows.
+    Field `currency_symbol` annotates all monetary fields (`cost`, `remaining`, `limit`)
+    and defaults to `"$"` when not resolved from API response or provider config.
+    @satisfies CTN-002
+    @satisfies REQ-050
+    @satisfies REQ-051
+    @satisfies REQ-052
+    @satisfies REQ-053
     """
 
     cost: float | None = Field(default=None, description="Total cost in USD")
@@ -49,6 +56,7 @@ class UsageMetrics(BaseModel):
     remaining: float | None = Field(default=None, description="Remaining quota/budget")
     limit: float | None = Field(default=None, description="Total quota/budget limit")
     reset_at: datetime | None = Field(default=None, description="When quota resets")
+    currency_symbol: str = Field(default="$", description="Currency symbol for monetary fields (cost, remaining, limit)")
 
     @property
     def usage_percent(self) -> float | None:

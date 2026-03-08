@@ -794,10 +794,11 @@ class AIBarIndicator extends PanelMenu.Button {
         }
 
         if (metrics.cost !== null && metrics.cost !== undefined) {
+            const currencySymbol = metrics.currency_symbol || '$';
             if (providerName === 'openrouter' && metrics.limit !== null && metrics.limit !== undefined)
-                card.costLabel.text = `$${metrics.cost.toFixed(4)} / $${metrics.limit.toFixed(2)}`;
+                card.costLabel.text = `${currencySymbol}${metrics.cost.toFixed(4)} / ${currencySymbol}${metrics.limit.toFixed(2)}`;
             else
-                card.costLabel.text = `$${metrics.cost.toFixed(4)}`;
+                card.costLabel.text = `${currencySymbol}${metrics.cost.toFixed(4)}`;
         } else if (metrics.remaining !== null && metrics.limit !== null) {
             card.costLabel.clutter_text.set_markup(
                 `Remaining credits: <b>${metrics.remaining.toFixed(1)}</b>/${metrics.limit.toFixed(1)}`
@@ -815,10 +816,12 @@ class AIBarIndicator extends PanelMenu.Button {
             else
                 byokValue = raw.data.byok_usage_weekly;
 
-            if (byokValue !== null && byokValue !== undefined && byokValue > 0)
-                card.byokLabel.text = `BYOK: $${byokValue.toFixed(4)}`;
-            else
+            if (byokValue !== null && byokValue !== undefined && byokValue > 0) {
+                const byokCurrency = metrics.currency_symbol || '$';
+                card.byokLabel.text = `BYOK: ${byokCurrency}${byokValue.toFixed(4)}`;
+            } else {
                 card.byokLabel.text = '';
+            }
         } else {
             card.byokLabel.text = '';
         }
@@ -991,11 +994,14 @@ class AIBarIndicator extends PanelMenu.Button {
     /**
      * @brief Execute update u i.
      * @details Applies update u i logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
+     * Uses `metrics.currency_symbol` from the first cost-bearing provider for the panel summary label.
      * @returns {any} Function return value.
+     * @satisfies REQ-053
      */
     _updateUI() {
         let totalCost = 0;
         let hasCostData = false;
+        let panelCurrencySymbol = '$';
         let configuredProviders = 0;
         const usageLabels = {
             claude5h: this._panelClaudePctLabel,
@@ -1123,6 +1129,8 @@ class AIBarIndicator extends PanelMenu.Button {
 
             if (data.metrics && data.metrics.cost !== null && data.metrics.cost !== undefined) {
                 totalCost += data.metrics.cost;
+                if (!hasCostData)
+                    panelCurrencySymbol = data.metrics.currency_symbol || '$';
                 hasCostData = true;
                 configuredProviders++;
             } else if (data.metrics && (data.metrics.remaining !== null || data.metrics.limit !== null)) {
@@ -1134,7 +1142,7 @@ class AIBarIndicator extends PanelMenu.Button {
             this._switchToProvider(firstProvider);
 
         if (hasCostData)
-            this._panelLabel.set_text(`$${totalCost.toFixed(2)}`);
+            this._panelLabel.set_text(`${panelCurrencySymbol}${totalCost.toFixed(2)}`);
         else if (configuredProviders > 0)
             this._panelLabel.set_text(`${configuredProviders} active`);
         else

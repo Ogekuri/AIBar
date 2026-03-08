@@ -478,7 +478,7 @@ from typing import Any
 
 ---
 
-# cli.py | Python | 1734L | 50 symbols | 18 imports | 68 comments
+# cli.py | Python | 1758L | 50 symbols | 18 imports | 68 comments
 > Path: `src/aibar/aibar/cli.py`
 - @brief Command-line interface for aibar.
 - @details Defines command parsing, provider dispatch, formatted output, setup helpers, login flows, and UI launch hooks.
@@ -855,23 +855,26 @@ decode of provider data from `cache.json` for downstream rendering.
 - @satisfies REQ-042
 - @satisfies REQ-043
 
-### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L1265-1326)
-- @brief Execute print result.
-- @details Applies print result logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
-- @param name {ProviderName} Input parameter `name`.
-- @param result {None} Input parameter `result`.
-- @param label {str | None} Input parameter `label`.
+### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L1265-1331)
+- @brief Render CLI text output for one provider result.
+- @details Formats usage percentage, reset countdown, remaining credits, cost, requests, and token counts for one provider/window result. Cost is formatted using `metrics.currency_symbol` (never hardcoded `$`).
+- @param name {ProviderName} Provider name enum value.
+- @param result {ProviderResult} Provider result to render.
+- @param label {str | None} Optional window label suffix (e.g. `"5h"`, `"7d"`).
 - @return {None} Function return value.
+- @satisfies REQ-034
+- @satisfies REQ-035
+- @satisfies REQ-051
 
-### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L1327-1342)
+### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L1332-1347)
 - @brief Execute format reset duration.
 - @details Applies format reset duration logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param seconds {float} Input parameter `seconds`.
 - @return {str} Function return value.
 
-### fn `def _should_render_metrics_after_error(` `priv` (L1343-1345)
+### fn `def _should_render_metrics_after_error(` `priv` (L1348-1350)
 
-### fn `def _should_print_claude_reset_pending_hint(` `priv` (L1363-1365)
+### fn `def _should_print_claude_reset_pending_hint(` `priv` (L1368-1370)
 - @brief Check whether CLI output must render metrics after printing an error line.
 - @details Allows continuation only for Claude HTTP 429 partial-window state so the
 5h section can include `Error:` and still display usage/reset lines.
@@ -880,7 +883,7 @@ decode of provider data from `cache.json` for downstream rendering.
 - @return {bool} True when metrics should still be rendered after error line.
 - @satisfies REQ-036
 
-### fn `def _is_displayed_zero_percent(percent: float | None) -> bool` `priv` (L1385-1401)
+### fn `def _is_displayed_zero_percent(percent: float | None) -> bool` `priv` (L1390-1406)
 - @brief Determine whether CLI output must render the reset-pending fallback hint.
 - @brief Check whether a percentage renders as `0.0%` in one-decimal UI output.
 - @details The hint is only valid for Claude windows when no reset timestamp is
@@ -896,46 +899,47 @@ providers other than Claude.
 - @satisfies REQ-002
 - @satisfies REQ-002
 
-### fn `def _progress_bar(percent: float, width: int = 20) -> str` `priv` (L1402-1414)
+### fn `def _progress_bar(percent: float, width: int = 20) -> str` `priv` (L1407-1419)
 - @brief Execute progress bar.
 - @details Applies progress bar logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param percent {float} Input parameter `percent`.
 - @param width {int} Input parameter `width`.
 - @return {str} Function return value.
 
-### fn `def doctor() -> None` `@main.command()` (L1416-1468)
+### fn `def doctor() -> None` `@main.command()` (L1421-1473)
 - @brief Execute doctor.
 - @details Applies doctor logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def ui() -> None` `@main.command()` (L1470-1480)
+### fn `def ui() -> None` `@main.command()` (L1475-1485)
 - @brief Execute ui.
 - @details Applies ui logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def env() -> None` `@main.command()` (L1482-1490)
+### fn `def env() -> None` `@main.command()` (L1487-1495)
 - @brief Execute env.
 - @details Applies env logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def setup() -> None` `@main.command()` (L1492-1631)
+### fn `def setup() -> None` `@main.command()` (L1497-1655)
 - @brief Execute setup.
-- @details Prompts for `idle_delay_seconds`, `api_call_delay_seconds`, and `gnome_refresh_interval_seconds` in order, then persists all three values to `~/.config/aibar/config.json`. Also prompts for provider API keys and writes them to `~/.config/aibar/env`.
+- @details Prompts for `idle_delay_seconds`, `api_call_delay_seconds`, and `gnome_refresh_interval_seconds` in order, then prompts for per-provider currency symbols (choices: `$`, `£`, `€`, default `$`), then persists all values to `~/.config/aibar/config.json`. Also prompts for provider API keys and writes them to `~/.config/aibar/env`.
 - @return {None} Function return value.
 - @satisfies REQ-005
+- @satisfies REQ-049
 
-### fn `def login(provider: str) -> None` (L1639-1655)
+### fn `def login(provider: str) -> None` (L1663-1679)
 - @brief Execute login.
 - @details Applies login logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param provider {str} Input parameter `provider`.
 - @return {None} Function return value.
 
-### fn `def _login_claude() -> None` `priv` (L1656-1704)
+### fn `def _login_claude() -> None` `priv` (L1680-1728)
 - @brief Execute login claude.
 - @details Applies login claude logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_copilot() -> None` `priv` (L1705-1732)
+### fn `def _login_copilot() -> None` `priv` (L1729-1756)
 - @brief Execute login copilot.
 - @details Applies login copilot logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
@@ -980,24 +984,24 @@ providers other than Claude.
 |`_build_cached_dual_window_results`|fn|priv|1085-1088|def _build_cached_dual_window_results(|
 |`main`|fn|pub|1144-1152|def main() -> None|
 |`show`|fn|pub|1178-1264|def show(provider: str, window: str, output_json: bool, f...|
-|`_print_result`|fn|priv|1265-1326|def _print_result(name: ProviderName, result, label: str ...|
-|`_format_reset_duration`|fn|priv|1327-1342|def _format_reset_duration(seconds: float) -> str|
-|`_should_render_metrics_after_error`|fn|priv|1343-1345|def _should_render_metrics_after_error(|
-|`_should_print_claude_reset_pending_hint`|fn|priv|1363-1365|def _should_print_claude_reset_pending_hint(|
-|`_is_displayed_zero_percent`|fn|priv|1385-1401|def _is_displayed_zero_percent(percent: float | None) -> ...|
-|`_progress_bar`|fn|priv|1402-1414|def _progress_bar(percent: float, width: int = 20) -> str|
-|`doctor`|fn|pub|1416-1468|def doctor() -> None|
-|`ui`|fn|pub|1470-1480|def ui() -> None|
-|`env`|fn|pub|1482-1490|def env() -> None|
-|`setup`|fn|pub|1492-1631|def setup() -> None|
-|`login`|fn|pub|1639-1655|def login(provider: str) -> None|
-|`_login_claude`|fn|priv|1656-1704|def _login_claude() -> None|
-|`_login_copilot`|fn|priv|1705-1732|def _login_copilot() -> None|
+|`_print_result`|fn|priv|1265-1331|def _print_result(name: ProviderName, result, label: str ...|
+|`_format_reset_duration`|fn|priv|1332-1347|def _format_reset_duration(seconds: float) -> str|
+|`_should_render_metrics_after_error`|fn|priv|1348-1350|def _should_render_metrics_after_error(|
+|`_should_print_claude_reset_pending_hint`|fn|priv|1368-1370|def _should_print_claude_reset_pending_hint(|
+|`_is_displayed_zero_percent`|fn|priv|1390-1406|def _is_displayed_zero_percent(percent: float | None) -> ...|
+|`_progress_bar`|fn|priv|1407-1419|def _progress_bar(percent: float, width: int = 20) -> str|
+|`doctor`|fn|pub|1421-1473|def doctor() -> None|
+|`ui`|fn|pub|1475-1485|def ui() -> None|
+|`env`|fn|pub|1487-1495|def env() -> None|
+|`setup`|fn|pub|1497-1655|def setup() -> None|
+|`login`|fn|pub|1663-1679|def login(provider: str) -> None|
+|`_login_claude`|fn|priv|1680-1728|def _login_claude() -> None|
+|`_login_copilot`|fn|priv|1729-1756|def _login_copilot() -> None|
 
 
 ---
 
-# config.py | Python | 488L | 33 symbols | 11 imports | 32 comments
+# config.py | Python | 529L | 35 symbols | 11 imports | 33 comments
 > Path: `src/aibar/aibar/config.py`
 - @brief Configuration and credential resolution for aibar.
 - @details Provides environment-file parsing, token precedence resolution, and provider configuration status reporting.
@@ -1028,34 +1032,36 @@ from aibar.providers import (
 - var `DEFAULT_IDLE_DELAY_SECONDS = 300` (L26)
 - var `DEFAULT_API_CALL_DELAY_SECONDS = 20` (L27)
 - var `DEFAULT_GNOME_REFRESH_INTERVAL_SECONDS = 60` (L28)
-### class `class RuntimeConfig(BaseModel)` : BaseModel (L31-45)
-- @brief Define runtime configuration component for refresh throttling controls.
-- @details Encodes persisted CLI runtime controls used by `show` refresh logic and GNOME extension scheduling. Fields are validated as positive integers and default to conservative values that reduce rate-limit pressure while preserving configurability.
+- var `DEFAULT_CURRENCY_SYMBOL = "$"` (L29)
+### class `class RuntimeConfig(BaseModel)` : BaseModel (L39-56)
+- @brief Define runtime configuration component for refresh throttling and currency controls.
+- @details Encodes persisted CLI runtime controls used by `show` refresh logic, GNOME extension scheduling, and per-provider currency symbol resolution. Fields are validated with defaults that reduce rate-limit pressure. `currency_symbols` maps provider name strings to currency symbols (`$`, `£`, `€`); missing entries default to `DEFAULT_CURRENCY_SYMBOL` at resolution time.
 - @satisfies CTN-008
+- @satisfies REQ-049
 
-### class `class IdleTimeState(BaseModel)` : BaseModel (L46-59)
+### class `class IdleTimeState(BaseModel)` : BaseModel (L57-70)
 - @brief Define persisted idle-time state component.
 - @details Stores last successful refresh timestamp and computed idle-until timestamp in both epoch and human-readable ISO-8601 UTC formats.
 - @satisfies CTN-009
 
-### fn `def _ensure_app_config_dir() -> None` `priv` (L60-69)
+### fn `def _ensure_app_config_dir() -> None` `priv` (L71-80)
 - @brief Ensure AIBar configuration directory exists before file persistence.
 - @details Creates `~/.config/aibar` recursively when missing. This function is called by env-file and runtime-config persistence helpers.
 - @return {None} Function return value.
 
-### fn `def _ensure_app_cache_dir() -> None` `priv` (L70-79)
+### fn `def _ensure_app_cache_dir() -> None` `priv` (L81-90)
 - @brief Ensure AIBar cache directory exists before cache and idle-time persistence.
 - @details Creates `~/.cache/aibar` recursively when missing. This function is called by CLI cache and idle-time persistence helpers.
 - @return {None} Function return value.
 
-### fn `def _sanitize_cache_payload(payload: dict[str, Any]) -> dict[str, Any]` `priv` (L80-114)
+### fn `def _sanitize_cache_payload(payload: dict[str, Any]) -> dict[str, Any]` `priv` (L91-125)
 - @brief Redact sensitive keys from cache payload before disk persistence.
 - @details Recursively traverses dictionaries/lists and replaces values for case-insensitive key matches in `{token,key,secret,password,authorization}` with deterministic placeholder string `[REDACTED]`.
 - @param payload {dict[str, Any]} Cache document containing `payload` and `status` sections.
 - @return {dict[str, Any]} Sanitized deep-copy structure safe for persistence.
 - @satisfies DES-004
 
-### fn `def clean(value: Any) -> Any` (L92-111)
+### fn `def clean(value: Any) -> Any` (L103-122)
 - @brief Redact sensitive keys from cache payload before disk persistence.
 - @brief Apply recursive redaction to one JSON-compatible node.
 - @details Recursively traverses dictionaries/lists and replaces values for
@@ -1068,27 +1074,35 @@ with deterministic placeholder string `[REDACTED]`.
 - @return {Any} Sanitized node.
 - @satisfies DES-004
 
-### fn `def load_runtime_config() -> RuntimeConfig` (L115-131)
+### fn `def load_runtime_config() -> RuntimeConfig` (L126-142)
 - @brief Load runtime refresh configuration from disk with schema validation.
 - @details Reads `~/.config/aibar/config.json`, validates fields against `RuntimeConfig`, and returns defaults when file is missing or invalid.
 - @return {RuntimeConfig} Validated runtime configuration payload.
 - @satisfies CTN-008
 
-### fn `def save_runtime_config(runtime_config: RuntimeConfig) -> None` (L132-147)
+### fn `def save_runtime_config(runtime_config: RuntimeConfig) -> None` (L143-158)
 - @brief Persist runtime refresh configuration to disk.
 - @details Serializes `RuntimeConfig` to `~/.config/aibar/config.json` using stable pretty-printed JSON (`indent=2`) for deterministic readability.
 - @param runtime_config {RuntimeConfig} Validated runtime configuration model.
 - @return {None} Function return value.
 - @satisfies CTN-008
 
-### fn `def load_cli_cache() -> dict[str, Any] | None` (L148-165)
+### fn `def load_cli_cache() -> dict[str, Any] | None` (L159-176)
 - @brief Load CLI cache payload from disk.
 - @details Reads `~/.cache/aibar/cache.json` and returns parsed object only when payload root is a JSON object with canonical cache sections.
 - @return {dict[str, Any] | None} Parsed cache payload or None if unavailable.
 - @satisfies CTN-004
 - @satisfies REQ-047
 
-### fn `def save_cli_cache(payload: dict[str, Any]) -> None` (L166-188)
+### fn `def resolve_currency_symbol(raw: dict[str, Any], provider_name: str) -> str` (L177-206)
+- @brief Resolve currency symbol for a provider result from API response or config.
+- @details Extraction priority: 1. `raw["currency"]` field: if a recognized symbol (`$`, `£`, `€`) → use directly; if an ISO-4217 code (`USD`, `GBP`, `EUR`) → map to symbol. 2. `RuntimeConfig.currency_symbols[provider_name]` configured default. 3. `DEFAULT_CURRENCY_SYMBOL` (`"$"`) as final fallback.
+- @param raw {dict[str, Any]} Raw API response dict from the provider fetch call.
+- @param provider_name {str} Provider name string key (e.g. `"claude"`, `"openai"`).
+- @return {str} Resolved currency symbol; always a member of `VALID_CURRENCY_SYMBOLS`.
+- @satisfies REQ-050
+
+### fn `def save_cli_cache(payload: dict[str, Any]) -> None` (L207-229)
 - @brief Persist canonical cache document to disk.
 - @details Redacts sensitive keys from nested raw payload objects, then writes sanitized cache document to `~/.cache/aibar/cache.json` using pretty-printed JSON (`indent=2`) preserving `payload` and `status` sections.
 - @param payload {dict[str, Any]} Canonical cache document.
@@ -1100,13 +1114,13 @@ with deterministic placeholder string `[REDACTED]`.
 - @satisfies REQ-046
 - @satisfies REQ-047
 
-### fn `def load_idle_time() -> IdleTimeState | None` (L189-205)
+### fn `def load_idle_time() -> IdleTimeState | None` (L230-246)
 - @brief Load idle-time control state from disk.
 - @details Reads and validates `~/.cache/aibar/idle-time.json`. Invalid or unreadable payloads return None and are treated as missing state.
 - @return {IdleTimeState | None} Validated idle-time state or None.
 - @satisfies CTN-009
 
-### fn `def save_idle_time(last_success_at: datetime, idle_until: datetime) -> IdleTimeState` (L206-231)
+### fn `def save_idle_time(last_success_at: datetime, idle_until: datetime) -> IdleTimeState` (L247-272)
 - @brief Persist idle-time state using epoch and human-readable timestamp fields.
 - @details Normalizes timestamps to UTC, serializes both epoch and ISO strings, and writes `~/.cache/aibar/idle-time.json` in pretty-printed JSON.
 - @param last_success_at {datetime} Last successful refresh timestamp.
@@ -1114,53 +1128,53 @@ with deterministic placeholder string `[REDACTED]`.
 - @return {IdleTimeState} Persisted idle-time model.
 - @satisfies CTN-009
 
-### fn `def remove_idle_time_file() -> None` (L232-245)
+### fn `def remove_idle_time_file() -> None` (L273-286)
 - @brief Remove persisted idle-time state file if present.
 - @details Deletes `~/.cache/aibar/idle-time.json` to force immediate refresh behavior on subsequent `show` execution.
 - @return {None} Function return value.
 - @satisfies REQ-039
 
-### fn `def load_env_file() -> dict[str, str]` (L246-264)
+### fn `def load_env_file() -> dict[str, str]` (L287-305)
 - @brief Execute load env file.
 - @details Applies load env file logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {dict[str, str]} Function return value.
 
-### fn `def write_env_file(updates: dict[str, str]) -> None` (L265-304)
+### fn `def write_env_file(updates: dict[str, str]) -> None` (L306-345)
 - @brief Execute write env file.
 - @details Applies write env file logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param updates {dict[str, str]} Input parameter `updates`.
 - @return {None} Function return value.
 
-### class `class Config` (L305-486)
+### class `class Config` (L346-527)
 - @brief Define config component.
 - @details Encapsulates config state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
-- var `ENV_VARS =` (L312)
-- var `PROVIDER_INFO =` (L321)
-- fn `def get_token(self, provider: ProviderName) -> str | None` (L354-391)
+- var `ENV_VARS =` (L353)
+- var `PROVIDER_INFO =` (L362)
+- fn `def get_token(self, provider: ProviderName) -> str | None` (L395-432)
   - @brief Execute get token.
   - @details Applies get token logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param provider {ProviderName} Input parameter `provider`.
   - @return {str | None} Function return value.
-- fn `def is_provider_configured(self, provider: ProviderName) -> bool` (L392-421)
+- fn `def is_provider_configured(self, provider: ProviderName) -> bool` (L433-462)
   - @brief Execute is provider configured.
   - @details Applies is provider configured logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param provider {ProviderName} Input parameter `provider`.
   - @return {bool} Function return value.
-- fn `def get_provider_status(self, provider: ProviderName) -> dict[str, Any]` (L422-443)
+- fn `def get_provider_status(self, provider: ProviderName) -> dict[str, Any]` (L463-484)
   - @brief Execute get provider status.
   - @details Applies get provider status logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param provider {ProviderName} Input parameter `provider`.
   - @return {dict[str, Any]} Function return value.
-- fn `def get_all_provider_status(self) -> list[dict[str, Any]]` (L444-451)
+- fn `def get_all_provider_status(self) -> list[dict[str, Any]]` (L485-492)
   - @brief Execute get all provider status.
   - @details Applies get all provider status logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {list[dict[str, Any]]} Function return value.
-- fn `def _get_token_preview(self, provider: ProviderName) -> str | None` `priv` (L452-463)
+- fn `def _get_token_preview(self, provider: ProviderName) -> str | None` `priv` (L493-504)
   - @brief Execute get token preview.
   - @details Applies get token preview logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param provider {ProviderName} Input parameter `provider`.
   - @return {str | None} Function return value.
-- fn `def get_env_var_help(self) -> str` (L464-486)
+- fn `def get_env_var_help(self) -> str` (L505-527)
   - @brief Execute get env var help.
   - @details Applies get env var help logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {str} Function return value.
@@ -1177,30 +1191,32 @@ with deterministic placeholder string `[REDACTED]`.
 |`DEFAULT_IDLE_DELAY_SECONDS`|var|pub|26||
 |`DEFAULT_API_CALL_DELAY_SECONDS`|var|pub|27||
 |`DEFAULT_GNOME_REFRESH_INTERVAL_SECONDS`|var|pub|28||
-|`RuntimeConfig`|class|pub|31-45|class RuntimeConfig(BaseModel)|
-|`IdleTimeState`|class|pub|46-59|class IdleTimeState(BaseModel)|
-|`_ensure_app_config_dir`|fn|priv|60-69|def _ensure_app_config_dir() -> None|
-|`_ensure_app_cache_dir`|fn|priv|70-79|def _ensure_app_cache_dir() -> None|
-|`_sanitize_cache_payload`|fn|priv|80-114|def _sanitize_cache_payload(payload: dict[str, Any]) -> d...|
-|`clean`|fn|pub|92-111|def clean(value: Any) -> Any|
-|`load_runtime_config`|fn|pub|115-131|def load_runtime_config() -> RuntimeConfig|
-|`save_runtime_config`|fn|pub|132-147|def save_runtime_config(runtime_config: RuntimeConfig) ->...|
-|`load_cli_cache`|fn|pub|148-165|def load_cli_cache() -> dict[str, Any] | None|
-|`save_cli_cache`|fn|pub|166-188|def save_cli_cache(payload: dict[str, Any]) -> None|
-|`load_idle_time`|fn|pub|189-205|def load_idle_time() -> IdleTimeState | None|
-|`save_idle_time`|fn|pub|206-231|def save_idle_time(last_success_at: datetime, idle_until:...|
-|`remove_idle_time_file`|fn|pub|232-245|def remove_idle_time_file() -> None|
-|`load_env_file`|fn|pub|246-264|def load_env_file() -> dict[str, str]|
-|`write_env_file`|fn|pub|265-304|def write_env_file(updates: dict[str, str]) -> None|
-|`Config`|class|pub|305-486|class Config|
-|`Config.ENV_VARS`|var|pub|312||
-|`Config.PROVIDER_INFO`|var|pub|321||
-|`Config.get_token`|fn|pub|354-391|def get_token(self, provider: ProviderName) -> str | None|
-|`Config.is_provider_configured`|fn|pub|392-421|def is_provider_configured(self, provider: ProviderName) ...|
-|`Config.get_provider_status`|fn|pub|422-443|def get_provider_status(self, provider: ProviderName) -> ...|
-|`Config.get_all_provider_status`|fn|pub|444-451|def get_all_provider_status(self) -> list[dict[str, Any]]|
-|`Config._get_token_preview`|fn|priv|452-463|def _get_token_preview(self, provider: ProviderName) -> s...|
-|`Config.get_env_var_help`|fn|pub|464-486|def get_env_var_help(self) -> str|
+|`DEFAULT_CURRENCY_SYMBOL`|var|pub|29||
+|`RuntimeConfig`|class|pub|39-56|class RuntimeConfig(BaseModel)|
+|`IdleTimeState`|class|pub|57-70|class IdleTimeState(BaseModel)|
+|`_ensure_app_config_dir`|fn|priv|71-80|def _ensure_app_config_dir() -> None|
+|`_ensure_app_cache_dir`|fn|priv|81-90|def _ensure_app_cache_dir() -> None|
+|`_sanitize_cache_payload`|fn|priv|91-125|def _sanitize_cache_payload(payload: dict[str, Any]) -> d...|
+|`clean`|fn|pub|103-122|def clean(value: Any) -> Any|
+|`load_runtime_config`|fn|pub|126-142|def load_runtime_config() -> RuntimeConfig|
+|`save_runtime_config`|fn|pub|143-158|def save_runtime_config(runtime_config: RuntimeConfig) ->...|
+|`load_cli_cache`|fn|pub|159-176|def load_cli_cache() -> dict[str, Any] | None|
+|`resolve_currency_symbol`|fn|pub|177-206|def resolve_currency_symbol(raw: dict[str, Any], provider...|
+|`save_cli_cache`|fn|pub|207-229|def save_cli_cache(payload: dict[str, Any]) -> None|
+|`load_idle_time`|fn|pub|230-246|def load_idle_time() -> IdleTimeState | None|
+|`save_idle_time`|fn|pub|247-272|def save_idle_time(last_success_at: datetime, idle_until:...|
+|`remove_idle_time_file`|fn|pub|273-286|def remove_idle_time_file() -> None|
+|`load_env_file`|fn|pub|287-305|def load_env_file() -> dict[str, str]|
+|`write_env_file`|fn|pub|306-345|def write_env_file(updates: dict[str, str]) -> None|
+|`Config`|class|pub|346-527|class Config|
+|`Config.ENV_VARS`|var|pub|353||
+|`Config.PROVIDER_INFO`|var|pub|362||
+|`Config.get_token`|fn|pub|395-432|def get_token(self, provider: ProviderName) -> str | None|
+|`Config.is_provider_configured`|fn|pub|433-462|def is_provider_configured(self, provider: ProviderName) ...|
+|`Config.get_provider_status`|fn|pub|463-484|def get_provider_status(self, provider: ProviderName) -> ...|
+|`Config.get_all_provider_status`|fn|pub|485-492|def get_all_provider_status(self) -> list[dict[str, Any]]|
+|`Config._get_token_preview`|fn|priv|493-504|def _get_token_preview(self, provider: ProviderName) -> s...|
+|`Config.get_env_var_help`|fn|pub|505-527|def get_env_var_help(self) -> str|
 
 
 ---
@@ -1223,7 +1239,7 @@ from aibar.providers.codex import CodexProvider
 
 ---
 
-# base.py | Python | 181L | 23 symbols | 5 imports | 16 comments
+# base.py | Python | 189L | 23 symbols | 5 imports | 16 comments
 > Path: `src/aibar/aibar/providers/base.py`
 - @brief Base provider abstractions and normalized metric models.
 - @details Defines provider/window enums, normalized usage/result payloads, provider exception hierarchy, and the abstract provider interface.
@@ -1259,55 +1275,60 @@ from pydantic import BaseModel, Field
 - var `COPILOT = "copilot"` (L35)
 - var `CODEX = "codex"` (L36)
 
-### class `class UsageMetrics(BaseModel)` : BaseModel (L39-77)
+### class `class UsageMetrics(BaseModel)` : BaseModel (L39-85)
 - @brief Define usage metrics component.
-- @details Encapsulates usage metrics state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
-- fn `def usage_percent(self) -> float | None` (L54-65)
+- @details Encapsulates normalized provider usage metrics for AIBar runtime flows. Field `currency_symbol` annotates all monetary fields (`cost`, `remaining`, `limit`) and defaults to `"$"` when not resolved from API response or provider config.
+- @satisfies CTN-002
+- @satisfies REQ-050
+- @satisfies REQ-051
+- @satisfies REQ-052
+- @satisfies REQ-053
+- fn `def usage_percent(self) -> float | None` (L62-73)
   - @brief Execute usage percent.
   - @details Applies usage percent logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {float | None} Function return value.
-- fn `def total_tokens(self) -> int | None` (L67-77)
+- fn `def total_tokens(self) -> int | None` (L75-85)
   - @brief Execute total tokens.
   - @details Applies total tokens logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {int | None} Function return value.
 
-### class `class ProviderResult(BaseModel)` : BaseModel (L78-100)
+### class `class ProviderResult(BaseModel)` : BaseModel (L86-108)
 - @brief Define provider result component.
 - @details Encapsulates provider result state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
-- fn `def is_error(self) -> bool` (L92-100)
+- fn `def is_error(self) -> bool` (L100-108)
   - @brief Execute is error.
   - @details Applies is error logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {bool} Function return value.
 
-### class `class ProviderError(Exception)` : Exception (L101-109)
+### class `class ProviderError(Exception)` : Exception (L109-117)
 - @brief Define provider error component.
 - @details Encapsulates provider error state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
 
-### class `class AuthenticationError(ProviderError)` : ProviderError (L110-118)
+### class `class AuthenticationError(ProviderError)` : ProviderError (L118-126)
 - @brief Define authentication error component.
 - @details Encapsulates authentication error state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
 
-### class `class RateLimitError(ProviderError)` : ProviderError (L119-127)
+### class `class RateLimitError(ProviderError)` : ProviderError (L127-135)
 - @brief Define rate limit error component.
 - @details Encapsulates rate limit error state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
 
-### class `class BaseProvider(ABC)` : ABC (L128-181)
+### class `class BaseProvider(ABC)` : ABC (L136-189)
 - @brief Define base provider component.
 - @details Encapsulates base provider state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
-- fn `async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult` (L137-145)
+- fn `async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult` (L145-153)
   - @brief Execute fetch.
   - @details Applies fetch logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param window {WindowPeriod} Input parameter `window`.
   - @return {ProviderResult} Function return value.
-- fn `def is_configured(self) -> bool` (L147-154)
+- fn `def is_configured(self) -> bool` (L155-162)
   - @brief Execute is configured.
   - @details Applies is configured logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {bool} Function return value.
-- fn `def get_config_help(self) -> str` (L156-163)
+- fn `def get_config_help(self) -> str` (L164-171)
   - @brief Execute get config help.
   - @details Applies get config help logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {str} Function return value.
-- fn `def _make_error_result(` `priv` (L164-165)
+- fn `def _make_error_result(` `priv` (L172-173)
 
 ## Symbol Index
 |Symbol|Kind|Vis|Lines|Sig|
@@ -1322,24 +1343,24 @@ from pydantic import BaseModel, Field
 |`ProviderName.OPENROUTER`|var|pub|34||
 |`ProviderName.COPILOT`|var|pub|35||
 |`ProviderName.CODEX`|var|pub|36||
-|`UsageMetrics`|class|pub|39-77|class UsageMetrics(BaseModel)|
-|`UsageMetrics.usage_percent`|fn|pub|54-65|def usage_percent(self) -> float | None|
-|`UsageMetrics.total_tokens`|fn|pub|67-77|def total_tokens(self) -> int | None|
-|`ProviderResult`|class|pub|78-100|class ProviderResult(BaseModel)|
-|`ProviderResult.is_error`|fn|pub|92-100|def is_error(self) -> bool|
-|`ProviderError`|class|pub|101-109|class ProviderError(Exception)|
-|`AuthenticationError`|class|pub|110-118|class AuthenticationError(ProviderError)|
-|`RateLimitError`|class|pub|119-127|class RateLimitError(ProviderError)|
-|`BaseProvider`|class|pub|128-181|class BaseProvider(ABC)|
-|`BaseProvider.fetch`|fn|pub|137-145|async def fetch(self, window: WindowPeriod = WindowPeriod...|
-|`BaseProvider.is_configured`|fn|pub|147-154|def is_configured(self) -> bool|
-|`BaseProvider.get_config_help`|fn|pub|156-163|def get_config_help(self) -> str|
-|`BaseProvider._make_error_result`|fn|priv|164-165|def _make_error_result(|
+|`UsageMetrics`|class|pub|39-85|class UsageMetrics(BaseModel)|
+|`UsageMetrics.usage_percent`|fn|pub|62-73|def usage_percent(self) -> float | None|
+|`UsageMetrics.total_tokens`|fn|pub|75-85|def total_tokens(self) -> int | None|
+|`ProviderResult`|class|pub|86-108|class ProviderResult(BaseModel)|
+|`ProviderResult.is_error`|fn|pub|100-108|def is_error(self) -> bool|
+|`ProviderError`|class|pub|109-117|class ProviderError(Exception)|
+|`AuthenticationError`|class|pub|118-126|class AuthenticationError(ProviderError)|
+|`RateLimitError`|class|pub|127-135|class RateLimitError(ProviderError)|
+|`BaseProvider`|class|pub|136-189|class BaseProvider(ABC)|
+|`BaseProvider.fetch`|fn|pub|145-153|async def fetch(self, window: WindowPeriod = WindowPeriod...|
+|`BaseProvider.is_configured`|fn|pub|155-162|def is_configured(self) -> bool|
+|`BaseProvider.get_config_help`|fn|pub|164-171|def get_config_help(self) -> str|
+|`BaseProvider._make_error_result`|fn|priv|172-173|def _make_error_result(|
 
 
 ---
 
-# claude_oauth.py | Python | 323L | 14 symbols | 9 imports | 17 comments
+# claude_oauth.py | Python | 338L | 15 symbols | 10 imports | 18 comments
 > Path: `src/aibar/aibar/providers/claude_oauth.py`
 - @brief Claude OAuth usage provider.
 - @details Fetches Claude subscription utilization through OAuth credentials and normalizes provider quota state into the shared result contract.
@@ -1353,43 +1374,52 @@ from datetime import datetime
 import httpx
 from aibar.claude_cli_auth import extract_claude_cli_token
 from aibar.providers.base import (
+from aibar.config import resolve_currency_symbol
 from aibar.config import load_runtime_config
 from datetime import timezone
 ```
 
 ## Definitions
 
-### class `class ClaudeOAuthProvider(BaseProvider)` : BaseProvider (L26-62)
+### fn `def _resolve_provider_currency(raw: dict, provider_name: str) -> str` `priv` (L26-39)
+- @brief Resolve currency symbol for a provider from raw API response or config.
+- @details Delegates to `resolve_currency_symbol` from `aibar.config`. Imported lazily inside the function to avoid circular import at module load time.
+- @param raw {dict} Raw API response dict.
+- @param provider_name {str} Provider name key.
+- @return {str} Resolved currency symbol.
+- @satisfies REQ-050
+
+### class `class ClaudeOAuthProvider(BaseProvider)` : BaseProvider (L40-76)
 - @brief Define claude o auth provider component.
 - @details Encapsulates claude o auth provider state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
-- var `USAGE_URL = "https://api.anthropic.com/api/oauth/usage"` (L33)
+- var `USAGE_URL = "https://api.anthropic.com/api/oauth/usage"` (L47)
   - @brief Define claude o auth provider component.
   - @details Encapsulates claude o auth provider state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
-- var `TOKEN_ENV_VAR = "CLAUDE_CODE_OAUTH_TOKEN"` (L34)
-- fn `def __init__(self, token: str | None = None) -> None` `priv` (L36-46)
+- var `TOKEN_ENV_VAR = "CLAUDE_CODE_OAUTH_TOKEN"` (L48)
+- fn `def __init__(self, token: str | None = None) -> None` `priv` (L50-60)
   - @brief Execute init.
   - @details Applies init logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param token {str | None} Input parameter `token`.
   - @return {None} Function return value.
-- fn `def is_configured(self) -> bool` (L47-54)
+- fn `def is_configured(self) -> bool` (L61-68)
   - @brief Execute is configured.
   - @details Applies is configured logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {bool} Function return value.
-- fn `def get_config_help(self) -> str` (L55-62)
+- fn `def get_config_help(self) -> str` (L69-76)
   - @brief Execute get config help.
   - @details Applies get config help logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {str} Function return value.
 
-- var `MAX_RETRIES = 3` (L69)
-- var `RETRY_BACKOFF_BASE = 2.0` (L70)
-- var `RETRY_JITTER_MAX = 1.0` (L71)
-### fn `async def _request_usage(self, client: httpx.AsyncClient) -> httpx.Response` `priv` (L73-110)
+- var `MAX_RETRIES = 3` (L83)
+- var `RETRY_BACKOFF_BASE = 2.0` (L84)
+- var `RETRY_JITTER_MAX = 1.0` (L85)
+### fn `async def _request_usage(self, client: httpx.AsyncClient) -> httpx.Response` `priv` (L87-124)
 - @brief Execute HTTP GET to usage endpoint with retry on HTTP 429.
 - @details Retries up to MAX_RETRIES times on 429 responses, respecting the retry-after header with exponential backoff fallback and random jitter to prevent thundering-herd synchronization. Backoff sequence with RETRY_BACKOFF_BASE=2.0: ~2-3s, ~4-5s, ~8-9s (total ~14-17s).
 - @param client {httpx.AsyncClient} Reusable HTTP client session.
 - @return {httpx.Response} Final HTTP response after retries exhausted or success.
 
-### fn `async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult` (L111-150)
+### fn `async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult` (L125-164)
 - @brief Execute fetch for a single window period.
 - @details Makes one HTTP request to the usage endpoint (with retry on 429) and parses the response for the requested window.
 - @param window {WindowPeriod} Window period to parse from the API response.
@@ -1397,9 +1427,9 @@ from datetime import timezone
 - @throws {AuthenticationError} When the OAuth token is invalid or expired.
 - @throws {ProviderError} On unexpected non-HTTP errors.
 
-### fn `async def fetch_all_windows(` (L151-152)
+### fn `async def fetch_all_windows(` (L165-166)
 
-### fn `def _handle_response(` `priv` (L205-206)
+### fn `def _handle_response(` `priv` (L219-220)
 - @brief Execute a single API call and parse results for multiple windows.
 - @details The usage endpoint returns data for all windows in one response.
 This method avoids redundant HTTP requests when multiple windows are needed.
@@ -1408,7 +1438,7 @@ This method avoids redundant HTTP requests when multiple windows are needed.
 - @throws {AuthenticationError} When the OAuth token is invalid or expired.
 - @throws {ProviderError} On unexpected non-HTTP errors.
 
-### fn `def _parse_response(self, data: dict, window: WindowPeriod) -> ProviderResult` `priv` (L258-323)
+### fn `def _parse_response(self, data: dict, window: WindowPeriod) -> ProviderResult` `priv` (L272-338)
 - @brief Map HTTP error status codes to ProviderResult error payloads.
 - @brief Normalize a raw Claude API payload dict into a ProviderResult for the given window.
 - @details Returns None on HTTP 200 (success), otherwise returns an error
@@ -1426,25 +1456,26 @@ ProviderResult for the given window. Raises AuthenticationError on 401.
 ## Symbol Index
 |Symbol|Kind|Vis|Lines|Sig|
 |---|---|---|---|---|
-|`ClaudeOAuthProvider`|class|pub|26-62|class ClaudeOAuthProvider(BaseProvider)|
-|`ClaudeOAuthProvider.USAGE_URL`|var|pub|33||
-|`ClaudeOAuthProvider.TOKEN_ENV_VAR`|var|pub|34||
-|`ClaudeOAuthProvider.__init__`|fn|priv|36-46|def __init__(self, token: str | None = None) -> None|
-|`ClaudeOAuthProvider.is_configured`|fn|pub|47-54|def is_configured(self) -> bool|
-|`ClaudeOAuthProvider.get_config_help`|fn|pub|55-62|def get_config_help(self) -> str|
-|`MAX_RETRIES`|var|pub|69||
-|`RETRY_BACKOFF_BASE`|var|pub|70||
-|`RETRY_JITTER_MAX`|var|pub|71||
-|`_request_usage`|fn|priv|73-110|async def _request_usage(self, client: httpx.AsyncClient)...|
-|`fetch`|fn|pub|111-150|async def fetch(self, window: WindowPeriod = WindowPeriod...|
-|`fetch_all_windows`|fn|pub|151-152|async def fetch_all_windows(|
-|`_handle_response`|fn|priv|205-206|def _handle_response(|
-|`_parse_response`|fn|priv|258-323|def _parse_response(self, data: dict, window: WindowPerio...|
+|`_resolve_provider_currency`|fn|priv|26-39|def _resolve_provider_currency(raw: dict, provider_name: ...|
+|`ClaudeOAuthProvider`|class|pub|40-76|class ClaudeOAuthProvider(BaseProvider)|
+|`ClaudeOAuthProvider.USAGE_URL`|var|pub|47||
+|`ClaudeOAuthProvider.TOKEN_ENV_VAR`|var|pub|48||
+|`ClaudeOAuthProvider.__init__`|fn|priv|50-60|def __init__(self, token: str | None = None) -> None|
+|`ClaudeOAuthProvider.is_configured`|fn|pub|61-68|def is_configured(self) -> bool|
+|`ClaudeOAuthProvider.get_config_help`|fn|pub|69-76|def get_config_help(self) -> str|
+|`MAX_RETRIES`|var|pub|83||
+|`RETRY_BACKOFF_BASE`|var|pub|84||
+|`RETRY_JITTER_MAX`|var|pub|85||
+|`_request_usage`|fn|priv|87-124|async def _request_usage(self, client: httpx.AsyncClient)...|
+|`fetch`|fn|pub|125-164|async def fetch(self, window: WindowPeriod = WindowPeriod...|
+|`fetch_all_windows`|fn|pub|165-166|async def fetch_all_windows(|
+|`_handle_response`|fn|priv|219-220|def _handle_response(|
+|`_parse_response`|fn|priv|272-338|def _parse_response(self, data: dict, window: WindowPerio...|
 
 
 ---
 
-# codex.py | Python | 429L | 21 symbols | 6 imports | 32 comments
+# codex.py | Python | 443L | 22 symbols | 7 imports | 33 comments
 > Path: `src/aibar/aibar/providers/codex.py`
 - @brief OpenAI Codex usage provider and credential helpers.
 - @details Resolves Codex credentials, refreshes OAuth tokens when required, queries usage endpoints, and normalizes quota metrics.
@@ -1457,17 +1488,26 @@ from datetime import datetime, timezone
 from pathlib import Path
 import httpx
 from aibar.providers.base import (
+from aibar.config import resolve_currency_symbol
 ```
 
 ## Definitions
 
-### class `class CodexCredentials` (L24-91)
+### fn `def _resolve_provider_currency(raw: dict, provider_name: str) -> str` `priv` (L24-36)
+- @brief Resolve currency symbol from raw API response or configured provider default.
+- @details Delegates to `resolve_currency_symbol` in `aibar.config` (lazy import).
+- @param raw {dict} Raw API response dict.
+- @param provider_name {str} Provider name key.
+- @return {str} Resolved currency symbol.
+- @satisfies REQ-050
+
+### class `class CodexCredentials` (L37-104)
 - @brief Define codex credentials component.
 - @details Encapsulates codex credentials state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
-- fn `def __init__(` `priv` (L30-36)
+- fn `def __init__(` `priv` (L43-49)
   - @brief Define codex credentials component.
   - @details Encapsulates codex credentials state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
-- fn `def needs_refresh(self) -> bool` (L54-64)
+- fn `def needs_refresh(self) -> bool` (L67-77)
   - @brief Execute init.
   - @brief Execute needs refresh.
   - @details Applies init logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
@@ -1479,74 +1519,74 @@ from aibar.providers.base import (
   - @param last_refresh {datetime | None} Input parameter `last_refresh`.
   - @return {None} Function return value.
   - @return {bool} Function return value.
-- fn `def from_auth_json(cls, data: dict) -> "CodexCredentials"` (L66-91)
+- fn `def from_auth_json(cls, data: dict) -> "CodexCredentials"` (L79-104)
   - @brief Execute from auth json.
   - @details Applies from auth json logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param data {dict} Input parameter `data`.
   - @return {'CodexCredentials'} Function return value.
 
-### class `class CodexCredentialStore` (L92-182)
+### class `class CodexCredentialStore` (L105-195)
 - @brief Define codex credential store component.
 - @details Encapsulates codex credential store state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
-- fn `def codex_home(self) -> Path` (L99-108)
+- fn `def codex_home(self) -> Path` (L112-121)
   - @brief Execute codex home.
   - @details Applies codex home logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {Path} Function return value.
-- fn `def auth_file(self) -> Path` (L110-117)
+- fn `def auth_file(self) -> Path` (L123-130)
   - @brief Execute auth file.
   - @details Applies auth file logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {Path} Function return value.
-- fn `def load(self) -> CodexCredentials | None` (L118-157)
+- fn `def load(self) -> CodexCredentials | None` (L131-170)
   - @brief Execute load.
   - @details Applies load logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {CodexCredentials | None} Function return value.
-- fn `def save(self, credentials: CodexCredentials) -> None` (L158-182)
+- fn `def save(self, credentials: CodexCredentials) -> None` (L171-195)
   - @brief Execute save.
   - @details Applies save logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param credentials {CodexCredentials} Input parameter `credentials`.
   - @return {None} Function return value.
 
-### class `class CodexTokenRefresher` (L183-246)
+### class `class CodexTokenRefresher` (L196-259)
 - @brief Define codex token refresher component.
 - @details Encapsulates codex token refresher state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
-- var `REFRESH_URL = "https://auth.openai.com/oauth/token"` (L189)
+- var `REFRESH_URL = "https://auth.openai.com/oauth/token"` (L202)
   - @brief Define codex token refresher component.
   - @details Encapsulates codex token refresher state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
-- var `CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann"` (L190)
-- fn `async def refresh(self, credentials: CodexCredentials) -> CodexCredentials` (L192-246)
+- var `CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann"` (L203)
+- fn `async def refresh(self, credentials: CodexCredentials) -> CodexCredentials` (L205-259)
   - @brief Execute refresh.
   - @details Applies refresh logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param credentials {CodexCredentials} Input parameter `credentials`.
   - @return {CodexCredentials} Function return value.
   - @throws {Exception} Propagates explicit raised error states from internal validation or provider operations.
 
-### class `class CodexProvider(BaseProvider)` : BaseProvider (L247-285)
+### class `class CodexProvider(BaseProvider)` : BaseProvider (L260-298)
 - @brief Define codex provider component.
 - @details Encapsulates codex provider state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
-- var `BASE_URL = "https://chatgpt.com/backend-api"` (L256)
-- var `USAGE_PATH = "/wham/usage"` (L257)
-- fn `def __init__(self, credentials: CodexCredentials | None = None) -> None` `priv` (L259-269)
+- var `BASE_URL = "https://chatgpt.com/backend-api"` (L269)
+- var `USAGE_PATH = "/wham/usage"` (L270)
+- fn `def __init__(self, credentials: CodexCredentials | None = None) -> None` `priv` (L272-282)
   - @brief Execute init.
   - @details Applies init logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param credentials {CodexCredentials | None} Input parameter `credentials`.
   - @return {None} Function return value.
-- fn `def is_configured(self) -> bool` (L270-277)
+- fn `def is_configured(self) -> bool` (L283-290)
   - @brief Execute is configured.
   - @details Applies is configured logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {bool} Function return value.
-- fn `def get_config_help(self) -> str` (L278-285)
+- fn `def get_config_help(self) -> str` (L291-298)
   - @brief Execute get config help.
   - @details Applies get config help logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {str} Function return value.
 
-### fn `async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult` (L297-376)
+### fn `async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult` (L310-389)
 - @brief Execute fetch.
 - @details Applies fetch logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param window {WindowPeriod} Input parameter `window`.
 - @return {ProviderResult} Function return value.
 - @throws {Exception} Propagates explicit raised error states from internal validation or provider operations.
 
-### fn `def _parse_response(self, data: dict, window: WindowPeriod) -> ProviderResult` `priv` (L377-429)
+### fn `def _parse_response(self, data: dict, window: WindowPeriod) -> ProviderResult` `priv` (L390-443)
 - @brief Execute parse response.
 - @details Applies parse response logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param data {dict} Input parameter `data`.
@@ -1556,32 +1596,33 @@ from aibar.providers.base import (
 ## Symbol Index
 |Symbol|Kind|Vis|Lines|Sig|
 |---|---|---|---|---|
-|`CodexCredentials`|class|pub|24-91|class CodexCredentials|
-|`CodexCredentials.__init__`|fn|priv|30-36|def __init__(|
-|`CodexCredentials.needs_refresh`|fn|pub|54-64|def needs_refresh(self) -> bool|
-|`CodexCredentials.from_auth_json`|fn|pub|66-91|def from_auth_json(cls, data: dict) -> "CodexCredentials"|
-|`CodexCredentialStore`|class|pub|92-182|class CodexCredentialStore|
-|`CodexCredentialStore.codex_home`|fn|pub|99-108|def codex_home(self) -> Path|
-|`CodexCredentialStore.auth_file`|fn|pub|110-117|def auth_file(self) -> Path|
-|`CodexCredentialStore.load`|fn|pub|118-157|def load(self) -> CodexCredentials | None|
-|`CodexCredentialStore.save`|fn|pub|158-182|def save(self, credentials: CodexCredentials) -> None|
-|`CodexTokenRefresher`|class|pub|183-246|class CodexTokenRefresher|
-|`CodexTokenRefresher.REFRESH_URL`|var|pub|189||
-|`CodexTokenRefresher.CLIENT_ID`|var|pub|190||
-|`CodexTokenRefresher.refresh`|fn|pub|192-246|async def refresh(self, credentials: CodexCredentials) ->...|
-|`CodexProvider`|class|pub|247-285|class CodexProvider(BaseProvider)|
-|`CodexProvider.BASE_URL`|var|pub|256||
-|`CodexProvider.USAGE_PATH`|var|pub|257||
-|`CodexProvider.__init__`|fn|priv|259-269|def __init__(self, credentials: CodexCredentials | None =...|
-|`CodexProvider.is_configured`|fn|pub|270-277|def is_configured(self) -> bool|
-|`CodexProvider.get_config_help`|fn|pub|278-285|def get_config_help(self) -> str|
-|`fetch`|fn|pub|297-376|async def fetch(self, window: WindowPeriod = WindowPeriod...|
-|`_parse_response`|fn|priv|377-429|def _parse_response(self, data: dict, window: WindowPerio...|
+|`_resolve_provider_currency`|fn|priv|24-36|def _resolve_provider_currency(raw: dict, provider_name: ...|
+|`CodexCredentials`|class|pub|37-104|class CodexCredentials|
+|`CodexCredentials.__init__`|fn|priv|43-49|def __init__(|
+|`CodexCredentials.needs_refresh`|fn|pub|67-77|def needs_refresh(self) -> bool|
+|`CodexCredentials.from_auth_json`|fn|pub|79-104|def from_auth_json(cls, data: dict) -> "CodexCredentials"|
+|`CodexCredentialStore`|class|pub|105-195|class CodexCredentialStore|
+|`CodexCredentialStore.codex_home`|fn|pub|112-121|def codex_home(self) -> Path|
+|`CodexCredentialStore.auth_file`|fn|pub|123-130|def auth_file(self) -> Path|
+|`CodexCredentialStore.load`|fn|pub|131-170|def load(self) -> CodexCredentials | None|
+|`CodexCredentialStore.save`|fn|pub|171-195|def save(self, credentials: CodexCredentials) -> None|
+|`CodexTokenRefresher`|class|pub|196-259|class CodexTokenRefresher|
+|`CodexTokenRefresher.REFRESH_URL`|var|pub|202||
+|`CodexTokenRefresher.CLIENT_ID`|var|pub|203||
+|`CodexTokenRefresher.refresh`|fn|pub|205-259|async def refresh(self, credentials: CodexCredentials) ->...|
+|`CodexProvider`|class|pub|260-298|class CodexProvider(BaseProvider)|
+|`CodexProvider.BASE_URL`|var|pub|269||
+|`CodexProvider.USAGE_PATH`|var|pub|270||
+|`CodexProvider.__init__`|fn|priv|272-282|def __init__(self, credentials: CodexCredentials | None =...|
+|`CodexProvider.is_configured`|fn|pub|283-290|def is_configured(self) -> bool|
+|`CodexProvider.get_config_help`|fn|pub|291-298|def get_config_help(self) -> str|
+|`fetch`|fn|pub|310-389|async def fetch(self, window: WindowPeriod = WindowPeriod...|
+|`_parse_response`|fn|priv|390-443|def _parse_response(self, data: dict, window: WindowPerio...|
 
 
 ---
 
-# copilot.py | Python | 420L | 27 symbols | 8 imports | 31 comments
+# copilot.py | Python | 434L | 28 symbols | 9 imports | 32 comments
 > Path: `src/aibar/aibar/providers/copilot.py`
 - @brief GitHub Copilot usage provider and device-flow authentication.
 - @details Handles device-code authorization, token storage resolution, Copilot quota retrieval, and normalization to provider result schema.
@@ -1595,24 +1636,33 @@ from pathlib import Path
 from typing import Any
 import httpx
 from aibar.providers.base import (
+from aibar.config import resolve_currency_symbol
 import asyncio
 ```
 
 ## Definitions
 
-### class `class CopilotDeviceFlow` (L26-114)
+### fn `def _resolve_provider_currency(raw: dict, provider_name: str) -> str` `priv` (L26-38)
+- @brief Resolve currency symbol from raw API response or configured provider default.
+- @details Delegates to `resolve_currency_symbol` in `aibar.config` (lazy import).
+- @param raw {dict} Raw API response dict.
+- @param provider_name {str} Provider name key.
+- @return {str} Resolved currency symbol.
+- @satisfies REQ-050
+
+### class `class CopilotDeviceFlow` (L39-127)
 - @brief Define copilot device flow component.
 - @details Encapsulates copilot device flow state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
-- var `CLIENT_ID = "Iv1.b507a08c87ecfe98"` (L33)
-- var `SCOPES = "read:user"` (L34)
-- var `DEVICE_CODE_URL = "https://github.com/login/device/code"` (L36)
-- var `TOKEN_URL = "https://github.com/login/oauth/access_token"` (L37)
-- fn `async def request_device_code(self) -> dict[str, Any]` (L39-63)
+- var `CLIENT_ID = "Iv1.b507a08c87ecfe98"` (L46)
+- var `SCOPES = "read:user"` (L47)
+- var `DEVICE_CODE_URL = "https://github.com/login/device/code"` (L49)
+- var `TOKEN_URL = "https://github.com/login/oauth/access_token"` (L50)
+- fn `async def request_device_code(self) -> dict[str, Any]` (L52-76)
   - @brief Execute request device code.
   - @details Applies request device code logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {dict[str, Any]} Function return value.
   - @throws {Exception} Propagates explicit raised error states from internal validation or provider operations.
-- fn `async def poll_for_token(self, device_code: str, interval: int = 5) -> str` (L64-114)
+- fn `async def poll_for_token(self, device_code: str, interval: int = 5) -> str` (L77-127)
   - @brief Execute poll for token.
   - @details Applies poll for token logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param device_code {str} Input parameter `device_code`.
@@ -1620,63 +1670,63 @@ import asyncio
   - @return {str} Function return value.
   - @throws {Exception} Propagates explicit raised error states from internal validation or provider operations.
 
-### class `class CopilotCredentialStore` (L115-171)
+### class `class CopilotCredentialStore` (L128-184)
 - @brief Define copilot credential store component.
 - @details Encapsulates copilot credential store state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
-- var `CONFIG_DIR = Path.home() / ".config" / "aibar"` (L121)
+- var `CONFIG_DIR = Path.home() / ".config" / "aibar"` (L134)
   - @brief Define copilot credential store component.
   - @details Encapsulates copilot credential store state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
-- var `CREDS_FILE = CONFIG_DIR / "copilot.json"` (L122)
-- var `CODEXBAR_CONFIG = Path.home() / ".codexbar" / "config.json"` (L123)
-- fn `def load_token(self) -> str | None` (L125-156)
+- var `CREDS_FILE = CONFIG_DIR / "copilot.json"` (L135)
+- var `CODEXBAR_CONFIG = Path.home() / ".codexbar" / "config.json"` (L136)
+- fn `def load_token(self) -> str | None` (L138-169)
   - @brief Execute load token.
   - @details Applies load token logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {str | None} Function return value.
-- fn `def save_token(self, token: str) -> None` (L157-171)
+- fn `def save_token(self, token: str) -> None` (L170-184)
   - @brief Execute save token.
   - @details Applies save token logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param token {str} Input parameter `token`.
   - @return {None} Function return value.
 
-### class `class CopilotProvider(BaseProvider)` : BaseProvider (L172-212)
+### class `class CopilotProvider(BaseProvider)` : BaseProvider (L185-225)
 - @brief Define copilot provider component.
 - @details Encapsulates copilot provider state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
-- var `USAGE_URL = "https://api.github.com/copilot_internal/user"` (L179)
+- var `USAGE_URL = "https://api.github.com/copilot_internal/user"` (L192)
   - @brief Define copilot provider component.
   - @details Encapsulates copilot provider state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
-- var `EDITOR_VERSION = "vscode/1.96.2"` (L182)
-- var `PLUGIN_VERSION = "copilot-chat/0.26.7"` (L183)
-- var `USER_AGENT = "GitHubCopilotChat/0.26.7"` (L184)
-- var `API_VERSION = "2025-04-01"` (L185)
-- fn `def __init__(self, token: str | None = None) -> None` `priv` (L187-196)
+- var `EDITOR_VERSION = "vscode/1.96.2"` (L195)
+- var `PLUGIN_VERSION = "copilot-chat/0.26.7"` (L196)
+- var `USER_AGENT = "GitHubCopilotChat/0.26.7"` (L197)
+- var `API_VERSION = "2025-04-01"` (L198)
+- fn `def __init__(self, token: str | None = None) -> None` `priv` (L200-209)
   - @brief Execute init.
   - @details Applies init logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param token {str | None} Input parameter `token`.
   - @return {None} Function return value.
-- fn `def is_configured(self) -> bool` (L197-204)
+- fn `def is_configured(self) -> bool` (L210-217)
   - @brief Execute is configured.
   - @details Applies is configured logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {bool} Function return value.
-- fn `def get_config_help(self) -> str` (L205-212)
+- fn `def get_config_help(self) -> str` (L218-225)
   - @brief Execute get config help.
   - @details Applies get config help logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {str} Function return value.
 
-### fn `async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult` (L222-293)
+### fn `async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult` (L235-306)
 - @brief Execute fetch.
 - @details Applies fetch logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param window {WindowPeriod} Input parameter `window`.
 - @return {ProviderResult} Function return value.
 - @throws {Exception} Propagates explicit raised error states from internal validation or provider operations.
 
-### fn `def _parse_response(self, data: dict, window: WindowPeriod) -> ProviderResult` `priv` (L294-389)
+### fn `def _parse_response(self, data: dict, window: WindowPeriod) -> ProviderResult` `priv` (L307-403)
 - @brief Execute parse response.
 - @details Applies parse response logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param data {dict} Input parameter `data`.
 - @param window {WindowPeriod} Input parameter `window`.
 - @return {ProviderResult} Function return value.
 
-### fn `def _get_snapshot(key_camel: str, key_snake: str) -> dict` `priv` (L304-313)
+### fn `def _get_snapshot(key_camel: str, key_snake: str) -> dict` `priv` (L317-326)
 - @brief Execute parse response.
 - @brief Execute get snapshot.
 - @details Applies parse response logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
@@ -1688,13 +1738,13 @@ import asyncio
 - @return {ProviderResult} Function return value.
 - @return {dict} Function return value.
 
-### fn `def _extract_quota_data(snapshot: dict) -> tuple[float | None, float | None]` `priv` (L314-340)
+### fn `def _extract_quota_data(snapshot: dict) -> tuple[float | None, float | None]` `priv` (L327-353)
 - @brief Execute extract quota data.
 - @details Applies extract quota data logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param snapshot {dict} Input parameter `snapshot`.
 - @return {tuple[float | None, float | None]} Function return value.
 
-### fn `async def login(self) -> str` (L390-420)
+### fn `async def login(self) -> str` (L404-434)
 - @brief Execute login.
 - @details Applies login logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {str} Function return value.
@@ -1702,38 +1752,39 @@ import asyncio
 ## Symbol Index
 |Symbol|Kind|Vis|Lines|Sig|
 |---|---|---|---|---|
-|`CopilotDeviceFlow`|class|pub|26-114|class CopilotDeviceFlow|
-|`CopilotDeviceFlow.CLIENT_ID`|var|pub|33||
-|`CopilotDeviceFlow.SCOPES`|var|pub|34||
-|`CopilotDeviceFlow.DEVICE_CODE_URL`|var|pub|36||
-|`CopilotDeviceFlow.TOKEN_URL`|var|pub|37||
-|`CopilotDeviceFlow.request_device_code`|fn|pub|39-63|async def request_device_code(self) -> dict[str, Any]|
-|`CopilotDeviceFlow.poll_for_token`|fn|pub|64-114|async def poll_for_token(self, device_code: str, interval...|
-|`CopilotCredentialStore`|class|pub|115-171|class CopilotCredentialStore|
-|`CopilotCredentialStore.CONFIG_DIR`|var|pub|121||
-|`CopilotCredentialStore.CREDS_FILE`|var|pub|122||
-|`CopilotCredentialStore.CODEXBAR_CONFIG`|var|pub|123||
-|`CopilotCredentialStore.load_token`|fn|pub|125-156|def load_token(self) -> str | None|
-|`CopilotCredentialStore.save_token`|fn|pub|157-171|def save_token(self, token: str) -> None|
-|`CopilotProvider`|class|pub|172-212|class CopilotProvider(BaseProvider)|
-|`CopilotProvider.USAGE_URL`|var|pub|179||
-|`CopilotProvider.EDITOR_VERSION`|var|pub|182||
-|`CopilotProvider.PLUGIN_VERSION`|var|pub|183||
-|`CopilotProvider.USER_AGENT`|var|pub|184||
-|`CopilotProvider.API_VERSION`|var|pub|185||
-|`CopilotProvider.__init__`|fn|priv|187-196|def __init__(self, token: str | None = None) -> None|
-|`CopilotProvider.is_configured`|fn|pub|197-204|def is_configured(self) -> bool|
-|`CopilotProvider.get_config_help`|fn|pub|205-212|def get_config_help(self) -> str|
-|`fetch`|fn|pub|222-293|async def fetch(self, window: WindowPeriod = WindowPeriod...|
-|`_parse_response`|fn|priv|294-389|def _parse_response(self, data: dict, window: WindowPerio...|
-|`_get_snapshot`|fn|priv|304-313|def _get_snapshot(key_camel: str, key_snake: str) -> dict|
-|`_extract_quota_data`|fn|priv|314-340|def _extract_quota_data(snapshot: dict) -> tuple[float | ...|
-|`login`|fn|pub|390-420|async def login(self) -> str|
+|`_resolve_provider_currency`|fn|priv|26-38|def _resolve_provider_currency(raw: dict, provider_name: ...|
+|`CopilotDeviceFlow`|class|pub|39-127|class CopilotDeviceFlow|
+|`CopilotDeviceFlow.CLIENT_ID`|var|pub|46||
+|`CopilotDeviceFlow.SCOPES`|var|pub|47||
+|`CopilotDeviceFlow.DEVICE_CODE_URL`|var|pub|49||
+|`CopilotDeviceFlow.TOKEN_URL`|var|pub|50||
+|`CopilotDeviceFlow.request_device_code`|fn|pub|52-76|async def request_device_code(self) -> dict[str, Any]|
+|`CopilotDeviceFlow.poll_for_token`|fn|pub|77-127|async def poll_for_token(self, device_code: str, interval...|
+|`CopilotCredentialStore`|class|pub|128-184|class CopilotCredentialStore|
+|`CopilotCredentialStore.CONFIG_DIR`|var|pub|134||
+|`CopilotCredentialStore.CREDS_FILE`|var|pub|135||
+|`CopilotCredentialStore.CODEXBAR_CONFIG`|var|pub|136||
+|`CopilotCredentialStore.load_token`|fn|pub|138-169|def load_token(self) -> str | None|
+|`CopilotCredentialStore.save_token`|fn|pub|170-184|def save_token(self, token: str) -> None|
+|`CopilotProvider`|class|pub|185-225|class CopilotProvider(BaseProvider)|
+|`CopilotProvider.USAGE_URL`|var|pub|192||
+|`CopilotProvider.EDITOR_VERSION`|var|pub|195||
+|`CopilotProvider.PLUGIN_VERSION`|var|pub|196||
+|`CopilotProvider.USER_AGENT`|var|pub|197||
+|`CopilotProvider.API_VERSION`|var|pub|198||
+|`CopilotProvider.__init__`|fn|priv|200-209|def __init__(self, token: str | None = None) -> None|
+|`CopilotProvider.is_configured`|fn|pub|210-217|def is_configured(self) -> bool|
+|`CopilotProvider.get_config_help`|fn|pub|218-225|def get_config_help(self) -> str|
+|`fetch`|fn|pub|235-306|async def fetch(self, window: WindowPeriod = WindowPeriod...|
+|`_parse_response`|fn|priv|307-403|def _parse_response(self, data: dict, window: WindowPerio...|
+|`_get_snapshot`|fn|priv|317-326|def _get_snapshot(key_camel: str, key_snake: str) -> dict|
+|`_extract_quota_data`|fn|priv|327-353|def _extract_quota_data(snapshot: dict) -> tuple[float | ...|
+|`login`|fn|pub|404-434|async def login(self) -> str|
 
 
 ---
 
-# openai_usage.py | Python | 235L | 12 symbols | 6 imports | 16 comments
+# openai_usage.py | Python | 242L | 12 symbols | 7 imports | 16 comments
 > Path: `src/aibar/aibar/providers/openai_usage.py`
 - @brief OpenAI organization usage provider.
 - @details Retrieves organization completion usage and cost buckets, aggregates counters, and maps response data to normalized provider metrics.
@@ -1746,6 +1797,7 @@ import httpx
 from aibar.providers.base import (
 from aibar.config import config
 from aibar.config import load_runtime_config
+from aibar.config import resolve_currency_symbol
 ```
 
 ## Definitions
@@ -1830,7 +1882,7 @@ from aibar.config import load_runtime_config
 
 ---
 
-# openrouter.py | Python | 203L | 11 symbols | 3 imports | 11 comments
+# openrouter.py | Python | 209L | 11 symbols | 4 imports | 11 comments
 > Path: `src/aibar/aibar/providers/openrouter.py`
 - @brief OpenRouter key usage and credit provider.
 - @details Fetches key usage snapshots and quota limits, then transforms provider payloads into normalized cost and quota metrics.
@@ -1840,6 +1892,7 @@ from aibar.config import load_runtime_config
 import httpx
 from aibar.providers.base import (
 from aibar.config import config
+from aibar.config import resolve_currency_symbol
 ```
 
 ## Definitions
@@ -1872,28 +1925,29 @@ from aibar.config import config
 - @return {ProviderResult} Function return value.
 - @throws {Exception} Propagates explicit raised error states from internal validation or provider operations.
 
-### fn `def _parse_response(self, data: dict, window: WindowPeriod) -> ProviderResult` `priv` (L133-162)
+### fn `def _parse_response(self, data: dict, window: WindowPeriod) -> ProviderResult` `priv` (L133-168)
 - @brief Execute parse response.
 - @details Applies parse response logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param data {dict} Input parameter `data`.
 - @param window {WindowPeriod} Input parameter `window`.
 - @return {ProviderResult} Function return value.
+- @satisfies REQ-050
 
-### fn `def _get_usage(self, payload: dict, window: WindowPeriod) -> float` `priv` (L163-176)
+### fn `def _get_usage(self, payload: dict, window: WindowPeriod) -> float` `priv` (L169-182)
 - @brief Execute get usage.
 - @details Applies get usage logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param payload {dict} Input parameter `payload`.
 - @param window {WindowPeriod} Input parameter `window`.
 - @return {float} Function return value.
 
-### fn `def _get_byok_usage(self, payload: dict, window: WindowPeriod) -> float` `priv` (L177-190)
+### fn `def _get_byok_usage(self, payload: dict, window: WindowPeriod) -> float` `priv` (L183-196)
 - @brief Execute get byok usage.
 - @details Applies get byok usage logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param payload {dict} Input parameter `payload`.
 - @param window {WindowPeriod} Input parameter `window`.
 - @return {float} Function return value.
 
-### fn `def _to_float(self, value: float | int | None) -> float` `priv` (L191-203)
+### fn `def _to_float(self, value: float | int | None) -> float` `priv` (L197-209)
 - @brief Execute to float.
 - @details Applies to float logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param value {float | int | None} Input parameter `value`.
@@ -1909,15 +1963,15 @@ from aibar.config import config
 |`OpenRouterUsageProvider.is_configured`|fn|pub|43-50|def is_configured(self) -> bool|
 |`OpenRouterUsageProvider.get_config_help`|fn|pub|51-58|def get_config_help(self) -> str|
 |`fetch`|fn|pub|64-132|async def fetch(self, window: WindowPeriod = WindowPeriod...|
-|`_parse_response`|fn|priv|133-162|def _parse_response(self, data: dict, window: WindowPerio...|
-|`_get_usage`|fn|priv|163-176|def _get_usage(self, payload: dict, window: WindowPeriod)...|
-|`_get_byok_usage`|fn|priv|177-190|def _get_byok_usage(self, payload: dict, window: WindowPe...|
-|`_to_float`|fn|priv|191-203|def _to_float(self, value: float | int | None) -> float|
+|`_parse_response`|fn|priv|133-168|def _parse_response(self, data: dict, window: WindowPerio...|
+|`_get_usage`|fn|priv|169-182|def _get_usage(self, payload: dict, window: WindowPeriod)...|
+|`_get_byok_usage`|fn|priv|183-196|def _get_byok_usage(self, payload: dict, window: WindowPe...|
+|`_to_float`|fn|priv|197-209|def _to_float(self, value: float | int | None) -> float|
 
 
 ---
 
-# ui.py | Python | 715L | 32 symbols | 13 imports | 43 comments
+# ui.py | Python | 719L | 32 symbols | 13 imports | 43 comments
 > Path: `src/aibar/aibar/ui.py`
 - @brief Textual terminal UI for usage metrics.
 - @details Implements provider cards, refresh controls, window switching, and raw JSON visualization over normalized provider results.
@@ -1957,144 +2011,146 @@ from aibar.providers.base import (
   - @return {None} Function return value.
   - @return {ComposeResult} Function return value.
 
-### fn `def watch_result(self, result: ProviderResult | None) -> None` (L163-255)
-- @brief Execute watch result.
-- @details Applies watch result logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
-- @param result {ProviderResult | None} Input parameter `result`.
+### fn `def watch_result(self, result: ProviderResult | None) -> None` (L163-259)
+- @brief Render provider metrics into the TUI card widget.
+- @details Triggered when the reactive `result` attribute changes. Builds usage bar, cost, requests, and token rows. Cost label uses `metrics.currency_symbol` (never hardcoded `$`).
+- @param result {ProviderResult | None} Updated provider result; no-op when `None`.
 - @return {None} Function return value.
+- @satisfies REQ-043
+- @satisfies REQ-052
 
-### fn `def watch_is_loading(self, loading: bool) -> None` (L256-268)
+### fn `def watch_is_loading(self, loading: bool) -> None` (L260-272)
 - @brief Execute watch is loading.
 - @details Applies watch is loading logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param loading {bool} Input parameter `loading`.
 - @return {None} Function return value.
 
-### fn `def _is_rate_limit_quota_error(self, result: ProviderResult) -> bool` `priv` (L269-283)
+### fn `def _is_rate_limit_quota_error(self, result: ProviderResult) -> bool` `priv` (L273-287)
 - @brief Check whether result is a rate-limit payload that still carries quota metrics.
 - @details Detects the normalized Claude/Codex/Copilot rate-limit message with available `limit` and `remaining` values so card rendering can continue without showing the textual error banner.
 - @param result {ProviderResult} Provider result candidate.
 - @return {bool} True when result error is rate-limit with quota metrics.
 
-### fn `def _is_displayed_full_percent(self, percent: float | None) -> bool` `priv` (L284-295)
+### fn `def _is_displayed_full_percent(self, percent: float | None) -> bool` `priv` (L288-299)
 - @brief Check whether usage renders as `100.0%` in one-decimal output.
 - @details Applies display-rounding semantics used by Textual labels so near-full values (for example `99.96`) are treated as full usage.
 - @param percent {float | None} Candidate usage percentage.
 - @return {bool} True when rendered one-decimal value is `100.0%`.
 
-### fn `def _supports_limit_reached_hint(self, result: ProviderResult) -> bool` `priv` (L296-309)
+### fn `def _supports_limit_reached_hint(self, result: ProviderResult) -> bool` `priv` (L300-313)
 - @brief Validate whether provider/window pair supports `Limit reached!` hint.
 - @details Limits warning rendering scope to Claude/Codex `5h` or `7d` cards and Copilot `30d` cards.
 - @param result {ProviderResult} Provider result candidate.
 - @return {bool} True when provider/window pair is eligible.
 
-### fn `def _should_show_limit_reached_hint(self, result: ProviderResult) -> bool` `priv` (L310-320)
+### fn `def _should_show_limit_reached_hint(self, result: ProviderResult) -> bool` `priv` (L314-324)
 - @brief Determine whether reset text must include `⚠️ Limit reached!`.
 - @details Evaluates provider/window scope and displayed usage rounding.
 - @param result {ProviderResult} Provider result candidate.
 - @return {bool} True when reset label must include limit-reached hint.
 
-### fn `def _format_reset_value(self, reset_str: str, result: ProviderResult) -> str` `priv` (L321-331)
+### fn `def _format_reset_value(self, reset_str: str, result: ProviderResult) -> str` `priv` (L325-335)
 - @brief Compose reset label value with optional limit-reached suffix.
 - @param reset_str {str} Countdown text from `_format_duration`.
 - @param result {ProviderResult} Provider result candidate.
 - @return {str} Reset value with optional `⚠️ Limit reached!` suffix.
 
-### fn `def _format_age(self, seconds: float) -> str` `priv` (L332-345)
+### fn `def _format_age(self, seconds: float) -> str` `priv` (L336-349)
 - @brief Execute format age.
 - @details Applies format age logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param seconds {float} Input parameter `seconds`.
 - @return {str} Function return value.
 
-### fn `def _format_duration(self, seconds: float) -> str` `priv` (L346-365)
+### fn `def _format_duration(self, seconds: float) -> str` `priv` (L350-369)
 - @brief Execute format duration.
 - @details Applies format duration logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param seconds {float} Input parameter `seconds`.
 - @return {str} Function return value.
 
-### class `class RawJsonView(Static)` : Static (L366-413)
+### class `class RawJsonView(Static)` : Static (L370-417)
 - @brief Define raw json view component.
 - @details Encapsulates raw json view state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
-- fn `def compose(self) -> ComposeResult` (L388-398)
+- fn `def compose(self) -> ComposeResult` (L392-402)
   - @brief Define raw json view component.
   - @brief Execute compose.
   - @details Encapsulates raw json view state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
   - @details Applies compose logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {ComposeResult} Function return value.
-- fn `def watch_data(self, data: dict | None) -> None` (L399-413)
+- fn `def watch_data(self, data: dict | None) -> None` (L403-417)
   - @brief Execute watch data.
   - @details Applies watch data logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param data {dict | None} Input parameter `data`.
   - @return {None} Function return value.
 
-### class `class AIBarUI(App)` : App (L414-613)
+### class `class AIBarUI(App)` : App (L418-617)
 - @brief Define a i bar u i component.
 - @details Encapsulates a i bar u i state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
-- var `BINDINGS = [` (L474)
-- var `TITLE = "Usage Metrics UI"` (L482)
-- fn `def __init__(self) -> None` `priv` (L487-502)
+- var `BINDINGS = [` (L478)
+- var `TITLE = "Usage Metrics UI"` (L486)
+- fn `def __init__(self) -> None` `priv` (L491-506)
   - @brief Execute init.
   - @details Applies init logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {None} Function return value.
-- fn `def compose(self) -> ComposeResult` (L503-530)
+- fn `def compose(self) -> ComposeResult` (L507-534)
   - @brief Execute compose.
   - @details Applies compose logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {ComposeResult} Function return value.
-- fn `async def on_mount(self) -> None` (L531-539)
+- fn `async def on_mount(self) -> None` (L535-543)
   - @brief Execute on mount.
   - @details Applies on mount logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {None} Function return value.
-- fn `async def on_refresh_pressed(self) -> None` (L541-548)
+- fn `async def on_refresh_pressed(self) -> None` (L545-552)
   - @brief Execute on refresh pressed.
   - @details Applies on refresh pressed logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {None} Function return value.
-- fn `async def on_5h_pressed(self) -> None` (L550-557)
+- fn `async def on_5h_pressed(self) -> None` (L554-561)
   - @brief Execute on 5h pressed.
   - @details Applies on 5h pressed logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {None} Function return value.
-- fn `async def on_7d_pressed(self) -> None` (L559-566)
+- fn `async def on_7d_pressed(self) -> None` (L563-570)
   - @brief Execute on 7d pressed.
   - @details Applies on 7d pressed logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {None} Function return value.
 
-### fn `async def action_refresh(self) -> None` (L567-623)
+### fn `async def action_refresh(self) -> None` (L571-627)
 - @brief Execute action refresh.
 - @details Executes shared cache-based retrieval pipeline reused by CLI `show`: force-flag evaluation, idle-time gate check, conditional cache refresh, and readback from `cache.json` before card projection.
 - @return {None} Function return value.
 - @satisfies REQ-009
 - @satisfies REQ-043
 
-### fn `async def action_window_5h(self) -> None` (L624-633)
+### fn `async def action_window_5h(self) -> None` (L628-637)
 - @brief Execute action window 5h.
 - @details Applies action window 5h logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `async def action_window_7d(self) -> None` (L634-643)
+### fn `async def action_window_7d(self) -> None` (L638-647)
 - @brief Execute action window 7d.
 - @details Applies action window 7d logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `async def action_toggle_json(self) -> None` (L644-656)
+### fn `async def action_toggle_json(self) -> None` (L648-660)
 - @brief Execute action toggle json.
 - @details Applies action toggle json logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _get_card(self, provider: ProviderName) -> ProviderCard | None` `priv` (L657-669)
+### fn `def _get_card(self, provider: ProviderName) -> ProviderCard | None` `priv` (L661-673)
 - @brief Execute get card.
 - @details Applies get card logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param provider {ProviderName} Input parameter `provider`.
 - @return {ProviderCard | None} Function return value.
 
-### fn `def _update_window_buttons(self) -> None` `priv` (L670-689)
+### fn `def _update_window_buttons(self) -> None` `priv` (L674-693)
 - @brief Execute update window buttons.
 - @details Applies update window buttons logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _update_json_view(self) -> None` `priv` (L690-703)
+### fn `def _update_json_view(self) -> None` `priv` (L694-707)
 - @brief Execute update json view.
 - @details Applies update json view logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def run_ui() -> None` (L704-713)
+### fn `def run_ui() -> None` (L708-717)
 - @brief Execute run ui.
 - @details Applies run ui logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
@@ -2105,40 +2161,40 @@ from aibar.providers.base import (
 |`ProviderCard`|class|pub|46-245|class ProviderCard(Static)|
 |`ProviderCard.__init__`|fn|priv|123-126|def __init__(|
 |`ProviderCard.compose`|fn|pub|139-162|def compose(self) -> ComposeResult|
-|`watch_result`|fn|pub|163-255|def watch_result(self, result: ProviderResult | None) -> ...|
-|`watch_is_loading`|fn|pub|256-268|def watch_is_loading(self, loading: bool) -> None|
-|`_is_rate_limit_quota_error`|fn|priv|269-283|def _is_rate_limit_quota_error(self, result: ProviderResu...|
-|`_is_displayed_full_percent`|fn|priv|284-295|def _is_displayed_full_percent(self, percent: float | Non...|
-|`_supports_limit_reached_hint`|fn|priv|296-309|def _supports_limit_reached_hint(self, result: ProviderRe...|
-|`_should_show_limit_reached_hint`|fn|priv|310-320|def _should_show_limit_reached_hint(self, result: Provide...|
-|`_format_reset_value`|fn|priv|321-331|def _format_reset_value(self, reset_str: str, result: Pro...|
-|`_format_age`|fn|priv|332-345|def _format_age(self, seconds: float) -> str|
-|`_format_duration`|fn|priv|346-365|def _format_duration(self, seconds: float) -> str|
-|`RawJsonView`|class|pub|366-413|class RawJsonView(Static)|
-|`RawJsonView.compose`|fn|pub|388-398|def compose(self) -> ComposeResult|
-|`RawJsonView.watch_data`|fn|pub|399-413|def watch_data(self, data: dict | None) -> None|
-|`AIBarUI`|class|pub|414-613|class AIBarUI(App)|
-|`AIBarUI.BINDINGS`|var|pub|474||
-|`AIBarUI.TITLE`|var|pub|482||
-|`AIBarUI.__init__`|fn|priv|487-502|def __init__(self) -> None|
-|`AIBarUI.compose`|fn|pub|503-530|def compose(self) -> ComposeResult|
-|`AIBarUI.on_mount`|fn|pub|531-539|async def on_mount(self) -> None|
-|`AIBarUI.on_refresh_pressed`|fn|pub|541-548|async def on_refresh_pressed(self) -> None|
-|`AIBarUI.on_5h_pressed`|fn|pub|550-557|async def on_5h_pressed(self) -> None|
-|`AIBarUI.on_7d_pressed`|fn|pub|559-566|async def on_7d_pressed(self) -> None|
-|`action_refresh`|fn|pub|567-623|async def action_refresh(self) -> None|
-|`action_window_5h`|fn|pub|624-633|async def action_window_5h(self) -> None|
-|`action_window_7d`|fn|pub|634-643|async def action_window_7d(self) -> None|
-|`action_toggle_json`|fn|pub|644-656|async def action_toggle_json(self) -> None|
-|`_get_card`|fn|priv|657-669|def _get_card(self, provider: ProviderName) -> ProviderCa...|
-|`_update_window_buttons`|fn|priv|670-689|def _update_window_buttons(self) -> None|
-|`_update_json_view`|fn|priv|690-703|def _update_json_view(self) -> None|
-|`run_ui`|fn|pub|704-713|def run_ui() -> None|
+|`watch_result`|fn|pub|163-259|def watch_result(self, result: ProviderResult | None) -> ...|
+|`watch_is_loading`|fn|pub|260-272|def watch_is_loading(self, loading: bool) -> None|
+|`_is_rate_limit_quota_error`|fn|priv|273-287|def _is_rate_limit_quota_error(self, result: ProviderResu...|
+|`_is_displayed_full_percent`|fn|priv|288-299|def _is_displayed_full_percent(self, percent: float | Non...|
+|`_supports_limit_reached_hint`|fn|priv|300-313|def _supports_limit_reached_hint(self, result: ProviderRe...|
+|`_should_show_limit_reached_hint`|fn|priv|314-324|def _should_show_limit_reached_hint(self, result: Provide...|
+|`_format_reset_value`|fn|priv|325-335|def _format_reset_value(self, reset_str: str, result: Pro...|
+|`_format_age`|fn|priv|336-349|def _format_age(self, seconds: float) -> str|
+|`_format_duration`|fn|priv|350-369|def _format_duration(self, seconds: float) -> str|
+|`RawJsonView`|class|pub|370-417|class RawJsonView(Static)|
+|`RawJsonView.compose`|fn|pub|392-402|def compose(self) -> ComposeResult|
+|`RawJsonView.watch_data`|fn|pub|403-417|def watch_data(self, data: dict | None) -> None|
+|`AIBarUI`|class|pub|418-617|class AIBarUI(App)|
+|`AIBarUI.BINDINGS`|var|pub|478||
+|`AIBarUI.TITLE`|var|pub|486||
+|`AIBarUI.__init__`|fn|priv|491-506|def __init__(self) -> None|
+|`AIBarUI.compose`|fn|pub|507-534|def compose(self) -> ComposeResult|
+|`AIBarUI.on_mount`|fn|pub|535-543|async def on_mount(self) -> None|
+|`AIBarUI.on_refresh_pressed`|fn|pub|545-552|async def on_refresh_pressed(self) -> None|
+|`AIBarUI.on_5h_pressed`|fn|pub|554-561|async def on_5h_pressed(self) -> None|
+|`AIBarUI.on_7d_pressed`|fn|pub|563-570|async def on_7d_pressed(self) -> None|
+|`action_refresh`|fn|pub|571-627|async def action_refresh(self) -> None|
+|`action_window_5h`|fn|pub|628-637|async def action_window_5h(self) -> None|
+|`action_window_7d`|fn|pub|638-647|async def action_window_7d(self) -> None|
+|`action_toggle_json`|fn|pub|648-660|async def action_toggle_json(self) -> None|
+|`_get_card`|fn|priv|661-673|def _get_card(self, provider: ProviderName) -> ProviderCa...|
+|`_update_window_buttons`|fn|priv|674-693|def _update_window_buttons(self) -> None|
+|`_update_json_view`|fn|priv|694-707|def _update_json_view(self) -> None|
+|`run_ui`|fn|pub|708-717|def run_ui() -> None|
 
 
 ---
 
-# extension.js | JavaScript | 1231L | 17 symbols | 9 imports | 26 comments
+# extension.js | JavaScript | 1239L | 17 symbols | 9 imports | 26 comments
 > Path: `src/aibar/gnome-extension/aibar@aibar.panel/extension.js`
 - @brief GNOME Shell panel extension for aibar metrics.
 - @details Collects usage JSON from the aibar CLI and renders provider-specific quota/cost cards in the GNOME panel popup.
@@ -2212,14 +2268,16 @@ full usage for limit-reached warning rendering.
 
 ### fn `const showResetPendingHint = () =>` (L675-677)
 
-### fn `const toPercent = (value) =>` (L1008-1013)
+### fn `const toPercent = (value) =>` (L1014-1019)
 - @brief Execute update u i.
 - @details Applies update u i logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
+Uses `metrics.currency_symbol` from the first cost-bearing provider for the panel summary label.
 - @return s {any} Function return value.
+- @satisfies REQ-053
 
-### fn `const getPanelUsageValues = (providerName, data) =>` (L1015-1072)
+### fn `const getPanelUsageValues = (providerName, data) =>` (L1021-1078)
 
-### class `export default class AIBarExtension extends Extension` : Extension (L1205-1231)
+### class `export default class AIBarExtension extends Extension` : Extension (L1213-1239)
 - @brief GNOME extension lifecycle adapter for AIBarIndicator registration.
 - @brief Execute enable.
 - @details Extends Extension (GNOME Shell 45+ API) to integrate with the extension lifecycle.
@@ -2245,7 +2303,7 @@ Uses this.uuid (provided by the Extension base class) as the status-area key.
 |`updateWindowBar`|fn||652-710|const updateWindowBar = (bar, pct, resetTime, useDays) =>|
 |`setResetLabel`|fn||658-664|const setResetLabel = (baseText) =>|
 |`showResetPendingHint`|fn||675-677|const showResetPendingHint = () =>|
-|`toPercent`|fn||1008-1013|const toPercent = (value) =>|
-|`getPanelUsageValues`|fn||1015-1072|const getPanelUsageValues = (providerName, data) =>|
-|`AIBarExtension`|class||1205-1231|export default class AIBarExtension extends Extension|
+|`toPercent`|fn||1014-1019|const toPercent = (value) =>|
+|`getPanelUsageValues`|fn||1021-1078|const getPanelUsageValues = (providerName, data) =>|
+|`AIBarExtension`|class||1213-1239|export default class AIBarExtension extends Extension|
 

@@ -26,21 +26,32 @@ IDLE_TIME_PATH = APP_CACHE_DIR / "idle-time.json"
 DEFAULT_IDLE_DELAY_SECONDS = 300
 DEFAULT_API_CALL_DELAY_SECONDS = 20
 DEFAULT_GNOME_REFRESH_INTERVAL_SECONDS = 60
+DEFAULT_CURRENCY_SYMBOL = "$"
+VALID_CURRENCY_SYMBOLS: tuple[str, ...] = ("$", "£", "€")
+
+_CURRENCY_CODE_TO_SYMBOL: dict[str, str] = {
+    "USD": "$",
+    "GBP": "£",
+    "EUR": "€",
+}
 
 
 class RuntimeConfig(BaseModel):
     """
-    @brief Define runtime configuration component for refresh throttling controls.
-    @details Encodes persisted CLI runtime controls used by `show` refresh logic
-    and GNOME extension scheduling. Fields are validated as positive integers and
-    default to conservative values that reduce rate-limit pressure while preserving
-    configurability.
+    @brief Define runtime configuration component for refresh throttling and currency controls.
+    @details Encodes persisted CLI runtime controls used by `show` refresh logic,
+    GNOME extension scheduling, and per-provider currency symbol resolution.
+    Fields are validated with defaults that reduce rate-limit pressure.
+    `currency_symbols` maps provider name strings to currency symbols (`$`, `£`, `€`);
+    missing entries default to `DEFAULT_CURRENCY_SYMBOL` at resolution time.
     @satisfies CTN-008
+    @satisfies REQ-049
     """
 
     idle_delay_seconds: int = Field(default=DEFAULT_IDLE_DELAY_SECONDS, ge=1)
     api_call_delay_seconds: int = Field(default=DEFAULT_API_CALL_DELAY_SECONDS, ge=1)
     gnome_refresh_interval_seconds: int = Field(default=DEFAULT_GNOME_REFRESH_INTERVAL_SECONDS, ge=1)
+    currency_symbols: dict[str, str] = Field(default_factory=dict)
 
 
 class IdleTimeState(BaseModel):
@@ -161,6 +172,36 @@ def load_cli_cache() -> dict[str, Any] | None:
     except (OSError, ValueError):
         return None
     return None
+
+
+def resolve_currency_symbol(raw: dict[str, Any], provider_name: str) -> str:
+    """
+    @brief Resolve currency symbol for a provider result from API response or config.
+    @details Extraction priority:
+    1. `raw["currency"]` field: if a recognized symbol (`$`, `£`, `€`) → use directly;
+       if an ISO-4217 code (`USD`, `GBP`, `EUR`) → map to symbol.
+    2. `RuntimeConfig.currency_symbols[provider_name]` configured default.
+    3. `DEFAULT_CURRENCY_SYMBOL` (`"$"`) as final fallback.
+    @param raw {dict[str, Any]} Raw API response dict from the provider fetch call.
+    @param provider_name {str} Provider name string key (e.g. `"claude"`, `"openai"`).
+    @return {str} Resolved currency symbol; always a member of `VALID_CURRENCY_SYMBOLS`.
+    @satisfies REQ-050
+    """
+    raw_currency = raw.get("currency") if isinstance(raw, dict) else None
+    if isinstance(raw_currency, str):
+        if raw_currency in VALID_CURRENCY_SYMBOLS:
+            return raw_currency
+        mapped = _CURRENCY_CODE_TO_SYMBOL.get(raw_currency.upper())
+        if mapped is not None:
+            return mapped
+    try:
+        runtime_config = load_runtime_config()
+        symbol = runtime_config.currency_symbols.get(provider_name, DEFAULT_CURRENCY_SYMBOL)
+        if symbol in VALID_CURRENCY_SYMBOLS:
+            return symbol
+    except Exception:  # noqa: BLE001
+        pass
+    return DEFAULT_CURRENCY_SYMBOL
 
 
 def save_cli_cache(payload: dict[str, Any]) -> None:
