@@ -31,7 +31,17 @@ log() {
 }
 
 # Run a single refresh cycle
+##
+# @brief Execute a single token refresh cycle.
+# @details Truncates LOG_FILE to zero bytes before writing any log entries, ensuring each
+#   invocation (once mode) and each daemon iteration (loop mode) produces a standalone log
+#   containing only entries from that cycle. Invokes `claude /usage` and `aibar login --provider
+#   claude` when the respective commands are available on PATH.
+# @retval 0 Always; individual command failures are logged as warnings, not fatal errors.
+# @satisfies REQ-048
+##
 do_refresh() {
+    > "$LOG_FILE"
     log "Starting token refresh cycle"
     
     if command -v claude >/dev/null 2>&1; then

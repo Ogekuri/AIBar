@@ -85,7 +85,7 @@ GNOME Shell runtime. The original file is never modified.
 
 ---
 
-# claude_token_refresh.sh | Shell | 164L | 12 symbols | 0 imports | 26 comments
+# claude_token_refresh.sh | Shell | 174L | 12 symbols | 0 imports | 35 comments
 > Path: `scripts/claude_token_refresh.sh`
 
 ## Definitions
@@ -95,13 +95,13 @@ GNOME Shell runtime. The original file is never modified.
 - var `LOG_FILE="$CONFIG_DIR/claude_token_refresh.log"` (L22)
 - var `INTERVAL="${AIBAR_CLAUDE_REFRESH_INTERVAL_SECONDS:-1800}"` (L23)
 - fn `log() {` (L29)
-- fn `do_refresh() {` (L34)
-- fn `run_loop() {` (L55)
-- fn `is_running() {` (L65)
-- fn `start_daemon() {` (L77)
-- fn `stop_daemon() {` (L91)
-- fn `show_status() {` (L112)
-- fn `show_usage() {` (L126)
+- fn `do_refresh() {` (L43)
+- fn `run_loop() {` (L65)
+- fn `is_running() {` (L75)
+- fn `start_daemon() {` (L87)
+- fn `stop_daemon() {` (L101)
+- fn `show_status() {` (L122)
+- fn `show_usage() {` (L136)
 ## Symbol Index
 |Symbol|Kind|Vis|Lines|Sig|
 |---|---|---|---|---|
@@ -110,13 +110,13 @@ GNOME Shell runtime. The original file is never modified.
 |`LOG_FILE`|var||22||
 |`INTERVAL`|var||23||
 |`log`|fn||29|log()|
-|`do_refresh`|fn||34|do_refresh()|
-|`run_loop`|fn||55|run_loop()|
-|`is_running`|fn||65|is_running()|
-|`start_daemon`|fn||77|start_daemon()|
-|`stop_daemon`|fn||91|stop_daemon()|
-|`show_status`|fn||112|show_status()|
-|`show_usage`|fn||126|show_usage()|
+|`do_refresh`|fn||43|do_refresh()|
+|`run_loop`|fn||65|run_loop()|
+|`is_running`|fn||75|is_running()|
+|`start_daemon`|fn||87|start_daemon()|
+|`stop_daemon`|fn||101|stop_daemon()|
+|`show_status`|fn||122|show_status()|
+|`show_usage`|fn||136|show_usage()|
 
 
 ---

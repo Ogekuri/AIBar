@@ -40,6 +40,14 @@
   - `defining_files: scripts/test-gnome-extension.sh`
   - `thread_model: no explicit threads detected`
 
+- `id: PROC:claude-token-refresh`
+  - `type: Process`
+  - `parent_process: null`
+  - `role: Claude token refresh daemon and single-shot executor`
+  - `entrypoint_symbols: main script dispatch (start|stop|status|once|loop subcommands)`
+  - `defining_files: scripts/claude_token_refresh.sh`
+  - `thread_model: no explicit threads detected`
+
 ## Execution Units
 
 ### PROC:install-ext
@@ -265,6 +273,34 @@
   - GNOME Shell UI/runtime APIs (`Main`, `PanelMenu`, `PopupMenu`, `St`, `GLib`, `Gio`, `Clutter`, `GObject`) accessed via ES module imports (`gi://` and `resource://` schemes; GNOME Shell 45+ only).
   - Subprocess creation and asynchronous stdio communication.
   - Terminal emulator process launch.
+
+### PROC:claude-token-refresh
+- `Entrypoints`
+  - main script dispatch: subcommand routing via `case` statement [`scripts/claude_token_refresh.sh`]
+- `Lifecycle/Trigger`
+  - Invoked by user or external scheduler with one of `start|stop|status|once|loop` subcommands.
+  - `once`: calls `do_refresh()` once and exits; `start`: daemonizes via `nohup` + re-invokes with `loop`; `loop`: calls `run_loop()` indefinitely.
+- `Internal Call-Trace Tree`
+  - main script dispatch [`scripts/claude_token_refresh.sh`]
+    - `do_refresh(...)`: truncate LOG_FILE, then execute single token refresh cycle [`scripts/claude_token_refresh.sh`]
+      - External boundary: `> "$LOG_FILE"` truncation.
+      - External boundary: `claude /usage` (optional, PATH-gated).
+      - External boundary: `aibar login --provider claude` (optional, PATH-gated).
+    - `run_loop(...)`: infinite loop calling `do_refresh()` with configurable sleep interval [`scripts/claude_token_refresh.sh`]
+      - `do_refresh(...)`: single cycle execution (see above) [`scripts/claude_token_refresh.sh`]
+    - `start_daemon(...)`: guard duplicate start, daemonize via nohup re-invoke as `loop` [`scripts/claude_token_refresh.sh`]
+      - `is_running(...)`: PID-file existence + kill-0 liveness check [`scripts/claude_token_refresh.sh`]
+      - External boundary: `nohup "$0" loop` subprocess detach.
+    - `stop_daemon(...)`: signal running daemon PID and remove PID file [`scripts/claude_token_refresh.sh`]
+      - `is_running(...)`: PID-file existence + kill-0 liveness check [`scripts/claude_token_refresh.sh`]
+    - `show_status(...)`: print daemon state, config dir, log file, interval [`scripts/claude_token_refresh.sh`]
+      - `is_running(...)`: PID-file existence + kill-0 liveness check [`scripts/claude_token_refresh.sh`]
+    - `log(...)`: timestamped `tee -a "$LOG_FILE"` appender [`scripts/claude_token_refresh.sh`]
+- `External Boundaries`
+  - Filesystem: `$CONFIG_DIR/claude_token_refresh.log` (truncated then appended per cycle), `$CONFIG_DIR/claude_token_refresh.pid`.
+  - `claude` CLI (optional, PATH-dependent).
+  - `aibar` CLI (optional, PATH-dependent).
+  - `nohup` for daemon detachment.
 
 ## Communication Edges
 
