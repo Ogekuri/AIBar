@@ -34,6 +34,7 @@ class ProviderName(str, Enum):
     OPENROUTER = "openrouter"
     COPILOT = "copilot"
     CODEX = "codex"
+    GEMINIAI = "geminiai"
 
 
 class UsageMetrics(BaseModel):

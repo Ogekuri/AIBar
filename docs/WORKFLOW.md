@@ -108,6 +108,7 @@
         - `OpenRouterUsageProvider.__init__(...)`: resolve OpenRouter token source [`src/aibar/aibar/providers/openrouter.py`]
         - `CopilotProvider.__init__(...)`: resolve Copilot token source [`src/aibar/aibar/providers/copilot.py`]
         - `CodexProvider.__init__(...)`: resolve Codex credential source [`src/aibar/aibar/providers/codex.py`]
+        - `GeminiAIProvider.__init__(...)`: resolve GeminiAI OAuth token/client/project/billing sources [`src/aibar/aibar/providers/geminiai.py`]
       - `retrieve_results_via_cache_pipeline(...)`: shared retrieval order (`force` -> idle-time gate -> conditional refresh -> cache readback) using canonical cache sections `payload`/`status` [`src/aibar/aibar/cli.py`]
         - `remove_idle_time_file(...)`: clear persisted idle-time state on forced refresh [`src/aibar/aibar/config.py`]
         - `load_cli_cache(...)`: load persisted provider dataset from `~/.cache/aibar/cache.json` [`src/aibar/aibar/config.py`]
@@ -133,6 +134,8 @@
             - `CopilotProvider.fetch(...)`: Copilot usage retrieval with `resolve_currency_symbol` for `currency_symbol` [`src/aibar/aibar/providers/copilot.py`]
               - `resolve_currency_symbol(...)`: resolve ISO code or symbol from API raw → configured default → `"$"` [`src/aibar/aibar/config.py`]
             - `CodexProvider.fetch(...)`: Codex usage retrieval with `resolve_currency_symbol` for `currency_symbol` [`src/aibar/aibar/providers/codex.py`]
+              - `resolve_currency_symbol(...)`: resolve ISO code or symbol from API raw → configured default → `"$"` [`src/aibar/aibar/config.py`]
+            - `GeminiAIProvider.fetch(...)`: GeminiAI usage/cost retrieval via Cloud Monitoring + Cloud Billing with `resolve_currency_symbol` for `currency_symbol` [`src/aibar/aibar/providers/geminiai.py`]
               - `resolve_currency_symbol(...)`: resolve ISO code or symbol from API raw → configured default → `"$"` [`src/aibar/aibar/config.py`]
           - `_record_attempt_status(...)`: persist per-provider/window attempt result (`OK`/`FAIL`) in cache `status` section [`src/aibar/aibar/cli.py`]
           - `_serialize_results_payload(...)`: serialize refreshed provider results [`src/aibar/aibar/cli.py`]
@@ -180,9 +183,12 @@
     - `env(...)`: environment-help route [`src/aibar/aibar/cli.py`]
       - `Config.get_env_var_help(...)`: provider help block synthesis [`src/aibar/aibar/config.py`]
         - `Config.is_provider_configured(...)`: provider probe via provider class [`src/aibar/aibar/config.py`]
-    - `setup(...)`: interactive setup route for runtime throttling (idle delay, API call delay, gnome refresh interval), per-provider currency symbol defaults, and provider credentials [`src/aibar/aibar/cli.py`]
+    - `setup(...)`: interactive setup route for runtime throttling (idle delay, API call delay, gnome refresh interval), per-provider currency symbol defaults, provider credentials, and GeminiAI OAuth/project/billing configuration [`src/aibar/aibar/cli.py`]
       - `load_runtime_config(...)`: load persisted runtime throttling and currency defaults [`src/aibar/aibar/config.py`]
       - `RuntimeConfig(...)`: validate user-provided idle delay, API call delay, gnome_refresh_interval_seconds, and currency_symbols values [`src/aibar/aibar/config.py`]
+      - `GeminiAICredentialStore.save_client_config(...)`: persist validated GeminiAI OAuth desktop-client JSON [`src/aibar/aibar/providers/geminiai.py`]
+      - `GeminiAICredentialStore.extract_project_id(...)`: derive project id from validated OAuth payload [`src/aibar/aibar/providers/geminiai.py`]
+      - `GeminiAICredentialStore.authorize_interactively(...)`: optional browser OAuth flow and token persistence [`src/aibar/aibar/providers/geminiai.py`]
       - `save_runtime_config(...)`: persist runtime throttling and currency settings to `~/.config/aibar/config.json` [`src/aibar/aibar/config.py`]
       - `write_env_file(...)`: env-file credential update/persist [`src/aibar/aibar/config.py`]
     - `login(...)`: provider login router [`src/aibar/aibar/cli.py`]
@@ -198,6 +204,9 @@
           - `CopilotDeviceFlow.request_device_code(...)`: device-code request [`src/aibar/aibar/providers/copilot.py`]
           - `CopilotDeviceFlow.poll_for_token(...)`: token polling loop [`src/aibar/aibar/providers/copilot.py`]
           - `CopilotCredentialStore.save_token(...)`: token persistence [`src/aibar/aibar/providers/copilot.py`]
+      - `_login_geminiai(...)`: GeminiAI OAuth browser-flow route [`src/aibar/aibar/cli.py`]
+        - `GeminiAICredentialStore.has_client_config(...)`: OAuth desktop client-file availability check [`src/aibar/aibar/providers/geminiai.py`]
+        - `GeminiAICredentialStore.authorize_interactively(...)`: browser authorization + token persistence [`src/aibar/aibar/providers/geminiai.py`]
   - `run_ui(...)`: standalone module entrypoint path [`src/aibar/aibar/ui.py`]
     - `AIBarUI.__init__(...)`: provider registry initialization [`src/aibar/aibar/ui.py`]
     - `AIBarUI.on_mount(...)`: first-refresh trigger [`src/aibar/aibar/ui.py`]
@@ -209,6 +218,8 @@
   - Textual event loop, rendering, and widget runtime.
   - Python threadpool scheduling via `asyncio.to_thread(...)` in Text UI refresh.
   - HTTP network interactions through provider endpoints.
+  - Browser-based OAuth consent flow and loopback callback for GeminiAI Google credentials.
+  - Google Cloud Monitoring API and Cloud Billing API HTTPS endpoints.
   - Local filesystem reads/writes under user home for env, credentials, runtime config, CLI cache, and idle-time state.
   - Process environment and terminal stdout/stderr streams.
 
@@ -249,6 +260,7 @@
 - `Internal Call-Trace Tree`
   - `AIBarExtension.enable(...)`: extension enable adapter; registers indicator via `Main.panel.addToStatusArea(this.uuid, ...)` [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
     - `AIBarIndicator._init(...)`: indicator runtime bootstrap with panel title `AIBar Monitor` [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+      - provider-order initialization: `_providerOrder = ['claude', 'openrouter', 'copilot', 'codex', 'geminiai']` for deterministic tab/card sorting [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
       - `AIBarIndicator._buildPanelButton(...)`: panel icon/percentage/summary-label setup with five ordered percentage labels (Claude 5h, Claude 7d, Copilot, Codex 5h, Codex 7d) and primary/secondary style classes [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
       - `AIBarIndicator._buildPopupMenu(...)`: popup structure and actions setup including tab container scaffold and `Refresh Now` forced-refresh action wiring [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
         - `AIBarIndicator._refreshData(...)`: refresh action handler with forced CLI path (`aibar show --json --force`) for popup `Refresh Now` [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
@@ -259,10 +271,12 @@
         - `_getAiBarPath(...)`: executable path resolution [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
         - callback chain
           - `AIBarIndicator._parseOutput(...)`: JSON decode + state update supporting canonical `payload`/`status`/`extension` schema; reads `extension.gnome_refresh_interval_seconds` and reschedules auto-refresh timer on interval change [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
-          - `AIBarIndicator._updateUI(...)`: provider tab/card rendering update plus ordered panel percentage-label projection (`claude5h`, `claude7d`, `copilot`, `codex5h`, `codex7d`) with hidden-label fallback for missing metrics; per-card `Update at: HH:MM` label bottom-right populated from `data.updated_at`; panel summary cost label uses `currency_symbol` from first cost-bearing provider [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+          - `AIBarIndicator._updateUI(...)`: provider tab/card rendering update with deterministic order (`claude`, `openrouter`, `copilot`, `codex`, `geminiai`) plus ordered panel percentage-label projection (`claude5h`, `claude7d`, `copilot`, `codex5h`, `codex7d`) with hidden-label fallback for missing metrics; per-card `Update at: HH:MM` label bottom-right populated from `data.updated_at`; panel summary cost label uses `currency_symbol` from first cost-bearing provider [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
             - `AIBarIndicator._createTab(...)`: provider tab creation [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+              - `_getProviderDisplayName(...)`: provider label resolver with GeminiAI title-case override [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
             - `AIBarIndicator._updateProviderCard(...)`: card lifecycle update [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
               - `AIBarIndicator._createProviderCard(...)`: card widget graph creation including `updateAtLabel` bottom-right row [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+                - `_getProviderDisplayName(...)`: provider header label resolver with GeminiAI title-case override [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
               - `AIBarIndicator._populateProviderCard(...)`: metrics-to-widget projection with quota label, cost label using `metrics.currency_symbol`, byok label using `metrics.currency_symbol`, `⚠️ Limit reached!` suffix at displayed `100.0%` for Claude/Codex/Copilot bars, and `Update at: HH:MM` bottom-right label [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
                 - `_isDisplayedZeroPercent(...)`: normalize near-zero percentages to displayed `0.0%` semantics for fallback eligibility [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
                 - `_getProgressClass(...)`: usage-threshold class mapping [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]

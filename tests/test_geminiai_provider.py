@@ -1,0 +1,209 @@
+"""
+@file
+@brief GeminiAI provider integration tests.
+@details Verifies GeminiAI provider metric normalization, OAuth-backed fetch flow
+error handling for HTTP 429, and Monitoring time-series aggregation behavior.
+@satisfies REQ-054
+@satisfies REQ-057
+@satisfies REQ-058
+@satisfies REQ-060
+@satisfies TST-026
+@satisfies TST-027
+"""
+
+import asyncio
+from pathlib import Path
+
+from googleapiclient.errors import HttpError
+from httplib2 import Response
+
+from aibar.providers.base import ProviderName, WindowPeriod
+from aibar.providers.geminiai import GEMINIAI_OAUTH_SCOPES, GeminiAIProvider
+
+
+class _FakeCredentialStore:
+    """
+    @brief Minimal credential-store stub for GeminiAI provider unit tests.
+    @details Supplies deterministic OAuth material without filesystem or network
+    dependencies.
+    """
+
+    client_config_path = Path("/tmp/fake-geminiai-client.json")
+    token_path = Path("/tmp/fake-geminiai-token.json")
+
+    def has_authorized_credentials(self) -> bool:
+        """
+        @brief Return deterministic configured state for tests.
+        @return {bool} Always True.
+        """
+        return True
+
+    def has_client_config(self) -> bool:
+        """
+        @brief Return deterministic client-config availability for tests.
+        @return {bool} Always True.
+        """
+        return True
+
+    def load_client_config(self) -> dict:
+        """
+        @brief Return deterministic OAuth payload fixture.
+        @return {dict} Minimal OAuth payload containing `project_id`.
+        """
+        return {"installed": {"project_id": "demo-project"}}
+
+    def extract_project_id(self, payload: dict) -> str | None:
+        """
+        @brief Extract project id from payload fixture.
+        @param payload {dict} OAuth payload fixture.
+        @return {str | None} Embedded project id.
+        """
+        return payload.get("installed", {}).get("project_id")
+
+    def load_credentials(self):
+        """
+        @brief Return opaque credential sentinel object.
+        @return {object} Non-null sentinel used by patched provider internals.
+        """
+        return object()
+
+
+def test_geminiai_fetch_maps_monitoring_and_billing_metrics(monkeypatch) -> None:
+    """
+    @brief Verify GeminiAI provider maps Monitoring/Billing values into UsageMetrics.
+    @details Mocks Google API adapters so no network calls occur; asserts requests,
+    token usage, and cost metrics are propagated to ProviderResult.
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @return {None} Function return value.
+    @satisfies REQ-057
+    @satisfies REQ-060
+    @satisfies TST-026
+    """
+    provider = GeminiAIProvider(
+        credential_store=_FakeCredentialStore(),
+        project_id="demo-project",
+    )
+
+    monkeypatch.setattr(provider, "_build_monitoring_service", lambda credentials: object())
+    monkeypatch.setattr(provider, "_build_billing_service", lambda credentials: object())
+    monkeypatch.setattr(
+        provider,
+        "_list_billing_accounts",
+        lambda billing_service: [{"name": "billingAccounts/111111-222222-333333"}],
+    )
+    monkeypatch.setattr(
+        provider,
+        "_get_project_billing_info",
+        lambda billing_service, project_id: {
+            "billingAccountName": "billingAccounts/111111-222222-333333"
+        },
+    )
+
+    responses = iter(
+        [
+            (42.0, {"timeSeries": [{"points": [{"value": {"int64Value": "42"}}]}]}),
+            (314.0, {"timeSeries": [{"points": [{"value": {"doubleValue": 314.0}}]}]}),
+            (12.5, {"timeSeries": [{"points": [{"value": {"doubleValue": 12.5}}]}]}),
+        ]
+    )
+
+    def _fake_query(
+        monitoring_service,
+        project_id: str,
+        metric_filter: str,
+        start_time,
+        end_time,
+        allow_missing: bool,
+    ):
+        """
+        @brief Return deterministic metric responses in expected query order.
+        @return {tuple[float | None, dict]} Next metric aggregate payload.
+        """
+        del monitoring_service, project_id, metric_filter, start_time, end_time, allow_missing
+        return next(responses)
+
+    monkeypatch.setattr(provider, "_query_monitoring_metric", _fake_query)
+
+    result = asyncio.run(provider.fetch(WindowPeriod.DAY_7))
+    assert result.provider == ProviderName.GEMINIAI
+    assert result.window == WindowPeriod.DAY_7
+    assert result.metrics.requests == 42
+    assert result.metrics.input_tokens == 314
+    assert result.metrics.cost == 12.5
+    assert result.raw["project_id"] == "demo-project"
+    assert result.raw["billing_account"] == "billingAccounts/111111-222222-333333"
+
+
+def test_geminiai_fetch_converts_http_429_to_rate_limit_error(monkeypatch) -> None:
+    """
+    @brief Verify GeminiAI provider maps Google API HTTP 429 to standard rate-limit error.
+    @details Asserts provider returns normalized `status_code=429` and retry-after
+    metadata used by idle-time retry policy.
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @return {None} Function return value.
+    @satisfies REQ-058
+    @satisfies TST-027
+    """
+    provider = GeminiAIProvider(
+        credential_store=_FakeCredentialStore(),
+        project_id="demo-project",
+    )
+
+    monkeypatch.setattr(provider, "_build_monitoring_service", lambda credentials: object())
+    monkeypatch.setattr(provider, "_build_billing_service", lambda credentials: object())
+
+    response = Response({"status": "429", "retry-after": "120"})
+    http_error = HttpError(resp=response, content=b'{"error":"rate limit"}')
+    monkeypatch.setattr(
+        provider,
+        "_query_monitoring_metric",
+        lambda *args, **kwargs: (_ for _ in ()).throw(http_error),
+    )
+
+    result = asyncio.run(provider.fetch(WindowPeriod.DAY_7))
+    assert result.is_error
+    assert result.error == "Rate limited. Try again later."
+    assert result.raw["status_code"] == 429
+    assert result.raw["retry_after_seconds"] == 120.0
+
+
+def test_geminiai_sum_time_series_values_aggregates_numeric_points() -> None:
+    """
+    @brief Verify GeminiAI time-series aggregator sums int64 and double values.
+    @return {None} Function return value.
+    @satisfies REQ-057
+    """
+    provider = GeminiAIProvider(
+        credential_store=_FakeCredentialStore(),
+        project_id="demo-project",
+    )
+    response = {
+        "timeSeries": [
+            {
+                "points": [
+                    {"value": {"int64Value": "3"}},
+                    {"value": {"doubleValue": 2.5}},
+                ]
+            },
+            {
+                "points": [
+                    {"value": {"int64Value": "4"}},
+                ]
+            },
+        ]
+    }
+    assert provider._sum_time_series_values(response) == 9.5
+
+
+def test_geminiai_oauth_scopes_include_monitoring_and_billing_readonly() -> None:
+    """
+    @brief Verify GeminiAI OAuth scopes include Monitoring and Cloud Billing read permissions.
+    @return {None} Function return value.
+    @satisfies REQ-056
+    @satisfies TST-025
+    """
+    assert "https://www.googleapis.com/auth/monitoring.read" in GEMINIAI_OAUTH_SCOPES
+    assert (
+        "https://www.googleapis.com/auth/cloud-billing.readonly"
+        in GEMINIAI_OAUTH_SCOPES
+    )

@@ -44,6 +44,8 @@ class RuntimeConfig(BaseModel):
     Fields are validated with defaults that reduce rate-limit pressure.
     `currency_symbols` maps provider name strings to currency symbols (`$`, `£`, `€`);
     missing entries default to `DEFAULT_CURRENCY_SYMBOL` at resolution time.
+    Optional GeminiAI fields persist Google Cloud project/billing identifiers used
+    by OAuth-backed Monitoring/Billing API fetch execution.
     @satisfies CTN-008
     @satisfies REQ-049
     """
@@ -52,6 +54,8 @@ class RuntimeConfig(BaseModel):
     api_call_delay_seconds: int = Field(default=DEFAULT_API_CALL_DELAY_SECONDS, ge=1)
     gnome_refresh_interval_seconds: int = Field(default=DEFAULT_GNOME_REFRESH_INTERVAL_SECONDS, ge=1)
     currency_symbols: dict[str, str] = Field(default_factory=dict)
+    geminiai_project_id: str | None = Field(default=None)
+    geminiai_billing_account: str | None = Field(default=None)
 
 
 class IdleTimeState(BaseModel):
@@ -356,6 +360,7 @@ class Config:
         ProviderName.OPENROUTER: "OPENROUTER_API_KEY",
         ProviderName.COPILOT: "GITHUB_TOKEN",
         ProviderName.CODEX: "CODEX_ACCESS_TOKEN",
+        ProviderName.GEMINIAI: "GEMINIAI_OAUTH_ACCESS_TOKEN",
     }
 
     # Provider descriptions
@@ -389,6 +394,12 @@ class Config:
             "description": "OpenAI Codex usage via ChatGPT backend",
             "official": False,
             "note": "Reads credentials from ~/.codex/auth.json",
+        },
+        ProviderName.GEMINIAI: {
+            "name": "GeminiAI",
+            "description": "Google Gemini API usage and billing via OAuth",
+            "official": True,
+            "note": "Uses Google Cloud Monitoring + Cloud Billing APIs",
         },
     }
 
@@ -428,6 +439,12 @@ class Config:
             store = CopilotCredentialStore()
             return store.load_token()
 
+        if provider == ProviderName.GEMINIAI:
+            from aibar.providers.geminiai import GeminiAICredentialStore
+
+            store = GeminiAICredentialStore()
+            return store.load_access_token()
+
         return None
 
     def is_provider_configured(self, provider: ProviderName) -> bool:
@@ -444,6 +461,7 @@ class Config:
             OpenRouterUsageProvider,
             CopilotProvider,
             CodexProvider,
+            GeminiAIProvider,
         )
 
         provider_map = {
@@ -452,6 +470,7 @@ class Config:
             ProviderName.OPENROUTER: OpenRouterUsageProvider,
             ProviderName.COPILOT: CopilotProvider,
             ProviderName.CODEX: CodexProvider,
+            ProviderName.GEMINIAI: GeminiAIProvider,
         }
 
         provider_class = provider_map.get(provider)

@@ -11,6 +11,7 @@ import sys
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import click
 from click.core import ParameterSource
@@ -32,6 +33,7 @@ from aibar.providers import (
     OpenRouterUsageProvider,
     CopilotProvider,
     CodexProvider,
+    GeminiAIProvider,
 )
 from aibar.providers.base import (
     BaseProvider,
@@ -581,6 +583,7 @@ def get_providers() -> dict[ProviderName, BaseProvider]:
         ProviderName.OPENROUTER: OpenRouterUsageProvider(),
         ProviderName.COPILOT: CopilotProvider(),
         ProviderName.CODEX: CodexProvider(),
+        ProviderName.GEMINIAI: GeminiAIProvider(),
     }
 
 
@@ -1155,7 +1158,7 @@ def main() -> None:
     "--provider",
     "-p",
     default="all",
-    help="Provider to query (claude, openai, openrouter, copilot, codex, all)",
+    help="Provider to query (claude, openai, openrouter, copilot, codex, geminiai, all)",
 )
 @click.option(
     "--window",
@@ -1307,7 +1310,12 @@ def _print_result(name: ProviderName, result, label: str | None = None) -> None:
         click.echo(f"Resets in: {_RESET_PENDING_MESSAGE}")
 
     if (
-        name in (ProviderName.CLAUDE, ProviderName.CODEX, ProviderName.COPILOT)
+        name in (
+            ProviderName.CLAUDE,
+            ProviderName.CODEX,
+            ProviderName.COPILOT,
+            ProviderName.GEMINIAI,
+        )
         and m.remaining is not None
         and m.limit is not None
     ):
@@ -1505,6 +1513,9 @@ def setup() -> None:
     @return {None} Function return value.
     @satisfies REQ-005
     @satisfies REQ-049
+    @satisfies REQ-055
+    @satisfies REQ-056
+    @satisfies REQ-059
     """
     from aibar.config import (
         ENV_FILE_PATH,
@@ -1515,6 +1526,7 @@ def setup() -> None:
         save_runtime_config,
         write_env_file,
     )
+    from aibar.providers.geminiai import GeminiAICredentialStore
 
     click.echo()
     click.echo("Usage UI Setup")
@@ -1560,11 +1572,88 @@ def setup() -> None:
             show_choices=True,
         )
         currency_symbols[_provider_name] = _chosen
+
+    geminiai_project_id = runtime_config.geminiai_project_id
+    geminiai_billing_account = runtime_config.geminiai_billing_account
+    credential_store = GeminiAICredentialStore()
+
+    click.echo()
+    click.echo(click.style("GeminiAI (Google Cloud OAuth)", bold=True))
+    click.echo("  Configure OAuth desktop client JSON for Monitoring/Billing API access.")
+    oauth_source = click.prompt(
+        "  geminiai oauth source",
+        type=click.Choice(["skip", "file", "paste"]),
+        default="skip",
+        show_choices=True,
+    )
+    if oauth_source == "skip":
+        click.echo("  -> Skipped")
+    else:
+        client_payload_raw: dict[str, object] | None = None
+        if oauth_source == "file":
+            default_path = str(credential_store.client_config_path)
+            oauth_path_raw = click.prompt(
+                "  geminiai oauth client json path",
+                default=default_path,
+                show_default=True,
+            ).strip()
+            try:
+                client_payload_raw = json.loads(
+                    Path(oauth_path_raw).read_text(encoding="utf-8")
+                )
+            except OSError as exc:
+                click.echo(click.style(f"  -> OAuth file error: {exc}", fg="red"))
+            except ValueError as exc:
+                click.echo(click.style(f"  -> OAuth JSON decode error: {exc}", fg="red"))
+        else:
+            pasted_json = click.prompt(
+                "  geminiai oauth client json (single-line)",
+                default="",
+                show_default=False,
+            ).strip()
+            if pasted_json:
+                try:
+                    client_payload_raw = json.loads(pasted_json)
+                except ValueError as exc:
+                    click.echo(click.style(f"  -> OAuth JSON decode error: {exc}", fg="red"))
+
+        if client_payload_raw is not None:
+            try:
+                credential_store.save_client_config(client_payload_raw)
+                saved_payload = credential_store.load_client_config()
+                detected_project_id = credential_store.extract_project_id(saved_payload)
+                if detected_project_id is not None:
+                    geminiai_project_id = detected_project_id
+                click.echo("  -> OAuth client saved")
+                if click.confirm("  Open browser and authorize GeminiAI now?", default=True):
+                    credential_store.authorize_interactively()
+                    click.echo("  -> OAuth token saved")
+            except (FileNotFoundError, ValueError, OSError, ProviderError) as exc:
+                click.echo(click.style(f"  -> GeminiAI OAuth setup failed: {exc}", fg="red"))
+
+        project_default = geminiai_project_id or ""
+        project_input = click.prompt(
+            "  geminiai project id",
+            default=project_default,
+            show_default=bool(project_default),
+        ).strip()
+        geminiai_project_id = project_input or None
+
+        billing_default = geminiai_billing_account or ""
+        billing_input = click.prompt(
+            "  geminiai billing account (optional)",
+            default=billing_default,
+            show_default=bool(billing_default),
+        ).strip()
+        geminiai_billing_account = billing_input or None
+
     configured_runtime = RuntimeConfig(
         idle_delay_seconds=idle_delay_seconds,
         api_call_delay_seconds=api_call_delay_seconds,
         gnome_refresh_interval_seconds=gnome_refresh_interval_seconds,
         currency_symbols=currency_symbols,
+        geminiai_project_id=geminiai_project_id,
+        geminiai_billing_account=geminiai_billing_account,
     )
     save_runtime_config(configured_runtime)
     click.echo("  -> Saved")
@@ -1658,7 +1747,7 @@ def setup() -> None:
     "--provider",
     "-p",
     default="claude",
-    help="Provider to login to (claude, copilot)",
+    help="Provider to login to (claude, copilot, geminiai)",
 )
 def login(provider: str) -> None:
     """
@@ -1671,9 +1760,11 @@ def login(provider: str) -> None:
         _login_claude()
     elif provider == "copilot":
         _login_copilot()
+    elif provider == "geminiai":
+        _login_geminiai()
     else:
         click.echo(f"Login not supported for provider: {provider}")
-        click.echo("Supported providers: claude, copilot")
+        click.echo("Supported providers: claude, copilot, geminiai")
         sys.exit(1)
 
 
@@ -1752,6 +1843,43 @@ def _login_copilot() -> None:
     except Exception as e:
         click.echo(click.style(f"\n Login failed: {e}", fg="red"))
         sys.exit(1)
+
+
+def _login_geminiai() -> None:
+    """
+    @brief Execute GeminiAI OAuth login flow.
+    @details Reuses persisted OAuth client configuration to launch browser-based
+    authorization and persist refresh-capable Google credentials.
+    @return {None} Function return value.
+    @satisfies REQ-055
+    @satisfies REQ-056
+    """
+    from aibar.providers.geminiai import GeminiAICredentialStore
+
+    click.echo()
+    click.echo("GeminiAI Login")
+    click.echo("=" * 40)
+    click.echo()
+
+    credential_store = GeminiAICredentialStore()
+    if not credential_store.has_client_config():
+        click.echo(click.style(" GeminiAI OAuth client config not found.", fg="red"))
+        click.echo("Run 'aibar setup' and configure GeminiAI OAuth first.")
+        sys.exit(1)
+
+    try:
+        credentials = credential_store.authorize_interactively()
+    except (FileNotFoundError, ValueError, OSError, ProviderError) as exc:
+        click.echo(click.style(f"\n Login failed: {exc}", fg="red"))
+        sys.exit(1)
+
+    click.echo(click.style(" Login successful!", fg="green", bold=True))
+    click.echo()
+    click.echo(f"  OAuth token saved to: {credential_store.token_path}")
+    if credentials.token:
+        click.echo(f"  Access token: {credentials.token[:12]}...")
+    click.echo()
+    click.echo("You can now run: aibar show --provider geminiai")
 
 
 if __name__ == "__main__":

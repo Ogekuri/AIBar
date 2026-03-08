@@ -10,6 +10,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 EXTENSION_PATH = PROJECT_ROOT / "src" / "aibar" / "gnome-extension" / "aibar@aibar.panel" / "extension.js"
 METADATA_PATH = PROJECT_ROOT / "src" / "aibar" / "gnome-extension" / "aibar@aibar.panel" / "metadata.json"
+STYLESHEET_PATH = PROJECT_ROOT / "src" / "aibar" / "gnome-extension" / "aibar@aibar.panel" / "stylesheet.css"
 
 
 def test_quota_only_label_uses_remaining_credits_prefix_and_bold_remaining() -> None:
@@ -219,3 +220,28 @@ def test_extension_auto_refresh_uses_configurable_interval() -> None:
     source = EXTENSION_PATH.read_text(encoding="utf-8")
     assert "this._refreshIntervalSeconds," in source
     assert "REFRESH_INTERVAL_SECONDS," not in source
+
+
+def test_geminiai_extension_tab_order_label_and_bright_pink_styles() -> None:
+    """
+    @brief Verify GeminiAI extension integration uses expected order, label, and colors.
+    @details Asserts provider ordering array places `geminiai` after `codex`,
+    display-name mapping renders `GeminiAI`, and stylesheet defines bright-pink
+    tab/card classes for GeminiAI.
+    @satisfies REQ-061
+    @satisfies REQ-062
+    @satisfies TST-029
+    """
+    extension_source = EXTENSION_PATH.read_text(encoding="utf-8")
+    stylesheet_source = STYLESHEET_PATH.read_text(encoding="utf-8")
+
+    assert "this._providerOrder = ['claude', 'openrouter', 'copilot', 'codex', 'geminiai'];" in extension_source
+    assert "const PROVIDER_DISPLAY_NAMES = {" in extension_source
+    assert "geminiai: 'GeminiAI'" in extension_source
+    assert "_getProviderDisplayName(providerName)" in extension_source
+    assert "text: _getProviderDisplayName(providerName)" in extension_source
+
+    assert ".aibar-tab-active-geminiai {" in stylesheet_source
+    assert ".aibar-tab-label-geminiai {" in stylesheet_source
+    assert ".aibar-provider-geminiai {" in stylesheet_source
+    assert "#FF1493" in stylesheet_source

@@ -1,5 +1,8 @@
 # Runtime dependencies for src/aibar/aibar.
 click
+google-api-python-client
+google-auth-httplib2
+google-auth-oauthlib
 httpx
 pydantic
 textual

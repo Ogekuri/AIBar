@@ -10,6 +10,7 @@ from aibar.providers.openai_usage import OpenAIUsageProvider
 from aibar.providers.openrouter import OpenRouterUsageProvider
 from aibar.providers.copilot import CopilotProvider
 from aibar.providers.codex import CodexProvider
+from aibar.providers.geminiai import GeminiAIProvider
 
 __all__ = [
     "BaseProvider",
@@ -20,4 +21,5 @@ __all__ = [
     "OpenRouterUsageProvider",
     "CopilotProvider",
     "CodexProvider",
+    "GeminiAIProvider",
 ]

@@ -71,6 +71,10 @@
     border-bottom: 2px solid #FF6B35;
 }
 
+.aibar-tab-active-geminiai {
+    border-bottom: 2px solid #FF1493;
+}
+
 /* Tab label (base + per-provider color) */
 .aibar-tab-label {
     font-size: 0.8em;
@@ -96,6 +100,10 @@
 
 .aibar-tab-label-codex {
     color: #FF6B35;
+}
+
+.aibar-tab-label-geminiai {
+    color: #FF1493;
 }
 
 /* Separator */
@@ -135,6 +143,10 @@
 
 .aibar-provider-codex {
     border-left: 3px solid #FF6B35;
+}
+
+.aibar-provider-geminiai {
+    border-left: 3px solid #FF1493;
 }
 
 /* Progress bars */

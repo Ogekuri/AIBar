@@ -19,6 +19,20 @@ const REFRESH_INTERVAL_SECONDS = 60;
 const ENV_FILE_PATH = GLib.get_home_dir() + '/.config/aibar/env';
 const RESET_PENDING_MESSAGE = 'Starts when the first message is sent';
 const RATE_LIMIT_ERROR_MESSAGE = 'Rate limited. Try again later.';
+const PROVIDER_DISPLAY_NAMES = {
+    geminiai: 'GeminiAI',
+};
+
+/**
+ * @brief Resolve provider label text for GNOME tab/card rendering.
+ * @param {string} providerName Provider key from JSON payload.
+ * @returns {string} Display label for provider tab and card.
+ */
+function _getProviderDisplayName(providerName) {
+    if (providerName in PROVIDER_DISPLAY_NAMES)
+        return PROVIDER_DISPLAY_NAMES[providerName];
+    return providerName.toUpperCase();
+}
 
 /**
  * @brief Resolve aibar executable path.
@@ -158,7 +172,7 @@ class AIBarIndicator extends PanelMenu.Button {
         this._providerTabs = {};
         this._refreshIntervalSeconds = REFRESH_INTERVAL_SECONDS;
         this._activeProvider = null;
-        this._providerOrder = ['claude', 'openrouter', 'copilot', 'codex'];
+        this._providerOrder = ['claude', 'openrouter', 'copilot', 'codex', 'geminiai'];
 
         this._buildPanelButton();
         this._buildPopupMenu();
@@ -368,7 +382,7 @@ class AIBarIndicator extends PanelMenu.Button {
         });
 
         let tabLabel = new St.Label({
-            text: providerName.toUpperCase(),
+            text: _getProviderDisplayName(providerName),
             style_class: `aibar-tab-label aibar-tab-label-${providerName}`,
         });
 
@@ -446,7 +460,7 @@ class AIBarIndicator extends PanelMenu.Button {
         });
 
         let header = new St.Label({
-            text: providerName.toUpperCase(),
+            text: _getProviderDisplayName(providerName),
         });
         header.hide();
         container.add_child(header);

@@ -1,7 +1,7 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.3.18"
+version: "0.3.19"
 date: "2026-03-08"
 author: "req-change"
 scope:
@@ -113,6 +113,8 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **DES-004**: MUST sanitize sensitive keys (`token`, `key`, `secret`, `password`, `authorization`) from cached raw payloads before disk writes.
 - **DES-005**: MUST parse env-file assignments with optional `export`, quoted values, and inline comments in GNOME extension env loading.
 - **DES-006**: MUST auto-refresh GNOME extension data at interval read from `extension.gnome_refresh_interval_seconds` in the `aibar show --json` output (fallback `60` seconds when field absent), execute popup `Refresh Now` actions with `aibar show --json --force`, and apply the new interval on each successful data refresh.
+- **DES-007**: MUST use provider-registry-driven instantiation so adding `geminiai` introduces no duplicated control-flow branches in `show`, `doctor`, `setup`, `ui`, or refresh/load orchestration.
+- **DES-008**: MUST include `geminiai` in provider-name typing and validation while preserving compatibility for `claude`, `openai`, `openrouter`, `copilot`, and `codex`.
 
 ### 3.2 Functions
 - **REQ-001**: MUST skip unconfigured providers in `show` output and print missing environment-variable hints when text mode is used.
@@ -168,6 +170,16 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-051**: CLI `show` text output MUST format cost values using `metrics.currency_symbol` from the fetched result; MUST NOT use hardcoded `$` for cost lines.
 - **REQ-052**: Textual UI provider cards MUST format cost values using `metrics.currency_symbol` from the loaded provider result; MUST NOT use hardcoded `$` for cost display.
 - **REQ-053**: GNOME extension panel summary label MUST use `metrics.currency_symbol` from the JSON payload for cost aggregation display; provider card cost label MUST use `metrics.currency_symbol` per-provider instead of hardcoded `$`.
+- **REQ-054**: MUST support provider key `geminiai` across `aibar`, `aibar setup`, `aibar show`, `aibar show --json`, Textual UI, and GNOME extension payload pipelines.
+- **REQ-055**: `setup` MUST accept GeminiAI OAuth desktop-client credentials from file path or pasted JSON, validate required fields, and persist normalized client-secret JSON under `~/.config/aibar/`.
+- **REQ-056**: `setup` MUST execute OAuth installed-app authorization with scopes `https://www.googleapis.com/auth/monitoring.read` and `https://www.googleapis.com/auth/cloud-billing.readonly`, then persist refresh-capable authorized-user credentials for GeminiAI API calls.
+- **REQ-057**: GeminiAI provider `fetch` MUST query Cloud Monitoring usage metrics and Cloud Billing account/cost endpoints, then return unified `UsageMetrics` containing token usage and monetary cost for requested window semantics.
+- **REQ-058**: GeminiAI provider failures for HTTP `429` or Google quota exhaustion MUST mark attempt status as `FAIL`, preserve prior payload snapshots, and apply idle-time retry policy used for rate-limited refreshes.
+- **REQ-059**: `setup` MUST include `geminiai` in `currency_symbols` selection prompts and persist `RuntimeConfig.currency_symbols.geminiai`; GeminiAI cost rendering MUST resolve `metrics.currency_symbol` from API currency or configured fallback.
+- **REQ-060**: CLI text `show`, JSON `show --json`, and Textual UI provider cards MUST expose GeminiAI token usage, quota values, reset metadata, and cost fields using existing per-window payload/status contracts.
+- **REQ-061**: GNOME extension MUST render GeminiAI provider tab/card using bright-pink style classes, include GeminiAI payload in panel aggregation logic, and order `geminiai` immediately after `codex`.
+- **REQ-062**: GUI labels for GeminiAI MUST render provider title exactly `GeminiAI` in Textual and GNOME surfaces, while machine-readable payload keys and CLI provider arguments remain lowercase `geminiai`.
+- **REQ-063**: Refresh scheduling MUST apply configured inter-provider call delay and idle-time lifecycle updates to GeminiAI fetches identically to existing providers, including `idle-time.json` updates after success and rate-limited failures.
 
 ## 4. Test Requirements
 
@@ -196,6 +208,12 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-021**: Tests that mock `httpx.AsyncClient` transport and invoke provider `fetch` or `fetch_all_windows` execution path MUST restrict assertions to success/error state (`is_error`, `error` fields), result-dict window key presence, HTTP call count, and cache/filesystem side effects; MUST NOT assert specific numeric metric field values (`usage_percent`, `remaining`, `cost`) derived from the parsed HTTP response.
 - **TST-022**: MUST verify `scripts/claude_token_refresh.sh` `do_refresh()` truncates `LOG_FILE` before writing any log entries (source-level pattern assertion).
 - **TST-023**: MUST verify `currency_symbol` in `UsageMetrics` flows through provider fetch and cache serialization to CLI text output (`_print_result`) and Textual UI cost label using the symbol from metrics, not a hardcoded `$`.
+- **TST-024**: MUST verify `setup` accepts GeminiAI OAuth desktop-client credentials from both pasted JSON and file path input and persists normalized client-secret JSON in `~/.config/aibar/`.
+- **TST-025**: MUST verify GeminiAI OAuth authorization uses scopes `monitoring.read` and `cloud-billing.readonly` and persists refresh-capable authorized-user credentials for subsequent provider fetch execution.
+- **TST-026**: MUST verify GeminiAI provider fetch calls Cloud Monitoring and Cloud Billing APIs and maps responses into token usage plus monetary cost fields in `UsageMetrics`.
+- **TST-027**: MUST verify GeminiAI HTTP `429` and quota-exhaustion responses preserve cached payload snapshots, mark status `FAIL`, and update `idle-time.json` using existing rate-limit retry policy.
+- **TST-028**: MUST verify `setup` currency prompt includes `geminiai` and GeminiAI cost rendering in CLI text, JSON payload, and Textual UI uses `metrics.currency_symbol` with configured fallback behavior.
+- **TST-029**: MUST verify GNOME extension renders GeminiAI provider tab/card with bright-pink style class assignment, provider title `GeminiAI`, and provider ordering immediately after `codex`.
 
 ## 5. Evidence
 

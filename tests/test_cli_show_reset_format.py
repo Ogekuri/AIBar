@@ -23,8 +23,11 @@ def test_show_reset_output_uses_ui_style_day_token() -> None:
 
 def test_show_output_prints_remaining_credits_for_quota_providers() -> None:
     """
-    @brief Verify CLI source renders remaining-credits line for Claude, Codex, and Copilot.
+    @brief Verify CLI source renders remaining-credits line for quota providers.
     """
     source = CLI_PATH.read_text(encoding="utf-8")
-    assert "ProviderName.CLAUDE, ProviderName.CODEX, ProviderName.COPILOT" in source
+    assert "ProviderName.CLAUDE" in source
+    assert "ProviderName.CODEX" in source
+    assert "ProviderName.COPILOT" in source
+    assert "ProviderName.GEMINIAI" in source
     assert 'click.echo(f"Remaining credits: {m.remaining:.1f} / {m.limit:.1f}")' in source

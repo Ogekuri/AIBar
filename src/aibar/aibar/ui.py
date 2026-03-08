@@ -32,6 +32,7 @@ from aibar.providers import (
     ClaudeOAuthProvider,
     CodexProvider,
     CopilotProvider,
+    GeminiAIProvider,
     OpenAIUsageProvider,
     OpenRouterUsageProvider,
 )
@@ -501,6 +502,7 @@ class AIBarUI(App):
             ProviderName.OPENROUTER: OpenRouterUsageProvider(),
             ProviderName.COPILOT: CopilotProvider(),
             ProviderName.CODEX: CodexProvider(),
+            ProviderName.GEMINIAI: GeminiAIProvider(),
         }
         self.results: dict[ProviderName, ProviderResult | None] = {}
 
@@ -526,6 +528,7 @@ class AIBarUI(App):
                         ProviderCard(ProviderName.OPENROUTER, id="card-openrouter"),
                         ProviderCard(ProviderName.COPILOT, id="card-copilot"),
                         ProviderCard(ProviderName.CODEX, id="card-codex"),
+                        ProviderCard(ProviderName.GEMINIAI, id="card-geminiai"),
                         id="cards-container",
                     )
                 with TabPane("Raw JSON", id="json-tab"):
