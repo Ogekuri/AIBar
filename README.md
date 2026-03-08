@@ -34,7 +34,11 @@ AIBar aggregates usage metrics for Claude, OpenAI, OpenRouter, GitHub Copilot, C
 - Human-readable output and JSON output (`--json`) for scripting/integration.
 - Provider diagnostics (`doctor`) and interactive setup (`setup`) for credentials.
 - Local cache of successful results under `~/.cache/aibar` to reduce repeated API calls.
-- GNOME Shell extension: [![Screenshot10](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot10.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot10.png)
+- GNOME Shell extension
+
+### Screenshot
+
+[![Screenshot10](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot10.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot10.png)
 
 
 
@@ -148,9 +152,7 @@ To enable GeminiAI features, configure Google Cloud before running `aibar setup`
 ### Claude
 
 [![Screenshot01](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot01.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot01.png)
-
 [![Screenshot02](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot02.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot02.png)
-
 [![Screenshot03](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot03.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot03.png)
 
 
