@@ -234,7 +234,7 @@
   - On enable, constructs panel indicator, performs immediate refresh, and schedules periodic refresh timer.
   - On disable, destroys indicator and removes timer source.
 - `Internal Call-Trace Tree`
-  - `AIBarExtension.enable(...)`: extension enable adapter [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+  - `AIBarExtension.enable(...)`: extension enable adapter; registers indicator via `Main.panel.addToStatusArea(this.uuid, ...)` [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
     - `AIBarIndicator._init(...)`: indicator runtime bootstrap with panel title `AIBar Monitor` [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
       - `AIBarIndicator._buildPanelButton(...)`: panel icon/percentage/summary-label setup with five ordered percentage labels (Claude 5h, Claude 7d, Copilot, Codex 5h, Codex 7d) and primary/secondary style classes [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
       - `AIBarIndicator._buildPopupMenu(...)`: popup structure and actions setup including `Last updated`/`next update` status item scaffold and `Refresh Now` forced-refresh action wiring [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
@@ -261,7 +261,8 @@
   - `AIBarExtension.disable(...)`: extension disable adapter [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
     - `AIBarIndicator.destroy(...)`: timer teardown + parent destroy [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
 - `External Boundaries`
-  - GNOME Shell UI/runtime APIs (`Main`, `PanelMenu`, `PopupMenu`, `St`, `GLib`, `Gio`, `Clutter`, `GObject`).
+  - GNOME Shell extensions API (`Extension` base class providing `uuid`, `metadata`, `dir`).
+  - GNOME Shell UI/runtime APIs (`Main`, `PanelMenu`, `PopupMenu`, `St`, `GLib`, `Gio`, `Clutter`, `GObject`) accessed via ES module imports (`gi://` and `resource://` schemes; GNOME Shell 45+ only).
   - Subprocess creation and asynchronous stdio communication.
   - Terminal emulator process launch.
 

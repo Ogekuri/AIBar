@@ -2,39 +2,18 @@
  * @file extension.js
  * @brief GNOME Shell panel extension for aibar metrics.
  * @details Collects usage JSON from the aibar CLI and renders provider-specific quota/cost cards in the GNOME panel popup.
+ * @note Targets GNOME Shell 45–48; uses ES module imports (gi:// and resource://) as required by GNOME Shell 45+.
  */
-if (typeof globalThis.imports === 'undefined') {
-    globalThis.imports = {
-        gi: {
-            GLib: {
-                get_home_dir: () => '',
-            },
-            St: {},
-            Gio: {},
-            Clutter: {},
-            GObject: {
-                registerClass: (...args) => args[args.length - 1],
-            },
-        },
-        ui: {
-            main: {},
-            panelMenu: {
-                Button: class {},
-            },
-            popupMenu: {},
-        },
-    };
-}
 
-const GLib = globalThis.imports.gi.GLib;
-const St = globalThis.imports.gi.St;
-const Gio = globalThis.imports.gi.Gio;
-const Clutter = globalThis.imports.gi.Clutter;
-const GObject = globalThis.imports.gi.GObject;
-
-const Main = globalThis.imports.ui.main;
-const PanelMenu = globalThis.imports.ui.panelMenu;
-const PopupMenu = globalThis.imports.ui.popupMenu;
+import GLib from 'gi://GLib';
+import St from 'gi://St';
+import Gio from 'gi://Gio';
+import Clutter from 'gi://Clutter';
+import GObject from 'gi://GObject';
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
+import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
+import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
 const REFRESH_INTERVAL_SECONDS = 300;
 const ENV_FILE_PATH = GLib.get_home_dir() + '/.config/aibar/env';
@@ -1202,32 +1181,29 @@ class AIBarIndicator extends PanelMenu.Button {
     }
 });
 
-/** @brief GNOME extension lifecycle adapter for AIBarIndicator registration. */
-export default class AIBarExtension {
-    /**
-     * @brief Execute constructor.
-     * @details Applies constructor logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
-     * @returns {any} Function return value.
-     */
-    constructor() {
-        this._indicator = null;
-    }
-
+/**
+ * @brief GNOME extension lifecycle adapter for AIBarIndicator registration.
+ * @details Extends Extension (GNOME Shell 45+ API) to integrate with the extension lifecycle.
+ * Uses this.uuid (provided by the Extension base class) as the status-area key.
+ * @satisfies PRJ-004
+ */
+export default class AIBarExtension extends Extension {
     /**
      * @brief Execute enable.
-     * @details Applies enable logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
-     * @returns {any} Function return value.
+     * @details Instantiates AIBarIndicator and adds it to the GNOME panel status area.
+     * @returns {void}
      */
     enable() {
+        this._indicator = null;
         console.debug('aibar: Enabling extension');
         this._indicator = new AIBarIndicator();
-        Main.panel.addToStatusArea('aibar', this._indicator, 0, 'right');
+        Main.panel.addToStatusArea(this.uuid, this._indicator, 0, 'right');
     }
 
     /**
      * @brief Execute disable.
-     * @details Applies disable logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
-     * @returns {any} Function return value.
+     * @details Destroys the AIBarIndicator and releases the panel status area slot.
+     * @returns {void}
      */
     disable() {
         console.debug('aibar: Disabling extension');

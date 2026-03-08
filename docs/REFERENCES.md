@@ -3,6 +3,7 @@
 .
 ├── scripts
 │   ├── aibar.sh
+│   ├── check-js-syntax.sh
 │   ├── claude_token_refresh.sh
 │   ├── install-gnome-extension.sh
 │   └── test-gnome-extension.sh
@@ -55,6 +56,31 @@ source ${VENVDIR}/bin/activate
 |`BASE_DIR`|var||18||
 |`VENVDIR`|var||26||
 |`PYTHONPATH`|var||48||
+
+
+---
+
+# check-js-syntax.sh | Shell | 37L | 2 symbols | 0 imports | 15 comments
+> Path: `scripts/check-js-syntax.sh`
+
+## Definitions
+
+- var `FILE="$1"` (L24)
+- @brief Syntax-only JavaScript checker for GJS (GNOME JavaScript) source files.
+- @details Preprocesses GNOME Shell extension JS files before syntax validation with Node.js.
+Replaces gi:// and resource:// import statements (GJS-only URL schemes) with equivalent
+const stub declarations so that Node.js syntax checking succeeds without requiring the
+GNOME Shell runtime. The original file is never modified.
+- @param $1 Path to the .js file to syntax-check.
+- @retval 0 Syntax is valid.
+- @retval 1 File argument missing, sed preprocessing failed, or syntax error detected.
+- @note GJS supports gi:// (GObject introspection) and resource:// (GNOME Shell UI modules)
+- var `TMP=$(mktemp /tmp/check-js-syntax-XXXXXX.js)` (L25)
+## Symbol Index
+|Symbol|Kind|Vis|Lines|Sig|
+|---|---|---|---|---|
+|`FILE`|var||24||
+|`TMP`|var||25||
 
 
 ---
@@ -2109,59 +2135,73 @@ from aibar.providers.base import (
 
 ---
 
-# extension.js | JavaScript | 1240L | 17 symbols | 0 imports | 28 comments
+# extension.js | JavaScript | 1216L | 17 symbols | 9 imports | 27 comments
 > Path: `src/aibar/gnome-extension/aibar@aibar.panel/extension.js`
 - @brief GNOME Shell panel extension for aibar metrics.
 - @details Collects usage JSON from the aibar CLI and renders provider-specific quota/cost cards in the GNOME panel popup.
+- @note Targets GNOME Shell 45–48; uses ES module imports (gi:// and resource://) as required by GNOME Shell 45+.
+
+## Imports
+```
+import GLib from 'gi://GLib';
+import St from 'gi://St';
+import Gio from 'gi://Gio';
+import Clutter from 'gi://Clutter';
+import GObject from 'gi://GObject';
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
+import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
+import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
+```
 
 ## Definitions
 
-- const `const REFRESH_INTERVAL_SECONDS = 300;` (L39)
-- const `const ENV_FILE_PATH = GLib.get_home_dir() + '/.config/aibar/env';` (L40)
-- const `const RESET_PENDING_MESSAGE = 'Starts when the first message is sent';` (L41)
-- const `const RATE_LIMIT_ERROR_MESSAGE = 'Rate limited. Try again later.';` (L42)
-### fn `function _getAiBarPath()` (L49-59)
+- const `const REFRESH_INTERVAL_SECONDS = 300;` (L18)
+- const `const ENV_FILE_PATH = GLib.get_home_dir() + '/.config/aibar/env';` (L19)
+- const `const RESET_PENDING_MESSAGE = 'Starts when the first message is sent';` (L20)
+- const `const RATE_LIMIT_ERROR_MESSAGE = 'Rate limited. Try again later.';` (L21)
+### fn `function _getAiBarPath()` (L28-38)
 - @brief Resolve aibar executable path.
 - @details Prefers PATH discovery and falls back to AIBAR_PATH from the env file.
 - @return s {string} Resolved executable path or fallback command name.
 
-### fn `function _loadEnvFromFile()` (L66-118)
+### fn `function _loadEnvFromFile()` (L45-97)
 - @brief Load key-value environment variables from aibar env file.
 - @details Parses export syntax, quoted values, and inline comments.
 - @return s {Object<string,string>} Parsed environment map.
 
-### fn `function _getProgressClass(pct)` (L125-131)
+### fn `function _getProgressClass(pct)` (L104-110)
 - @brief Map percentage usage to CSS progress severity class.
 - @param {number} pct Usage percentage.
 - @return s {string} CSS class suffix for progress state.
 
-### fn `function _isDisplayedZeroPercent(pct)` (L140-147)
+### fn `function _isDisplayedZeroPercent(pct)` (L119-126)
 - @brief Check whether a percentage renders as `0.0%` in one-decimal UI output.
 - @details Mirrors display rounding semantics so fallback reset text is shown when
 usage is effectively zero from the user's perspective (e.g. internal 0.04 -> 0.0%).
 - @param {number} pct Usage percentage candidate.
 - @return s {boolean} True when value is finite, non-negative, and rounds to 0.0.
 
-### fn `function _isDisplayedFullPercent(pct)` (L156-161)
+### fn `function _isDisplayedFullPercent(pct)` (L135-140)
 - @brief Check whether a percentage renders as `100.0%` in one-decimal UI output.
 - @details Mirrors display rounding semantics so near-full values are treated as
 full usage for limit-reached warning rendering.
 - @param {number} pct Usage percentage candidate.
 - @return s {boolean} True when value is finite and rounds to `100.0`.
 
-### class `class AIBarIndicator extends PanelMenu.Button` : PanelMenu.Button (L165-464)
+### class `class AIBarIndicator extends PanelMenu.Button` : PanelMenu.Button (L144-443)
 - @brief Panel indicator widget that manages popup rendering and refresh lifecycle. */
 - @brief Execute init.
 - @details Applies init logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @return s {any} Function return value.
 
-### fn `const createWindowBar = (labelText) =>` (L509-555)
+### fn `const createWindowBar = (labelText) =>` (L488-534)
 - @brief Execute create provider card.
 - @details Applies create provider card logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @param {any} providerName Input parameter `providerName`.
 - @return s {any} Function return value.
 
-### fn `const updateWindowBar = (bar, pct, resetTime, useDays) =>` (L664-722)
+### fn `const updateWindowBar = (bar, pct, resetTime, useDays) =>` (L643-701)
 - @brief Execute populate provider card.
 - @details Applies populate provider card logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @param {any} card Input parameter `card`.
@@ -2169,41 +2209,44 @@ full usage for limit-reached warning rendering.
 - @param {any} data Input parameter `data`.
 - @return s {any} Function return value.
 
-### fn `const setResetLabel = (baseText) =>` (L670-676)
+### fn `const setResetLabel = (baseText) =>` (L649-655)
 
-### fn `const showResetPendingHint = () =>` (L687-689)
+### fn `const showResetPendingHint = () =>` (L666-668)
 
-### fn `const toPercent = (value) =>` (L1006-1011)
+### fn `const toPercent = (value) =>` (L985-990)
 - @brief Execute update u i.
 - @details Applies update u i logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @return s {any} Function return value.
 
-### fn `const getPanelUsageValues = (providerName, data) =>` (L1013-1070)
+### fn `const getPanelUsageValues = (providerName, data) =>` (L992-1049)
 
-### class `export default class AIBarExtension` (L1206-1240)
-- @brief GNOME extension lifecycle adapter for AIBarIndicator registration. */
-- @brief Execute constructor.
-- @details Applies constructor logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
-- @return s {any} Function return value.
+### class `export default class AIBarExtension extends Extension` : Extension (L1190-1216)
+- @brief GNOME extension lifecycle adapter for AIBarIndicator registration.
+- @brief Execute enable.
+- @details Extends Extension (GNOME Shell 45+ API) to integrate with the extension lifecycle.
+Uses this.uuid (provided by the Extension base class) as the status-area key.
+- @details Instantiates AIBarIndicator and adds it to the GNOME panel status area.
+- @return s {void}
+- @satisfies PRJ-004
 
 ## Symbol Index
 |Symbol|Kind|Vis|Lines|Sig|
 |---|---|---|---|---|
-|`REFRESH_INTERVAL_SECONDS`|const||39||
-|`ENV_FILE_PATH`|const||40||
-|`RESET_PENDING_MESSAGE`|const||41||
-|`RATE_LIMIT_ERROR_MESSAGE`|const||42||
-|`_getAiBarPath`|fn||49-59|function _getAiBarPath()|
-|`_loadEnvFromFile`|fn||66-118|function _loadEnvFromFile()|
-|`_getProgressClass`|fn||125-131|function _getProgressClass(pct)|
-|`_isDisplayedZeroPercent`|fn||140-147|function _isDisplayedZeroPercent(pct)|
-|`_isDisplayedFullPercent`|fn||156-161|function _isDisplayedFullPercent(pct)|
-|`AIBarIndicator`|class||165-464|class AIBarIndicator extends PanelMenu.Button|
-|`createWindowBar`|fn||509-555|const createWindowBar = (labelText) =>|
-|`updateWindowBar`|fn||664-722|const updateWindowBar = (bar, pct, resetTime, useDays) =>|
-|`setResetLabel`|fn||670-676|const setResetLabel = (baseText) =>|
-|`showResetPendingHint`|fn||687-689|const showResetPendingHint = () =>|
-|`toPercent`|fn||1006-1011|const toPercent = (value) =>|
-|`getPanelUsageValues`|fn||1013-1070|const getPanelUsageValues = (providerName, data) =>|
-|`AIBarExtension`|class||1206-1240|export default class AIBarExtension|
+|`REFRESH_INTERVAL_SECONDS`|const||18||
+|`ENV_FILE_PATH`|const||19||
+|`RESET_PENDING_MESSAGE`|const||20||
+|`RATE_LIMIT_ERROR_MESSAGE`|const||21||
+|`_getAiBarPath`|fn||28-38|function _getAiBarPath()|
+|`_loadEnvFromFile`|fn||45-97|function _loadEnvFromFile()|
+|`_getProgressClass`|fn||104-110|function _getProgressClass(pct)|
+|`_isDisplayedZeroPercent`|fn||119-126|function _isDisplayedZeroPercent(pct)|
+|`_isDisplayedFullPercent`|fn||135-140|function _isDisplayedFullPercent(pct)|
+|`AIBarIndicator`|class||144-443|class AIBarIndicator extends PanelMenu.Button|
+|`createWindowBar`|fn||488-534|const createWindowBar = (labelText) =>|
+|`updateWindowBar`|fn||643-701|const updateWindowBar = (bar, pct, resetTime, useDays) =>|
+|`setResetLabel`|fn||649-655|const setResetLabel = (baseText) =>|
+|`showResetPendingHint`|fn||666-668|const showResetPendingHint = () =>|
+|`toPercent`|fn||985-990|const toPercent = (value) =>|
+|`getPanelUsageValues`|fn||992-1049|const getPanelUsageValues = (providerName, data) =>|
+|`AIBarExtension`|class||1190-1216|export default class AIBarExtension extends Extension|
 
