@@ -828,11 +828,17 @@ ORDER BY net_cost DESC
         @param billing_cost_total {float} Current-month net billing total.
         @return {UsageMetrics} Normalized metrics object.
         @satisfies REQ-050
+        @satisfies REQ-059
         @satisfies REQ-060
         """
-        del raw_payload
+        from aibar.config import resolve_currency_symbol
+
         requests_value = int(request_total) if request_total is not None else None
         input_tokens_value = int(token_total) if token_total is not None else None
+        currency_symbol = resolve_currency_symbol(
+            raw=raw_payload,
+            provider_name=ProviderName.GEMINIAI.value,
+        )
         return UsageMetrics(
             cost=billing_cost_total,
             requests=requests_value,
@@ -841,5 +847,5 @@ ORDER BY net_cost DESC
             remaining=None,
             limit=None,
             reset_at=None,
-            currency_symbol="€",
+            currency_symbol=currency_symbol,
         )

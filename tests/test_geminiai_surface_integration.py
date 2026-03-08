@@ -36,6 +36,7 @@ def test_cli_registers_geminiai_provider_and_login_paths() -> None:
     source = CLI_PATH.read_text(encoding="utf-8")
     assert "ProviderName.GEMINIAI: GeminiAIProvider()," in source
     assert "geminiai oauth source" in source
+    assert "_currency_provider_names = [p.value for p in ProviderName]" in source
     assert 'help="Provider to query (claude, openai, openrouter, copilot, codex, geminiai, all)"' in source
     assert 'help="Provider to login to (claude, copilot, geminiai)"' in source
     assert "_login_geminiai()" in source

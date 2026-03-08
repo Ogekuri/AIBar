@@ -158,14 +158,14 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-039**: MUST support force-refresh handling that deletes `~/.cache/aibar/idle-time.json`, bypasses idle-time gating for the current execution, and executes a fresh provider refresh before loading `~/.cache/aibar/cache.json`.
 - **REQ-040**: MUST enforce at least `api_call_delay_seconds` between consecutive provider API requests during refresh execution, with default `20` seconds when configuration is missing.
 - **REQ-041**: MUST update idle-time on HTTP `429` using `max(retry_after_seconds, idle_delay_seconds)` and, when multiple `429` responses occur, MUST persist the largest computed `idle_until`.
-- **REQ-042**: MUST minimize provider API requests by serving `~/.cache/aibar/cache.json` whenever idle-time gating disables refresh and by using only `~/.cache/aibar/cache.json` plus `~/.cache/aibar/idle-time.json` as persisted retrieval artifacts.
+- **REQ-042**: MUST minimize provider API requests and cache I/O by reusing in-memory cache and idle-time state within each refresh cycle and persisting `cache.json` or `idle-time.json` only when content changes.
 - **REQ-043**: MUST centralize refresh and load logic for `~/.cache/aibar/cache.json` into shared internal functions reused by CLI `show` and Text UI refresh workflows.
 - **REQ-044**: MUST persist per-provider, per-window last-attempt status in `cache.json` with fields `result`, `error`, and `updated_at`, where `result` is `OK` or `FAIL`.
 - **REQ-045**: MUST overwrite a provider/window payload in `cache.json` only when the current fetch for that provider/window succeeds.
 - **REQ-046**: MUST preserve the previous provider/window payload in `cache.json` when the current fetch for that provider/window fails, including HTTP `429`.
 - **REQ-047**: MUST store and load all last-success fallback payloads from `~/.cache/aibar/cache.json` and MUST NOT require `~/.cache/aibar/claude_dual_last_success.json`.
 - **REQ-048**: `scripts/claude_token_refresh.sh` `do_refresh()` MUST truncate `LOG_FILE` to zero bytes before writing any log entries, so each `once` invocation and each daemon refresh cycle produces a standalone log containing only entries from that cycle.
-- **REQ-049**: `setup` MUST prompt for per-provider default currency symbol (choices: `$`, `£`, `€`; default `$`) for providers `claude`, `openai`, `openrouter`, `copilot`, `codex` in a dedicated section placed after the timeout configuration section, then persist selections into `currency_symbols` in `~/.config/aibar/config.json`.
+- **REQ-049**: `setup` MUST prompt for per-provider default currency symbol (choices: `$`, `£`, `€`; default `$`) for providers `claude`, `openai`, `openrouter`, `copilot`, `codex`, `geminiai` in a dedicated section after timeout configuration, then persist selections in `~/.config/aibar/config.json` `currency_symbols`.
 - **REQ-050**: Provider `fetch` MUST attempt to extract `currency_symbol` from the raw API JSON response (field `currency`); when absent, MUST resolve `currency_symbol` from `RuntimeConfig.currency_symbols[provider_name]` with fallback `"$"`.
 - **REQ-051**: CLI `show` text output MUST format cost values using `metrics.currency_symbol` from the fetched result; MUST NOT use hardcoded `$` for cost lines.
 - **REQ-052**: Textual UI provider cards MUST format cost values using `metrics.currency_symbol` from the loaded provider result; MUST NOT use hardcoded `$` for cost display.
@@ -175,13 +175,16 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-056**: `setup` MUST execute OAuth installed-app authorization with scopes `https://www.googleapis.com/auth/monitoring.read` and `https://www.googleapis.com/auth/bigquery.readonly`, then persist refresh-capable authorized-user credentials for GeminiAI Monitoring and BigQuery API calls.
 - **REQ-057**: GeminiAI provider `fetch` MUST query Cloud Monitoring with filter `resource.type="api" AND resource.labels.service="generativelanguage.googleapis.com"` and map Generative Language usage metrics (`request_count`, latency, errors, token usage) into `UsageMetrics`.
 - **REQ-058**: GeminiAI provider failures for HTTP `429`, Google quota exhaustion, or missing billing-export table MUST mark attempt status `FAIL`, preserve prior payload snapshots, and apply existing idle-time retry policy for rate-limited refreshes.
-- **REQ-059**: `setup` MUST NOT include `geminiai` in `currency_symbols` prompts, and GeminiAI outputs MUST NOT require `RuntimeConfig.currency_symbols.geminiai` for rendering.
+- **REQ-059**: `setup` MUST include `geminiai` in `currency_symbols` prompts, and GeminiAI rendering MUST resolve `RuntimeConfig.currency_symbols.geminiai` with fallback `"$"` when missing.
 - **REQ-060**: CLI text `show`, JSON `show --json`, and Textual UI provider cards MUST expose GeminiAI monitoring usage fields, current-month monetary cost values, and cached `result/error` status for billing table discovery or query failures.
 - **REQ-061**: GNOME extension MUST render GeminiAI provider tab/card using bright-pink style classes, include GeminiAI payload and status in panel aggregation logic, and order `geminiai` immediately after `codex`.
 - **REQ-062**: GUI labels for GeminiAI MUST render provider title exactly `GeminiAI` in Textual and GNOME surfaces, while machine-readable payload keys and CLI provider arguments remain lowercase `geminiai`.
 - **REQ-063**: Refresh scheduling MUST apply configured inter-provider call delay and idle-time lifecycle updates to GeminiAI fetches identically to existing providers, including `idle-time.json` updates after success and rate-limited failures.
 - **REQ-064**: GeminiAI billing fetch MUST read `<project_id>` from `~/.config/aibar/geminiai_oauth_client.json`, discover `<table_id>` by listing tables in dataset `billing_data`, and fail with structured error when billing export table is unavailable.
 - **REQ-065**: GeminiAI billing fetch MUST query `billing_data.gcp_billing_export_v1_<table_id>` for current-month costs using explicit column projection and `usage_start_time >= TIMESTAMP_TRUNC(CURRENT_TIMESTAMP(), MONTH)` to minimize scanned partitions.
+- **REQ-066**: MUST guard every read/write of `~/.cache/aibar/cache.json` and `~/.cache/aibar/idle-time.json` with blocking lock files in `~/.cache/aibar/`, polling lock release every 250 milliseconds before continuing.
+- **REQ-067**: CLI `show` text mode MUST render ANSI blue bordered provider panels with progress bars and include every provider metric and status field available in Textual UI cards and GNOME extension payloads.
+- **REQ-068**: Bare `aibar` and `aibar --help` MUST print human-readable usage text listing all commands and global or command-specific options, including `show --force` and `show --json`, without Doxygen tags.
 
 ## 4. Test Requirements
 

@@ -143,7 +143,7 @@ def test_geminiai_fetch_maps_monitoring_and_billing_metrics(monkeypatch) -> None
     assert result.metrics.requests == 42
     assert result.metrics.input_tokens == 314
     assert result.metrics.cost == 3.2
-    assert result.metrics.currency_symbol == "€"
+    assert result.metrics.currency_symbol == "$"
     assert result.raw["project_id"] == "demo-project"
     assert result.raw["monitoring"]["latency_total"] == 8.75
     assert result.raw["monitoring"]["error_total"] == 3.0
@@ -215,6 +215,49 @@ def test_geminiai_fetch_missing_billing_table_sets_error_result(monkeypatch) -> 
     result = asyncio.run(provider.fetch(WindowPeriod.DAY_7))
     assert result.is_error
     assert "billing export table" in result.error
+
+
+def test_geminiai_fetch_uses_runtime_config_currency_symbol(monkeypatch) -> None:
+    """
+    @brief Verify GeminiAI metrics currency resolves from runtime-config fallback.
+    @details Patches runtime config loader to return `currency_symbols.geminiai = "€"`
+    and asserts provider fetch propagates that symbol when API payload omits currency.
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @return {None} Function return value.
+    @satisfies REQ-059
+    """
+    from aibar.config import RuntimeConfig
+
+    provider = GeminiAIProvider(
+        credential_store=_FakeCredentialStore(),
+        project_id="demo-project",
+    )
+
+    monkeypatch.setattr(provider, "_build_monitoring_service", lambda credentials: object())
+    monkeypatch.setattr(provider, "_build_bigquery_client", lambda credentials, project_id: object())
+    monkeypatch.setattr(
+        provider,
+        "_discover_billing_table_id",
+        lambda bigquery_client, project_id: "gcp_billing_export_v1_001",
+    )
+    monkeypatch.setattr(
+        provider,
+        "_query_current_month_billing_cost",
+        lambda bigquery_client, project_id, table_id: ([], 1.25),
+    )
+    metric_payload = {"timeSeries": [{"points": [{"value": {"int64Value": "2"}}]}]}
+    monkeypatch.setattr(
+        provider,
+        "_query_monitoring_metric",
+        lambda *args, **kwargs: (2.0, metric_payload),
+    )
+    monkeypatch.setattr(
+        "aibar.config.load_runtime_config",
+        lambda: RuntimeConfig(currency_symbols={"geminiai": "€"}),
+    )
+
+    result = asyncio.run(provider.fetch(WindowPeriod.DAY_7))
+    assert result.metrics.currency_symbol == "€"
 
 
 def test_geminiai_sum_time_series_values_aggregates_numeric_points() -> None:

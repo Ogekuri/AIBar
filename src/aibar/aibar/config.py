@@ -6,6 +6,8 @@
 
 import os
 import json
+import time
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -28,6 +30,7 @@ DEFAULT_API_CALL_DELAY_SECONDS = 20
 DEFAULT_GNOME_REFRESH_INTERVAL_SECONDS = 60
 DEFAULT_CURRENCY_SYMBOL = "$"
 VALID_CURRENCY_SYMBOLS: tuple[str, ...] = ("$", "£", "€")
+LOCK_POLL_INTERVAL_SECONDS = 0.25
 
 _CURRENCY_CODE_TO_SYMBOL: dict[str, str] = {
     "USD": "$",
@@ -89,6 +92,48 @@ def _ensure_app_cache_dir() -> None:
     @return {None} Function return value.
     """
     APP_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _lock_file_path(target_path: Path) -> Path:
+    """
+    @brief Resolve lock-file path for one cache artifact.
+    @details Produces deterministic lock-file names under `~/.cache/aibar/`
+    using `<filename>.lock` to coordinate cross-process read/write exclusion.
+    @param target_path {Path} Cache file path guarded by lock.
+    @return {Path} Absolute lock-file path.
+    @satisfies REQ-066
+    """
+    return APP_CACHE_DIR / f"{target_path.name}.lock"
+
+
+@contextmanager
+def _blocking_file_lock(target_path: Path):
+    """
+    @brief Acquire and release blocking lock-file for cache artifact I/O.
+    @details Uses atomic `O_CREAT|O_EXCL` lock-file creation. When lock-file
+    already exists, polls every `250ms` until lock release, then acquires lock.
+    Always removes owned lock-file during exit.
+    @param target_path {Path} Cache artifact path protected by this lock.
+    @return {Iterator[None]} Context manager yielding while lock is held.
+    @satisfies REQ-066
+    """
+    _ensure_app_cache_dir()
+    lock_path = _lock_file_path(target_path)
+    while True:
+        try:
+            lock_fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            with os.fdopen(lock_fd, "w", encoding="utf-8") as lock_file:
+                lock_file.write(f"{os.getpid()}\n")
+            break
+        except FileExistsError:
+            time.sleep(LOCK_POLL_INTERVAL_SECONDS)
+    try:
+        yield
+    finally:
+        try:
+            lock_path.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 def _sanitize_cache_payload(payload: dict[str, Any]) -> dict[str, Any]:
@@ -167,11 +212,13 @@ def load_cli_cache() -> dict[str, Any] | None:
     @return {dict[str, Any] | None} Parsed cache payload or None if unavailable.
     @satisfies CTN-004
     @satisfies REQ-047
+    @satisfies REQ-066
     """
     try:
-        decoded = json.loads(CACHE_FILE_PATH.read_text(encoding="utf-8"))
-        if isinstance(decoded, dict):
-            return decoded
+        with _blocking_file_lock(CACHE_FILE_PATH):
+            decoded = json.loads(CACHE_FILE_PATH.read_text(encoding="utf-8"))
+            if isinstance(decoded, dict):
+                return decoded
     except (OSError, ValueError):
         return None
     return None
@@ -221,13 +268,14 @@ def save_cli_cache(payload: dict[str, Any]) -> None:
     @satisfies REQ-045
     @satisfies REQ-046
     @satisfies REQ-047
+    @satisfies REQ-066
     """
     sanitized_payload = _sanitize_cache_payload(payload)
-    _ensure_app_cache_dir()
-    CACHE_FILE_PATH.write_text(
-        json.dumps(sanitized_payload, indent=2),
-        encoding="utf-8",
-    )
+    with _blocking_file_lock(CACHE_FILE_PATH):
+        CACHE_FILE_PATH.write_text(
+            json.dumps(sanitized_payload, indent=2),
+            encoding="utf-8",
+        )
 
 
 def load_idle_time() -> IdleTimeState | None:
@@ -237,11 +285,13 @@ def load_idle_time() -> IdleTimeState | None:
     unreadable payloads return None and are treated as missing state.
     @return {IdleTimeState | None} Validated idle-time state or None.
     @satisfies CTN-009
+    @satisfies REQ-066
     """
     try:
-        decoded = json.loads(IDLE_TIME_PATH.read_text(encoding="utf-8"))
-        if isinstance(decoded, dict):
-            return IdleTimeState.model_validate(decoded)
+        with _blocking_file_lock(IDLE_TIME_PATH):
+            decoded = json.loads(IDLE_TIME_PATH.read_text(encoding="utf-8"))
+            if isinstance(decoded, dict):
+                return IdleTimeState.model_validate(decoded)
     except (OSError, ValueError, ValidationError):
         return None
     return None
@@ -256,6 +306,7 @@ def save_idle_time(last_success_at: datetime, idle_until: datetime) -> IdleTimeS
     @param idle_until {datetime} Timestamp until refresh must remain disabled.
     @return {IdleTimeState} Persisted idle-time model.
     @satisfies CTN-009
+    @satisfies REQ-066
     """
     last_success_utc = last_success_at.astimezone(timezone.utc)
     idle_until_utc = idle_until.astimezone(timezone.utc)
@@ -265,11 +316,11 @@ def save_idle_time(last_success_at: datetime, idle_until: datetime) -> IdleTimeS
         idle_until_timestamp=int(idle_until_utc.timestamp()),
         idle_until_human=idle_until_utc.isoformat(),
     )
-    _ensure_app_cache_dir()
-    IDLE_TIME_PATH.write_text(
-        state.model_dump_json(indent=2),
-        encoding="utf-8",
-    )
+    with _blocking_file_lock(IDLE_TIME_PATH):
+        IDLE_TIME_PATH.write_text(
+            state.model_dump_json(indent=2),
+            encoding="utf-8",
+        )
     return state
 
 
@@ -280,9 +331,11 @@ def remove_idle_time_file() -> None:
     behavior on subsequent `show` execution.
     @return {None} Function return value.
     @satisfies REQ-039
+    @satisfies REQ-066
     """
     try:
-        IDLE_TIME_PATH.unlink(missing_ok=True)
+        with _blocking_file_lock(IDLE_TIME_PATH):
+            IDLE_TIME_PATH.unlink(missing_ok=True)
     except OSError:
         return
 

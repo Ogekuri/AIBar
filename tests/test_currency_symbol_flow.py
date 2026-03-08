@@ -219,3 +219,29 @@ class TestCliPrintResultUsesCurrencySymbol:
 
         captured = capsys.readouterr()
         assert "$0.5000" in captured.out
+
+    def test_print_result_uses_blue_panel_and_progress_bar(self, capsys) -> None:
+        """
+        @brief Verify `_print_result` renders panel borders and progress bar in text mode.
+        @param capsys {pytest.CaptureFixture} Pytest stdout/stderr capture fixture.
+        @return {None} Function return value.
+        @satisfies REQ-067
+        """
+        from aibar.cli import _print_result
+        from aibar.providers.base import ProviderName, ProviderResult, UsageMetrics, WindowPeriod
+
+        metrics = UsageMetrics(limit=100.0, remaining=75.0, currency_symbol="$")
+        result = ProviderResult(
+            provider=ProviderName.CLAUDE,
+            window=WindowPeriod.DAY_7,
+            is_error=False,
+            metrics=metrics,
+        )
+        _print_result(ProviderName.CLAUDE, result)
+        captured = capsys.readouterr()
+
+        assert "┌" in captured.out
+        assert "└" in captured.out
+        assert "Usage:" in captured.out
+        assert "█" in captured.out
+        assert "Updated at:" in captured.out

@@ -8,6 +8,7 @@ import asyncio
 import json
 import math
 import sys
+import textwrap
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -56,6 +57,8 @@ _CACHE_STATUS_SECTION_KEY = "status"
 _CACHE_EXTENSION_SECTION_KEY = "extension"
 _ATTEMPT_RESULT_OK = "OK"
 _ATTEMPT_RESULT_FAIL = "FAIL"
+_SHOW_PANEL_MIN_WIDTH = 72
+_SHOW_PANEL_MAX_WIDTH = 110
 
 
 @dataclass(frozen=True)
@@ -65,7 +68,7 @@ class RetrievalPipelineOutput:
     @details Encodes deterministic retrieval state produced by the shared
     cache-based pipeline used by `show` and Text UI refresh execution.
     The pipeline enforces force-flag handling, idle-time gating, conditional
-    refresh into `cache.json`, and post-refresh readback from `cache.json`.
+    refresh into `cache.json`, and deterministic payload projection for rendering.
     @note `payload` contains cache JSON sections: `payload` and `status`.
     @note `results` contains validated ProviderResult objects keyed by provider id.
     @note `idle_active` indicates that idle-time gating blocked refresh.
@@ -960,8 +963,8 @@ def _refresh_and_persist_cache_payload(
     @brief Refresh provider data and persist updates into `cache.json`.
     @details Executes provider fetches for configured providers only, records
     per-provider/window attempt status, updates payload only for successful
-    provider/window outcomes, writes canonical cache document, and updates
-    idle-time metadata.
+    provider/window outcomes, writes canonical cache document only on effective
+    content change, and updates idle-time metadata.
     @param providers {dict[ProviderName, BaseProvider]} Provider scope for refresh.
     @param target_window {WindowPeriod} Requested window for refresh execution.
     @param runtime_config {RuntimeConfig} Runtime throttling configuration.
@@ -975,8 +978,10 @@ def _refresh_and_persist_cache_payload(
     @satisfies REQ-045
     @satisfies REQ-046
     @satisfies REQ-047
+    @satisfies REQ-066
     """
     cache_document = _normalize_cache_document(load_cli_cache())
+    cache_before_refresh = json.dumps(cache_document, sort_keys=True)
     payload_section = _cache_payload_section(cache_document)
     status_section = _cache_status_section(cache_document)
 
@@ -1033,7 +1038,8 @@ def _refresh_and_persist_cache_payload(
 
     if successful_payload_results:
         payload_section.update(_serialize_results_payload(successful_payload_results))
-    if fetched_results:
+    cache_after_refresh = json.dumps(cache_document, sort_keys=True)
+    if cache_after_refresh != cache_before_refresh:
         save_cli_cache(cache_document)
     _update_idle_time_after_refresh(fetched_results, runtime_config)
     return cache_document
@@ -1048,8 +1054,8 @@ def retrieve_results_via_cache_pipeline(
     """
     @brief Execute shared cache-based retrieval pipeline for CLI and Text UI.
     @details Applies required operation order: force-flag handling, idle-time
-    evaluation, conditional refresh/update of `cache.json`, then readback and
-    decode of provider data from `cache.json` for downstream rendering.
+    evaluation, conditional refresh/update of `cache.json`, then decode of
+    effective cache payload for downstream rendering without redundant reload.
     @param provider_filter {ProviderName | None} Optional provider selector.
     @param target_window {WindowPeriod} Target window requested by caller.
     @param force_refresh {bool} Force-refresh flag for current execution.
@@ -1063,6 +1069,7 @@ def retrieve_results_via_cache_pipeline(
     @satisfies REQ-045
     @satisfies REQ-046
     @satisfies REQ-047
+    @satisfies REQ-066
     """
     if force_refresh:
         remove_idle_time_file()
@@ -1113,15 +1120,10 @@ def retrieve_results_via_cache_pipeline(
         target_window=target_window,
         runtime_config=runtime_config,
     )
-    reloaded_payload_raw = load_cli_cache()
-    effective_payload = (
-        _normalize_cache_document(reloaded_payload_raw)
-        if reloaded_payload_raw is not None
-        else persisted_payload
+    effective_payload = persisted_payload
+    cache_available = bool(_cache_payload_section(effective_payload)) or bool(
+        _cache_status_section(effective_payload)
     )
-    cache_available = reloaded_payload_raw is not None or bool(
-        _cache_payload_section(effective_payload)
-    ) or bool(_cache_status_section(effective_payload))
     if not cache_available:
         return RetrievalPipelineOutput(
             payload=_empty_cache_document(),
@@ -1200,18 +1202,44 @@ def _build_cached_dual_window_results(
     return (result_5h, result_7d)
 
 
-@click.group()
+@click.group(
+    invoke_without_command=True,
+    context_settings={"help_option_names": ["--help", "-h"]},
+    help=(
+        "Monitor AI provider usage, quota, and cost data from one CLI.\n"
+        "Use 'show' for terminal output, 'show --json' for machine output, "
+        "and 'show --force' to bypass idle-time gating for one run."
+    ),
+    epilog=(
+        "Examples:\n"
+        "  aibar show\n"
+        "  aibar show --json\n"
+        "  aibar show --force\n"
+        "  aibar setup\n"
+        "  aibar ui"
+    ),
+)
 @click.version_option()
-def main() -> None:
+@click.pass_context
+def main(ctx: click.Context) -> None:
     """
     @brief Execute main.
     @details Applies main logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
     @return {None} Function return value.
+    @satisfies REQ-068
     """
-    pass
+    if ctx.invoked_subcommand is None:
+        click.echo(ctx.get_help())
 
 
-@main.command()
+@main.command(
+    short_help="Display provider usage and cost metrics.",
+    help=(
+        "Display provider usage and cost metrics using the shared cache pipeline.\n"
+        "Supports text output (default) or JSON output with '--json'.\n"
+        "Use '--force' to bypass idle-time gating for this execution."
+    ),
+)
 @click.option(
     "--provider",
     "-p",
@@ -1255,6 +1283,7 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
     @satisfies REQ-041
     @satisfies REQ-042
     @satisfies REQ-043
+    @satisfies REQ-067
     """
     window_period = parse_window(window)
     provider_filter = parse_provider(provider)
@@ -1296,8 +1325,13 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
     for name, prov in providers.items():
         if not prov.is_configured():
             if provider_filter is None or provider_filter == name:
-                click.echo(f"\n{name.value}: Not configured")
-                click.echo(f"  Set {config.ENV_VARS.get(name)} environment variable")
+                _emit_blue_panel(
+                    title=_provider_display_name(name),
+                    body_lines=[
+                        "Status: NOT CONFIGURED",
+                        f"Missing env: {config.ENV_VARS.get(name)}",
+                    ],
+                )
 
     if provider_filter is not None and provider_filter.value not in retrieval.results:
         click.echo(f"\n{provider_filter.value}: Not available in cache")
@@ -1323,6 +1357,59 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
         _print_result(provider_name, result)
 
 
+def _provider_display_name(provider_name: ProviderName) -> str:
+    """
+    @brief Resolve human-facing provider title for terminal panel rendering.
+    @details Maps machine-readable provider keys to display names aligned with
+    Textual and GNOME UI surfaces.
+    @param provider_name {ProviderName} Provider enum key.
+    @return {str} Human-facing provider display name.
+    @satisfies REQ-062
+    """
+    if provider_name == ProviderName.GEMINIAI:
+        return "GeminiAI"
+    return provider_name.value.upper()
+
+
+def _emit_blue_panel(title: str, body_lines: list[str]) -> None:
+    """
+    @brief Render blue ANSI bordered output panel with wrapped content lines.
+    @details Creates fixed-width terminal panels inspired by Textual/extension
+    card layout, preserving deterministic borders and line wrapping behavior.
+    @param title {str} Panel header text.
+    @param body_lines {list[str]} Content lines rendered in panel body.
+    @return {None} Function return value.
+    @satisfies REQ-067
+    """
+    wrapped_lines: list[str] = []
+    for body_line in body_lines:
+        chunks = textwrap.wrap(body_line, width=_SHOW_PANEL_MAX_WIDTH - 4)
+        wrapped_lines.extend(chunks or [""])
+
+    content_width = max(
+        _SHOW_PANEL_MIN_WIDTH - 4,
+        len(title),
+        max((len(item) for item in wrapped_lines), default=0),
+    )
+    content_width = min(content_width, _SHOW_PANEL_MAX_WIDTH - 4)
+    horizontal_border = "─" * (content_width + 2)
+    click.echo(click.style(f"┌{horizontal_border}┐", fg="blue"))
+    click.echo(
+        f"{click.style('│', fg='blue')} "
+        f"{click.style(title.ljust(content_width), fg='blue', bold=True)} "
+        f"{click.style('│', fg='blue')}"
+    )
+    click.echo(click.style(f"├{horizontal_border}┤", fg="blue"))
+    for body_line in wrapped_lines:
+        click.echo(
+            f"{click.style('│', fg='blue')} "
+            f"{body_line.ljust(content_width)} "
+            f"{click.style('│', fg='blue')}"
+        )
+    click.echo(click.style(f"└{horizontal_border}┘", fg="blue"))
+    click.echo()
+
+
 def _print_result(name: ProviderName, result, label: str | None = None) -> None:
     """
     @brief Render CLI text output for one provider result.
@@ -1336,36 +1423,41 @@ def _print_result(name: ProviderName, result, label: str | None = None) -> None:
     @satisfies REQ-034
     @satisfies REQ-035
     @satisfies REQ-051
+    @satisfies REQ-067
     """
-    title = name.value.upper()
+    title = _provider_display_name(name)
+    window_label = label or result.window.value
     if label:
         title = f"{title} ({label})"
-    click.echo(f"\n{click.style(title, bold=True)}")
-    click.echo("-" * 40)
 
+    lines: list[str] = [
+        f"Status: {'FAIL' if result.is_error else 'OK'}",
+        f"Window: {window_label}",
+        (
+            "Updated at: "
+            f"{result.updated_at.astimezone(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}"
+        ),
+    ]
     if result.is_error:
-        click.echo(click.style(f"Error: {result.error}", fg="red"))
+        lines.append(f"Error: {result.error}")
         if not _should_render_metrics_after_error(name, result):
+            _emit_blue_panel(title=title, body_lines=lines)
             return
 
     m = result.metrics
-
-    # Usage percentage (Claude)
     if m.usage_percent is not None:
         pct = m.usage_percent
-        color = "green" if pct < 50 else ("yellow" if pct < 80 else "red")
-        bar = _progress_bar(pct)
-        click.echo(f"Usage:    {bar} {click.style(f'{pct:.1f}%', fg=color)}")
+        lines.append(f"Usage: {pct:.1f}% {_progress_bar(pct)}")
 
-    # Reset time
     if m.reset_at:
-        from datetime import datetime, timezone
-
         delta = m.reset_at - datetime.now(timezone.utc)
         if delta.total_seconds() > 0:
-            click.echo(f"Resets in: {_format_reset_duration(delta.total_seconds())}")
+            reset_value = _format_reset_duration(delta.total_seconds())
+            if round(m.usage_percent or 0.0, 1) >= 100.0:
+                reset_value = f"{reset_value} ⚠️ Limit reached!"
+            lines.append(f"Resets in: {reset_value}")
     elif _should_print_claude_reset_pending_hint(name, m):
-        click.echo(f"Resets in: {_RESET_PENDING_MESSAGE}")
+        lines.append(f"Resets in: {_RESET_PENDING_MESSAGE}")
 
     if (
         name in (
@@ -1377,22 +1469,66 @@ def _print_result(name: ProviderName, result, label: str | None = None) -> None:
         and m.remaining is not None
         and m.limit is not None
     ):
-        click.echo(f"Remaining credits: {m.remaining:.1f} / {m.limit:.1f}")
+        lines.append(f"Remaining credits: {m.remaining:.1f} / {m.limit:.1f}")
 
-    # Cost
     if m.cost is not None:
-        click.echo(f"Cost:     {m.currency_symbol}{m.cost:.4f}")
+        if name == ProviderName.OPENROUTER and m.limit is not None:
+            lines.append(
+                f"Cost: {m.currency_symbol}{m.cost:.4f} / "
+                f"{m.currency_symbol}{m.limit:.2f}"
+            )
+        else:
+            lines.append(f"Cost: {m.currency_symbol}{m.cost:.4f}")
 
-    # Requests
     if m.requests is not None:
-        click.echo(f"Requests: {m.requests:,}")
+        lines.append(f"Requests: {m.requests:,}")
 
-    # Tokens
     if m.input_tokens is not None or m.output_tokens is not None:
         total = (m.input_tokens or 0) + (m.output_tokens or 0)
-        click.echo(
-            f"Tokens:   {total:,} ({m.input_tokens or 0:,} in / {m.output_tokens or 0:,} out)"
+        lines.append(
+            f"Tokens: {total:,} ({m.input_tokens or 0:,} in / {m.output_tokens or 0:,} out)"
         )
+
+    raw_data = result.raw.get("data")
+    if name == ProviderName.OPENROUTER and isinstance(raw_data, dict):
+        byok_key_map = {
+            WindowPeriod.HOUR_5: "byok_usage_daily",
+            WindowPeriod.DAY_7: "byok_usage_weekly",
+            WindowPeriod.DAY_30: "byok_usage_monthly",
+        }
+        byok_raw = raw_data.get(byok_key_map.get(result.window, "byok_usage_weekly"))
+        if isinstance(byok_raw, (int, float)) and byok_raw > 0:
+            lines.append(f"BYOK: {m.currency_symbol}{float(byok_raw):.4f}")
+
+    if name == ProviderName.GEMINIAI:
+        monitoring_raw = result.raw.get("monitoring")
+        if isinstance(monitoring_raw, dict):
+            latency_total = monitoring_raw.get("latency_total")
+            error_total = monitoring_raw.get("error_total")
+            if isinstance(latency_total, (int, float)):
+                lines.append(f"Monitoring latency total: {float(latency_total):.2f}")
+            if isinstance(error_total, (int, float)):
+                lines.append(f"Monitoring error total: {float(error_total):.2f}")
+        billing_raw = result.raw.get("billing")
+        if isinstance(billing_raw, dict):
+            table_id = billing_raw.get("table_id")
+            table_path = billing_raw.get("table_path")
+            services = billing_raw.get("services")
+            if isinstance(table_id, str) and table_id:
+                lines.append(f"Billing table: {table_id}")
+            if isinstance(table_path, str) and table_path:
+                lines.append(f"Billing path: {table_path}")
+            if isinstance(services, list):
+                lines.append(f"Billing services: {len(services)}")
+
+    status_code = result.raw.get("status_code")
+    if isinstance(status_code, int):
+        lines.append(f"HTTP status: {status_code}")
+    retry_after = result.raw.get("retry_after_seconds")
+    if isinstance(retry_after, (int, float)) and retry_after > 0:
+        lines.append(f"Retry after: {float(retry_after):.1f}s")
+
+    _emit_blue_panel(title=title, body_lines=lines)
 
 
 def _format_reset_duration(seconds: float) -> str:
@@ -1478,12 +1614,16 @@ def _progress_bar(percent: float, width: int = 20) -> str:
     @param width {int} Input parameter `width`.
     @return {str} Function return value.
     """
-    filled = int(width * percent / 100)
+    normalized_percent = max(0.0, min(100.0, percent))
+    filled = int(width * normalized_percent / 100)
     empty = width - filled
-    return f"[{'#' * filled}{'-' * empty}]"
+    return f"[{'█' * filled}{'░' * empty}]"
 
 
-@main.command()
+@main.command(
+    short_help="Run provider diagnostics.",
+    help="Run per-provider configuration checks and 5h fetch diagnostics.",
+)
 def doctor() -> None:
     """
     @brief Execute doctor.
@@ -1537,7 +1677,10 @@ def doctor() -> None:
         click.echo(click.style("Some providers need attention.", fg="yellow"))
 
 
-@main.command()
+@main.command(
+    short_help="Launch the terminal UI.",
+    help="Launch the Textual UI with refresh controls and provider cards.",
+)
 def ui() -> None:
     """
     @brief Execute ui.
@@ -1549,7 +1692,10 @@ def ui() -> None:
     run_ui()
 
 
-@main.command()
+@main.command(
+    short_help="Show environment variable guidance.",
+    help="Print provider environment-variable configuration guidance.",
+)
 def env() -> None:
     """
     @brief Execute env.
@@ -1559,13 +1705,16 @@ def env() -> None:
     click.echo(config.get_env_var_help())
 
 
-@main.command()
+@main.command(
+    short_help="Run interactive setup.",
+    help="Configure runtime settings, currency symbols, and provider credentials.",
+)
 def setup() -> None:
     """
     @brief Execute setup.
     @details Prompts for `idle_delay_seconds`, `api_call_delay_seconds`, and
-    `gnome_refresh_interval_seconds` in order, then prompts for cost-enabled providers
-    currency symbols (choices: `$`, `£`, `€`, default `$`), then persists
+    `gnome_refresh_interval_seconds` in order, then prompts for provider
+    currency symbols including `geminiai` (choices: `$`, `£`, `€`, default `$`), then persists
     all values to `~/.config/aibar/config.json`. Also prompts for provider
     API keys and writes them to `~/.config/aibar/env`.
     @return {None} Function return value.
@@ -1619,9 +1768,7 @@ def setup() -> None:
     click.echo(click.style("Currency symbols", bold=True))
     click.echo("  Configure the default currency symbol for cost display per provider.")
     click.echo(f"  Valid choices: {', '.join(VALID_CURRENCY_SYMBOLS)}")
-    _currency_provider_names = [
-        p.value for p in ProviderName if p is not ProviderName.GEMINIAI
-    ]
+    _currency_provider_names = [p.value for p in ProviderName]
     currency_symbols: dict[str, str] = {}
     for _provider_name in _currency_provider_names:
         _current_symbol = runtime_config.currency_symbols.get(_provider_name, "$")
@@ -1794,7 +1941,10 @@ def setup() -> None:
     click.echo("  aibar ui")
 
 
-@main.command()
+@main.command(
+    short_help="Authenticate provider accounts.",
+    help="Authenticate supported providers (claude, copilot, geminiai).",
+)
 @click.option(
     "--provider",
     "-p",
