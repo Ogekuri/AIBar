@@ -36,8 +36,9 @@ from aibar.providers.base import (
 )
 
 GEMINIAI_OAUTH_SCOPES: tuple[str, ...] = (
-    "https://www.googleapis.com/auth/monitoring.read",
     "https://www.googleapis.com/auth/bigquery.readonly",
+    "https://www.googleapis.com/auth/monitoring.read",
+    "https://www.googleapis.com/auth/cloud-platform",
 )
 GEMINIAI_OAUTH_CLIENT_PATH = Path.home() / ".config" / "aibar" / "geminiai_oauth_client.json"
 GEMINIAI_OAUTH_TOKEN_PATH = Path.home() / ".config" / "aibar" / "geminiai_oauth_token.json"

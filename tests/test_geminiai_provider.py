@@ -90,6 +90,8 @@ def test_geminiai_fetch_maps_monitoring_and_billing_metrics(monkeypatch) -> None
     @satisfies REQ-065
     @satisfies TST-026
     """
+    from aibar.config import RuntimeConfig
+
     provider = GeminiAIProvider(
         credential_store=_FakeCredentialStore(),
         project_id="demo-project",
@@ -143,6 +145,10 @@ def test_geminiai_fetch_maps_monitoring_and_billing_metrics(monkeypatch) -> None
         return next(responses)
 
     monkeypatch.setattr(provider, "_query_monitoring_metric", _fake_query)
+    monkeypatch.setattr(
+        "aibar.config.load_runtime_config",
+        lambda: RuntimeConfig(currency_symbols={"geminiai": "$"}),
+    )
 
     result = asyncio.run(provider.fetch(WindowPeriod.DAY_7))
     assert result.provider == ProviderName.GEMINIAI
@@ -341,14 +347,15 @@ def test_geminiai_sum_time_series_values_aggregates_numeric_points() -> None:
     assert provider._sum_time_series_values(response) == 11.0
 
 
-def test_geminiai_oauth_scopes_include_monitoring_and_bigquery_read() -> None:
+def test_geminiai_oauth_scopes_include_monitoring_bigquery_and_cloud_platform() -> None:
     """
-    @brief Verify GeminiAI OAuth scopes include Monitoring and BigQuery read permissions.
+    @brief Verify GeminiAI OAuth scopes include Monitoring, BigQuery read, and cloud-platform.
     @return {None} Function return value.
     @satisfies REQ-056
     @satisfies TST-025
     """
     assert GEMINIAI_OAUTH_SCOPES == (
-        "https://www.googleapis.com/auth/monitoring.read",
         "https://www.googleapis.com/auth/bigquery.readonly",
+        "https://www.googleapis.com/auth/monitoring.read",
+        "https://www.googleapis.com/auth/cloud-platform",
     )

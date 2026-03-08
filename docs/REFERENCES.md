@@ -1866,7 +1866,7 @@ import asyncio
 
 ---
 
-# geminiai.py | Python | 914L | 45 symbols | 19 imports | 38 comments
+# geminiai.py | Python | 915L | 45 symbols | 19 imports | 38 comments
 > Path: `src/aibar/aibar/providers/geminiai.py`
 - @brief GeminiAI provider with Google OAuth, Monitoring, and BigQuery billing integration.
 - @details Implements OAuth credential persistence, token refresh, usage retrieval from
@@ -1898,92 +1898,92 @@ from aibar.config import resolve_currency_symbol
 
 ## Definitions
 
-- var `GEMINIAI_OAUTH_CLIENT_PATH = Path.home() / ".config" / "aibar" / "geminiai_oauth_client.json"` (L42)
-- var `GEMINIAI_OAUTH_TOKEN_PATH = Path.home() / ".config" / "aibar" / "geminiai_oauth_token.json"` (L43)
-- var `GEMINIAI_PROJECT_ID_ENV_VAR = "GEMINIAI_PROJECT_ID"` (L44)
-- var `GEMINIAI_ACCESS_TOKEN_ENV_VAR = "GEMINIAI_OAUTH_ACCESS_TOKEN"` (L45)
-- var `BILLING_DATASET_ID = "billing_data"` (L46)
-- var `BILLING_TABLE_PREFIX = "gcp_billing_export_v1_"` (L47)
-### fn `def _to_rfc3339_utc(value: datetime) -> str` `priv` (L50-61)
+- var `GEMINIAI_OAUTH_CLIENT_PATH = Path.home() / ".config" / "aibar" / "geminiai_oauth_client.json"` (L43)
+- var `GEMINIAI_OAUTH_TOKEN_PATH = Path.home() / ".config" / "aibar" / "geminiai_oauth_token.json"` (L44)
+- var `GEMINIAI_PROJECT_ID_ENV_VAR = "GEMINIAI_PROJECT_ID"` (L45)
+- var `GEMINIAI_ACCESS_TOKEN_ENV_VAR = "GEMINIAI_OAUTH_ACCESS_TOKEN"` (L46)
+- var `BILLING_DATASET_ID = "billing_data"` (L47)
+- var `BILLING_TABLE_PREFIX = "gcp_billing_export_v1_"` (L48)
+### fn `def _to_rfc3339_utc(value: datetime) -> str` `priv` (L51-62)
 - @brief Convert datetime to RFC3339 UTC string accepted by Google APIs.
 - @details Normalizes timezone awareness and strips microseconds to produce stable API query timestamps.
 - @param value {datetime} Input datetime value.
 - @return {str} RFC3339 UTC timestamp (e.g. `2026-03-08T11:00:00Z`).
 
-### fn `def _extract_http_status(error: HttpError) -> int` `priv` (L62-82)
+### fn `def _extract_http_status(error: HttpError) -> int` `priv` (L63-83)
 - @brief Extract integer HTTP status from Google API HttpError.
 - @details Returns `0` when status is unavailable to preserve deterministic error payload shape.
 - @param error {HttpError} Google API exception.
 - @return {int} HTTP status code or `0`.
 
-### fn `def _extract_retry_after_seconds(error: HttpError) -> float` `priv` (L83-106)
+### fn `def _extract_retry_after_seconds(error: HttpError) -> float` `priv` (L84-107)
 - @brief Extract retry-after seconds from HttpError response headers.
 - @details Reads `retry-after` case-insensitively and normalizes invalid values to `0.0`.
 - @param error {HttpError} Google API exception.
 - @return {float} Non-negative retry-after delay in seconds.
 
-### fn `def _extract_google_api_status(error: GoogleAPICallError) -> int` `priv` (L107-127)
+### fn `def _extract_google_api_status(error: GoogleAPICallError) -> int` `priv` (L108-128)
 - @brief Extract HTTP-like status code from Google API Core exceptions.
 - @details Normalizes exception `code` payloads to integer status values and returns `0` when status is unavailable.
 - @param error {GoogleAPICallError} Google API Core exception.
 - @return {int} Status code or `0`.
 
-### fn `def _is_scope_insufficient_error(error: Exception) -> bool` `priv` (L128-151)
+### fn `def _is_scope_insufficient_error(error: Exception) -> bool` `priv` (L129-152)
 - @brief Determine whether exception payload indicates OAuth scope insufficiency.
 - @details Matches Google API error reason `ACCESS_TOKEN_SCOPE_INSUFFICIENT` and equivalent human-readable messages.
 - @param error {Exception} Exception to inspect.
 - @return {bool} True when the error indicates insufficient OAuth scopes.
 
-### class `class GeminiAIWindowRange` `@dataclass(frozen=True)` (L153-162)
+### class `class GeminiAIWindowRange` `@dataclass(frozen=True)` (L154-163)
 - @brief Immutable time-range descriptor for one GeminiAI fetch window.
 - @details Encodes start and end UTC timestamps used for Monitoring API queries.
 
-### class `class GeminiAICredentialStore` (L163-362)
+### class `class GeminiAICredentialStore` (L164-363)
 - @brief OAuth credential persistence and validation helper for GeminiAI.
 - @details Manages client-secret JSON validation, token-file persistence, and interactive InstalledAppFlow authorization.
-- fn `def __init__(` `priv` (L170-173)
+- fn `def __init__(` `priv` (L171-174)
   - @brief OAuth credential persistence and validation helper for GeminiAI.
   - @details Manages client-secret JSON validation, token-file persistence, and
 interactive InstalledAppFlow authorization.
-- fn `def _ensure_config_dir(self) -> None` `priv` (L184-191)
+- fn `def _ensure_config_dir(self) -> None` `priv` (L185-192)
   - @brief Initialize credential store with optional custom file paths.
   - @brief Create parent directories for OAuth files when missing.
   - @param client_config_path {Path | None} Optional OAuth client config path.
   - @param token_path {Path | None} Optional OAuth token path.
   - @return {None} Function return value.
   - @return {None} Function return value.
-- fn `def has_client_config(self) -> bool` (L192-198)
+- fn `def has_client_config(self) -> bool` (L193-199)
   - @brief Check whether GeminiAI client config JSON exists.
   - @return {bool} True when client config file exists.
-- fn `def has_authorized_credentials(self) -> bool` (L199-209)
+- fn `def has_authorized_credentials(self) -> bool` (L200-210)
   - @brief Check whether GeminiAI authorized token material exists.
   - @details Environment access-token override is treated as configured token material.
   - @return {bool} True when token file or env token is available.
-- fn `def validate_client_config(self, payload: dict[str, Any]) -> dict[str, Any]` (L210-239)
+- fn `def validate_client_config(self, payload: dict[str, Any]) -> dict[str, Any]` (L211-240)
   - @brief Validate Google InstalledApp OAuth client-secret payload.
   - @details Enforces required `installed` section fields used by `InstalledAppFlow.from_client_config`.
   - @param payload {dict[str, Any]} Decoded JSON payload to validate.
   - @return {dict[str, Any]} Normalized payload.
   - @throws {ValueError} When required fields are missing or malformed.
-- fn `def save_client_config(self, payload: dict[str, Any]) -> None` (L240-252)
+- fn `def save_client_config(self, payload: dict[str, Any]) -> None` (L241-253)
   - @brief Persist validated OAuth client config JSON to disk.
   - @param payload {dict[str, Any]} Validated client payload.
   - @return {None} Function return value.
-- fn `def load_client_config(self) -> dict[str, Any]` (L253-271)
+- fn `def load_client_config(self) -> dict[str, Any]` (L254-272)
   - @brief Load and validate persisted OAuth client config JSON.
   - @return {dict[str, Any]} Validated OAuth client payload.
   - @throws {FileNotFoundError} When client config file is missing.
   - @throws {ValueError} When payload is invalid JSON or fails validation.
-- fn `def extract_project_id(self, payload: dict[str, Any]) -> str | None` (L272-285)
+- fn `def extract_project_id(self, payload: dict[str, Any]) -> str | None` (L273-286)
   - @brief Extract project_id from validated OAuth payload.
   - @param payload {dict[str, Any]} Validated OAuth payload.
   - @return {str | None} Project identifier or None when absent.
-- fn `def save_authorized_credentials(self, credentials: Credentials) -> None` (L286-295)
+- fn `def save_authorized_credentials(self, credentials: Credentials) -> None` (L287-296)
   - @brief Persist authorized-user OAuth credentials JSON.
   - @param credentials {Credentials} Google OAuth credentials object.
   - @return {None} Function return value.
-- fn `def authorize_interactively(` (L296-298)
-- fn `def load_access_token(self) -> str | None` (L314-331)
+- fn `def authorize_interactively(` (L297-299)
+- fn `def load_access_token(self) -> str | None` (L315-332)
   - @brief Execute OAuth browser flow and persist refresh-capable credentials.
   - @brief Load access token from env override or token file.
   - @details Uses InstalledAppFlow local-server flow (`http://localhost`) and
@@ -1992,62 +1992,62 @@ saves authorized-user token JSON to disk.
   - @return {Credentials} Authorized credentials.
   - @return {str | None} Access token or None when unavailable.
   - @throws {ValueError} When client config is invalid.
-- fn `def load_credentials(` (L332-334)
+- fn `def load_credentials(` (L333-335)
 
-### class `class GeminiAIProvider(BaseProvider)` : BaseProvider (L366-427)
+### class `class GeminiAIProvider(BaseProvider)` : BaseProvider (L367-428)
 - @brief GeminiAI usage provider backed by Monitoring and BigQuery APIs.
 - @details Retrieves Generative Language API usage counters and status telemetry from Cloud Monitoring, retrieves current-month billing costs from BigQuery export, then maps data into AIBar `ProviderResult` models.
-- var `SERVICE_FILTER = (` (L376)
+- var `SERVICE_FILTER = (` (L377)
   - @brief GeminiAI usage provider backed by Monitoring and BigQuery APIs.
   - @details Retrieves Generative Language API usage counters and status telemetry
 from Cloud Monitoring, retrieves current-month billing costs from BigQuery export,
 then maps data into AIBar `ProviderResult` models.
-- var `REQUEST_COUNT_FILTER = (` (L379)
-- var `LATENCY_FILTER = (` (L387)
-- var `ERROR_FILTER = (` (L390)
-- fn `def __init__(` `priv` (L396-399)
-- fn `def is_configured(self) -> bool` (L410-419)
+- var `REQUEST_COUNT_FILTER = (` (L380)
+- var `LATENCY_FILTER = (` (L388)
+- var `ERROR_FILTER = (` (L391)
+- fn `def __init__(` `priv` (L397-400)
+- fn `def is_configured(self) -> bool` (L411-420)
   - @brief Initialize GeminiAI provider with optional overrides.
   - @brief Check whether GeminiAI provider has required auth and project metadata.
   - @param credential_store {GeminiAICredentialStore | None} Optional credential store.
   - @param project_id {str | None} Optional project id override.
   - @return {None} Function return value.
   - @return {bool} True when project id and OAuth token material are available.
-- fn `def get_config_help(self) -> str` (L420-427)
+- fn `def get_config_help(self) -> str` (L421-428)
   - @brief Return setup guidance for GeminiAI OAuth configuration.
   - @return {str} Provider-specific setup instructions.
 
-### fn `async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult` (L435-462)
+### fn `async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult` (L436-463)
 - @brief Fetch GeminiAI monitoring usage metrics for one window.
 - @details Executes synchronous Google API calls in a worker thread and returns normalized provider metrics. HTTP 429 responses are normalized as rate-limit provider error payloads with retry-after metadata.
 - @param window {WindowPeriod} Requested window period.
 - @return {ProviderResult} Provider result payload.
 - @throws {AuthenticationError} When OAuth credentials are invalid.
 
-### fn `def _fetch_sync(self, window: WindowPeriod) -> ProviderResult` `priv` (L463-616)
+### fn `def _fetch_sync(self, window: WindowPeriod) -> ProviderResult` `priv` (L464-617)
 - @brief Execute blocking Google API retrieval flow for GeminiAI metrics.
 - @param window {WindowPeriod} Requested window period.
 - @return {ProviderResult} Normalized provider result.
 - @throws {AuthenticationError} When credentials are missing/invalid.
 - @throws {ProviderError} On non-auth API failures.
 
-### fn `def _build_window_range(self, window: WindowPeriod) -> GeminiAIWindowRange` `priv` (L617-631)
+### fn `def _build_window_range(self, window: WindowPeriod) -> GeminiAIWindowRange` `priv` (L618-632)
 - @brief Build UTC time interval used for Monitoring queries.
 - @param window {WindowPeriod} Requested window period.
 - @return {GeminiAIWindowRange} Start/end UTC timestamps.
 
-### fn `def _resolve_project_id(self) -> str | None` `priv` (L632-653)
+### fn `def _resolve_project_id(self) -> str | None` `priv` (L633-654)
 - @brief Resolve project id from override, env, runtime config, or client JSON.
 - @return {str | None} Project id or None when unresolved.
 
-### fn `def _build_monitoring_service(self, credentials: Credentials) -> Any` `priv` (L654-661)
+### fn `def _build_monitoring_service(self, credentials: Credentials) -> Any` `priv` (L655-662)
 - @brief Build Google Cloud Monitoring API client.
 - @param credentials {Credentials} OAuth credentials.
 - @return {Any} Monitoring service client.
 
-### fn `def _build_bigquery_client(` `priv` (L662-665)
+### fn `def _build_bigquery_client(` `priv` (L663-666)
 
-### fn `def _discover_billing_table_id(` `priv` (L677-680)
+### fn `def _discover_billing_table_id(` `priv` (L678-681)
 - @brief Build BigQuery client for GeminiAI billing export queries.
 - @param credentials {Credentials} OAuth credentials with BigQuery read scope.
 - @param project_id {str} Google Cloud project id.
@@ -2055,7 +2055,7 @@ then maps data into AIBar `ProviderResult` models.
 - @satisfies REQ-056
 - @satisfies REQ-065
 
-### fn `def _query_current_month_billing_cost(` `priv` (L705-709)
+### fn `def _query_current_month_billing_cost(` `priv` (L706-710)
 - @brief Discover billing export table id in dataset `billing_data`.
 - @details Lists dataset tables and selects the first lexicographically sorted
 id that starts with `gcp_billing_export_v1_`.
@@ -2065,7 +2065,7 @@ id that starts with `gcp_billing_export_v1_`.
 - @throws {ProviderError} When billing export table is unavailable.
 - @satisfies REQ-064
 
-### fn `def _coerce_float(self, value: Any) -> float` `priv` (L760-779)
+### fn `def _coerce_float(self, value: Any) -> float` `priv` (L761-780)
 - @brief Query current-month billing costs grouped by Google service.
 - @brief Convert numeric BigQuery row field values to float.
 - @details Uses explicit projection and month-partition filter to reduce scanned
@@ -2080,9 +2080,9 @@ total net monthly cost.
 - @satisfies REQ-057
 - @satisfies REQ-065
 
-### fn `def _query_monitoring_metric(` `priv` (L780-787)
+### fn `def _query_monitoring_metric(` `priv` (L781-788)
 
-### fn `def _sum_time_series_values(self, response: dict[str, Any]) -> float | None` `priv` (L826-878)
+### fn `def _sum_time_series_values(self, response: dict[str, Any]) -> float | None` `priv` (L827-879)
 - @brief Query Monitoring time-series metric and aggregate point values.
 - @brief Sum numeric point values in Monitoring `timeSeries` payload.
 - @details Returns None when metric is unavailable and `allow_missing=True`.
@@ -2097,56 +2097,56 @@ total net monthly cost.
 - @return {float | None} Aggregated numeric value or None when no points exist.
 - @throws {HttpError} For non-missing API errors.
 
-### fn `def _build_metrics(` `priv` (L879-884)
+### fn `def _build_metrics(` `priv` (L880-885)
 
 ## Symbol Index
 |Symbol|Kind|Vis|Lines|Sig|
 |---|---|---|---|---|
-|`GEMINIAI_OAUTH_CLIENT_PATH`|var|pub|42||
-|`GEMINIAI_OAUTH_TOKEN_PATH`|var|pub|43||
-|`GEMINIAI_PROJECT_ID_ENV_VAR`|var|pub|44||
-|`GEMINIAI_ACCESS_TOKEN_ENV_VAR`|var|pub|45||
-|`BILLING_DATASET_ID`|var|pub|46||
-|`BILLING_TABLE_PREFIX`|var|pub|47||
-|`_to_rfc3339_utc`|fn|priv|50-61|def _to_rfc3339_utc(value: datetime) -> str|
-|`_extract_http_status`|fn|priv|62-82|def _extract_http_status(error: HttpError) -> int|
-|`_extract_retry_after_seconds`|fn|priv|83-106|def _extract_retry_after_seconds(error: HttpError) -> float|
-|`_extract_google_api_status`|fn|priv|107-127|def _extract_google_api_status(error: GoogleAPICallError)...|
-|`_is_scope_insufficient_error`|fn|priv|128-151|def _is_scope_insufficient_error(error: Exception) -> bool|
-|`GeminiAIWindowRange`|class|pub|153-162|class GeminiAIWindowRange|
-|`GeminiAICredentialStore`|class|pub|163-362|class GeminiAICredentialStore|
-|`GeminiAICredentialStore.__init__`|fn|priv|170-173|def __init__(|
-|`GeminiAICredentialStore._ensure_config_dir`|fn|priv|184-191|def _ensure_config_dir(self) -> None|
-|`GeminiAICredentialStore.has_client_config`|fn|pub|192-198|def has_client_config(self) -> bool|
-|`GeminiAICredentialStore.has_authorized_credentials`|fn|pub|199-209|def has_authorized_credentials(self) -> bool|
-|`GeminiAICredentialStore.validate_client_config`|fn|pub|210-239|def validate_client_config(self, payload: dict[str, Any])...|
-|`GeminiAICredentialStore.save_client_config`|fn|pub|240-252|def save_client_config(self, payload: dict[str, Any]) -> ...|
-|`GeminiAICredentialStore.load_client_config`|fn|pub|253-271|def load_client_config(self) -> dict[str, Any]|
-|`GeminiAICredentialStore.extract_project_id`|fn|pub|272-285|def extract_project_id(self, payload: dict[str, Any]) -> ...|
-|`GeminiAICredentialStore.save_authorized_credentials`|fn|pub|286-295|def save_authorized_credentials(self, credentials: Creden...|
-|`GeminiAICredentialStore.authorize_interactively`|fn|pub|296-298|def authorize_interactively(|
-|`GeminiAICredentialStore.load_access_token`|fn|pub|314-331|def load_access_token(self) -> str | None|
-|`GeminiAICredentialStore.load_credentials`|fn|pub|332-334|def load_credentials(|
-|`GeminiAIProvider`|class|pub|366-427|class GeminiAIProvider(BaseProvider)|
-|`GeminiAIProvider.SERVICE_FILTER`|var|pub|376||
-|`GeminiAIProvider.REQUEST_COUNT_FILTER`|var|pub|379||
-|`GeminiAIProvider.LATENCY_FILTER`|var|pub|387||
-|`GeminiAIProvider.ERROR_FILTER`|var|pub|390||
-|`GeminiAIProvider.__init__`|fn|priv|396-399|def __init__(|
-|`GeminiAIProvider.is_configured`|fn|pub|410-419|def is_configured(self) -> bool|
-|`GeminiAIProvider.get_config_help`|fn|pub|420-427|def get_config_help(self) -> str|
-|`fetch`|fn|pub|435-462|async def fetch(self, window: WindowPeriod = WindowPeriod...|
-|`_fetch_sync`|fn|priv|463-616|def _fetch_sync(self, window: WindowPeriod) -> ProviderRe...|
-|`_build_window_range`|fn|priv|617-631|def _build_window_range(self, window: WindowPeriod) -> Ge...|
-|`_resolve_project_id`|fn|priv|632-653|def _resolve_project_id(self) -> str | None|
-|`_build_monitoring_service`|fn|priv|654-661|def _build_monitoring_service(self, credentials: Credenti...|
-|`_build_bigquery_client`|fn|priv|662-665|def _build_bigquery_client(|
-|`_discover_billing_table_id`|fn|priv|677-680|def _discover_billing_table_id(|
-|`_query_current_month_billing_cost`|fn|priv|705-709|def _query_current_month_billing_cost(|
-|`_coerce_float`|fn|priv|760-779|def _coerce_float(self, value: Any) -> float|
-|`_query_monitoring_metric`|fn|priv|780-787|def _query_monitoring_metric(|
-|`_sum_time_series_values`|fn|priv|826-878|def _sum_time_series_values(self, response: dict[str, Any...|
-|`_build_metrics`|fn|priv|879-884|def _build_metrics(|
+|`GEMINIAI_OAUTH_CLIENT_PATH`|var|pub|43||
+|`GEMINIAI_OAUTH_TOKEN_PATH`|var|pub|44||
+|`GEMINIAI_PROJECT_ID_ENV_VAR`|var|pub|45||
+|`GEMINIAI_ACCESS_TOKEN_ENV_VAR`|var|pub|46||
+|`BILLING_DATASET_ID`|var|pub|47||
+|`BILLING_TABLE_PREFIX`|var|pub|48||
+|`_to_rfc3339_utc`|fn|priv|51-62|def _to_rfc3339_utc(value: datetime) -> str|
+|`_extract_http_status`|fn|priv|63-83|def _extract_http_status(error: HttpError) -> int|
+|`_extract_retry_after_seconds`|fn|priv|84-107|def _extract_retry_after_seconds(error: HttpError) -> float|
+|`_extract_google_api_status`|fn|priv|108-128|def _extract_google_api_status(error: GoogleAPICallError)...|
+|`_is_scope_insufficient_error`|fn|priv|129-152|def _is_scope_insufficient_error(error: Exception) -> bool|
+|`GeminiAIWindowRange`|class|pub|154-163|class GeminiAIWindowRange|
+|`GeminiAICredentialStore`|class|pub|164-363|class GeminiAICredentialStore|
+|`GeminiAICredentialStore.__init__`|fn|priv|171-174|def __init__(|
+|`GeminiAICredentialStore._ensure_config_dir`|fn|priv|185-192|def _ensure_config_dir(self) -> None|
+|`GeminiAICredentialStore.has_client_config`|fn|pub|193-199|def has_client_config(self) -> bool|
+|`GeminiAICredentialStore.has_authorized_credentials`|fn|pub|200-210|def has_authorized_credentials(self) -> bool|
+|`GeminiAICredentialStore.validate_client_config`|fn|pub|211-240|def validate_client_config(self, payload: dict[str, Any])...|
+|`GeminiAICredentialStore.save_client_config`|fn|pub|241-253|def save_client_config(self, payload: dict[str, Any]) -> ...|
+|`GeminiAICredentialStore.load_client_config`|fn|pub|254-272|def load_client_config(self) -> dict[str, Any]|
+|`GeminiAICredentialStore.extract_project_id`|fn|pub|273-286|def extract_project_id(self, payload: dict[str, Any]) -> ...|
+|`GeminiAICredentialStore.save_authorized_credentials`|fn|pub|287-296|def save_authorized_credentials(self, credentials: Creden...|
+|`GeminiAICredentialStore.authorize_interactively`|fn|pub|297-299|def authorize_interactively(|
+|`GeminiAICredentialStore.load_access_token`|fn|pub|315-332|def load_access_token(self) -> str | None|
+|`GeminiAICredentialStore.load_credentials`|fn|pub|333-335|def load_credentials(|
+|`GeminiAIProvider`|class|pub|367-428|class GeminiAIProvider(BaseProvider)|
+|`GeminiAIProvider.SERVICE_FILTER`|var|pub|377||
+|`GeminiAIProvider.REQUEST_COUNT_FILTER`|var|pub|380||
+|`GeminiAIProvider.LATENCY_FILTER`|var|pub|388||
+|`GeminiAIProvider.ERROR_FILTER`|var|pub|391||
+|`GeminiAIProvider.__init__`|fn|priv|397-400|def __init__(|
+|`GeminiAIProvider.is_configured`|fn|pub|411-420|def is_configured(self) -> bool|
+|`GeminiAIProvider.get_config_help`|fn|pub|421-428|def get_config_help(self) -> str|
+|`fetch`|fn|pub|436-463|async def fetch(self, window: WindowPeriod = WindowPeriod...|
+|`_fetch_sync`|fn|priv|464-617|def _fetch_sync(self, window: WindowPeriod) -> ProviderRe...|
+|`_build_window_range`|fn|priv|618-632|def _build_window_range(self, window: WindowPeriod) -> Ge...|
+|`_resolve_project_id`|fn|priv|633-654|def _resolve_project_id(self) -> str | None|
+|`_build_monitoring_service`|fn|priv|655-662|def _build_monitoring_service(self, credentials: Credenti...|
+|`_build_bigquery_client`|fn|priv|663-666|def _build_bigquery_client(|
+|`_discover_billing_table_id`|fn|priv|678-681|def _discover_billing_table_id(|
+|`_query_current_month_billing_cost`|fn|priv|706-710|def _query_current_month_billing_cost(|
+|`_coerce_float`|fn|priv|761-780|def _coerce_float(self, value: Any) -> float|
+|`_query_monitoring_metric`|fn|priv|781-788|def _query_monitoring_metric(|
+|`_sum_time_series_values`|fn|priv|827-879|def _sum_time_series_values(self, response: dict[str, Any...|
+|`_build_metrics`|fn|priv|880-885|def _build_metrics(|
 
 
 ---
