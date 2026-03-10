@@ -67,7 +67,7 @@ AIBar aggregates usage metrics for Claude, OpenAI, OpenRouter, GitHub Copilot, C
 ### Install from Git
 
 ```bash
-uv pip install "aibar @ git+https://github.com/Ogekuri/AIBar.git"
+uv tool install aibar --force --from git+https://github.com/Ogekuri/AIBar.git
 ```
 
 After installation the `aibar` command is available system-wide (or in the active virtual environment):
@@ -91,7 +91,7 @@ uvx --from "git+https://github.com/Ogekuri/AIBar.git" aibar doctor
 ### Uninstall
 
 ```bash
-uv pip uninstall aibar
+uv tool uninstall aibar
 ```
 
 
