@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.6.0](https://github.com/Ogekuri/AIBar/compare/v0.5.0..v0.6.0) - 2026-03-14
+### 🚜  Changes
+- scope provider idle-time and isolate 429 backoff [useReq] *(idle-time)*
+  - REQ: CTN-009, REQ-009, REQ-038, REQ-041, TST-003, TST-011, TST-014, and TST-027 now require provider-scoped idle-time state.
+  - Code: config.py persists idle-time.json as provider-keyed entries; cli.py applies per-provider idle gating and refresh scope selection.
+  - Code: HTTP 429 backoff updates only the rate-limited provider entry; non-rate-limited providers keep idle_delay scheduling.
+  - Tests: updated idle/cache/lock suites and added GeminiAI 429 payload-retention and provider-scoped idle-time assertions.
+  - Docs: updated REQUIREMENTS.md and WORKFLOW.md, then regenerated REFERENCES.md.
+
+### 📚  Documentation
+- Update README.md file.
+
 ## [0.5.0](https://github.com/Ogekuri/AIBar/compare/v0.4.0..v0.5.0) - 2026-03-08
 ### 📚  Documentation
 - Update README.md.
@@ -494,9 +506,11 @@
 - \[0.3.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.3.0
 - \[0.4.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.4.0
 - \[0.5.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.5.0
+- \[0.6.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.6.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
 [0.3.0]: https://github.com/Ogekuri/AIBar/compare/v0.2.0..v0.3.0
 [0.4.0]: https://github.com/Ogekuri/AIBar/compare/v0.3.0..v0.4.0
 [0.5.0]: https://github.com/Ogekuri/AIBar/compare/v0.4.0..v0.5.0
+[0.6.0]: https://github.com/Ogekuri/AIBar/compare/v0.5.0..v0.6.0
