@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.7.0](https://github.com/Ogekuri/AIBar/compare/v0.6.0..v0.7.0) - 2026-03-14
+### 🚜  Changes
+- add startup release preflight and uv lifecycle flags [useReq] *(cli)*
+  - Update REQUIREMENTS with startup GitHub release-check, idle-time file, and lifecycle flag requirements.
+  - Implement startup preflight in cli.py with 300s idle gate, 2s timeout, 429 retry-after handling, and bright color diagnostics.
+  - Add --upgrade/--uninstall/--version/--ver handlers with exact uv subprocess commands and exit-code propagation.
+  - Add targeted startup-preflight and packaging tests plus deterministic test fixture.
+  - Update pyproject build includes, WORKFLOW runtime model, and regenerate REFERENCES.
+
 ## [0.6.0](https://github.com/Ogekuri/AIBar/compare/v0.5.0..v0.6.0) - 2026-03-14
 ### 🚜  Changes
 - scope provider idle-time and isolate 429 backoff [useReq] *(idle-time)*
@@ -507,6 +516,7 @@
 - \[0.4.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.4.0
 - \[0.5.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.5.0
 - \[0.6.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.6.0
+- \[0.7.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.7.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -514,3 +524,4 @@
 [0.4.0]: https://github.com/Ogekuri/AIBar/compare/v0.3.0..v0.4.0
 [0.5.0]: https://github.com/Ogekuri/AIBar/compare/v0.4.0..v0.5.0
 [0.6.0]: https://github.com/Ogekuri/AIBar/compare/v0.5.0..v0.6.0
+[0.7.0]: https://github.com/Ogekuri/AIBar/compare/v0.6.0..v0.7.0
