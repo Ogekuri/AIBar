@@ -4,6 +4,7 @@
 @details Verifies PEP 621 metadata, build-system backend, console entry point,
 runtime dependencies, and Python version constraint declared in pyproject.toml.
 @satisfies TST-008
+@satisfies TST-037
 """
 
 import tomllib
@@ -119,3 +120,51 @@ class TestConsoleEntryPoint:
         scripts = pyproject_data.get("project", {}).get("scripts", {})
         assert "aibar" in scripts, "Missing 'aibar' entry in [project.scripts]"
         assert scripts["aibar"] == "aibar.cli:main"
+
+
+class TestBuildArtifacts:
+    """
+    @brief Validates build artifact include settings.
+    @details Ensures wheel and sdist include settings cover non-code runtime
+    assets required by packaged releases.
+    """
+
+    def test_wheel_includes_runtime_assets(self, pyproject_data: dict) -> None:
+        """
+        @brief Verify wheel include settings list runtime assets.
+        @details Asserts hatch wheel include list contains gnome-extension and
+        scripts globs required by release artifact builds.
+        @param pyproject_data {dict} Parsed pyproject.toml.
+        @return {None} Function return value.
+        @satisfies TST-037
+        """
+        wheel = (
+            pyproject_data.get("tool", {})
+            .get("hatch", {})
+            .get("build", {})
+            .get("targets", {})
+            .get("wheel", {})
+        )
+        include = wheel.get("include", [])
+        assert "src/aibar/gnome-extension/**" in include
+        assert "scripts/**" in include
+
+    def test_sdist_includes_runtime_assets(self, pyproject_data: dict) -> None:
+        """
+        @brief Verify sdist include settings list runtime assets.
+        @details Asserts hatch sdist include list contains gnome-extension and
+        scripts globs required by release artifact builds.
+        @param pyproject_data {dict} Parsed pyproject.toml.
+        @return {None} Function return value.
+        @satisfies TST-037
+        """
+        sdist = (
+            pyproject_data.get("tool", {})
+            .get("hatch", {})
+            .get("build", {})
+            .get("targets", {})
+            .get("sdist", {})
+        )
+        include = sdist.get("include", [])
+        assert "src/aibar/gnome-extension/**" in include
+        assert "scripts/**" in include

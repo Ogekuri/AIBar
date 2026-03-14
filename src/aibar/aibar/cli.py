@@ -5,20 +5,26 @@
 """
 
 import asyncio
+import email.utils
 import json
 import math
 import re
+import subprocess
 import sys
 import textwrap
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import NoReturn, Sequence
+from urllib import error as urllib_error
+from urllib import request as urllib_request
 
 import click
 from click.core import ParameterSource
 from pydantic import ValidationError
 
+from . import __version__
 from aibar.config import (
     RuntimeConfig,
     build_idle_time_state,
@@ -63,6 +69,8 @@ _SHOW_PANEL_MIN_WIDTH = 72
 _SHOW_PANEL_MAX_WIDTH = 110
 _ANSI_RESET = "\033[0m"
 _ANSI_ESCAPE_SEQUENCE_PATTERN = re.compile(r"\x1b\[[0-9;]*m")
+_ANSI_BRIGHT_GREEN = "\033[92m"
+_ANSI_BRIGHT_RED = "\033[91m"
 _PROVIDER_PANEL_COLOR_CODES: dict[ProviderName, str] = {
     ProviderName.CLAUDE: "\033[91m",
     ProviderName.OPENROUTER: "\033[38;5;208m",
@@ -71,6 +79,14 @@ _PROVIDER_PANEL_COLOR_CODES: dict[ProviderName, str] = {
     ProviderName.OPENAI: "\033[94m",
     ProviderName.GEMINIAI: "\033[95m",
 }
+_STARTUP_UPDATE_PROGRAM = "aibar"
+_STARTUP_UPDATE_URL = "https://api.github.com/repos/Ogekuri/AIBar/releases/latest"
+_STARTUP_IDLE_DELAY_SECONDS = 300
+_STARTUP_HTTP_TIMEOUT_SECONDS = 2
+_STARTUP_IDLE_STATE_LAST_SUCCESS_EPOCH_KEY = "last_success_at_epoch"
+_STARTUP_IDLE_STATE_LAST_SUCCESS_HUMAN_KEY = "last_success_at_human"
+_STARTUP_IDLE_STATE_IDLE_UNTIL_EPOCH_KEY = "idle_until_epoch"
+_STARTUP_IDLE_STATE_IDLE_UNTIL_HUMAN_KEY = "idle_until_human"
 
 
 @dataclass(frozen=True)
@@ -100,6 +116,496 @@ class RetrievalPipelineOutput:
     results: dict[str, ProviderResult]
     idle_active: bool
     cache_available: bool
+
+
+@dataclass(frozen=True)
+class StartupReleaseCheckResponse:
+    """
+    @brief Represent one startup GitHub release-check execution result.
+    @details Encodes normalized response state for startup preflight control-flow.
+    `latest_version` is populated only on successful metadata retrieval.
+    `status_code`, `error_message`, and `retry_after_seconds` carry normalized
+    failure metadata used by 429 idle-time expansion and bright-red diagnostics.
+    @note Immutable dataclass to keep preflight decisions deterministic.
+    @satisfies REQ-070
+    @satisfies REQ-073
+    @satisfies REQ-074
+    @satisfies REQ-075
+    """
+
+    latest_version: str | None
+    status_code: int | None
+    error_message: str | None
+    retry_after_seconds: int
+
+
+def _startup_idle_state_path() -> Path:
+    """
+    @brief Resolve startup update idle-state JSON path.
+    @details Builds `$HOME/.github_api_idle-time.aibar` using the configured
+    program identifier. Path is user-scoped and outside project directories.
+    @return {Path} Absolute path for startup idle-state persistence.
+    @satisfies CTN-013
+    """
+    return Path.home() / f".github_api_idle-time.{_STARTUP_UPDATE_PROGRAM}"
+
+
+def _startup_human_timestamp(epoch_seconds: int) -> str:
+    """
+    @brief Convert epoch seconds to UTC ISO-8601 timestamp text.
+    @details Normalizes negative input to zero and emits timezone-aware UTC
+    values so startup idle-state JSON remains machine-parseable and stable.
+    @param epoch_seconds {int} Epoch timestamp in seconds.
+    @return {str} UTC ISO-8601 timestamp string.
+    @satisfies CTN-013
+    """
+    normalized_epoch = max(0, int(epoch_seconds))
+    return datetime.fromtimestamp(normalized_epoch, tz=timezone.utc).isoformat()
+
+
+def _startup_parse_int(value: object, default: int = 0) -> int:
+    """
+    @brief Parse integer-like values for startup idle-state normalization.
+    @details Supports int, float, and numeric strings; invalid values return
+    provided default. Parsed values are clamped to non-negative integers.
+    @param value {object} Raw decoded value from JSON or headers.
+    @param default {int} Fallback integer when parsing fails.
+    @return {int} Non-negative parsed integer or fallback default.
+    """
+    if not isinstance(value, (int, float, str)):
+        return max(0, default)
+    try:
+        parsed_value = int(float(value))
+    except (TypeError, ValueError):
+        return max(0, default)
+    return max(0, parsed_value)
+
+
+def _load_startup_idle_state() -> dict[str, object] | None:
+    """
+    @brief Load startup update idle-state JSON from disk.
+    @details Reads `$HOME/.github_api_idle-time.aibar` and returns decoded JSON
+    object when valid. Corrupt, missing, or unreadable files normalize to None.
+    @return {dict[str, object] | None} Parsed idle-state mapping or None.
+    @satisfies CTN-013
+    """
+    state_path = _startup_idle_state_path()
+    if not state_path.exists():
+        return None
+    try:
+        decoded = json.loads(state_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if isinstance(decoded, dict):
+        return decoded
+    return None
+
+
+def _startup_idle_epochs(state: dict[str, object] | None) -> tuple[int, int]:
+    """
+    @brief Extract normalized startup idle-state epoch timestamps.
+    @details Reads `last_success_at_epoch` and `idle_until_epoch` from decoded
+    state object and normalizes missing/invalid values to zero.
+    @param state {dict[str, object] | None} Decoded startup idle-state mapping.
+    @return {tuple[int, int]} Tuple `(last_success_epoch, idle_until_epoch)`.
+    @satisfies CTN-013
+    """
+    if not isinstance(state, dict):
+        return (0, 0)
+    last_success_epoch = _startup_parse_int(
+        state.get(_STARTUP_IDLE_STATE_LAST_SUCCESS_EPOCH_KEY),
+        default=0,
+    )
+    idle_until_epoch = _startup_parse_int(
+        state.get(_STARTUP_IDLE_STATE_IDLE_UNTIL_EPOCH_KEY),
+        default=0,
+    )
+    return (last_success_epoch, idle_until_epoch)
+
+
+def _save_startup_idle_state(last_success_epoch: int, idle_until_epoch: int) -> None:
+    """
+    @brief Persist startup update idle-state JSON.
+    @details Writes epoch and UTC human-readable values for last successful
+    startup release check and idle-disable-until timestamp to
+    `$HOME/.github_api_idle-time.aibar`.
+    @param last_success_epoch {int} Last successful startup check epoch.
+    @param idle_until_epoch {int} Startup idle gate expiry epoch.
+    @return {None} Function return value.
+    @throws {OSError} Propagates filesystem write failures.
+    @satisfies CTN-013
+    @satisfies REQ-072
+    """
+    state_path = _startup_idle_state_path()
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    state_payload = {
+        _STARTUP_IDLE_STATE_LAST_SUCCESS_EPOCH_KEY: max(0, int(last_success_epoch)),
+        _STARTUP_IDLE_STATE_LAST_SUCCESS_HUMAN_KEY: _startup_human_timestamp(
+            last_success_epoch
+        ),
+        _STARTUP_IDLE_STATE_IDLE_UNTIL_EPOCH_KEY: max(0, int(idle_until_epoch)),
+        _STARTUP_IDLE_STATE_IDLE_UNTIL_HUMAN_KEY: _startup_human_timestamp(
+            idle_until_epoch
+        ),
+    }
+    state_path.write_text(
+        json.dumps(state_payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _emit_startup_preflight_message(message: str, color_code: str, err: bool = False) -> None:
+    """
+    @brief Emit colorized startup preflight diagnostics.
+    @details Wraps message text with ANSI bright color escape sequences so update
+    availability notices and failures are visually distinct in terminal output.
+    @param message {str} Rendered diagnostic message text.
+    @param color_code {str} ANSI SGR color escape prefix.
+    @param err {bool} When true, write to stderr stream.
+    @return {None} Function return value.
+    @satisfies REQ-073
+    @satisfies REQ-074
+    """
+    click.echo(f"{color_code}{message}{_ANSI_RESET}", err=err)
+
+
+def _parse_retry_after_header(retry_after_raw: str | None) -> int:
+    """
+    @brief Parse HTTP Retry-After header to delay seconds.
+    @details Supports integer-second values and HTTP-date formats. Date values
+    are converted to seconds relative to current UTC time and clamped to zero.
+    @param retry_after_raw {str | None} Retry-After header value.
+    @return {int} Non-negative delay seconds.
+    @satisfies REQ-075
+    """
+    if retry_after_raw is None:
+        return 0
+    try:
+        return max(0, int(float(retry_after_raw)))
+    except (TypeError, ValueError):
+        pass
+    try:
+        retry_after_datetime = email.utils.parsedate_to_datetime(retry_after_raw)
+    except (TypeError, ValueError):
+        return 0
+    retry_after_utc = _normalize_utc(retry_after_datetime)
+    now_utc = datetime.now(tz=timezone.utc)
+    delta_seconds = int((retry_after_utc - now_utc).total_seconds())
+    return max(0, delta_seconds)
+
+
+def _normalize_release_version(raw_version: object) -> str | None:
+    """
+    @brief Normalize release tag text extracted from GitHub API payload.
+    @details Accepts string-like values, trims whitespace, and returns None for
+    empty/invalid payload values.
+    @param raw_version {object} Decoded `tag_name` value from release JSON.
+    @return {str | None} Normalized release version string.
+    @satisfies REQ-073
+    """
+    if not isinstance(raw_version, str):
+        return None
+    normalized = raw_version.strip()
+    if not normalized:
+        return None
+    return normalized
+
+
+def _fetch_startup_latest_release() -> StartupReleaseCheckResponse:
+    """
+    @brief Fetch latest GitHub release metadata for startup preflight.
+    @details Executes one HTTP request to the canonical releases/latest endpoint
+    with hardcoded timeout. Success returns normalized latest version tag.
+    Failures return status/error metadata and parsed retry-after delay.
+    @return {StartupReleaseCheckResponse} Normalized startup release-check result.
+    @satisfies CTN-011
+    @satisfies CTN-012
+    @satisfies REQ-073
+    @satisfies REQ-074
+    @satisfies REQ-075
+    """
+    request = urllib_request.Request(
+        _STARTUP_UPDATE_URL,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "User-Agent": f"{_STARTUP_UPDATE_PROGRAM}/{__version__}",
+        },
+    )
+    try:
+        with urllib_request.urlopen(request, timeout=_STARTUP_HTTP_TIMEOUT_SECONDS) as response:
+            decoded_payload = json.loads(response.read().decode("utf-8"))
+    except urllib_error.HTTPError as exc:
+        retry_after_seconds = _parse_retry_after_header(exc.headers.get("Retry-After"))
+        return StartupReleaseCheckResponse(
+            latest_version=None,
+            status_code=exc.code,
+            error_message=f"Startup update check failed: HTTP {exc.code} {exc.reason}.",
+            retry_after_seconds=retry_after_seconds,
+        )
+    except (urllib_error.URLError, TimeoutError, ValueError) as exc:
+        return StartupReleaseCheckResponse(
+            latest_version=None,
+            status_code=None,
+            error_message=f"Startup update check failed: {exc}.",
+            retry_after_seconds=0,
+        )
+
+    latest_version = _normalize_release_version(decoded_payload.get("tag_name"))
+    if latest_version is None:
+        return StartupReleaseCheckResponse(
+            latest_version=None,
+            status_code=200,
+            error_message="Startup update check failed: invalid release metadata payload.",
+            retry_after_seconds=0,
+        )
+    return StartupReleaseCheckResponse(
+        latest_version=latest_version,
+        status_code=200,
+        error_message=None,
+        retry_after_seconds=0,
+    )
+
+
+def _parse_version_triplet(version_text: str) -> tuple[int, int, int] | None:
+    """
+    @brief Parse semantic version tuple from version text.
+    @details Accepts optional `v` prefix and optional suffix metadata. Returns
+    first `major.minor.patch` triplet or None when parsing fails.
+    @param version_text {str} Raw version string.
+    @return {tuple[int, int, int] | None} Parsed semantic version tuple.
+    @satisfies REQ-073
+    """
+    match = re.match(r"^v?(\d+)\.(\d+)\.(\d+)", version_text.strip())
+    if match is None:
+        return None
+    return (
+        int(match.group(1)),
+        int(match.group(2)),
+        int(match.group(3)),
+    )
+
+
+def _is_newer_release(installed_version: str, latest_version: str) -> bool:
+    """
+    @brief Compare installed and latest release semantic versions.
+    @details Uses normalized `major.minor.patch` tuples. Invalid version formats
+    disable upgrade notice emission to avoid false positives.
+    @param installed_version {str} Installed program version text.
+    @param latest_version {str} Latest release version text.
+    @return {bool} True when latest release is newer than installed version.
+    @satisfies REQ-073
+    """
+    installed_triplet = _parse_version_triplet(installed_version)
+    latest_triplet = _parse_version_triplet(latest_version)
+    if installed_triplet is None or latest_triplet is None:
+        return False
+    return latest_triplet > installed_triplet
+
+
+def _run_startup_update_preflight() -> None:
+    """
+    @brief Execute startup update-check preflight with idle-time gating.
+    @details Evaluates startup idle-state file; skips HTTP calls while idle is
+    active; performs latest-release fetch when idle expires or file is missing;
+    prints bright-green update notice for newer releases; prints bright-red error
+    diagnostics on failures; updates idle-state after success and HTTP 429.
+    @return {None} Function return value.
+    @satisfies CTN-013
+    @satisfies CTN-014
+    @satisfies REQ-070
+    @satisfies REQ-071
+    @satisfies REQ-072
+    @satisfies REQ-073
+    @satisfies REQ-074
+    @satisfies REQ-075
+    """
+    now_epoch = int(time.time())
+    state = _load_startup_idle_state()
+    last_success_epoch, idle_until_epoch = _startup_idle_epochs(state)
+    if now_epoch < idle_until_epoch:
+        return
+
+    response = _fetch_startup_latest_release()
+    if response.error_message is None and response.latest_version is not None:
+        if _is_newer_release(__version__, response.latest_version):
+            _emit_startup_preflight_message(
+                message=(
+                    "New version available: "
+                    f"installed {__version__}, latest {response.latest_version}."
+                ),
+                color_code=_ANSI_BRIGHT_GREEN,
+            )
+        try:
+            _save_startup_idle_state(
+                last_success_epoch=now_epoch,
+                idle_until_epoch=now_epoch + _STARTUP_IDLE_DELAY_SECONDS,
+            )
+        except OSError as exc:
+            _emit_startup_preflight_message(
+                message=f"Startup update check failed: unable to persist idle state ({exc}).",
+                color_code=_ANSI_BRIGHT_RED,
+                err=True,
+            )
+        return
+
+    if response.status_code == 429:
+        retry_after_seconds = max(_STARTUP_IDLE_DELAY_SECONDS, response.retry_after_seconds)
+        idle_until_epoch = max(idle_until_epoch, now_epoch + retry_after_seconds)
+        try:
+            _save_startup_idle_state(
+                last_success_epoch=last_success_epoch,
+                idle_until_epoch=idle_until_epoch,
+            )
+        except OSError as exc:
+            _emit_startup_preflight_message(
+                message=f"Startup update check failed: unable to persist idle state ({exc}).",
+                color_code=_ANSI_BRIGHT_RED,
+                err=True,
+            )
+    if response.error_message is not None:
+        _emit_startup_preflight_message(
+            message=response.error_message,
+            color_code=_ANSI_BRIGHT_RED,
+            err=True,
+        )
+
+
+def _execute_lifecycle_subprocess(command: list[str]) -> int:
+    """
+    @brief Execute lifecycle subprocess command for upgrade/uninstall options.
+    @details Runs provided command via `subprocess.run` and returns subprocess
+    exit code. Command execution failures return non-zero status with red error.
+    @param command {list[str]} Lifecycle command argv.
+    @return {int} Subprocess exit code.
+    @satisfies CTN-015
+    @satisfies REQ-076
+    @satisfies REQ-077
+    """
+    try:
+        completed = subprocess.run(command, check=False)
+    except OSError as exc:
+        _emit_startup_preflight_message(
+            message=f"Lifecycle command failed: {exc}.",
+            color_code=_ANSI_BRIGHT_RED,
+            err=True,
+        )
+        return 1
+    return int(completed.returncode)
+
+
+def _handle_upgrade_option(
+    ctx: click.Context, param: click.Parameter, value: bool
+) -> None:
+    """
+    @brief Handle eager `--upgrade` lifecycle option callback.
+    @details Executes required `uv tool install ... --force` command and exits
+    current Click context with subprocess return code when option is provided.
+    @param ctx {click.Context} Active Click context.
+    @param param {click.Parameter} Option metadata (unused).
+    @param value {bool} Parsed `--upgrade` flag value.
+    @return {None} Function return value.
+    @satisfies CTN-015
+    @satisfies REQ-076
+    """
+    del param
+    if not value or ctx.resilient_parsing:
+        return
+    exit_code = _execute_lifecycle_subprocess(
+        [
+            "uv",
+            "tool",
+            "install",
+            "aibar",
+            "--force",
+            "--from",
+            "git+https://github.com/Ogekuri/AIBar.git",
+        ]
+    )
+    ctx.exit(exit_code)
+
+
+def _handle_uninstall_option(
+    ctx: click.Context, param: click.Parameter, value: bool
+) -> None:
+    """
+    @brief Handle eager `--uninstall` lifecycle option callback.
+    @details Executes required `uv tool uninstall aibar` command and exits Click
+    context with subprocess return code when option is provided.
+    @param ctx {click.Context} Active Click context.
+    @param param {click.Parameter} Option metadata (unused).
+    @param value {bool} Parsed `--uninstall` flag value.
+    @return {None} Function return value.
+    @satisfies CTN-015
+    @satisfies REQ-077
+    """
+    del param
+    if not value or ctx.resilient_parsing:
+        return
+    exit_code = _execute_lifecycle_subprocess(["uv", "tool", "uninstall", "aibar"])
+    ctx.exit(exit_code)
+
+
+def _handle_version_option(
+    ctx: click.Context, param: click.Parameter, value: bool
+) -> None:
+    """
+    @brief Handle eager `--version` and `--ver` option callback.
+    @details Prints installed package version and exits before command dispatch
+    when either version flag is present.
+    @param ctx {click.Context} Active Click context.
+    @param param {click.Parameter} Option metadata (unused).
+    @param value {bool} Parsed version-option flag value.
+    @return {None} Function return value.
+    @satisfies REQ-078
+    """
+    del param
+    if not value or ctx.resilient_parsing:
+        return
+    click.echo(__version__)
+    ctx.exit(0)
+
+
+class StartupPreflightGroup(click.Group):
+    """
+    @brief Click group subclass that enforces startup preflight ordering.
+    @details Executes startup update-check preflight before Click argument
+    parsing and command dispatch. This guarantees preflight execution even when
+    invocation later fails due to invalid arguments.
+    @satisfies REQ-070
+    """
+
+    def main(
+        self,
+        args: Sequence[str] | None = None,
+        prog_name: str | None = None,
+        complete_var: str | None = None,
+        standalone_mode: bool = True,
+        windows_expand_args: bool = True,
+        **extra: object,
+    ) -> NoReturn:
+        """
+        @brief Execute startup preflight before Click main dispatch.
+        @details Runs update-check preflight and then delegates to Click's
+        standard command parser and dispatcher.
+        @param args {Sequence[str] | None} Optional argv sequence.
+        @param prog_name {str | None} Program display name override.
+        @param complete_var {str | None} Shell-completion environment variable.
+        @param standalone_mode {bool} Click standalone execution mode flag.
+        @param windows_expand_args {bool} Windows argument expansion flag.
+        @param extra {object} Additional keyword arguments forwarded to Click.
+        @return {NoReturn} Click main dispatcher return contract.
+        @satisfies REQ-070
+        """
+        _run_startup_update_preflight()
+        super().main(
+            args=args,
+            prog_name=prog_name,
+            complete_var=complete_var,
+            standalone_mode=standalone_mode,
+            windows_expand_args=windows_expand_args,
+            **extra,
+        )
+        raise RuntimeError("Click main returned unexpectedly.")
 
 
 def _normalize_utc(value: datetime) -> datetime:
@@ -1263,6 +1769,7 @@ def _build_cached_dual_window_results(
 
 
 @click.group(
+    cls=StartupPreflightGroup,
     invoke_without_command=True,
     context_settings={"help_option_names": ["--help", "-h"]},
     help=(
@@ -1278,7 +1785,32 @@ def _build_cached_dual_window_results(
         "  aibar setup"
     ),
 )
-@click.version_option()
+@click.option(
+    "--version",
+    "--ver",
+    "show_version",
+    is_flag=True,
+    is_eager=True,
+    expose_value=False,
+    callback=_handle_version_option,
+    help="Show installed version and exit.",
+)
+@click.option(
+    "--upgrade",
+    is_flag=True,
+    is_eager=True,
+    expose_value=False,
+    callback=_handle_upgrade_option,
+    help="Upgrade aibar using uv and exit.",
+)
+@click.option(
+    "--uninstall",
+    is_flag=True,
+    is_eager=True,
+    expose_value=False,
+    callback=_handle_uninstall_option,
+    help="Uninstall aibar using uv and exit.",
+)
 @click.pass_context
 def main(ctx: click.Context) -> None:
     """

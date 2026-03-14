@@ -4,7 +4,7 @@
   - `type: Process`
   - `parent_process: null`
   - `role: aibar CLI runtime process`
-  - `entrypoint_symbols: main(...)`
+  - `entrypoint_symbols: StartupPreflightGroup.main(...), main(...)`
   - `defining_files: src/aibar/aibar/cli.py, src/aibar/aibar/__main__.py`
   - `thread_model: no explicit threads detected`
 
@@ -83,13 +83,31 @@
 
 ### PROC:main
 - `Entrypoints`
-  - `main(...)`: Click command-group entrypoint (prints usage/help when invoked without subcommand) [`src/aibar/aibar/cli.py`]
+  - `StartupPreflightGroup.main(...)`: startup preflight + Click parser dispatcher entrypoint [`src/aibar/aibar/cli.py`]
+  - `main(...)`: Click command-group callback (prints usage/help when invoked without subcommand) [`src/aibar/aibar/cli.py`]
 - `Lifecycle/Trigger`
   - Starts when `aibar` is invoked by a user shell or by subprocess spawn from `PROC:gnome-shell`.
-  - Executes one command route (`show`, `doctor`, `env`, `setup`, `login`) per invocation.
+  - Executes startup update preflight before CLI argument validation and command dispatch.
+  - Executes one command route (`show`, `doctor`, `env`, `setup`, `login`) or exits early via lifecycle flags (`--version`, `--ver`, `--upgrade`, `--uninstall`).
   - Exits after command completion.
 - `Internal Call-Trace Tree`
-  - `main(...)`: CLI command router [`src/aibar/aibar/cli.py`]
+  - `StartupPreflightGroup.main(...)`: startup preflight wrapper around Click parser/dispatcher [`src/aibar/aibar/cli.py`]
+    - `_run_startup_update_preflight(...)`: startup release-check idle gate and diagnostics pipeline [`src/aibar/aibar/cli.py`]
+      - `_load_startup_idle_state(...)`: load startup idle-state JSON from `$HOME/.github_api_idle-time.aibar` [`src/aibar/aibar/cli.py`]
+      - `_startup_idle_epochs(...)`: normalize `last_success_at_epoch` and `idle_until_epoch` from startup idle-state payload [`src/aibar/aibar/cli.py`]
+      - `_fetch_startup_latest_release(...)`: fetch and normalize latest GitHub release metadata with hardcoded timeout [`src/aibar/aibar/cli.py`]
+        - `_parse_retry_after_header(...)`: normalize Retry-After values for HTTP 429 handling [`src/aibar/aibar/cli.py`]
+        - `_normalize_release_version(...)`: normalize release `tag_name` payload text [`src/aibar/aibar/cli.py`]
+      - `_is_newer_release(...)`: semantic-version compare between installed and latest release tags [`src/aibar/aibar/cli.py`]
+        - `_parse_version_triplet(...)`: parse `major.minor.patch` tuple from version text [`src/aibar/aibar/cli.py`]
+      - `_save_startup_idle_state(...)`: persist startup idle-state JSON with epoch and human-readable fields [`src/aibar/aibar/cli.py`]
+      - `_emit_startup_preflight_message(...)`: emit bright-green/bright-red startup diagnostics [`src/aibar/aibar/cli.py`]
+    - `_handle_version_option(...)`: eager `--version`/`--ver` callback that prints installed version and exits [`src/aibar/aibar/cli.py`]
+    - `_handle_upgrade_option(...)`: eager `--upgrade` callback that executes uv install command and exits [`src/aibar/aibar/cli.py`]
+      - `_execute_lifecycle_subprocess(...)`: subprocess execution wrapper with exit-code propagation [`src/aibar/aibar/cli.py`]
+    - `_handle_uninstall_option(...)`: eager `--uninstall` callback that executes uv uninstall command and exits [`src/aibar/aibar/cli.py`]
+      - `_execute_lifecycle_subprocess(...)`: subprocess execution wrapper with exit-code propagation [`src/aibar/aibar/cli.py`]
+    - `main(...)`: CLI command router callback [`src/aibar/aibar/cli.py`]
     - `show(...)`: usage fetch/report route with shared cache pipeline [`src/aibar/aibar/cli.py`]
       - `parse_window(...)`: CLI window selector normalization [`src/aibar/aibar/cli.py`]
       - default-window override branch: when `show --provider geminiai` omits `--window`, effective window is set to `30d` before retrieval pipeline execution [`src/aibar/aibar/cli.py`]
@@ -206,10 +224,12 @@
     - `main(...)`: CLI command router [`src/aibar/aibar/cli.py`]
 - `External Boundaries`
   - Click command parsing and dispatch.
+  - GitHub Releases latest endpoint (`https://api.github.com/repos/Ogekuri/AIBar/releases/latest`) for startup update checks.
+  - `uv` subprocess execution for lifecycle flags (`--upgrade`, `--uninstall`).
   - HTTP network interactions through provider endpoints.
   - Browser-based OAuth consent flow and loopback callback for GeminiAI Google credentials.
   - Google Cloud Monitoring API HTTPS endpoints.
-  - Local filesystem reads/writes under user home for env, credentials, runtime config, CLI cache, and idle-time state.
+  - Local filesystem reads/writes under user home for env, credentials, runtime config, CLI cache, provider idle-time state, and startup idle-state file (`$HOME/.github_api_idle-time.aibar`).
   - Process environment and terminal stdout/stderr streams.
 
 ### PROC:gnome-shell

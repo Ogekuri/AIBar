@@ -1,8 +1,8 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.3.20"
-date: "2026-03-08"
+version: "0.3.21"
+date: "2026-03-14"
 author: "req-change"
 scope:
   paths:
@@ -89,6 +89,8 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **PRJ-006**: MUST provide a PEP 621-compliant `pyproject.toml` at repository root enabling installation via `uv pip install` and live execution via `uvx --from git+https://github.com/Ogekuri/AIBar.git aibar <command>`.
 - **PRJ-007**: MUST document in `README.md` a dedicated section covering `uv`-based installation, removal, and `uvx` live execution instructions, plus GeminiAI prerequisites (Desktop OAuth client, BigQuery dataset, required APIs).
 - **PRJ-008**: MUST provide `scripts/install-gnome-extension.sh` that copies GNOME extension files from `src/aibar/gnome-extension/aibar@aibar.panel/` to `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/` and enables the extension via `gnome-extensions enable`.
+- **PRJ-009**: MUST execute startup update checks and lifecycle flags `--upgrade`, `--uninstall`, `--version`, and `--ver` for program `aibar`.
+- **PRJ-010**: MUST package all runtime files required by `aibar` so local execution and `uv tool install` execution remain behaviorally equivalent.
 
 ### 2.2 Project Constraints
 - **CTN-001**: MUST resolve provider credentials with precedence: environment variable, then `~/.config/aibar/env`, then provider-specific local credential stores.
@@ -101,6 +103,11 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **CTN-008**: MUST persist runtime configuration in `~/.config/aibar/config.json` with keys `idle_delay_seconds`, `api_call_delay_milliseconds`, `gnome_refresh_interval_seconds`, `billing_data`, and `currency_symbols` (mapping provider name → currency symbol string; default `"$"` per provider when key is absent).
 - **CTN-009**: MUST persist provider-scoped idle-time state in `~/.cache/aibar/idle-time.json`, where each provider key stores epoch and human-readable `last_success_at` and `idle_until` fields.
 - **CTN-010**: MUST update `cache.json` payload fields only after successful fetch for the same provider/window and MUST preserve previous payload fields on failed fetch attempts, including HTTP `429`.
+- **CTN-011**: MUST fetch latest release metadata from `https://api.github.com/repos/Ogekuri/AIBar/releases/latest` for startup update checks.
+- **CTN-012**: MUST use hardcoded startup update-check constants `idle_delay_seconds=300` and `http_timeout_seconds=2`.
+- **CTN-013**: MUST persist startup update-check idle state in `$HOME/.github_api_idle-time.aibar` JSON with epoch and human-readable `last_success_at` and `idle_until`.
+- **CTN-014**: MUST perform at most one startup update HTTP check per 300 seconds unless `$HOME/.github_api_idle-time.aibar` is missing or expired.
+- **CTN-015**: MUST execute lifecycle subprocess commands exactly as `uv tool install aibar --force --from git+https://github.com/Ogekuri/AIBar.git` and `uv tool uninstall aibar`.
 
 ## 3. Requirements
 
@@ -182,6 +189,16 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-067**: CLI `show` text mode MUST render ANSI provider-colored bordered panels (Claude red, OpenRouter orange, Copilot yellow, Codex green, OpenAI blue, GeminiAI purple) with provider-colored progress bars; all panels in one `show` execution MUST use the same width equal to the widest rendered panel.
 - **REQ-068**: Bare `aibar` and `aibar --help` MUST print human-readable usage text listing all commands and global or command-specific options, including `show --force` and `show --json`, without Doxygen tags.
 - **REQ-069**: GNOME panel icon MUST be bright white when all percentages are <= 25, bright yellow when any percentage > 25, bright orange when any percentage > 50, bright red when any percentage > 75, and blinking bright-red/dim-red when any percentage > 90.
+- **REQ-070**: MUST execute startup update-check preflight before CLI argument validation and command dispatch.
+- **REQ-071**: MUST skip startup update HTTP calls while current epoch is lower than persisted `idle_until` in `$HOME/.github_api_idle-time.aibar`.
+- **REQ-072**: MUST create or overwrite `$HOME/.github_api_idle-time.aibar` after successful startup update checks using `last_success_at=now` and `idle_until=now+300` in epoch and human-readable formats.
+- **REQ-073**: MUST print a bright-green message containing installed version and latest available version when the latest GitHub release is newer.
+- **REQ-074**: MUST print bright-red error diagnostics when startup update checks fail, including HTTP status details such as `403`.
+- **REQ-075**: MUST process startup update HTTP `429` responses by updating idle-time with `max(300, max_retry_after_seconds_observed)`.
+- **REQ-076**: MUST execute `uv tool install aibar --force --from git+https://github.com/Ogekuri/AIBar.git` when `--upgrade` is provided and propagate subprocess exit status.
+- **REQ-077**: MUST execute `uv tool uninstall aibar` when `--uninstall` is provided and propagate subprocess exit status.
+- **REQ-078**: MUST print installed program version and exit when `--version` or `--ver` is provided.
+- **REQ-079**: MUST include runtime files required by startup update-check behavior in `pyproject.toml` package configuration used by `.github/workflows/release-uvx+extension.yml`.
 
 ## 4. Test Requirements
 
@@ -216,6 +233,13 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-028**: MUST verify `setup` currency prompts exclude `geminiai` and GeminiAI rendering in CLI text and JSON payload includes latest-available billing-period monetary cost values when billing data exists.
 - **TST-029**: MUST verify GNOME extension renders GeminiAI provider tab/card with bright-purple style class assignment, provider title `GEMINIAI`, provider ordering immediately after `codex`, and GeminiAI cost/error status propagation from cache payload.
 - **TST-030**: MUST verify CLI `show` renders all provider panels with identical visible width in one execution, where the shared width equals the widest rendered panel content width.
+- **TST-031**: MUST verify startup update preflight executes before invalid-argument diagnostics and before subcommand handlers run.
+- **TST-032**: MUST verify startup update idle-time gating skips HTTP calls until `idle_until` expires and resumes checks when the idle-state file is missing or expired.
+- **TST-033**: MUST verify successful startup update checks write `$HOME/.github_api_idle-time.aibar` with epoch and human-readable `last_success_at` and `idle_until`.
+- **TST-034**: MUST verify repeated startup update HTTP `429` responses compute idle-time using `max(300, max(retry-after values))`.
+- **TST-035**: MUST verify `--upgrade` and `--uninstall` invoke required `uv tool` commands and propagate subprocess exit codes.
+- **TST-036**: MUST verify `--version` and `--ver` print installed version and bypass subcommand execution.
+- **TST-037**: MUST verify `pyproject.toml` include/package-data settings cover files needed for startup update-check runtime behavior in `.github/workflows/release-uvx+extension.yml` builds.
 
 ## 5. Evidence
 
