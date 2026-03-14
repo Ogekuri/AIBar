@@ -55,9 +55,14 @@ def test_show_force_bypasses_idle_time_and_recreates_state(
     config_module.save_runtime_config(
         config_module.RuntimeConfig(idle_delay_seconds=300, api_call_delay_milliseconds=20)
     )
-    stale_state = config_module.save_idle_time(
+    stale_state = config_module.build_idle_time_state(
         last_success_at=datetime.now(timezone.utc) - timedelta(hours=1),
         idle_until=datetime.now(timezone.utc) + timedelta(hours=2),
+    )
+    config_module.save_idle_time(
+        {
+            ProviderName.OPENROUTER.value: stale_state,
+        }
     )
     config_module.save_cli_cache(
         {
@@ -107,8 +112,9 @@ def test_show_force_bypasses_idle_time_and_recreates_state(
     assert output_payload["payload"]["openrouter"]["raw"]["source"] == "live"
 
     refreshed_state = json.loads(config_module.IDLE_TIME_PATH.read_text(encoding="utf-8"))
-    assert refreshed_state["last_success_timestamp"] >= stale_state.last_success_timestamp
-    assert refreshed_state["idle_until_timestamp"] > refreshed_state["last_success_timestamp"]
+    openrouter_state = refreshed_state[ProviderName.OPENROUTER.value]
+    assert openrouter_state["last_success_timestamp"] >= stale_state.last_success_timestamp
+    assert openrouter_state["idle_until_timestamp"] > openrouter_state["last_success_timestamp"]
 
 
 def test_show_geminiai_defaults_to_30d_when_window_is_omitted(

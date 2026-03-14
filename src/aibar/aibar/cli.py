@@ -21,6 +21,7 @@ from pydantic import ValidationError
 
 from aibar.config import (
     RuntimeConfig,
+    build_idle_time_state,
     config,
     load_cli_cache,
     load_idle_time,
@@ -82,7 +83,8 @@ class RetrievalPipelineOutput:
     refresh into `cache.json`, and deterministic payload projection for rendering.
     @note `payload` contains cache JSON sections: `payload` and `status`.
     @note `results` contains validated ProviderResult objects keyed by provider id.
-    @note `idle_active` indicates that idle-time gating blocked refresh.
+    @note `idle_active` indicates provider-scoped idle-time gating blocked at
+    least one selected provider refresh.
     @note `cache_available` indicates `cache.json` was readable for this run.
     @satisfies REQ-009
     @satisfies REQ-039
@@ -531,10 +533,11 @@ def _update_idle_time_after_refresh(
     runtime_config: RuntimeConfig,
 ) -> None:
     """
-    @brief Persist idle-time metadata after refresh completion.
-    @details Computes idle-until from last successful fetch timestamp plus
-    `idle_delay_seconds`; on HTTP 429, expands idle-until using the greater value
-    between idle-delay and maximum retry-after observed in the run.
+    @brief Persist provider-scoped idle-time metadata after refresh completion.
+    @details Computes per-provider `idle_until` from provider-local
+    `last_success_at + idle_delay_seconds`; for provider-local HTTP 429 results,
+    expands only that provider entry using
+    `max(idle_delay_seconds, retry_after_seconds)`.
     @param fetched_results {list[ProviderResult]} Live results produced by refresh calls.
     @param runtime_config {RuntimeConfig} Runtime delay configuration.
     @return {None} Function return value.
@@ -545,36 +548,65 @@ def _update_idle_time_after_refresh(
         return
 
     now_utc = datetime.now(timezone.utc)
-    successful_results = [result for result in fetched_results if not result.is_error]
-    rate_limited_results = [result for result in fetched_results if _is_http_429_result(result)]
+    persisted_idle_time_state = load_idle_time()
+    updated_idle_time_state = dict(persisted_idle_time_state)
+    did_change = False
 
-    last_success_at: datetime | None = None
-    if successful_results:
-        last_success_at = max(_normalize_utc(result.updated_at) for result in successful_results)
-    else:
-        previous_state = load_idle_time()
-        if previous_state is not None:
-            last_success_at = datetime.fromtimestamp(
-                previous_state.last_success_timestamp,
-                tz=timezone.utc,
+    results_by_provider: dict[str, list[ProviderResult]] = {}
+    for result in fetched_results:
+        provider_results = results_by_provider.setdefault(result.provider.value, [])
+        provider_results.append(result)
+
+    for provider_key, provider_results in results_by_provider.items():
+        successful_results = [result for result in provider_results if not result.is_error]
+        rate_limited_results = [
+            result for result in provider_results if _is_http_429_result(result)
+        ]
+
+        last_success_at: datetime | None = None
+        if successful_results:
+            last_success_at = max(
+                _normalize_utc(result.updated_at) for result in successful_results
             )
+        else:
+            previous_state = persisted_idle_time_state.get(provider_key)
+            if previous_state is not None:
+                last_success_at = datetime.fromtimestamp(
+                    previous_state.last_success_timestamp,
+                    tz=timezone.utc,
+                )
+            elif rate_limited_results:
+                last_success_at = now_utc
 
-    if last_success_at is None and rate_limited_results:
-        last_success_at = now_utc
-    if last_success_at is None:
-        return
+        if last_success_at is None:
+            continue
 
-    base_idle_until = last_success_at + timedelta(seconds=runtime_config.idle_delay_seconds)
-    idle_until = base_idle_until
-    if rate_limited_results:
-        max_retry_after_seconds = max(
-            _extract_retry_after_seconds(result) for result in rate_limited_results
+        base_idle_until = last_success_at + timedelta(
+            seconds=runtime_config.idle_delay_seconds
         )
-        retry_idle_until = now_utc + timedelta(
-            seconds=max(runtime_config.idle_delay_seconds, max_retry_after_seconds)
+        idle_until = base_idle_until
+        if rate_limited_results:
+            max_retry_after_seconds = max(
+                _extract_retry_after_seconds(result)
+                for result in rate_limited_results
+            )
+            retry_idle_until = now_utc + timedelta(
+                seconds=max(runtime_config.idle_delay_seconds, max_retry_after_seconds)
+            )
+            idle_until = max(base_idle_until, retry_idle_until)
+
+        next_state = build_idle_time_state(
+            last_success_at=last_success_at,
+            idle_until=idle_until,
         )
-        idle_until = max(base_idle_until, retry_idle_until)
-    save_idle_time(last_success_at, idle_until)
+        previous_state = updated_idle_time_state.get(provider_key)
+        if previous_state is not None and previous_state == next_state:
+            continue
+        updated_idle_time_state[provider_key] = next_state
+        did_change = True
+
+    if did_change:
+        save_idle_time(updated_idle_time_state)
 
 
 def _project_next_reset(resets_at_str: str, window: WindowPeriod) -> datetime | None:
@@ -1065,8 +1097,8 @@ def retrieve_results_via_cache_pipeline(
 ) -> RetrievalPipelineOutput:
     """
     @brief Execute shared cache-based retrieval pipeline for CLI and Text UI.
-    @details Applies required operation order: force-flag handling, idle-time
-    evaluation, conditional refresh/update of `cache.json`, then decode of
+    @details Applies required operation order: force-flag handling, provider-scoped
+    idle-time evaluation, per-provider conditional refresh/update of `cache.json`, then decode of
     effective cache payload for downstream rendering without redundant reload.
     @param provider_filter {ProviderName | None} Optional provider selector.
     @param target_window {WindowPeriod} Target window requested by caller.
@@ -1088,19 +1120,45 @@ def retrieve_results_via_cache_pipeline(
 
     cached_payload_raw = load_cli_cache()
     cached_document = _normalize_cache_document(cached_payload_raw)
-    idle_state = load_idle_time()
+    idle_state_by_provider = load_idle_time()
     now_utc = datetime.now(timezone.utc)
-    idle_active = (
-        not force_refresh
-        and idle_state is not None
-        and idle_state.idle_until_timestamp > int(now_utc.timestamp())
-    )
-    if idle_active:
+    if provider_filter is None:
+        selected_providers = providers
+    else:
+        selected_provider = providers.get(provider_filter)
+        selected_providers = (
+            {}
+            if selected_provider is None
+            else {provider_filter: selected_provider}
+        )
+
+    idle_blocked_provider_keys: set[str] = set()
+    if not force_refresh:
+        current_timestamp = int(now_utc.timestamp())
+        for provider_name in selected_providers:
+            provider_state = idle_state_by_provider.get(provider_name.value)
+            if (
+                provider_state is not None
+                and provider_state.idle_until_timestamp > current_timestamp
+            ):
+                idle_blocked_provider_keys.add(provider_name.value)
+    idle_active = bool(idle_blocked_provider_keys)
+
+    if force_refresh:
+        refresh_scope = selected_providers
+    else:
+        refresh_scope = {
+            provider_name: provider
+            for provider_name, provider in selected_providers.items()
+            if provider_name.value not in idle_blocked_provider_keys
+        }
+
+    if not refresh_scope:
         if cached_payload_raw is None:
             return RetrievalPipelineOutput(
                 payload=_empty_cache_document(),
                 results={},
-                idle_active=True,
+                idle_active=idle_active,
                 cache_available=False,
             )
         filtered_cached_document = _filter_cached_payload(cached_document, provider_filter)
@@ -1112,21 +1170,11 @@ def retrieve_results_via_cache_pipeline(
                 target_window=target_window,
                 providers=providers,
             ),
-            idle_active=True,
+            idle_active=idle_active,
             cache_available=True,
         )
 
     runtime_config = load_runtime_config()
-    if provider_filter is None:
-        refresh_scope = providers
-    else:
-        selected_provider = providers.get(provider_filter)
-        refresh_scope = (
-            {}
-            if selected_provider is None
-            else {provider_filter: selected_provider}
-        )
-
     persisted_payload = _refresh_and_persist_cache_payload(
         providers=refresh_scope,
         target_window=target_window,
@@ -1152,7 +1200,7 @@ def retrieve_results_via_cache_pipeline(
             target_window=target_window,
             providers=providers,
         ),
-        idle_active=False,
+        idle_active=idle_active,
         cache_available=True,
     )
 

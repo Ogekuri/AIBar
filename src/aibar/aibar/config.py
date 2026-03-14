@@ -66,9 +66,10 @@ class RuntimeConfig(BaseModel):
 
 class IdleTimeState(BaseModel):
     """
-    @brief Define persisted idle-time state component.
-    @details Stores last successful refresh timestamp and computed idle-until
-    timestamp in both epoch and human-readable ISO-8601 UTC formats.
+    @brief Define persisted idle-time entry for one provider.
+    @details Stores provider-local last-success and idle-until timestamps in
+    epoch and ISO-8601 UTC formats. Serialized as one value under provider key
+    in `~/.cache/aibar/idle-time.json`.
     @satisfies CTN-009
     """
 
@@ -282,50 +283,87 @@ def save_cli_cache(payload: dict[str, Any]) -> None:
         )
 
 
-def load_idle_time() -> IdleTimeState | None:
+def build_idle_time_state(last_success_at: datetime, idle_until: datetime) -> IdleTimeState:
     """
-    @brief Load idle-time control state from disk.
-    @details Reads and validates `~/.cache/aibar/idle-time.json`. Invalid or
-    unreadable payloads return None and are treated as missing state.
-    @return {IdleTimeState | None} Validated idle-time state or None.
-    @satisfies CTN-009
-    @satisfies REQ-066
-    """
-    try:
-        with _blocking_file_lock(IDLE_TIME_PATH):
-            decoded = json.loads(IDLE_TIME_PATH.read_text(encoding="utf-8"))
-            if isinstance(decoded, dict):
-                return IdleTimeState.model_validate(decoded)
-    except (OSError, ValueError, ValidationError):
-        return None
-    return None
-
-
-def save_idle_time(last_success_at: datetime, idle_until: datetime) -> IdleTimeState:
-    """
-    @brief Persist idle-time state using epoch and human-readable timestamp fields.
-    @details Normalizes timestamps to UTC, serializes both epoch and ISO strings,
-    and writes `~/.cache/aibar/idle-time.json` in pretty-printed JSON.
+    @brief Build provider-local idle-time entry from UTC-compatible datetimes.
+    @details Normalizes timestamps to UTC and encodes epoch and ISO-8601 fields
+    required by provider-keyed idle-time persistence.
     @param last_success_at {datetime} Last successful refresh timestamp.
-    @param idle_until {datetime} Timestamp until refresh must remain disabled.
-    @return {IdleTimeState} Persisted idle-time model.
+    @param idle_until {datetime} Timestamp until provider refresh remains gated.
+    @return {IdleTimeState} Normalized provider idle-time entry.
     @satisfies CTN-009
-    @satisfies REQ-066
     """
     last_success_utc = last_success_at.astimezone(timezone.utc)
     idle_until_utc = idle_until.astimezone(timezone.utc)
-    state = IdleTimeState(
+    return IdleTimeState(
         last_success_timestamp=int(last_success_utc.timestamp()),
         last_success_human=last_success_utc.isoformat(),
         idle_until_timestamp=int(idle_until_utc.timestamp()),
         idle_until_human=idle_until_utc.isoformat(),
     )
+
+
+def load_idle_time() -> dict[str, IdleTimeState]:
+    """
+    @brief Load provider-keyed idle-time state from disk.
+    @details Reads `~/.cache/aibar/idle-time.json` and validates each provider
+    value as `IdleTimeState`. Invalid provider entries are ignored. Missing or
+    unreadable payloads return an empty map.
+    @return {dict[str, IdleTimeState]} Provider-keyed idle-time state map.
+    @satisfies CTN-009
+    @satisfies REQ-066
+    """
+    parsed_state: dict[str, IdleTimeState] = {}
+    try:
+        with _blocking_file_lock(IDLE_TIME_PATH):
+            decoded = json.loads(IDLE_TIME_PATH.read_text(encoding="utf-8"))
+            if isinstance(decoded, dict):
+                for provider_key, raw_state in decoded.items():
+                    if not isinstance(provider_key, str):
+                        continue
+                    if not isinstance(raw_state, dict):
+                        continue
+                    try:
+                        parsed_state[provider_key] = IdleTimeState.model_validate(raw_state)
+                    except ValidationError:
+                        continue
+    except (OSError, ValueError, ValidationError):
+        return {}
+    return parsed_state
+
+
+def save_idle_time(idle_time_by_provider: dict[str, IdleTimeState]) -> dict[str, IdleTimeState]:
+    """
+    @brief Persist provider-keyed idle-time state map.
+    @details Validates each provider entry, serializes canonical epoch and
+    ISO-8601 fields, and writes `~/.cache/aibar/idle-time.json` in pretty-printed JSON.
+    Invalid map entries are skipped.
+    @param idle_time_by_provider {dict[str, IdleTimeState]} Provider-keyed idle-time map.
+    @return {dict[str, IdleTimeState]} Persisted provider-keyed idle-time map.
+    @satisfies CTN-009
+    @satisfies REQ-066
+    """
+    normalized_state: dict[str, IdleTimeState] = {}
+    serialized_state: dict[str, dict[str, object]] = {}
+    for provider_key, provider_state in idle_time_by_provider.items():
+        if not isinstance(provider_key, str):
+            continue
+        try:
+            validated_state = (
+                provider_state
+                if isinstance(provider_state, IdleTimeState)
+                else IdleTimeState.model_validate(provider_state)
+            )
+        except ValidationError:
+            continue
+        normalized_state[provider_key] = validated_state
+        serialized_state[provider_key] = validated_state.model_dump(mode="json")
     with _blocking_file_lock(IDLE_TIME_PATH):
         IDLE_TIME_PATH.write_text(
-            state.model_dump_json(indent=2),
+            json.dumps(serialized_state, indent=2),
             encoding="utf-8",
         )
-    return state
+    return normalized_state
 
 
 def remove_idle_time_file() -> None:

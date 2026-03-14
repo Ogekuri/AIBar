@@ -1,8 +1,9 @@
 """
 @file
 @brief HTTP 429 idle-time update tests for CLI refresh.
-@details Verifies idle-time persistence uses max(idle-delay, retry-after) and
-selects the largest retry-after value when multiple 429 responses are returned.
+@details Verifies provider-scoped idle-time persistence uses
+max(idle-delay, retry-after) only for rate-limited providers, while non-rate-limited
+providers keep idle-delay scheduling.
 @satisfies REQ-041
 @satisfies TST-011
 """
@@ -58,6 +59,22 @@ def _make_429_provider_result(
     )
 
 
+def _make_success_provider_result(provider_name: ProviderName) -> ProviderResult:
+    """
+    @brief Build deterministic successful provider result payload.
+    @details Encodes a non-error 7-day result with numeric metrics and
+    `status_code=200` for idle-time update assertions.
+    @param provider_name {ProviderName} Provider identifier.
+    @return {ProviderResult} Success result with status metadata.
+    """
+    return ProviderResult(
+        provider=provider_name,
+        window=WindowPeriod.DAY_7,
+        metrics=UsageMetrics(cost=1.0, remaining=80.0, limit=100.0),
+        raw={"status_code": 200},
+    )
+
+
 def test_429_idle_time_uses_idle_delay_when_retry_after_is_lower(
     monkeypatch,
     tmp_path: Path,
@@ -102,16 +119,25 @@ def test_429_idle_time_uses_idle_delay_when_retry_after_is_lower(
     assert result.exit_code == 0
 
     idle_state = json.loads(config_module.IDLE_TIME_PATH.read_text(encoding="utf-8"))
-    delta_seconds = idle_state["idle_until_timestamp"] - idle_state["last_success_timestamp"]
-    assert 299 <= delta_seconds <= 301
+    openrouter_state = idle_state[ProviderName.OPENROUTER.value]
+    codex_state = idle_state[ProviderName.CODEX.value]
+    openrouter_delta = (
+        openrouter_state["idle_until_timestamp"] - openrouter_state["last_success_timestamp"]
+    )
+    codex_delta = codex_state["idle_until_timestamp"] - codex_state["last_success_timestamp"]
+    assert 299 <= openrouter_delta <= 301
+    assert 299 <= codex_delta <= 301
 
 
-def test_429_idle_time_uses_largest_retry_after_across_multiple_results(
+def test_429_only_affects_rate_limited_provider_idle_time(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
     """
-    @brief Verify idle-time uses the largest retry-after value across all 429 results.
+    @brief Verify rate-limit retry-after applies only to the rate-limited provider.
+    @details Executes one OpenRouter HTTP 429 result and one successful Codex result.
+    Asserts OpenRouter uses retry-after-expanded idle-time and Codex keeps
+    idle-delay scheduling.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
     @param tmp_path {Path} Temporary path fixture.
     @return {None} Function return value.
@@ -127,15 +153,13 @@ def test_429_idle_time_uses_largest_retry_after_across_multiple_results(
     openrouter.name = ProviderName.OPENROUTER
     openrouter.is_configured.return_value = True
     openrouter.fetch = AsyncMock(
-        return_value=_make_429_provider_result(ProviderName.OPENROUTER, 120)
+        return_value=_make_429_provider_result(ProviderName.OPENROUTER, 900)
     )
 
     codex = MagicMock()
     codex.name = ProviderName.CODEX
     codex.is_configured.return_value = True
-    codex.fetch = AsyncMock(
-        return_value=_make_429_provider_result(ProviderName.CODEX, 900)
-    )
+    codex.fetch = AsyncMock(return_value=_make_success_provider_result(ProviderName.CODEX))
 
     monkeypatch.setattr(
         "aibar.cli.get_providers",
@@ -151,5 +175,11 @@ def test_429_idle_time_uses_largest_retry_after_across_multiple_results(
     assert result.exit_code == 0
 
     idle_state = json.loads(config_module.IDLE_TIME_PATH.read_text(encoding="utf-8"))
-    delta_seconds = idle_state["idle_until_timestamp"] - idle_state["last_success_timestamp"]
-    assert 899 <= delta_seconds <= 901
+    openrouter_state = idle_state[ProviderName.OPENROUTER.value]
+    codex_state = idle_state[ProviderName.CODEX.value]
+    openrouter_delta = (
+        openrouter_state["idle_until_timestamp"] - openrouter_state["last_success_timestamp"]
+    )
+    codex_delta = codex_state["idle_until_timestamp"] - codex_state["last_success_timestamp"]
+    assert 899 <= openrouter_delta <= 901
+    assert 299 <= codex_delta <= 301

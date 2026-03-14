@@ -80,10 +80,12 @@ def test_load_idle_time_waits_for_lock_release_with_250ms_poll(
     config_module.IDLE_TIME_PATH.write_text(
         json.dumps(
             {
-                "last_success_timestamp": 1,
-                "last_success_human": datetime.now(timezone.utc).isoformat(),
-                "idle_until_timestamp": 2,
-                "idle_until_human": datetime.now(timezone.utc).isoformat(),
+                "openrouter": {
+                    "last_success_timestamp": 1,
+                    "last_success_human": datetime.now(timezone.utc).isoformat(),
+                    "idle_until_timestamp": 2,
+                    "idle_until_human": datetime.now(timezone.utc).isoformat(),
+                }
             }
         ),
         encoding="utf-8",
@@ -101,8 +103,8 @@ def test_load_idle_time_waits_for_lock_release_with_250ms_poll(
     state = config_module.load_idle_time()
 
     assert sleep_calls == [0.25]
-    assert state is not None
-    assert state.idle_until_timestamp == 2
+    assert "openrouter" in state
+    assert state["openrouter"].idle_until_timestamp == 2
 
 
 def test_retrieve_pipeline_avoids_redundant_cache_reload_after_refresh(monkeypatch) -> None:
@@ -123,7 +125,7 @@ def test_retrieve_pipeline_avoids_redundant_cache_reload_after_refresh(monkeypat
         return None
 
     monkeypatch.setattr(cli_module, "load_cli_cache", _single_cache_load)
-    monkeypatch.setattr(cli_module, "load_idle_time", lambda: None)
+    monkeypatch.setattr(cli_module, "load_idle_time", lambda: {})
     monkeypatch.setattr(cli_module, "load_runtime_config", lambda: RuntimeConfig())
     monkeypatch.setattr(
         cli_module,

@@ -11,6 +11,7 @@ skips live provider refresh execution.
 import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock
 
 from click.testing import CliRunner
 
@@ -37,14 +38,15 @@ def _patch_config_paths(monkeypatch, tmp_path: Path) -> Path:
     return config_dir
 
 
-def test_show_uses_cache_payload_when_idle_time_is_active(
+def test_show_uses_cache_for_idle_provider_and_refreshes_non_idle_provider(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
     """
-    @brief Verify active idle-time forces cache-only `show --json` behavior.
-    @details Persists future idle-time and cache payload, then asserts command
-    output equals cached JSON while live fetch helpers are never called.
+    @brief Verify provider-scoped idle-time gates only matching providers.
+    @details Persists future idle-time only for OpenRouter, then runs `show --json`
+    with OpenRouter and OpenAI configured. Asserts OpenRouter uses cached payload
+    while OpenAI executes live refresh and updates cache output.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
     @param tmp_path {Path} Temporary path fixture.
     @return {None} Function return value.
@@ -53,38 +55,71 @@ def test_show_uses_cache_payload_when_idle_time_is_active(
     @satisfies TST-014
     """
     _patch_config_paths(monkeypatch, tmp_path)
-    cached_result = ProviderResult(
+    cached_openrouter = ProviderResult(
         provider=ProviderName.OPENROUTER,
         window=WindowPeriod.DAY_7,
         metrics=UsageMetrics(cost=1.75, remaining=72.0, limit=100.0),
-        raw={"status_code": 200, "source": "cached"},
+        raw={"status_code": 200, "source": "cached-openrouter"},
+    )
+    cached_openai = ProviderResult(
+        provider=ProviderName.OPENAI,
+        window=WindowPeriod.DAY_7,
+        metrics=UsageMetrics(cost=0.25, remaining=95.0, limit=100.0),
+        raw={"status_code": 200, "source": "cached-openai"},
     )
     cached_payload = {
-        "payload": {"openrouter": cached_result.model_dump(mode="json")},
+        "payload": {
+            "openrouter": cached_openrouter.model_dump(mode="json"),
+            "openai": cached_openai.model_dump(mode="json"),
+        },
         "status": {},
     }
     config_module.save_cli_cache(cached_payload)
+    now_utc = datetime.now(timezone.utc)
     config_module.save_idle_time(
-        last_success_at=datetime.now(timezone.utc),
-        idle_until=datetime.now(timezone.utc) + timedelta(minutes=30),
+        {
+            ProviderName.OPENROUTER.value: config_module.build_idle_time_state(
+                last_success_at=now_utc,
+                idle_until=now_utc + timedelta(minutes=30),
+            )
+        }
     )
 
-    def _unexpected_fetch(*args, **kwargs):
-        """
-        @brief Fail test when live fetch helper is executed under active idle-time.
-        @return {None} No return value; always raises AssertionError.
-        """
-        del args, kwargs
-        raise AssertionError("Live fetch must not run while idle-time is active")
+    openrouter_provider = MagicMock()
+    openrouter_provider.is_configured.return_value = True
+    openrouter_provider.fetch = AsyncMock(return_value=cached_openrouter)
 
-    monkeypatch.setattr("aibar.cli.get_providers", lambda: {})
-    monkeypatch.setattr("aibar.cli._fetch_result", _unexpected_fetch)
-    monkeypatch.setattr("aibar.cli._fetch_claude_dual", _unexpected_fetch)
+    openai_live = ProviderResult(
+        provider=ProviderName.OPENAI,
+        window=WindowPeriod.DAY_7,
+        metrics=UsageMetrics(cost=2.10, remaining=70.0, limit=100.0),
+        raw={"status_code": 200, "source": "live-openai"},
+    )
+    openai_provider = MagicMock()
+    openai_provider.is_configured.return_value = True
+    openai_provider.fetch = AsyncMock(return_value=openai_live)
+
+    monkeypatch.setattr(
+        "aibar.cli.get_providers",
+        lambda: {
+            ProviderName.OPENROUTER: openrouter_provider,
+            ProviderName.OPENAI: openai_provider,
+        },
+    )
+    monkeypatch.setattr("aibar.cli._apply_api_call_delay", lambda state: None)
 
     runner = CliRunner()
     result = runner.invoke(main, ["show", "--json"])
 
-    expected_output = dict(cached_payload)
-    expected_output["extension"] = {"gnome_refresh_interval_seconds": 60}
     assert result.exit_code == 0
-    assert json.loads(result.output) == expected_output
+    openrouter_provider.fetch.assert_not_awaited()
+    openai_provider.fetch.assert_awaited_once_with(WindowPeriod.DAY_7)
+
+    output = json.loads(result.output)
+    assert output["payload"]["openrouter"]["raw"]["source"] == "cached-openrouter"
+    assert output["payload"]["openai"]["raw"]["source"] == "live-openai"
+    assert output["extension"]["gnome_refresh_interval_seconds"] == 60
+
+    persisted_idle_state = json.loads(config_module.IDLE_TIME_PATH.read_text(encoding="utf-8"))
+    assert ProviderName.OPENROUTER.value in persisted_idle_state
+    assert ProviderName.OPENAI.value in persisted_idle_state

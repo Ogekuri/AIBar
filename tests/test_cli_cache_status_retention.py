@@ -113,6 +113,39 @@ def _make_claude_429(window: WindowPeriod) -> ProviderResult:
     )
 
 
+def _make_geminiai_success(source: str) -> ProviderResult:
+    """
+    @brief Build deterministic successful GeminiAI ProviderResult fixture.
+    @details Creates 7-day payload with stable monitoring/billing fields and
+    caller-provided raw-source marker for cache-retention assertions.
+    @param source {str} Marker stored in raw payload.
+    @return {ProviderResult} Successful GeminiAI result.
+    """
+    return ProviderResult(
+        provider=ProviderName.GEMINIAI,
+        window=WindowPeriod.DAY_7,
+        metrics=UsageMetrics(cost=3.0, requests=90, input_tokens=600, currency_symbol="€"),
+        raw={"status_code": 200, "source": source, "project_id": "demo-project"},
+    )
+
+
+def _make_geminiai_429(retry_after_seconds: int) -> ProviderResult:
+    """
+    @brief Build deterministic GeminiAI HTTP 429 result fixture.
+    @details Produces normalized rate-limit error payload with retry-after
+    metadata used by provider-scoped idle-time policy assertions.
+    @param retry_after_seconds {int} Retry-after value to persist in raw payload.
+    @return {ProviderResult} Failed GeminiAI result.
+    """
+    return ProviderResult(
+        provider=ProviderName.GEMINIAI,
+        window=WindowPeriod.DAY_7,
+        metrics=UsageMetrics(),
+        error="Rate limited. Try again later.",
+        raw={"status_code": 429, "retry_after_seconds": retry_after_seconds},
+    )
+
+
 def test_failed_refresh_preserves_previous_payload_and_records_fail_status(
     monkeypatch,
     tmp_path: Path,
@@ -262,7 +295,6 @@ def test_geminiai_cached_fail_status_is_rendered_in_show_output(
     @param tmp_path {Path} Temporary path fixture.
     @return {None} Function return value.
     @satisfies REQ-060
-    @satisfies TST-027
     """
     _patch_config_paths(monkeypatch, tmp_path)
     config_module.save_runtime_config(
@@ -291,7 +323,14 @@ def test_geminiai_cached_fail_status_is_rendered_in_show_output(
         }
     )
     now_utc = datetime.now(timezone.utc)
-    config_module.save_idle_time(now_utc, now_utc + timedelta(minutes=5))
+    config_module.save_idle_time(
+        {
+            ProviderName.GEMINIAI.value: config_module.build_idle_time_state(
+                now_utc,
+                now_utc + timedelta(minutes=5),
+            )
+        }
+    )
 
     provider = MagicMock()
     provider.is_configured.return_value = True
@@ -304,3 +343,72 @@ def test_geminiai_cached_fail_status_is_rendered_in_show_output(
     result = runner.invoke(main, ["show", "--provider", "geminiai", "--window", "7d"])
     assert result.exit_code == 0
     assert "Error: GeminiAI billing export table was not found in dataset 'billing_data'." in result.output
+
+
+def test_geminiai_rate_limit_preserves_payload_and_updates_only_its_idle_state(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """
+    @brief Verify GeminiAI HTTP 429 preserves payload and updates only GeminiAI retry idle-time.
+    @details Executes refresh with cached GeminiAI payload, GeminiAI HTTP 429 failure,
+    and OpenRouter success. Asserts GeminiAI payload snapshot is retained with
+    `status=FAIL`, and idle-time entries apply retry-after expansion only to GeminiAI.
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @param tmp_path {Path} Temporary path fixture.
+    @return {None} Function return value.
+    @satisfies REQ-041
+    @satisfies REQ-058
+    @satisfies TST-027
+    """
+    _patch_config_paths(monkeypatch, tmp_path)
+    config_module.save_runtime_config(
+        config_module.RuntimeConfig(idle_delay_seconds=300, api_call_delay_milliseconds=20)
+    )
+    cached_geminiai = _make_geminiai_success(source="cached-geminiai")
+    config_module.save_cli_cache(
+        {
+            "payload": {"geminiai": cached_geminiai.model_dump(mode="json")},
+            "status": {},
+        }
+    )
+
+    geminiai_provider = MagicMock()
+    geminiai_provider.is_configured.return_value = True
+    geminiai_provider.fetch = AsyncMock(
+        return_value=_make_geminiai_429(retry_after_seconds=900)
+    )
+    openrouter_provider = MagicMock()
+    openrouter_provider.is_configured.return_value = True
+    openrouter_provider.fetch = AsyncMock(
+        return_value=_make_openrouter_success(source="live-openrouter")
+    )
+    monkeypatch.setattr(
+        "aibar.cli.get_providers",
+        lambda: {
+            ProviderName.GEMINIAI: geminiai_provider,
+            ProviderName.OPENROUTER: openrouter_provider,
+        },
+    )
+    monkeypatch.setattr("aibar.cli._apply_api_call_delay", lambda state: None)
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["show", "--json", "--force"])
+    assert result.exit_code == 0
+
+    output = json.loads(result.output)
+    assert output["payload"]["geminiai"]["raw"]["source"] == "cached-geminiai"
+    assert output["status"]["geminiai"]["7d"]["result"] == "FAIL"
+    assert output["status"]["geminiai"]["7d"]["status_code"] == 429
+
+    idle_state = json.loads(config_module.IDLE_TIME_PATH.read_text(encoding="utf-8"))
+    geminiai_state = idle_state[ProviderName.GEMINIAI.value]
+    openrouter_state = idle_state[ProviderName.OPENROUTER.value]
+    geminiai_delta = (
+        geminiai_state["idle_until_timestamp"] - geminiai_state["last_success_timestamp"]
+    )
+    openrouter_delta = (
+        openrouter_state["idle_until_timestamp"] - openrouter_state["last_success_timestamp"]
+    )
+    assert 899 <= geminiai_delta <= 901
+    assert 299 <= openrouter_delta <= 301
