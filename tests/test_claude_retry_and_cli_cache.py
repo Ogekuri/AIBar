@@ -121,6 +121,7 @@ class TestClaudeRetryOn429:
                     result = asyncio.run(provider.fetch(WindowPeriod.DAY_7))
 
         assert result.is_error
+        assert result.error is not None
         assert "Rate limited" in result.error
 
 

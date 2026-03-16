@@ -154,6 +154,7 @@ class TestClaudeDualFetchBypass:
 
         assert result_5h.is_error
         assert not result_7d.is_error
+        assert result_5h.error is not None
         assert "Rate limited" in result_5h.error
         assert result_5h.metrics.usage_percent == 100.0
         assert result_7d.metrics.usage_percent == 100.0

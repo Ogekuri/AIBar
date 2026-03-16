@@ -10,10 +10,6 @@ uses metrics.currency_symbol instead of a hardcoded `$`.
 @satisfies TST-023
 """
 
-from unittest.mock import MagicMock, patch
-
-import pytest
-
 from aibar.config import (
     DEFAULT_CURRENCY_SYMBOL,
     VALID_CURRENCY_SYMBOLS,
@@ -188,7 +184,6 @@ class TestCliPrintResultUsesCurrencySymbol:
         result = ProviderResult(
             provider=ProviderName.CLAUDE,
             window=WindowPeriod.DAY_7,
-            is_error=False,
             metrics=metrics,
         )
         _print_result(ProviderName.CLAUDE, result)
@@ -211,7 +206,6 @@ class TestCliPrintResultUsesCurrencySymbol:
         result = ProviderResult(
             provider=ProviderName.OPENAI,
             window=WindowPeriod.DAY_7,
-            is_error=False,
             metrics=metrics,
         )
         _print_result(ProviderName.OPENAI, result)
@@ -233,7 +227,6 @@ class TestCliPrintResultUsesCurrencySymbol:
         result = ProviderResult(
             provider=ProviderName.CLAUDE,
             window=WindowPeriod.DAY_7,
-            is_error=False,
             metrics=metrics,
         )
         _print_result(ProviderName.CLAUDE, result)

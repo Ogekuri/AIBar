@@ -229,7 +229,7 @@ def load_cli_cache() -> dict[str, Any] | None:
     return None
 
 
-def resolve_currency_symbol(raw: dict[str, Any], provider_name: str) -> str:
+def resolve_currency_symbol(raw: dict[str, Any] | None, provider_name: str) -> str:
     """
     @brief Resolve currency symbol for a provider result from API response or config.
     @details Extraction priority:
@@ -237,7 +237,7 @@ def resolve_currency_symbol(raw: dict[str, Any], provider_name: str) -> str:
        if an ISO-4217 code (`USD`, `GBP`, `EUR`) → map to symbol.
     2. `RuntimeConfig.currency_symbols[provider_name]` configured default.
     3. `DEFAULT_CURRENCY_SYMBOL` (`"$"`) as final fallback.
-    @param raw {dict[str, Any]} Raw API response dict from the provider fetch call.
+    @param raw {dict[str, Any] | None} Raw API response dict from the provider fetch call, or None.
     @param provider_name {str} Provider name string key (e.g. `"claude"`, `"openai"`).
     @return {str} Resolved currency symbol; always a member of `VALID_CURRENCY_SYMBOLS`.
     @satisfies REQ-050

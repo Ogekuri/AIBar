@@ -7,21 +7,17 @@ exit on missing source or missing target directory.
 @satisfies TST-009, REQ-025, REQ-026, REQ-027, REQ-028, REQ-029, REQ-030, REQ-032, REQ-080, REQ-081, REQ-082
 """
 
-import os
 import shutil
 import tempfile
 from pathlib import Path
+from typing import Any
 from unittest import mock
 
-import pytest
 from click.testing import CliRunner
 
 from aibar.cli import (
-    _EXT_TARGET_DIR,
     _EXT_UUID,
     _resolve_extension_source_dir,
-    gnome_install,
-    gnome_uninstall,
     main,
 )
 
@@ -351,11 +347,11 @@ class TestGnomeUninstallComposed:
 
         original_rmtree = shutil.rmtree
 
-        def tracking_rmtree(*args: object, **kwargs: object) -> None:
+        def tracking_rmtree(*args: Any, **kwargs: Any) -> None:
             call_order.append("rmtree")
             original_rmtree(*args, **kwargs)
 
-        def tracking_run(*args: object, **kwargs: object) -> mock.MagicMock:
+        def tracking_run(*args: Any, **kwargs: Any) -> mock.MagicMock:
             call_order.append("disable")
             return mock.MagicMock(returncode=0)
 

@@ -1392,10 +1392,10 @@ with deterministic placeholder string `[REDACTED]`.
 - @satisfies REQ-047
 - @satisfies REQ-066
 
-### fn `def resolve_currency_symbol(raw: dict[str, Any], provider_name: str) -> str` (L232-261)
+### fn `def resolve_currency_symbol(raw: dict[str, Any] | None, provider_name: str) -> str` (L232-261)
 - @brief Resolve currency symbol for a provider result from API response or config.
 - @details Extraction priority: 1. `raw["currency"]` field: if a recognized symbol (`$`, `£`, `€`) → use directly; if an ISO-4217 code (`USD`, `GBP`, `EUR`) → map to symbol. 2. `RuntimeConfig.currency_symbols[provider_name]` configured default. 3. `DEFAULT_CURRENCY_SYMBOL` (`"$"`) as final fallback.
-- @param raw {dict[str, Any]} Raw API response dict from the provider fetch call.
+- @param raw {dict[str, Any] | None} Raw API response dict from the provider fetch call, or None.
 - @param provider_name {str} Provider name string key (e.g. `"claude"`, `"openai"`).
 - @return {str} Resolved currency symbol; always a member of `VALID_CURRENCY_SYMBOLS`.
 - @satisfies REQ-050
@@ -1514,7 +1514,7 @@ with deterministic placeholder string `[REDACTED]`.
 |`load_runtime_config`|fn|pub|179-195|def load_runtime_config() -> RuntimeConfig|
 |`save_runtime_config`|fn|pub|196-211|def save_runtime_config(runtime_config: RuntimeConfig) ->...|
 |`load_cli_cache`|fn|pub|212-231|def load_cli_cache() -> dict[str, Any] | None|
-|`resolve_currency_symbol`|fn|pub|232-261|def resolve_currency_symbol(raw: dict[str, Any], provider...|
+|`resolve_currency_symbol`|fn|pub|232-261|def resolve_currency_symbol(raw: dict[str, Any] | None, p...|
 |`save_cli_cache`|fn|pub|262-285|def save_cli_cache(payload: dict[str, Any]) -> None|
 |`build_idle_time_state`|fn|pub|286-305|def build_idle_time_state(last_success_at: datetime, idle...|
 |`load_idle_time`|fn|pub|306-334|def load_idle_time() -> dict[str, IdleTimeState]|

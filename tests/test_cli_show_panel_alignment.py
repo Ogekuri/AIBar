@@ -40,11 +40,10 @@ def test_print_result_keeps_panel_rows_aligned_with_colored_progress_bar(capsys)
     @satisfies REQ-036
     @satisfies REQ-067
     """
-    metrics = UsageMetrics(usage_percent=100.0, remaining=0.0, limit=100.0)
+    metrics = UsageMetrics(remaining=0.0, limit=100.0)
     result = ProviderResult(
         provider=ProviderName.CLAUDE,
         window=WindowPeriod.HOUR_5,
-        is_error=True,
         error="Rate limited. Try again later.",
         metrics=metrics,
         raw={"status_code": 429},

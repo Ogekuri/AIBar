@@ -9,7 +9,6 @@ containing `gnome_refresh_interval_seconds` sourced from the runtime config.
 """
 
 import json
-from datetime import datetime, timezone
 from pathlib import Path
 
 from click.testing import CliRunner

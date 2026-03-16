@@ -308,7 +308,7 @@ class GeminiAICredentialStore:
         """
         client_payload = self.load_client_config()
         flow = InstalledAppFlow.from_client_config(client_payload, list(scopes))
-        credentials = flow.run_local_server(port=0)
+        credentials = cast(Credentials, flow.run_local_server(port=0))
         self.save_authorized_credentials(credentials)
         return credentials
 

@@ -16,9 +16,12 @@ and Monitoring time-series aggregation behavior.
 
 import asyncio
 from pathlib import Path
+from typing import cast
 
 import pytest
 from google.api_core.exceptions import Forbidden
+from google.cloud import bigquery  # pyright: ignore[reportAttributeAccessIssue]
+from google.oauth2.credentials import Credentials
 from googleapiclient.errors import HttpError
 from httplib2 import Response
 
@@ -28,18 +31,29 @@ from aibar.providers.base import (
     ProviderName,
     WindowPeriod,
 )
-from aibar.providers.geminiai import GEMINIAI_OAUTH_SCOPES, GeminiAIProvider
+from aibar.providers.geminiai import (
+    GEMINIAI_OAUTH_SCOPES,
+    GeminiAICredentialStore,
+    GeminiAIProvider,
+)
 
 
-class _FakeCredentialStore:
+class _FakeCredentialStore(GeminiAICredentialStore):
     """
     @brief Minimal credential-store stub for GeminiAI provider unit tests.
     @details Supplies deterministic OAuth material without filesystem or network
-    dependencies.
+    dependencies. Inherits from GeminiAICredentialStore for type-safe substitution.
     """
 
-    client_config_path = Path("/tmp/fake-geminiai-client.json")
-    token_path = Path("/tmp/fake-geminiai-token.json")
+    def __init__(self) -> None:
+        """
+        @brief Initialize fake credential store with deterministic temp paths.
+        @return {None} Function return value.
+        """
+        super().__init__(
+            client_config_path=Path("/tmp/fake-geminiai-client.json"),
+            token_path=Path("/tmp/fake-geminiai-token.json"),
+        )
 
     def has_authorized_credentials(self) -> bool:
         """
@@ -70,12 +84,16 @@ class _FakeCredentialStore:
         """
         return payload.get("installed", {}).get("project_id")
 
-    def load_credentials(self):
+    def load_credentials(
+        self,
+        scopes: tuple[str, ...] = GEMINIAI_OAUTH_SCOPES,
+    ) -> Credentials | None:
         """
-        @brief Return opaque credential sentinel object.
-        @return {object} Non-null sentinel used by patched provider internals.
+        @brief Return opaque credential sentinel object cast to Credentials.
+        @param scopes {tuple[str, ...]} OAuth scopes (unused in fake).
+        @return {Credentials | None} Non-null sentinel used by patched provider internals.
         """
-        return object()
+        return cast(Credentials, object())
 
 
 def test_geminiai_fetch_maps_monitoring_and_billing_metrics(monkeypatch) -> None:
@@ -298,6 +316,7 @@ def test_geminiai_fetch_missing_billing_table_sets_error_result(monkeypatch) -> 
 
     result = asyncio.run(provider.fetch(WindowPeriod.DAY_7))
     assert result.is_error
+    assert result.error is not None
     assert "billing export table" in result.error
 
 
@@ -484,7 +503,7 @@ def test_geminiai_billing_query_uses_latest_invoice_month_with_fallback() -> Non
 
     fake_client = _FakeBigQueryClient()
     services, total_net = provider._query_current_month_billing_cost(
-        fake_client,
+        cast(bigquery.Client, fake_client),
         "demo-project",
         "billing_data",
         "gcp_billing_export_v1_017F15_EC6BA0_8220E3",
