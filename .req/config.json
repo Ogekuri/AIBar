@@ -7,6 +7,8 @@
     "scripts",
     ".github/workflows"
   ],
+  "base-path": "/home/ogekuri/Git/AIBar",
+  "git-path": "/home/ogekuri/Git/AIBar",
   "static-check": {
     "C": [
       {
@@ -57,8 +59,10 @@
     "JavaScript": [
       {
         "module": "Command",
-        "cmd": "scripts/check-js-syntax.sh",
-        "params": []
+        "cmd": "node",
+        "params": [
+          "--check"
+        ]
       }
     ]
   },
