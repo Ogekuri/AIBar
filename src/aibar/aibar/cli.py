@@ -571,12 +571,33 @@ def _handle_version_option(
 
 class StartupPreflightGroup(click.Group):
     """
-    @brief Click group subclass that enforces startup preflight ordering.
+    @brief Click group subclass that enforces startup preflight ordering and preserves epilog formatting.
     @details Executes startup update-check preflight before Click argument
     parsing and command dispatch. This guarantees preflight execution even when
-    invocation later fails due to invalid arguments.
-    @satisfies REQ-070
+    invocation later fails due to invalid arguments. Overrides epilog rendering
+    to preserve multi-line example formatting without text wrapping.
+    @satisfies REQ-070, REQ-068
     """
+
+    def format_epilog(
+        self,
+        ctx: click.Context,
+        formatter: click.HelpFormatter,
+    ) -> None:
+        """
+        @brief Render epilog text preserving explicit line breaks.
+        @details Writes each epilog line verbatim to the help formatter,
+        bypassing Click's default text-wrapping behavior that collapses
+        multi-line examples into a single paragraph.
+        @param ctx {click.Context} Click invocation context.
+        @param formatter {click.HelpFormatter} Help output formatter instance.
+        @return {None} Function return value.
+        @satisfies REQ-068
+        """
+        if self.epilog:
+            formatter.write("\n")
+            for line in self.epilog.split("\n"):
+                formatter.write(f"  {line}\n")
 
     def main(
         self,
@@ -1783,10 +1804,12 @@ def _build_cached_dual_window_results(
     ),
     epilog=(
         "Examples:\n"
-        "  aibar show\n"
-        "  aibar show --json\n"
-        "  aibar show --force\n"
-        "  aibar setup"
+        "  aibar show                   Show usage metrics\n"
+        "  aibar show --json            Machine-readable output\n"
+        "  aibar show --force           Bypass idle-time gating\n"
+        "  aibar setup                  Interactive configuration\n"
+        "  aibar gnome-install          Install GNOME extension\n"
+        "  aibar gnome-uninstall        Remove GNOME extension"
     ),
 )
 @click.option(

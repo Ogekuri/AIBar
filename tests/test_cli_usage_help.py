@@ -13,7 +13,7 @@ from aibar.cli import main
 
 def test_main_invocation_without_subcommand_prints_human_usage() -> None:
     """
-    @brief Verify bare `aibar` invocation prints human-readable help text.
+    @brief Verify bare `aibar` invocation prints human-readable help text with all example commands.
     @return {None} Function return value.
     @satisfies REQ-068
     """
@@ -23,13 +23,15 @@ def test_main_invocation_without_subcommand_prints_human_usage() -> None:
     assert "Usage:" in result.output
     assert "show --json" in result.output
     assert "show --force" in result.output
+    assert "gnome-install" in result.output
+    assert "gnome-uninstall" in result.output
     assert "@brief" not in result.output
     assert "@details" not in result.output
 
 
 def test_top_level_help_lists_commands_without_doxygen_fragments() -> None:
     """
-    @brief Verify `aibar --help` lists commands and excludes Doxygen fragments.
+    @brief Verify `aibar --help` lists commands including gnome-install/gnome-uninstall and excludes Doxygen fragments.
     @return {None} Function return value.
     @satisfies REQ-068
     """
@@ -40,6 +42,8 @@ def test_top_level_help_lists_commands_without_doxygen_fragments() -> None:
     assert "doctor" in result.output
     assert "show" in result.output
     assert "setup" in result.output
+    assert "gnome-install" in result.output
+    assert "gnome-uninstall" in result.output
     assert "@return" not in result.output
 
 

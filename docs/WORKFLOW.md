@@ -53,6 +53,7 @@
 ### PROC:main
 - `Entrypoints`
   - `StartupPreflightGroup.main(...)`: startup preflight + Click parser dispatcher entrypoint [`src/aibar/aibar/cli.py`]
+  - `StartupPreflightGroup.format_epilog(...)`: renders epilog text preserving explicit line breaks for help examples [`src/aibar/aibar/cli.py`]
   - `main(...)`: Click command-group callback (prints usage/help when invoked without subcommand) [`src/aibar/aibar/cli.py`]
 - `Lifecycle/Trigger`
   - Starts when `aibar` is invoked by a user shell or by subprocess spawn from `PROC:gnome-shell`.
