@@ -27,7 +27,7 @@ from aibar.cli import (
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-EXT_SRC_DIR = PROJECT_ROOT / "src" / "aibar" / "gnome-extension" / "aibar@aibar.panel"
+EXT_SRC_DIR = PROJECT_ROOT / "src" / "aibar" / "aibar" / "gnome-extension" / "aibar@aibar.panel"
 
 
 class TestResolveExtensionSourceDirAtomic:

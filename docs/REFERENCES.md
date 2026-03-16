@@ -15,6 +15,9 @@
         │   ├── claude_cli_auth.py
         │   ├── cli.py
         │   ├── config.py
+        │   ├── gnome-extension
+        │   │   └── aibar@aibar.panel
+        │   │       └── extension.js
         │   └── providers
         │       ├── __init__.py
         │       ├── base.py
@@ -403,7 +406,7 @@ from typing import Any
 
 ---
 
-# cli.py | Python | 3051L | 85 symbols | 29 imports | 98 comments
+# cli.py | Python | 3052L | 85 symbols | 29 imports | 98 comments
 > Path: `src/aibar/aibar/cli.py`
 - @brief Command-line interface for aibar.
 - @details Defines command parsing, provider dispatch, formatted output, setup helpers, login flows, and UI launch hooks.
@@ -1167,20 +1170,20 @@ providers other than Claude.
 - @satisfies REQ-055
 - @satisfies REQ-056
 
-### fn `def _resolve_extension_source_dir() -> Path` `priv` (L2870-2881)
-- @brief Resolve GNOME extension source directory from installed package location.
-- @details Navigates from the `aibar` package directory (`__file__` parent) up one level to the package root, then into `gnome-extension/aibar@aibar.panel/`. Works both in development (git checkout) and installed package (pip/uv) layouts.
+### fn `def _resolve_extension_source_dir() -> Path` `priv` (L2870-2882)
+- @brief Resolve GNOME extension source directory from within the `aibar` package.
+- @details Uses `Path(__file__).resolve().parent` to locate the `aibar` package directory, then appends `gnome-extension/<UUID>/`. Works in development (editable install), wheel-installed, and `uv tool install` layouts because the extension directory resides inside the `aibar` Python package subtree.
 - @return {Path} Absolute path to the extension source directory.
-- @satisfies REQ-025
+- @satisfies REQ-025, REQ-083
 
-### fn `def gnome_install() -> None` (L2892-2976)
+### fn `def gnome_install() -> None` (L2893-2977)
 - @brief Install or update the AIBar GNOME Shell extension to the user's local extensions directory.
 - @details Resolves extension source from the installed package path, validates source directory contains `metadata.json` and is non-empty, creates target directory if absent, copies all extension files replacing existing ones, and enables the extension via `gnome-extensions enable`. Produces colored Click-styled terminal output for all status messages.
 - @return {None} Function return value.
 - @throws {SystemExit} Exits with code 1 on prerequisite validation failure.
 - @satisfies PRJ-008, REQ-025, REQ-026, REQ-027, REQ-028, REQ-029, REQ-030, REQ-032
 
-### fn `def gnome_uninstall() -> None` (L2986-3049)
+### fn `def gnome_uninstall() -> None` (L2987-3050)
 - @brief Remove the AIBar GNOME Shell extension from the user's local extensions directory.
 - @details Disables the extension via `gnome-extensions disable`, then removes the entire extension directory at `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/`. Exits with code 1 if the extension directory does not exist. Produces colored Click-styled terminal output for all status messages.
 - @return {None} Function return value.
@@ -1272,9 +1275,9 @@ providers other than Claude.
 |`_login_claude`|fn|priv|2756-2804|def _login_claude() -> None|
 |`_login_copilot`|fn|priv|2805-2832|def _login_copilot() -> None|
 |`_login_geminiai`|fn|priv|2833-2869|def _login_geminiai() -> None|
-|`_resolve_extension_source_dir`|fn|priv|2870-2881|def _resolve_extension_source_dir() -> Path|
-|`gnome_install`|fn|pub|2892-2976|def gnome_install() -> None|
-|`gnome_uninstall`|fn|pub|2986-3049|def gnome_uninstall() -> None|
+|`_resolve_extension_source_dir`|fn|priv|2870-2882|def _resolve_extension_source_dir() -> Path|
+|`gnome_install`|fn|pub|2893-2977|def gnome_install() -> None|
+|`gnome_uninstall`|fn|pub|2987-3050|def gnome_uninstall() -> None|
 
 
 ---
@@ -1531,6 +1534,142 @@ with deterministic placeholder string `[REDACTED]`.
 |`Config.get_all_provider_status`|fn|pub|598-605|def get_all_provider_status(self) -> list[dict[str, Any]]|
 |`Config._get_token_preview`|fn|priv|606-617|def _get_token_preview(self, provider: ProviderName) -> s...|
 |`Config.get_env_var_help`|fn|pub|618-640|def get_env_var_help(self) -> str|
+
+
+---
+
+# extension.js | JavaScript | 1420L | 21 symbols | 9 imports | 29 comments
+> Path: `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`
+- @brief GNOME Shell panel extension for aibar metrics.
+- @details Collects usage JSON from the aibar CLI and renders provider-specific quota/cost cards in the GNOME panel popup.
+- @note Targets GNOME Shell 45–48; uses ES module imports (gi:// and resource://) as required by GNOME Shell 45+.
+
+## Imports
+```
+import GLib from 'gi://GLib';
+import St from 'gi://St';
+import Gio from 'gi://Gio';
+import Clutter from 'gi://Clutter';
+import GObject from 'gi://GObject';
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
+import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
+import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
+```
+
+## Definitions
+
+- const `const REFRESH_INTERVAL_SECONDS = 60;` (L18)
+- const `const ENV_FILE_PATH = GLib.get_home_dir() + '/.config/aibar/env';` (L19)
+- const `const RESET_PENDING_MESSAGE = 'Starts when the first message is sent';` (L20)
+- const `const RATE_LIMIT_ERROR_MESSAGE = 'Rate limited. Try again later.';` (L21)
+- const `const PROVIDER_PROGRESS_CLASSES = {` (L22)
+- const `const PANEL_ICON_COLORS = {` (L30)
+- const `const PROVIDER_DISPLAY_NAMES = {` (L37)
+### fn `function _getProviderDisplayName(providerName)` (L46-50)
+- @brief Resolve provider label text for GNOME tab/card rendering.
+- @param {string} providerName Provider key from JSON payload.
+- @return s {string} Display label for provider tab and card.
+
+### fn `function _getAiBarPath()` (L57-67)
+- @brief Resolve aibar executable path.
+- @details Prefers PATH discovery and falls back to AIBAR_PATH from the env file.
+- @return s {string} Resolved executable path or fallback command name.
+
+### fn `function _loadEnvFromFile()` (L74-126)
+- @brief Load key-value environment variables from aibar env file.
+- @details Parses export syntax, quoted values, and inline comments.
+- @return s {Object<string,string>} Parsed environment map.
+
+### fn `function _getProviderProgressClass(providerName)` (L133-135)
+- @brief Map percentage usage to CSS progress severity class.
+- @param {number} pct Usage percentage.
+- @return s {string} CSS class suffix for progress state.
+
+### fn `function _isDisplayedZeroPercent(pct)` (L144-151)
+- @brief Check whether a percentage renders as `0.0%` in one-decimal UI output.
+- @details Mirrors display rounding semantics so fallback reset text is shown when
+usage is effectively zero from the user's perspective (e.g. internal 0.04 -> 0.0%).
+- @param {number} pct Usage percentage candidate.
+- @return s {boolean} True when value is finite, non-negative, and rounds to 0.0.
+
+### fn `function _isDisplayedFullPercent(pct)` (L160-165)
+- @brief Check whether a percentage renders as `100.0%` in one-decimal UI output.
+- @details Mirrors display rounding semantics so near-full values are treated as
+full usage for limit-reached warning rendering.
+- @param {number} pct Usage percentage candidate.
+- @return s {boolean} True when value is finite and rounds to `100.0`.
+
+### class `class AIBarIndicator extends PanelMenu.Button` : PanelMenu.Button (L169-468)
+- @brief Panel indicator widget that manages popup rendering and refresh lifecycle. */
+- @brief Execute init.
+- @details Applies init logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
+- @return s {any} Function return value.
+
+### fn `const createWindowBar = (labelText) =>` (L550-596)
+- @brief Execute create provider card.
+- @details Applies create provider card logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
+- @param {any} providerName Input parameter `providerName`.
+- @return s {any} Function return value.
+
+### fn `const updateWindowBar = (bar, pct, resetTime, useDays) =>` (L732-790)
+- @brief Execute populate provider card.
+- @details Applies populate provider card logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
+- @param {any} card Input parameter `card`.
+- @param {any} providerName Input parameter `providerName`.
+- @param {any} data Input parameter `data`.
+- @param {any} statusEntry Window-specific cached status entry.
+- @return s {any} Function return value.
+
+### fn `const setResetLabel = (baseText) =>` (L738-744)
+
+### fn `const showResetPendingHint = () =>` (L755-757)
+
+### fn `const toPercent = (value) =>` (L1161-1166)
+- @brief Execute update u i.
+- @details Applies update u i logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
+Resolves provider-window failure metadata from cache `status` section and forwards it
+to card renderers. Panel status row renders fixed-order percentages and per-provider costs.
+- @return s {any} Function return value.
+- @satisfies REQ-021
+- @satisfies REQ-053
+- @satisfies REQ-069
+
+### fn `const getPanelUsageValues = (providerName, data) =>` (L1168-1225)
+
+### class `export default class AIBarExtension extends Extension` : Extension (L1394-1420)
+- @brief GNOME extension lifecycle adapter for AIBarIndicator registration.
+- @brief Execute enable.
+- @details Extends Extension (GNOME Shell 45+ API) to integrate with the extension lifecycle.
+Uses this.uuid (provided by the Extension base class) as the status-area key.
+- @details Instantiates AIBarIndicator and adds it to the GNOME panel status area.
+- @return s {void}
+- @satisfies PRJ-004
+
+## Symbol Index
+|Symbol|Kind|Vis|Lines|Sig|
+|---|---|---|---|---|
+|`REFRESH_INTERVAL_SECONDS`|const||18||
+|`ENV_FILE_PATH`|const||19||
+|`RESET_PENDING_MESSAGE`|const||20||
+|`RATE_LIMIT_ERROR_MESSAGE`|const||21||
+|`PROVIDER_PROGRESS_CLASSES`|const||22||
+|`PANEL_ICON_COLORS`|const||30||
+|`PROVIDER_DISPLAY_NAMES`|const||37||
+|`_getProviderDisplayName`|fn||46-50|function _getProviderDisplayName(providerName)|
+|`_getAiBarPath`|fn||57-67|function _getAiBarPath()|
+|`_loadEnvFromFile`|fn||74-126|function _loadEnvFromFile()|
+|`_getProviderProgressClass`|fn||133-135|function _getProviderProgressClass(providerName)|
+|`_isDisplayedZeroPercent`|fn||144-151|function _isDisplayedZeroPercent(pct)|
+|`_isDisplayedFullPercent`|fn||160-165|function _isDisplayedFullPercent(pct)|
+|`AIBarIndicator`|class||169-468|class AIBarIndicator extends PanelMenu.Button|
+|`createWindowBar`|fn||550-596|const createWindowBar = (labelText) =>|
+|`updateWindowBar`|fn||732-790|const updateWindowBar = (bar, pct, resetTime, useDays) =>|
+|`setResetLabel`|fn||738-744|const setResetLabel = (baseText) =>|
+|`showResetPendingHint`|fn||755-757|const showResetPendingHint = () =>|
+|`toPercent`|fn||1161-1166|const toPercent = (value) =>|
+|`getPanelUsageValues`|fn||1168-1225|const getPanelUsageValues = (providerName, data) =>|
+|`AIBarExtension`|class||1394-1420|export default class AIBarExtension extends Extension|
 
 
 ---
@@ -2581,140 +2720,4 @@ from aibar.config import resolve_currency_symbol
 |`_get_usage`|fn|priv|169-182|def _get_usage(self, payload: dict, window: WindowPeriod)...|
 |`_get_byok_usage`|fn|priv|183-196|def _get_byok_usage(self, payload: dict, window: WindowPe...|
 |`_to_float`|fn|priv|197-209|def _to_float(self, value: float | int | None) -> float|
-
-
----
-
-# extension.js | JavaScript | 1420L | 21 symbols | 9 imports | 29 comments
-> Path: `src/aibar/gnome-extension/aibar@aibar.panel/extension.js`
-- @brief GNOME Shell panel extension for aibar metrics.
-- @details Collects usage JSON from the aibar CLI and renders provider-specific quota/cost cards in the GNOME panel popup.
-- @note Targets GNOME Shell 45–48; uses ES module imports (gi:// and resource://) as required by GNOME Shell 45+.
-
-## Imports
-```
-import GLib from 'gi://GLib';
-import St from 'gi://St';
-import Gio from 'gi://Gio';
-import Clutter from 'gi://Clutter';
-import GObject from 'gi://GObject';
-import * as Main from 'resource:///org/gnome/shell/ui/main.js';
-import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
-import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
-import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
-```
-
-## Definitions
-
-- const `const REFRESH_INTERVAL_SECONDS = 60;` (L18)
-- const `const ENV_FILE_PATH = GLib.get_home_dir() + '/.config/aibar/env';` (L19)
-- const `const RESET_PENDING_MESSAGE = 'Starts when the first message is sent';` (L20)
-- const `const RATE_LIMIT_ERROR_MESSAGE = 'Rate limited. Try again later.';` (L21)
-- const `const PROVIDER_PROGRESS_CLASSES = {` (L22)
-- const `const PANEL_ICON_COLORS = {` (L30)
-- const `const PROVIDER_DISPLAY_NAMES = {` (L37)
-### fn `function _getProviderDisplayName(providerName)` (L46-50)
-- @brief Resolve provider label text for GNOME tab/card rendering.
-- @param {string} providerName Provider key from JSON payload.
-- @return s {string} Display label for provider tab and card.
-
-### fn `function _getAiBarPath()` (L57-67)
-- @brief Resolve aibar executable path.
-- @details Prefers PATH discovery and falls back to AIBAR_PATH from the env file.
-- @return s {string} Resolved executable path or fallback command name.
-
-### fn `function _loadEnvFromFile()` (L74-126)
-- @brief Load key-value environment variables from aibar env file.
-- @details Parses export syntax, quoted values, and inline comments.
-- @return s {Object<string,string>} Parsed environment map.
-
-### fn `function _getProviderProgressClass(providerName)` (L133-135)
-- @brief Map percentage usage to CSS progress severity class.
-- @param {number} pct Usage percentage.
-- @return s {string} CSS class suffix for progress state.
-
-### fn `function _isDisplayedZeroPercent(pct)` (L144-151)
-- @brief Check whether a percentage renders as `0.0%` in one-decimal UI output.
-- @details Mirrors display rounding semantics so fallback reset text is shown when
-usage is effectively zero from the user's perspective (e.g. internal 0.04 -> 0.0%).
-- @param {number} pct Usage percentage candidate.
-- @return s {boolean} True when value is finite, non-negative, and rounds to 0.0.
-
-### fn `function _isDisplayedFullPercent(pct)` (L160-165)
-- @brief Check whether a percentage renders as `100.0%` in one-decimal UI output.
-- @details Mirrors display rounding semantics so near-full values are treated as
-full usage for limit-reached warning rendering.
-- @param {number} pct Usage percentage candidate.
-- @return s {boolean} True when value is finite and rounds to `100.0`.
-
-### class `class AIBarIndicator extends PanelMenu.Button` : PanelMenu.Button (L169-468)
-- @brief Panel indicator widget that manages popup rendering and refresh lifecycle. */
-- @brief Execute init.
-- @details Applies init logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
-- @return s {any} Function return value.
-
-### fn `const createWindowBar = (labelText) =>` (L550-596)
-- @brief Execute create provider card.
-- @details Applies create provider card logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
-- @param {any} providerName Input parameter `providerName`.
-- @return s {any} Function return value.
-
-### fn `const updateWindowBar = (bar, pct, resetTime, useDays) =>` (L732-790)
-- @brief Execute populate provider card.
-- @details Applies populate provider card logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
-- @param {any} card Input parameter `card`.
-- @param {any} providerName Input parameter `providerName`.
-- @param {any} data Input parameter `data`.
-- @param {any} statusEntry Window-specific cached status entry.
-- @return s {any} Function return value.
-
-### fn `const setResetLabel = (baseText) =>` (L738-744)
-
-### fn `const showResetPendingHint = () =>` (L755-757)
-
-### fn `const toPercent = (value) =>` (L1161-1166)
-- @brief Execute update u i.
-- @details Applies update u i logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
-Resolves provider-window failure metadata from cache `status` section and forwards it
-to card renderers. Panel status row renders fixed-order percentages and per-provider costs.
-- @return s {any} Function return value.
-- @satisfies REQ-021
-- @satisfies REQ-053
-- @satisfies REQ-069
-
-### fn `const getPanelUsageValues = (providerName, data) =>` (L1168-1225)
-
-### class `export default class AIBarExtension extends Extension` : Extension (L1394-1420)
-- @brief GNOME extension lifecycle adapter for AIBarIndicator registration.
-- @brief Execute enable.
-- @details Extends Extension (GNOME Shell 45+ API) to integrate with the extension lifecycle.
-Uses this.uuid (provided by the Extension base class) as the status-area key.
-- @details Instantiates AIBarIndicator and adds it to the GNOME panel status area.
-- @return s {void}
-- @satisfies PRJ-004
-
-## Symbol Index
-|Symbol|Kind|Vis|Lines|Sig|
-|---|---|---|---|---|
-|`REFRESH_INTERVAL_SECONDS`|const||18||
-|`ENV_FILE_PATH`|const||19||
-|`RESET_PENDING_MESSAGE`|const||20||
-|`RATE_LIMIT_ERROR_MESSAGE`|const||21||
-|`PROVIDER_PROGRESS_CLASSES`|const||22||
-|`PANEL_ICON_COLORS`|const||30||
-|`PROVIDER_DISPLAY_NAMES`|const||37||
-|`_getProviderDisplayName`|fn||46-50|function _getProviderDisplayName(providerName)|
-|`_getAiBarPath`|fn||57-67|function _getAiBarPath()|
-|`_loadEnvFromFile`|fn||74-126|function _loadEnvFromFile()|
-|`_getProviderProgressClass`|fn||133-135|function _getProviderProgressClass(providerName)|
-|`_isDisplayedZeroPercent`|fn||144-151|function _isDisplayedZeroPercent(pct)|
-|`_isDisplayedFullPercent`|fn||160-165|function _isDisplayedFullPercent(pct)|
-|`AIBarIndicator`|class||169-468|class AIBarIndicator extends PanelMenu.Button|
-|`createWindowBar`|fn||550-596|const createWindowBar = (labelText) =>|
-|`updateWindowBar`|fn||732-790|const updateWindowBar = (bar, pct, resetTime, useDays) =>|
-|`setResetLabel`|fn||738-744|const setResetLabel = (baseText) =>|
-|`showResetPendingHint`|fn||755-757|const showResetPendingHint = () =>|
-|`toPercent`|fn||1161-1166|const toPercent = (value) =>|
-|`getPanelUsageValues`|fn||1168-1225|const getPanelUsageValues = (providerName, data) =>|
-|`AIBarExtension`|class||1394-1420|export default class AIBarExtension extends Extension|
 

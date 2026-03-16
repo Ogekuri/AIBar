@@ -63,7 +63,7 @@ jobs:
 
       - name: Build GNOME extension zip
         run: |
-          cd src/aibar/gnome-extension/aibar@aibar.panel
+          cd src/aibar/aibar/gnome-extension/aibar@aibar.panel
           zip -r "$GITHUB_WORKSPACE/dist/aibar@aibar.panel.shell-extension.zip" . -x "*.md"
 
       - name: Attest build provenance

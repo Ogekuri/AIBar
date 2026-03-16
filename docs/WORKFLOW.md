@@ -13,7 +13,7 @@
   - `parent_process: null`
   - `role: GNOME Shell extension host process for panel metrics`
   - `entrypoint_symbols: AIBarExtension.enable(...), AIBarExtension.disable(...)`
-  - `defining_files: src/aibar/gnome-extension/aibar@aibar.panel/extension.js`
+  - `defining_files: src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`
   - `thread_model: no explicit threads detected`
 
 - `id: PROC:test-ext`
@@ -214,41 +214,41 @@
 
 ### PROC:gnome-shell
 - `Entrypoints`
-  - `AIBarExtension.enable(...)`: extension activation [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
-  - `AIBarExtension.disable(...)`: extension deactivation [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+  - `AIBarExtension.enable(...)`: extension activation [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+  - `AIBarExtension.disable(...)`: extension deactivation [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
 - `Lifecycle/Trigger`
   - Starts in GNOME Shell extension host process.
   - On enable, constructs panel indicator, performs immediate refresh, and schedules periodic refresh timer.
   - On disable, destroys indicator and removes timer source.
 - `Internal Call-Trace Tree`
-  - `AIBarExtension.enable(...)`: extension enable adapter; registers indicator via `Main.panel.addToStatusArea(this.uuid, ...)` [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
-    - `AIBarIndicator._init(...)`: indicator runtime bootstrap with panel title `AIBar Monitor` [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
-      - provider-order initialization: `_providerOrder = ['claude', 'openrouter', 'copilot', 'codex', 'geminiai']` for deterministic tab/card sorting [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
-      - `AIBarIndicator._buildPanelButton(...)`: panel icon/status-label setup with ordered percentage+cost labels (Claude 5h, Claude 7d, Claude cost, OpenRouter cost, Copilot 30d, Codex 5h, Codex 7d, Codex cost, OpenAI cost, GeminiAI cost) and provider style classes [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
-      - `AIBarIndicator._buildPopupMenu(...)`: popup structure and actions setup including tab container scaffold and `Refresh Now` forced-refresh action wiring [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
-        - `AIBarIndicator._refreshData(...)`: refresh action handler with forced CLI path (`aibar show --json --force`) for popup `Refresh Now` [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
-        - `AIBarIndicator._openTerminalWithCommand(...)`: terminal report-launch action handler [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
-        - menu `open-state-changed` callback -> `AIBarIndicator._applyBarWidths(...)`: re-apply progress bar fill widths on popup open using cached `_barData` [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
-      - `AIBarIndicator._refreshData(forceRefresh = false)`: subprocess-based JSON refresh with optional `--force` argument injection [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
-        - `_loadEnvFromFile(...)`: extension env map parse [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
-        - `_getAiBarPath(...)`: executable path resolution [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+  - `AIBarExtension.enable(...)`: extension enable adapter; registers indicator via `Main.panel.addToStatusArea(this.uuid, ...)` [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+    - `AIBarIndicator._init(...)`: indicator runtime bootstrap with panel title `AIBar Monitor` [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+      - provider-order initialization: `_providerOrder = ['claude', 'openrouter', 'copilot', 'codex', 'geminiai']` for deterministic tab/card sorting [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+      - `AIBarIndicator._buildPanelButton(...)`: panel icon/status-label setup with ordered percentage+cost labels (Claude 5h, Claude 7d, Claude cost, OpenRouter cost, Copilot 30d, Codex 5h, Codex 7d, Codex cost, OpenAI cost, GeminiAI cost) and provider style classes [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+      - `AIBarIndicator._buildPopupMenu(...)`: popup structure and actions setup including tab container scaffold and `Refresh Now` forced-refresh action wiring [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+        - `AIBarIndicator._refreshData(...)`: refresh action handler with forced CLI path (`aibar show --json --force`) for popup `Refresh Now` [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+        - `AIBarIndicator._openTerminalWithCommand(...)`: terminal report-launch action handler [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+        - menu `open-state-changed` callback -> `AIBarIndicator._applyBarWidths(...)`: re-apply progress bar fill widths on popup open using cached `_barData` [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+      - `AIBarIndicator._refreshData(forceRefresh = false)`: subprocess-based JSON refresh with optional `--force` argument injection [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+        - `_loadEnvFromFile(...)`: extension env map parse [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+        - `_getAiBarPath(...)`: executable path resolution [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
         - callback chain
-          - `AIBarIndicator._parseOutput(...)`: JSON decode + state update supporting canonical `payload`/`status`/`extension` schema; reads `extension.gnome_refresh_interval_seconds` and reschedules auto-refresh timer on interval change [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
-          - `AIBarIndicator._updateUI(...)`: provider tab/card rendering update with deterministic order (`claude`, `openrouter`, `copilot`, `codex`, `geminiai`) plus ordered panel status-label projection (`claude5h`, `claude7d`, `claudeCost`, `openrouterCost`, `copilot`, `codex5h`, `codex7d`, `codexCost`, `openaiCost`, `geminiaiCost`) with hidden-label fallback for missing metrics and zero-cost visibility via `_panelCostText(...)`; resolves window-scoped status entries from cache `status` section; per-card `Updated: HH:MM, Next: HH:MM` label bottom-right populated from `data.updated_at` and `this._refreshIntervalSeconds`; updates icon threshold colors and >90% blink state [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
-            - `AIBarIndicator._createTab(...)`: provider tab creation [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
-              - `_getProviderDisplayName(...)`: provider label resolver with GeminiAI uppercase override (`GEMINIAI`) [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
-            - `AIBarIndicator._updateProviderCard(...)`: card lifecycle update with optional window status entry argument [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
-              - `AIBarIndicator._createProviderCard(...)`: card widget graph creation including `updateAtLabel` bottom-right row [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
-                - `_getProviderDisplayName(...)`: provider header label resolver with GeminiAI uppercase override (`GEMINIAI`) [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
-              - `AIBarIndicator._populateProviderCard(...)`: metrics-to-widget projection with cache-status error precedence (`statusEntry.error` over payload `data.error`), quota label, cost label using `metrics.currency_symbol`, byok label using `metrics.currency_symbol`, provider-colored progress fills, `⚠️ Limit reached!` suffix at displayed `100.0%` for Claude/Codex/Copilot bars, and `Updated: HH:MM, Next: HH:MM` bottom-right label computed from `data.updated_at` plus `this._refreshIntervalSeconds` [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
-                - `_isDisplayedZeroPercent(...)`: normalize near-zero percentages to displayed `0.0%` semantics for fallback eligibility [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
-                - `_getProviderProgressClass(...)`: provider-to-progress-color class mapping [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
-            - `AIBarIndicator._switchToProvider(...)`: active provider switch [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
-          - `AIBarIndicator._handleError(...)`: error-state update with panel status-label reset, icon blink reset, and `Err` fallback label [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
-      - `AIBarIndicator._startAutoRefresh(...)`: periodic refresh timer registration using `this._refreshIntervalSeconds` (instance var, updated from `extension.gnome_refresh_interval_seconds` in parsed JSON) [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
-        - timer callback -> `AIBarIndicator._refreshData(...)`: recurring fetch trigger [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
-  - `AIBarExtension.disable(...)`: extension disable adapter [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
-    - `AIBarIndicator.destroy(...)`: timer teardown + parent destroy [`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+          - `AIBarIndicator._parseOutput(...)`: JSON decode + state update supporting canonical `payload`/`status`/`extension` schema; reads `extension.gnome_refresh_interval_seconds` and reschedules auto-refresh timer on interval change [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+          - `AIBarIndicator._updateUI(...)`: provider tab/card rendering update with deterministic order (`claude`, `openrouter`, `copilot`, `codex`, `geminiai`) plus ordered panel status-label projection (`claude5h`, `claude7d`, `claudeCost`, `openrouterCost`, `copilot`, `codex5h`, `codex7d`, `codexCost`, `openaiCost`, `geminiaiCost`) with hidden-label fallback for missing metrics and zero-cost visibility via `_panelCostText(...)`; resolves window-scoped status entries from cache `status` section; per-card `Updated: HH:MM, Next: HH:MM` label bottom-right populated from `data.updated_at` and `this._refreshIntervalSeconds`; updates icon threshold colors and >90% blink state [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+            - `AIBarIndicator._createTab(...)`: provider tab creation [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+              - `_getProviderDisplayName(...)`: provider label resolver with GeminiAI uppercase override (`GEMINIAI`) [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+            - `AIBarIndicator._updateProviderCard(...)`: card lifecycle update with optional window status entry argument [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+              - `AIBarIndicator._createProviderCard(...)`: card widget graph creation including `updateAtLabel` bottom-right row [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+                - `_getProviderDisplayName(...)`: provider header label resolver with GeminiAI uppercase override (`GEMINIAI`) [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+              - `AIBarIndicator._populateProviderCard(...)`: metrics-to-widget projection with cache-status error precedence (`statusEntry.error` over payload `data.error`), quota label, cost label using `metrics.currency_symbol`, byok label using `metrics.currency_symbol`, provider-colored progress fills, `⚠️ Limit reached!` suffix at displayed `100.0%` for Claude/Codex/Copilot bars, and `Updated: HH:MM, Next: HH:MM` bottom-right label computed from `data.updated_at` plus `this._refreshIntervalSeconds` [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+                - `_isDisplayedZeroPercent(...)`: normalize near-zero percentages to displayed `0.0%` semantics for fallback eligibility [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+                - `_getProviderProgressClass(...)`: provider-to-progress-color class mapping [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+            - `AIBarIndicator._switchToProvider(...)`: active provider switch [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+          - `AIBarIndicator._handleError(...)`: error-state update with panel status-label reset, icon blink reset, and `Err` fallback label [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+      - `AIBarIndicator._startAutoRefresh(...)`: periodic refresh timer registration using `this._refreshIntervalSeconds` (instance var, updated from `extension.gnome_refresh_interval_seconds` in parsed JSON) [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+        - timer callback -> `AIBarIndicator._refreshData(...)`: recurring fetch trigger [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+  - `AIBarExtension.disable(...)`: extension disable adapter [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+    - `AIBarIndicator.destroy(...)`: timer teardown + parent destroy [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
 - `External Boundaries`
   - GNOME Shell extensions API (`Extension` base class providing `uuid`, `metadata`, `dir`).
   - GNOME Shell UI/runtime APIs (`Main`, `PanelMenu`, `PopupMenu`, `St`, `GLib`, `Gio`, `Clutter`, `GObject`) accessed via ES module imports (`gi://` and `resource://` schemes; GNOME Shell 45+ only).
@@ -301,7 +301,7 @@
   - `mechanism: subprocess spawn + async stdio`
   - `endpoint_or_channel: argv [aibar, show, --json] for scheduled/initial refresh and argv [aibar, show, --json, --force] for popup `Refresh Now` + child stdout`
   - `payload_data_shape: JSON object {payload:{provider->ProviderResult}, status:{provider->{window->{result,error,updated_at,status_code}}}, extension:{gnome_refresh_interval_seconds:int}}`
-  - `declaration_files: src/aibar/gnome-extension/aibar@aibar.panel/extension.js, src/aibar/aibar/cli.py, src/aibar/aibar/providers/base.py`
+  - `declaration_files: src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js, src/aibar/aibar/cli.py, src/aibar/aibar/providers/base.py`
 
 - `id: EDGE-002`
   - `source: PROC:gnome-shell`
@@ -310,7 +310,7 @@
   - `mechanism: terminal subprocess spawn`
   - `endpoint_or_channel: shell command string passed to gnome-terminal bash -c`
   - `payload_data_shape: UTF-8 command text (no structured return payload to source unit)`
-  - `declaration_files: src/aibar/gnome-extension/aibar@aibar.panel/extension.js, src/aibar/aibar/cli.py`
+  - `declaration_files: src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js, src/aibar/aibar/cli.py`
 
 - `id: EDGE-003`
   - `source: PROC:gnome-shell`
@@ -319,4 +319,4 @@
   - `mechanism: env-file parse + launcher.setenv(...) before spawn`
   - `endpoint_or_channel: inherited child process environment`
   - `payload_data_shape: string key/value map loaded from ~/.config/aibar/env`
-  - `declaration_files: src/aibar/gnome-extension/aibar@aibar.panel/extension.js, src/aibar/aibar/config.py`
+  - `declaration_files: src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js, src/aibar/aibar/config.py`

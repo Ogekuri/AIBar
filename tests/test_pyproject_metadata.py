@@ -131,9 +131,9 @@ class TestBuildArtifacts:
 
     def test_wheel_includes_runtime_assets(self, pyproject_data: dict) -> None:
         """
-        @brief Verify wheel include settings list runtime assets.
-        @details Asserts hatch wheel include list contains gnome-extension and
-        scripts globs required by release artifact builds.
+        @brief Verify wheel packages setting includes aibar package with gnome-extension subtree.
+        @details Asserts hatch wheel packages list contains the aibar package directory
+        which auto-includes gnome-extension/ subtree, and include list contains scripts glob.
         @param pyproject_data {dict} Parsed pyproject.toml.
         @return {None} Function return value.
         @satisfies TST-037
@@ -145,15 +145,16 @@ class TestBuildArtifacts:
             .get("targets", {})
             .get("wheel", {})
         )
+        packages = wheel.get("packages", [])
+        assert "src/aibar/aibar" in packages
         include = wheel.get("include", [])
-        assert "src/aibar/gnome-extension/**" in include
         assert "scripts/**" in include
 
     def test_sdist_includes_runtime_assets(self, pyproject_data: dict) -> None:
         """
         @brief Verify sdist include settings list runtime assets.
-        @details Asserts hatch sdist include list contains gnome-extension and
-        scripts globs required by release artifact builds.
+        @details Asserts hatch sdist include list contains aibar package (with gnome-extension
+        subtree) and scripts globs required by release artifact builds.
         @param pyproject_data {dict} Parsed pyproject.toml.
         @return {None} Function return value.
         @satisfies TST-037
@@ -166,5 +167,5 @@ class TestBuildArtifacts:
             .get("sdist", {})
         )
         include = sdist.get("include", [])
-        assert "src/aibar/gnome-extension/**" in include
+        assert "src/aibar/aibar/**" in include
         assert "scripts/**" in include

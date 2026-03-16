@@ -25,14 +25,12 @@ aibar = "aibar.cli:main"
 [tool.hatch.build.targets.wheel]
 packages = ["src/aibar/aibar"]
 include = [
-    "src/aibar/gnome-extension/**",
     "scripts/**",
 ]
 
 [tool.hatch.build.targets.sdist]
 include = [
     "src/aibar/aibar/**",
-    "src/aibar/gnome-extension/**",
     "scripts/**",
     "pyproject.toml",
     "README.md",

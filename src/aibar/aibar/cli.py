@@ -2869,14 +2869,15 @@ def _login_geminiai() -> None:
 
 def _resolve_extension_source_dir() -> Path:
     """
-    @brief Resolve GNOME extension source directory from installed package location.
-    @details Navigates from the `aibar` package directory (`__file__` parent) up one level
-    to the package root, then into `gnome-extension/aibar@aibar.panel/`. Works both
-    in development (git checkout) and installed package (pip/uv) layouts.
+    @brief Resolve GNOME extension source directory from within the `aibar` package.
+    @details Uses `Path(__file__).resolve().parent` to locate the `aibar` package directory,
+    then appends `gnome-extension/<UUID>/`. Works in development (editable install),
+    wheel-installed, and `uv tool install` layouts because the extension directory resides
+    inside the `aibar` Python package subtree.
     @return {Path} Absolute path to the extension source directory.
-    @satisfies REQ-025
+    @satisfies REQ-025, REQ-083
     """
-    return Path(__file__).resolve().parent.parent / "gnome-extension" / _EXT_UUID
+    return Path(__file__).resolve().parent / "gnome-extension" / _EXT_UUID
 
 
 @main.command(

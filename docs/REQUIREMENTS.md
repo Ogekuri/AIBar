@@ -36,7 +36,7 @@ AIBar implements a Python CLI/UI usage monitor for Claude, OpenAI, OpenRouter, C
 
 Used libraries/components evidenced by direct imports:
 - Python: `click`, `textual`, `pydantic`, `httpx` (`src/aibar/aibar/*.py`, `src/aibar/aibar/providers/*.py`)
-- GNOME JS: `GLib`, `St`, `Gio`, `Clutter`, `GObject`, `Main`, `PanelMenu`, `PopupMenu` (`src/aibar/gnome-extension/aibar@aibar.panel/extension.js`)
+- GNOME JS: `GLib`, `St`, `Gio`, `Clutter`, `GObject`, `Main`, `PanelMenu`, `PopupMenu` (`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`)
 
 Performance note: explicit caching optimization uses persistent CLI cache (`~/.cache/aibar/cache.json`), idle-time gating (`~/.cache/aibar/idle-time.json`), and configurable provider-call throttling (`api_call_delay_seconds`) to minimize API request volume.
 
@@ -145,7 +145,8 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-022**: MUST style GNOME panel tab and label fonts with provider classes and bright colors: Claude red, OpenRouter orange, Copilot yellow, Codex green, OpenAI blue, GeminiAI purple; cost labels MUST use the same font family, render when numeric value is `0`, and hide only when cost metric is unavailable.
 - **REQ-023**: MUST declare a `[project.scripts]` entry `aibar = "aibar.cli:main"` in `pyproject.toml` so that `uv pip install` and `uvx` resolve the `aibar` console command.
 - **REQ-024**: MUST provide `src/aibar/aibar/__main__.py` that delegates to `aibar.cli:main` to enable `python -m aibar` execution.
-- **REQ-025**: MUST resolve GNOME extension source files from the installed package location via Python module path resolution in `gnome-install`, independent of git repository or working directory.
+- **REQ-025**: MUST resolve GNOME extension source files from within the `aibar` Python package directory via module-relative path resolution (`Path(__file__).resolve().parent / "gnome-extension" / <UUID>`) in `gnome-install`, independent of git repository, working directory, or installation method (editable, wheel, `uv tool`).
+- **REQ-083**: MUST place the GNOME extension source directory (`gnome-extension/aibar@aibar.panel/`) inside the `aibar` Python package subtree (`src/aibar/aibar/gnome-extension/`) so that wheel and sdist builds include extension files within the installed package at `<site-packages>/aibar/gnome-extension/aibar@aibar.panel/`.
 - **REQ-026**: MUST create target directory `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/` if it does not exist before copying extension files in `gnome-install`.
 - **REQ-027**: MUST validate that the extension source directory is non-empty and contains `metadata.json` before copying in `gnome-install`.
 - **REQ-028**: MUST produce colored, formatted terminal output via Click styling for status, success, error, and informational messages in `gnome-install` and `gnome-uninstall` commands.
@@ -242,7 +243,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-034**: MUST verify repeated startup update HTTP `429` responses compute idle-time using `max(300, max(retry-after values))`.
 - **TST-035**: MUST verify `--upgrade` and `--uninstall` invoke required `uv tool` commands and propagate subprocess exit codes.
 - **TST-036**: MUST verify `--version` and `--ver` print installed version and bypass subcommand execution.
-- **TST-037**: MUST verify `pyproject.toml` include/package-data settings cover files needed for startup update-check runtime behavior in `.github/workflows/release-uvx+extension.yml` builds.
+- **TST-037**: MUST verify `pyproject.toml` wheel `packages` setting includes the `aibar` package containing `gnome-extension/` subtree, and sdist `include` covers `src/aibar/aibar/gnome-extension/**` and `scripts/**` for `.github/workflows/release-uvx+extension.yml` builds.
 
 ## 5. Evidence
 
@@ -250,7 +251,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 |---|---|
 | PRJ-001 | `src/aibar/aibar/cli.py` + `main/show/doctor/env/setup/login/gnome_install/gnome_uninstall` + `@main.command()` declarations for all subcommands. |
 | PRJ-002 | `src/aibar/aibar/cli.py` + `get_providers` + returns Claude/OpenAI/OpenRouter/Copilot/Codex provider instances keyed by `ProviderName`. |
-| PRJ-004 | `src/aibar/gnome-extension/aibar@aibar.panel/metadata.json` + `name` set to `AIBar Monitor` and `url/github` owner `Ogekuri`, `src/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_refreshData/_updateProviderCard` provider-card rendering behavior, and `scripts/test-gnome-extension.sh` exports `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800`. |
+| PRJ-004 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/metadata.json` + `name` set to `AIBar Monitor` and `url/github` owner `Ogekuri`, `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_refreshData/_updateProviderCard` provider-card rendering behavior, and `scripts/test-gnome-extension.sh` exports `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800`. |
 | PRJ-005 | `docs/REFERENCES.md` + repository-wide symbol sections + machine-readable file/symbol index entries. |
 | PRJ-006 | `pyproject.toml` + `[build-system]`/`[project]`/`[project.scripts]` sections + `aibar = "aibar.cli:main"` console entry point enabling `uv pip install` and `uvx` execution. |
 | PRJ-007 | `README.md` + `## Installation (uv)` section + `uv pip install`, `uv pip uninstall`, `uvx --from` commands. |
@@ -269,8 +270,8 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | DES-002 | `src/aibar/aibar/providers/base.py` + `WindowPeriod/ProviderName` + enum literals `5h/7d/30d/code_review` and provider names. |
 | DES-003 | `src/aibar/aibar/cli.py` + `parse_window/parse_provider` + raises `click.BadParameter` for invalid inputs. |
 | DES-004 | `src/aibar/aibar/cache.py` + `_sanitize_raw` + redacts keys in sensitive set before file write. |
-| DES-005 | `src/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_loadEnvFromFile` + parses `export KEY=VALUE`, handles quotes/comments/semicolon cleanup. |
-| DES-006 | `src/aibar/gnome-extension/aibar@aibar.panel/extension.js` + scheduler-driven `_startAutoRefresh/_refreshData` using `this._refreshIntervalSeconds` read from `json.extension.gnome_refresh_interval_seconds`, popup `Refresh Now` command uses `aibar show --json --force`, interval updated on each successful refresh. |
+| DES-005 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_loadEnvFromFile` + parses `export KEY=VALUE`, handles quotes/comments/semicolon cleanup. |
+| DES-006 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + scheduler-driven `_startAutoRefresh/_refreshData` using `this._refreshIntervalSeconds` read from `json.extension.gnome_refresh_interval_seconds`, popup `Refresh Now` command uses `aibar show --json --force`, interval updated on each successful refresh. |
 | REQ-001 | `src/aibar/aibar/cli.py` + `show` loop + `if not prov.is_configured(): ... continue` and text hint `Set {config.ENV_VARS.get(name)}`. |
 | REQ-002 | `src/aibar/aibar/cli.py` + `show` + default-window Claude/Codex dual fetch output rendering. |
 | REQ-003 | `src/aibar/aibar/cli.py` + `show` JSON renderer emits `indent=2` with `payload`, `status`, and `extension` (containing `gnome_refresh_interval_seconds`) sections. |
@@ -279,7 +280,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-049 | `src/aibar/aibar/cli.py` + `setup` + per-provider currency symbol section after timeout section; prompts each provider with choices `$`/`£`/`€` default `$`; persists `currency_symbols` map in `~/.config/aibar/config.json`. |
 | REQ-050 | `src/aibar/aibar/providers/*.py` + `_parse_response`/`_build_result` + `_resolve_currency_symbol` helper resolves currency from raw API response `currency` field; fallback to `RuntimeConfig.currency_symbols[provider_name]`. |
 | REQ-051 | `src/aibar/aibar/cli.py` + `_print_result` + cost line uses `m.currency_symbol` instead of hardcoded `$`. |
-| REQ-053 | `src/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_updateUI/_populateProviderCard` + panel summary cost uses `metrics.currency_symbol`; card cost label uses per-provider `metrics.currency_symbol`. |
+| REQ-053 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_updateUI/_populateProviderCard` + panel summary cost uses `metrics.currency_symbol`; card cost label uses per-provider `metrics.currency_symbol`. |
 | TST-013 | `tests/test_setup_runtime_config.py` + setup prompt-order/default assertions extended with currency symbol prompt section and `currency_symbols` persistence checks. |
 | TST-023 | `tests/test_currency_symbol_flow.py` + `currency_symbol` field in `UsageMetrics`, provider fetch pass-through, CLI `_print_result`, and GNOME extension cost label use metrics symbol. |
 | REQ-006 | `src/aibar/aibar/cli.py` + `_login_claude` + missing/expired flows print `claude setup-token` then `sys.exit(1)`. |
@@ -291,13 +292,13 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-013 | `src/aibar/aibar/providers/codex.py` + `_parse_response` + `window_key = "primary_window" if 5h else "secondary_window"`. |
 | REQ-014 | `src/aibar/aibar/providers/codex.py` + `CodexCredentials.needs_refresh` + threshold `age.days >= 8`; `CodexProvider.fetch` calls refresher. |
 | REQ-015 | `src/aibar/aibar/providers/codex.py` + `fetch` + catches generic refresh exception and continues (`pass  # Continue with existing token`). |
-| REQ-016 | `src/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_refreshData` and popup `Refresh Now` handler + loads env file and `launcher.setenv(key, value, true)` before command spawn, including `--force` manual refresh path. |
-| REQ-017 | `src/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_updateUI/_populateProviderCard/_buildPopupMenu` + panel label fallback chain; quota-only cards with bold remaining credits; `Reset in:` prefix; `⚠️ Limit reached!` suffix at displayed `100.0%`; suppression of `Error: Rate limited. Try again later.` for rate-limit quota payloads; Copilot `30d` reset placement; popup labels `AIBar` and `Open AIBar Report`; `Updated: <HH:MM>, Next: <HH:MM>` label bottom-right per provider card sourced from `updated_at` and `this._refreshIntervalSeconds`. |
-| REQ-018 | `src/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_handleError` + `this._panelLabel.set_text('Err')` and `message.substring(0, 40)`. |
-| REQ-019 | `src/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_providerOrder` and `_updateUI` sorting + unknown providers rank `999` then lexical order. |
+| REQ-016 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_refreshData` and popup `Refresh Now` handler + loads env file and `launcher.setenv(key, value, true)` before command spawn, including `--force` manual refresh path. |
+| REQ-017 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_updateUI/_populateProviderCard/_buildPopupMenu` + panel label fallback chain; quota-only cards with bold remaining credits; `Reset in:` prefix; `⚠️ Limit reached!` suffix at displayed `100.0%`; suppression of `Error: Rate limited. Try again later.` for rate-limit quota payloads; Copilot `30d` reset placement; popup labels `AIBar` and `Open AIBar Report`; `Updated: <HH:MM>, Next: <HH:MM>` label bottom-right per provider card sourced from `updated_at` and `this._refreshIntervalSeconds`. |
+| REQ-018 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_handleError` + `this._panelLabel.set_text('Err')` and `message.substring(0, 40)`. |
+| REQ-019 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_providerOrder` and `_updateUI` sorting + unknown providers rank `999` then lexical order. |
 | REQ-020 | `docs/REFERENCES.md` + per-symbol entries containing symbol identifier, file path, and line-range spans. |
-| REQ-021 | `src/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_buildPanelButton/_updateUI` + panel labels inserted between icon and summary label in fixed order: Claude 5h, Claude 7d, Claude cost, OpenRouter cost, Copilot 30d, Codex 5h, Codex 7d, Codex cost, OpenAI cost, GeminiAI cost. |
-| REQ-022 | `src/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_buildPanelButton/_updateUI` + panel labels use provider classes/colors; cost labels render provider currency for numeric `0` values and hide only when cost metric is unavailable. |
+| REQ-021 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_buildPanelButton/_updateUI` + panel labels inserted between icon and summary label in fixed order: Claude 5h, Claude 7d, Claude cost, OpenRouter cost, Copilot 30d, Codex 5h, Codex 7d, Codex cost, OpenAI cost, GeminiAI cost. |
+| REQ-022 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_buildPanelButton/_updateUI` + panel labels use provider classes/colors; cost labels render provider currency for numeric `0` values and hide only when cost metric is unavailable. |
 | REQ-023 | `pyproject.toml` + `[project.scripts]` + `aibar = "aibar.cli:main"` declaration. |
 | REQ-024 | `src/aibar/aibar/__main__.py` + `main()` import and invocation from `aibar.cli`. |
 | REQ-034 | `src/aibar/aibar/cli.py` + `_format_reset_duration/_print_result` + day-token reset countdown formatting in text output. |
@@ -317,7 +318,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | TST-001 | `src/aibar/aibar/cli.py` + `parse_window/parse_provider` provide validation points for invalid input diagnostics. |
 | TST-002 | `src/aibar/aibar/config.py` + `get_token` implements explicit precedence chain requiring regression coverage. |
 | TST-003 | `tests/test_cli_idle_cache.py` and `tests/test_cli_idle_force.py` + assertions for cache schema parity with `show --json` and provider-keyed idle-time epoch/human-readable field persistence under `~/.cache/aibar/`. |
-| TST-004 | `tests/test_extension_quota_label.py` + popup-label assertions (`AIBar`, `Open AIBar Report`), reset-prefix and `⚠️ Limit reached!` assertions, rate-limit error-string suppression assertions, `Updated:` and `Next:` provider-card label assertions, and popup `Refresh Now` `--force` assertion; `tests/test_extension_dev_script.py` + `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800`; `src/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_handleError/_populateProviderCard/_buildPopupMenu` coverage. |
+| TST-004 | `tests/test_extension_quota_label.py` + popup-label assertions (`AIBar`, `Open AIBar Report`), reset-prefix and `⚠️ Limit reached!` assertions, rate-limit error-string suppression assertions, `Updated:` and `Next:` provider-card label assertions, and popup `Refresh Now` `--force` assertion; `tests/test_extension_dev_script.py` + `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800`; `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_handleError/_populateProviderCard/_buildPopupMenu` coverage. |
 | TST-005 | `src/aibar/aibar/providers/copilot.py` + `fetch` hard-codes `effective_window` to `WindowPeriod.DAY_30`. |
 | TST-006 | `docs/REFERENCES.md` + generated symbol coverage for tracked `src/` files validates documentation inventory completeness. |
 | TST-007 | `tests/test_extension_quota_label.py` + panel-segment order assertions (including OpenAI cost), provider style classes, zero-cost currency-label visibility checks, bold primary percentages, and missing-metric omission behavior. |
@@ -333,7 +334,8 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | TST-020 | `tests/test_cli_cache_status_retention.py` + file-system assertions verify no read/write path targets `~/.cache/aibar/claude_dual_last_success.json`. |
 | TST-016 | `tests/test_cli_provider_throttle.py` + refresh timing assertions verify configured inter-call delay and default `20`-second fallback. |
 | PRJ-008 | `src/aibar/aibar/cli.py` + `gnome_install` command + copies extension files from package source to `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/` + enables extension via `gnome-extensions enable`. |
-| REQ-025 | `src/aibar/aibar/cli.py` + `_resolve_extension_source_dir` + Python `__file__`-based module path resolution for extension source directory. |
+| REQ-025 | `src/aibar/aibar/cli.py` + `_resolve_extension_source_dir` + `Path(__file__).resolve().parent / "gnome-extension" / _EXT_UUID` module-relative path resolution for extension source directory. |
+| REQ-083 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/` subtree inside `aibar` package + `pyproject.toml` wheel `packages = ["src/aibar/aibar"]` auto-includes gnome-extension in wheel build. |
 | REQ-026 | `src/aibar/aibar/cli.py` + `gnome_install` + `os.makedirs` for target directory creation. |
 | REQ-027 | `src/aibar/aibar/cli.py` + `gnome_install` + validates non-empty source directory and `metadata.json` presence. |
 | REQ-028 | `src/aibar/aibar/cli.py` + `gnome_install/gnome_uninstall` + `click.style` colored output for status, success, error, and informational messages. |

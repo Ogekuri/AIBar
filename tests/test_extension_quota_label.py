@@ -8,9 +8,9 @@ from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-EXTENSION_PATH = PROJECT_ROOT / "src" / "aibar" / "gnome-extension" / "aibar@aibar.panel" / "extension.js"
-METADATA_PATH = PROJECT_ROOT / "src" / "aibar" / "gnome-extension" / "aibar@aibar.panel" / "metadata.json"
-STYLESHEET_PATH = PROJECT_ROOT / "src" / "aibar" / "gnome-extension" / "aibar@aibar.panel" / "stylesheet.css"
+EXTENSION_PATH = PROJECT_ROOT / "src" / "aibar" / "aibar" / "gnome-extension" / "aibar@aibar.panel" / "extension.js"
+METADATA_PATH = PROJECT_ROOT / "src" / "aibar" / "aibar" / "gnome-extension" / "aibar@aibar.panel" / "metadata.json"
+STYLESHEET_PATH = PROJECT_ROOT / "src" / "aibar" / "aibar" / "gnome-extension" / "aibar@aibar.panel" / "stylesheet.css"
 
 
 def test_quota_only_label_uses_remaining_credits_prefix_and_bold_remaining() -> None:

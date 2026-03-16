@@ -20,6 +20,7 @@ EXTENSION_PATH = (
     PROJECT_ROOT
     / "src"
     / "aibar"
+    / "aibar"
     / "gnome-extension"
     / "aibar@aibar.panel"
     / "extension.js"
