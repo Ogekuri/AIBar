@@ -1,5 +1,46 @@
 # Changelog
 
+## [0.10.0](https://github.com/Ogekuri/AIBar/compare/v0.9.0..v0.10.0) - 2026-03-16
+### 🐛  Bug Fixes
+- add pyrightconfig.json and pytest pythonpath for src-based imports [useReq] *(config)*
+  - Add pyrightconfig.json with extraPaths=['src/aibar'] and venv config
+  - so Pylance static analysis resolves aibar.* and third-party imports.
+  - Add [tool.pytest.ini_options] pythonpath=['src/aibar'] to pyproject.toml
+  - ensuring tests always import from src/aibar/ rather than system packages.
+  - Unignore pyrightconfig.json in .gitignore for version control tracking.
+  - Regenerate docs/REFERENCES.md.
+- Remove .req dir.
+- resolve Ruff F401 unused imports and Pylance type errors [useReq] *(static-check)*
+  - Remove unused imports in 3 test files (MagicMock, patch, pytest, os,
+  - datetime, timezone, gnome_install, gnome_uninstall, _EXT_TARGET_DIR)
+  - Fix ProviderResult construction: remove is_error= kwarg (computed property)
+  - Fix UsageMetrics construction: remove usage_percent= kwarg (computed property)
+  - Add type-narrowing assertions before 'in' operator on Optional[str]
+  - Fix resolve_currency_symbol signature: raw accepts dict | None
+  - Cast InstalledAppFlow.run_local_server() to Credentials in geminiai.py
+  - Make _FakeCredentialStore inherit GeminiAICredentialStore for type safety
+  - Cast _FakeBigQueryClient to bigquery.Client for Pylance compatibility
+- align JS static-check test with check-js-syntax.sh config [useReq] *(test_req_static_check_config)*
+  - Update test assertion from noop cmd "true" to "scripts/check-js-syntax.sh"
+  - matching current .req/config.json JavaScript static-check configuration.
+  - Rename test function to test_javascript_static_check_uses_gjs_compatible_script.
+  - Update Doxygen docstrings to reflect GJS preprocessor wrapper approach.
+  - Regenerate docs/REFERENCES.md.
+
+### 🚜  Changes
+- remove unused check-js-syntax.sh [useReq] *(scripts)*
+- BREAKING CHANGE: relocate GNOME extension into aibar package for correct wheel inclusion [useReq] *(gnome-install)*
+  - Move src/aibar/gnome-extension/ into src/aibar/aibar/gnome-extension/
+  - so extension files are included in wheel builds (fixes uv tool install).
+  - Update _resolve_extension_source_dir() to use Path(__file__).parent
+  - instead of parent.parent for module-relative resolution.
+  - Update pyproject.toml wheel/sdist include paths.
+  - Update REQ-025: explicit module-relative resolution from aibar package.
+  - Add REQ-083: extension source must reside inside aibar package subtree.
+  - Update TST-037: verify wheel packages contain gnome-extension subtree.
+  - Update all test and workflow file path references.
+  - Update WORKFLOW.md and REFERENCES.md with new file locations.
+
 ## [0.9.0](https://github.com/Ogekuri/AIBar/compare/v0.8.0..v0.9.0) - 2026-03-16
 ### 🚜  Changes
 - add lifecycle options to help epilog and update REQ-068 [useReq] *(cli)*
@@ -583,6 +624,7 @@
 - \[0.7.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.7.0
 - \[0.8.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.8.0
 - \[0.9.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.9.0
+- \[0.10.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.10.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -593,3 +635,4 @@
 [0.7.0]: https://github.com/Ogekuri/AIBar/compare/v0.6.0..v0.7.0
 [0.8.0]: https://github.com/Ogekuri/AIBar/compare/v0.7.0..v0.8.0
 [0.9.0]: https://github.com/Ogekuri/AIBar/compare/v0.8.0..v0.9.0
+[0.10.0]: https://github.com/Ogekuri/AIBar/compare/v0.9.0..v0.10.0
