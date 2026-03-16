@@ -33,7 +33,8 @@ def test_print_result_keeps_panel_rows_aligned_with_colored_progress_bar(capsys)
     """
     @brief Verify ANSI-colored progress bar rows preserve panel border alignment.
     @details Renders the Claude 5h partial-window error path and asserts every
-    non-empty panel row has identical visible width after ANSI stripping.
+    non-empty panel row has identical visible width after ANSI stripping and no
+    reset line contains the `⚠️` suffix glyph.
     @param capsys {pytest.CaptureFixture} Pytest stdout/stderr capture fixture.
     @return {None} Function return value.
     @satisfies REQ-036
@@ -57,6 +58,7 @@ def test_print_result_keeps_panel_rows_aligned_with_colored_progress_bar(capsys)
     ]
 
     assert panel_rows
+    assert all("⚠️" not in line for line in panel_rows)
     row_length = len(panel_rows[0])
     assert all(len(line) == row_length for line in panel_rows)
 

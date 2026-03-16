@@ -478,7 +478,7 @@ from typing import Any
 
 ---
 
-# cli.py | Python | 2843L | 81 symbols | 27 imports | 94 comments
+# cli.py | Python | 2841L | 81 symbols | 27 imports | 94 comments
 > Path: `src/aibar/aibar/cli.py`
 - @brief Command-line interface for aibar.
 - @details Defines command parsing, provider dispatch, formatted output, setup helpers, login flows, and UI launch hooks.
@@ -1123,7 +1123,7 @@ Border and title color use provider-specific ANSI palette.
 - @return {None} Function return value.
 - @satisfies REQ-067
 
-### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L2264-2282)
+### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L2262-2280)
 - @brief Build one provider panel title/body payload for CLI text rendering.
 - @brief Render CLI text output for one provider result.
 - @details Formats deterministic panel lines for one provider/window result and
@@ -1146,15 +1146,15 @@ preserves provider-specific metrics/error rendering rules used by `show`.
 - @satisfies REQ-051
 - @satisfies REQ-067
 
-### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L2283-2298)
+### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L2281-2296)
 - @brief Execute format reset duration.
 - @details Applies format reset duration logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param seconds {float} Input parameter `seconds`.
 - @return {str} Function return value.
 
-### fn `def _should_render_metrics_after_error(` `priv` (L2299-2301)
+### fn `def _should_render_metrics_after_error(` `priv` (L2297-2299)
 
-### fn `def _should_print_claude_reset_pending_hint(` `priv` (L2319-2321)
+### fn `def _should_print_claude_reset_pending_hint(` `priv` (L2317-2319)
 - @brief Check whether CLI output must render metrics after printing an error line.
 - @details Allows continuation only for Claude HTTP 429 partial-window state so the
 5h section can include `Error:` and still display usage/reset lines.
@@ -1163,7 +1163,7 @@ preserves provider-specific metrics/error rendering rules used by `show`.
 - @return {bool} True when metrics should still be rendered after error line.
 - @satisfies REQ-036
 
-### fn `def _is_displayed_zero_percent(percent: float | None) -> bool` `priv` (L2341-2357)
+### fn `def _is_displayed_zero_percent(percent: float | None) -> bool` `priv` (L2339-2355)
 - @brief Determine whether CLI output must render the reset-pending fallback hint.
 - @brief Check whether a percentage renders as `0.0%` in one-decimal UI output.
 - @details The hint is only valid for Claude windows when no reset timestamp is
@@ -1179,7 +1179,7 @@ providers other than Claude.
 - @satisfies REQ-002
 - @satisfies REQ-002
 
-### fn `def _progress_bar(percent: float, provider_name: ProviderName, width: int = 20) -> str` `priv` (L2358-2373)
+### fn `def _progress_bar(percent: float, provider_name: ProviderName, width: int = 20) -> str` `priv` (L2356-2371)
 - @brief Execute progress bar.
 - @details Applies progress bar logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param percent {float} Input parameter `percent`.
@@ -1187,17 +1187,17 @@ providers other than Claude.
 - @param width {int} Input parameter `width`.
 - @return {str} Function return value.
 
-### fn `def doctor() -> None` (L2378-2430)
+### fn `def doctor() -> None` (L2376-2428)
 - @brief Execute doctor.
 - @details Applies doctor logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def env() -> None` (L2435-2443)
+### fn `def env() -> None` (L2433-2441)
 - @brief Execute env.
 - @details Applies env logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def setup() -> None` (L2448-2647)
+### fn `def setup() -> None` (L2446-2645)
 - @brief Execute setup.
 - @details Prompts for `idle_delay_seconds`, `api_call_delay_milliseconds`, `gnome_refresh_interval_seconds`, and `billing_data` in order, then prompts for provider currency symbols including `geminiai` (choices: `$`, `£`, `€`, default `$`), then persists all values to `~/.config/aibar/config.json`. GeminiAI OAuth source supports `skip`, `file`, `paste`, and `login` (re-authorization with current scopes). Also prompts for provider API keys and writes them to `~/.config/aibar/env`.
 - @return {None} Function return value.
@@ -1207,23 +1207,23 @@ providers other than Claude.
 - @satisfies REQ-056
 - @satisfies REQ-059
 
-### fn `def login(provider: str) -> None` (L2709-2727)
+### fn `def login(provider: str) -> None` (L2707-2725)
 - @brief Execute login.
 - @details Applies login logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param provider {str} Input parameter `provider`.
 - @return {None} Function return value.
 
-### fn `def _login_claude() -> None` `priv` (L2728-2776)
+### fn `def _login_claude() -> None` `priv` (L2726-2774)
 - @brief Execute login claude.
 - @details Applies login claude logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_copilot() -> None` `priv` (L2777-2804)
+### fn `def _login_copilot() -> None` `priv` (L2775-2802)
 - @brief Execute login copilot.
 - @details Applies login copilot logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_geminiai() -> None` `priv` (L2805-2841)
+### fn `def _login_geminiai() -> None` `priv` (L2803-2839)
 - @brief Execute GeminiAI OAuth login flow.
 - @details Reuses persisted OAuth client configuration to launch browser-based authorization and persist refresh-capable Google credentials.
 - @return {None} Function return value.
@@ -1301,19 +1301,19 @@ providers other than Claude.
 |`_resolve_shared_panel_content_width`|fn|priv|2082-2083|def _resolve_shared_panel_content_width(|
 |`_emit_provider_panel`|fn|priv|2098-2102|def _emit_provider_panel(|
 |`_build_result_panel`|fn|priv|2141-2144|def _build_result_panel(|
-|`_print_result`|fn|priv|2264-2282|def _print_result(name: ProviderName, result, label: str ...|
-|`_format_reset_duration`|fn|priv|2283-2298|def _format_reset_duration(seconds: float) -> str|
-|`_should_render_metrics_after_error`|fn|priv|2299-2301|def _should_render_metrics_after_error(|
-|`_should_print_claude_reset_pending_hint`|fn|priv|2319-2321|def _should_print_claude_reset_pending_hint(|
-|`_is_displayed_zero_percent`|fn|priv|2341-2357|def _is_displayed_zero_percent(percent: float | None) -> ...|
-|`_progress_bar`|fn|priv|2358-2373|def _progress_bar(percent: float, provider_name: Provider...|
-|`doctor`|fn|pub|2378-2430|def doctor() -> None|
-|`env`|fn|pub|2435-2443|def env() -> None|
-|`setup`|fn|pub|2448-2647|def setup() -> None|
-|`login`|fn|pub|2709-2727|def login(provider: str) -> None|
-|`_login_claude`|fn|priv|2728-2776|def _login_claude() -> None|
-|`_login_copilot`|fn|priv|2777-2804|def _login_copilot() -> None|
-|`_login_geminiai`|fn|priv|2805-2841|def _login_geminiai() -> None|
+|`_print_result`|fn|priv|2262-2280|def _print_result(name: ProviderName, result, label: str ...|
+|`_format_reset_duration`|fn|priv|2281-2296|def _format_reset_duration(seconds: float) -> str|
+|`_should_render_metrics_after_error`|fn|priv|2297-2299|def _should_render_metrics_after_error(|
+|`_should_print_claude_reset_pending_hint`|fn|priv|2317-2319|def _should_print_claude_reset_pending_hint(|
+|`_is_displayed_zero_percent`|fn|priv|2339-2355|def _is_displayed_zero_percent(percent: float | None) -> ...|
+|`_progress_bar`|fn|priv|2356-2371|def _progress_bar(percent: float, provider_name: Provider...|
+|`doctor`|fn|pub|2376-2428|def doctor() -> None|
+|`env`|fn|pub|2433-2441|def env() -> None|
+|`setup`|fn|pub|2446-2645|def setup() -> None|
+|`login`|fn|pub|2707-2725|def login(provider: str) -> None|
+|`_login_claude`|fn|priv|2726-2774|def _login_claude() -> None|
+|`_login_copilot`|fn|priv|2775-2802|def _login_copilot() -> None|
+|`_login_geminiai`|fn|priv|2803-2839|def _login_geminiai() -> None|
 
 
 ---

@@ -169,7 +169,7 @@
             - `save_idle_time(...)`: persist provider-keyed idle-time map with blocking lock-file coordination [`src/aibar/aibar/config.py`]
               - `_blocking_file_lock(...)`: poll lock-file release at 250ms and own lock lifecycle for `idle-time.json` write [`src/aibar/aibar/config.py`]
       - `_build_cached_dual_window_results(...)`: cached Claude/Codex dual-window renderer helper [`src/aibar/aibar/cli.py`]
-      - `_build_result_panel(...)`: deterministic title/body builder for one provider result before panel emission [`src/aibar/aibar/cli.py`]
+      - `_build_result_panel(...)`: deterministic title/body builder for one provider result before panel emission; reset countdown lines omit warning-glyph suffixes to preserve panel alignment semantics [`src/aibar/aibar/cli.py`]
       - `_resolve_shared_panel_content_width(...)`: shared-width resolver selecting widest panel width across one `show` render cycle [`src/aibar/aibar/cli.py`]
       - `_print_result(...)`: ANSI provider-colored terminal panel rendering adapter for one provider/window result using `_build_result_panel(...)` and `metrics.currency_symbol` for costs [`src/aibar/aibar/cli.py`]
         - `_provider_display_name(...)`: provider display-title resolver with GeminiAI uppercase override (`GEMINIAI`) [`src/aibar/aibar/cli.py`]

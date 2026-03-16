@@ -2183,8 +2183,6 @@ def _build_result_panel(
         delta = m.reset_at - datetime.now(timezone.utc)
         if delta.total_seconds() > 0:
             reset_value = _format_reset_duration(delta.total_seconds())
-            if round(m.usage_percent or 0.0, 1) >= 100.0:
-                reset_value = f"{reset_value} ⚠️ Limit reached!"
             lines.append(f"Resets in: {reset_value}")
     elif _should_print_claude_reset_pending_hint(name, m):
         lines.append(f"Resets in: {_RESET_PENDING_MESSAGE}")
