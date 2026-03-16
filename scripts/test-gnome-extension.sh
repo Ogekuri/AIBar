@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # @file test-gnome-extension.sh
 # @brief Launches a nested GNOME Shell session for extension testing.
-# @details Invokes `install-gnome-extension.sh` to update and enable extension files,
+# @details Invokes `aibar gnome-install` to update and enable extension files,
 # then starts a nested GNOME Shell at 1024x800 resolution via
 # `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800 dbus-run-session -- gnome-shell --nested --wayland`.
 # No subcommand parameter required; executes directly on invocation.
@@ -9,24 +9,17 @@
 
 set -euo pipefail
 
-## @brief Resolves the directory containing this script.
-## @details Uses readlink -f to resolve symlinks, then extracts dirname.
-## @return Absolute path to the script's parent directory.
-SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
-
-readonly INSTALL_SCRIPT="${SCRIPT_DIR}/install-gnome-extension.sh"
-
-## @brief Runs the extension installer to update extension files.
-## @details Invokes install-gnome-extension.sh from the same scripts/ directory.
-## Exits with non-zero status if the installer fails.
-## @return Exit 0 on success; propagates installer exit code on failure.
+## @brief Runs the extension installer CLI command to update extension files.
+## @details Invokes `aibar gnome-install` to copy extension files and enable the extension.
+## Exits with non-zero status if the command fails.
+## @return Exit 0 on success; propagates CLI exit code on failure.
 ## @satisfies REQ-031
 update_extension() {
-    if [[ ! -x "${INSTALL_SCRIPT}" ]]; then
-        echo "ERROR: install-gnome-extension.sh not found or not executable: ${INSTALL_SCRIPT}" >&2
+    if ! command -v aibar >/dev/null 2>&1; then
+        echo "ERROR: aibar CLI not found in PATH." >&2
         exit 1
     fi
-    "${INSTALL_SCRIPT}"
+    aibar gnome-install
 }
 
 update_extension

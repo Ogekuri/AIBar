@@ -16,14 +16,6 @@
   - `defining_files: src/aibar/gnome-extension/aibar@aibar.panel/extension.js`
   - `thread_model: no explicit threads detected`
 
-- `id: PROC:install-ext`
-  - `type: Process`
-  - `parent_process: null`
-  - `role: GNOME extension file installer script`
-  - `entrypoint_symbols: main(...)`
-  - `defining_files: scripts/install-gnome-extension.sh`
-  - `thread_model: no explicit threads detected`
-
 - `id: PROC:test-ext`
   - `type: Process`
   - `parent_process: null`
@@ -42,43 +34,20 @@
 
 ## Execution Units
 
-### PROC:install-ext
-- `Entrypoints`
-  - `main(...)`: installer entrypoint [`scripts/install-gnome-extension.sh`]
-- `Lifecycle/Trigger`
-  - Starts when user invokes `scripts/install-gnome-extension.sh` from any directory within the git repository.
-  - Validates prerequisites, copies extension files, enables the extension, and exits.
-- `Internal Call-Trace Tree`
-  - `main(...)`: installer orchestrator [`scripts/install-gnome-extension.sh`]
-    - `print_header(...)`: ANSI banner output [`scripts/install-gnome-extension.sh`]
-    - `step(...)`: progress marker output [`scripts/install-gnome-extension.sh`]
-    - `success(...)`: success message output [`scripts/install-gnome-extension.sh`]
-    - `info(...)`: informational message output [`scripts/install-gnome-extension.sh`]
-    - `warn(...)`: warning message output [`scripts/install-gnome-extension.sh`]
-    - `die(...)`: fatal error output and exit [`scripts/install-gnome-extension.sh`]
-      - External boundary: `git rev-parse --show-toplevel` for project root resolution.
-      - External boundary: `cp -a` for file copy with attribute preservation.
-      - External boundary: `mkdir -p` for target directory creation.
-      - External boundary: `gnome-extensions enable` for extension activation.
-- `External Boundaries`
-  - Git CLI for project root detection.
-  - Local filesystem operations (directory creation, file copy).
-  - `gnome-extensions` CLI for extension enable.
-  - ANSI terminal output.
-
 ### PROC:test-ext
 - `Entrypoints`
   - main script body: direct execution [`scripts/test-gnome-extension.sh`]
 - `Lifecycle/Trigger`
   - Starts when user invokes `scripts/test-gnome-extension.sh` (no arguments required).
-  - Invokes `PROC:install-ext` to update and enable extension files, then launches nested shell.
+  - Invokes `aibar gnome-install` (`PROC:main`) to update and enable extension files, then launches nested shell.
 - `Internal Call-Trace Tree`
   - main script body: direct execution [`scripts/test-gnome-extension.sh`]
-    - `update_extension(...)`: invokes `scripts/install-gnome-extension.sh` to update and enable extension files [`scripts/test-gnome-extension.sh`]
-      - External boundary: subprocess call to `scripts/install-gnome-extension.sh`.
+    - `update_extension(...)`: invokes `aibar gnome-install` to update and enable extension files [`scripts/test-gnome-extension.sh`]
+      - External boundary: subprocess call to `aibar gnome-install` (`PROC:main`).
     - nested shell launch: `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800 dbus-run-session -- gnome-shell --nested --wayland` [`scripts/test-gnome-extension.sh`]
       - External boundary: `dbus-run-session -- gnome-shell --nested --wayland`.
 - `External Boundaries`
+  - `aibar` CLI for extension installation.
   - `dbus-run-session` and `gnome-shell` for nested shell.
 
 ### PROC:main
@@ -88,7 +57,7 @@
 - `Lifecycle/Trigger`
   - Starts when `aibar` is invoked by a user shell or by subprocess spawn from `PROC:gnome-shell`.
   - Executes startup update preflight before CLI argument validation and command dispatch.
-  - Executes one command route (`show`, `doctor`, `env`, `setup`, `login`) or exits early via lifecycle flags (`--version`, `--ver`, `--upgrade`, `--uninstall`).
+  - Executes one command route (`show`, `doctor`, `env`, `setup`, `login`, `gnome-install`, `gnome-uninstall`) or exits early via lifecycle flags (`--version`, `--ver`, `--upgrade`, `--uninstall`).
   - Exits after command completion.
 - `Internal Call-Trace Tree`
   - `StartupPreflightGroup.main(...)`: startup preflight wrapper around Click parser/dispatcher [`src/aibar/aibar/cli.py`]
@@ -220,6 +189,14 @@
       - `_login_geminiai(...)`: GeminiAI OAuth browser-flow route [`src/aibar/aibar/cli.py`]
         - `GeminiAICredentialStore.has_client_config(...)`: OAuth desktop client-file availability check [`src/aibar/aibar/providers/geminiai.py`]
         - `GeminiAICredentialStore.authorize_interactively(...)`: browser authorization + token persistence using `GEMINIAI_OAUTH_SCOPES` (`bigquery.readonly`, `monitoring.read`, `cloud-platform`) [`src/aibar/aibar/providers/geminiai.py`]
+    - `gnome_install(...)`: GNOME extension install/update route [`src/aibar/aibar/cli.py`]
+      - `_resolve_extension_source_dir(...)`: package-relative source directory resolution [`src/aibar/aibar/cli.py`]
+        - External boundary: `shutil.copy2` for file copy.
+        - External boundary: `os.makedirs` for target directory creation.
+        - External boundary: `gnome-extensions enable` for extension activation.
+    - `gnome_uninstall(...)`: GNOME extension removal route [`src/aibar/aibar/cli.py`]
+      - External boundary: `gnome-extensions disable` for extension deactivation.
+      - External boundary: `shutil.rmtree` for extension directory removal.
   - `__main__` module: `python -m aibar` entrypoint, delegates to `main(...)` [`src/aibar/aibar/__main__.py`]
     - `main(...)`: CLI command router [`src/aibar/aibar/cli.py`]
 - `External Boundaries`
@@ -230,6 +207,8 @@
   - Browser-based OAuth consent flow and loopback callback for GeminiAI Google credentials.
   - Google Cloud Monitoring API HTTPS endpoints.
   - Local filesystem reads/writes under user home for env, credentials, runtime config, CLI cache, provider idle-time state, and startup idle-state file (`$HOME/.github_api_idle-time.aibar`).
+  - Local filesystem operations for GNOME extension install/uninstall (directory creation, file copy, directory removal) under `~/.local/share/gnome-shell/extensions/`.
+  - `gnome-extensions` CLI for extension enable/disable.
   - Process environment and terminal stdout/stderr streams.
 
 ### PROC:gnome-shell
@@ -307,12 +286,12 @@
 
 - `id: EDGE-004`
   - `source: PROC:test-ext`
-  - `destination: PROC:install-ext`
+  - `destination: PROC:main`
   - `direction: request-response`
   - `mechanism: subprocess invocation`
-  - `endpoint_or_channel: scripts/install-gnome-extension.sh direct execution`
+  - `endpoint_or_channel: aibar gnome-install CLI command execution`
   - `payload_data_shape: no structured payload; exit code signals success/failure`
-  - `declaration_files: scripts/test-gnome-extension.sh, scripts/install-gnome-extension.sh`
+  - `declaration_files: scripts/test-gnome-extension.sh, src/aibar/aibar/cli.py`
 
 - `id: EDGE-001`
   - `source: PROC:gnome-shell`

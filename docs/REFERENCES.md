@@ -121,95 +121,21 @@ GNOME Shell runtime. The original file is never modified.
 
 ---
 
-# install-gnome-extension.sh | Shell | 160L | 18 symbols | 0 imports | 43 comments
-> Path: `scripts/install-gnome-extension.sh`
-
-## Definitions
-
-- var `readonly C_RESET='\033[0m'` (L14)
-- var `readonly C_BOLD='\033[1m'` (L15)
-- var `readonly C_RED='\033[1;31m'` (L16)
-- var `readonly C_GREEN='\033[1;32m'` (L17)
-- var `readonly C_YELLOW='\033[1;33m'` (L18)
-- var `readonly C_BLUE='\033[1;34m'` (L19)
-- var `readonly C_CYAN='\033[1;36m'` (L20)
-- var `readonly C_DIM='\033[2m'` (L21)
-- fn `print_header() {` (L27)
-- @brief Prints a formatted header banner.
-- @param $1 {string} Header text.
-- fn `info() {` (L37)
-- @brief Prints an informational message.
-- @param $* {string} Message text.
-- fn `success() {` (L43)
-- @brief Prints a success message.
-- @param $* {string} Message text.
-- fn `warn() {` (L49)
-- @brief Prints a warning message.
-- @param $* {string} Message text.
-- fn `die() {` (L56)
-- @brief Prints an error message to stderr and exits with status 1.
-- @param $* {string} Error text.
-- @return Does not return; exits with code 1.
-- fn `step() {` (L65)
-- @brief Prints a step progress marker.
-- @param $1 {string} Step number.
-- @param $2 {string} Step description.
-- var `readonly EXT_UUID="aibar@aibar.panel"` (L70)
-- var `readonly EXT_SRC_REL="src/aibar/gnome-extension/${EXT_UUID}"` (L71)
-- var `readonly EXT_TARGET_DIR="${HOME}/.local/share/gnome-shell/extensions/${EXT_UUID}"` (L72)
-- fn `main() {` (L81)
-- @brief Main installation function.
-- @details Executes sequential prerequisite checks (git availability, project root
-resolution, source directory validation, metadata.json presence), creates the
-target directory if absent, and copies all extension files preserving attributes.
-- @return Exit 0 on success; exit 1 on any prerequisite failure.
-## Symbol Index
-|Symbol|Kind|Vis|Lines|Sig|
-|---|---|---|---|---|
-|`C_RESET`|var||14||
-|`C_BOLD`|var||15||
-|`C_RED`|var||16||
-|`C_GREEN`|var||17||
-|`C_YELLOW`|var||18||
-|`C_BLUE`|var||19||
-|`C_CYAN`|var||20||
-|`C_DIM`|var||21||
-|`print_header`|fn||27|print_header()|
-|`info`|fn||37|info()|
-|`success`|fn||43|success()|
-|`warn`|fn||49|warn()|
-|`die`|fn||56|die()|
-|`step`|fn||65|step()|
-|`EXT_UUID`|var||70||
-|`EXT_SRC_REL`|var||71||
-|`EXT_TARGET_DIR`|var||72||
-|`main`|fn||81|main()|
-
-
----
-
-# test-gnome-extension.sh | Shell | 34L | 3 symbols | 0 imports | 16 comments
+# test-gnome-extension.sh | Shell | 27L | 1 symbols | 0 imports | 13 comments
 > Path: `scripts/test-gnome-extension.sh`
 
 ## Definitions
 
-- var `SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"` (L15)
-- @brief Resolves the directory containing this script.
-- @details Uses readlink -f to resolve symlinks, then extracts dirname.
-- @return Absolute path to the script's parent directory.
-- var `readonly INSTALL_SCRIPT="${SCRIPT_DIR}/install-gnome-extension.sh"` (L17)
-- fn `update_extension() {` (L24)
-- @brief Runs the extension installer to update extension files.
-- @details Invokes install-gnome-extension.sh from the same scripts/ directory.
-Exits with non-zero status if the installer fails.
-- @return Exit 0 on success; propagates installer exit code on failure.
+- fn `update_extension() {` (L17)
+- @brief Runs the extension installer CLI command to update extension files.
+- @details Invokes `aibar gnome-install` to copy extension files and enable the extension.
+Exits with non-zero status if the command fails.
+- @return Exit 0 on success; propagates CLI exit code on failure.
 - @satisfies REQ-031
 ## Symbol Index
 |Symbol|Kind|Vis|Lines|Sig|
 |---|---|---|---|---|
-|`SCRIPT_DIR`|var||15||
-|`INSTALL_SCRIPT`|var||17||
-|`update_extension`|fn||24|update_extension()|
+|`update_extension`|fn||17|update_extension()|
 
 
 ---
@@ -478,7 +404,7 @@ from typing import Any
 
 ---
 
-# cli.py | Python | 2841L | 81 symbols | 27 imports | 94 comments
+# cli.py | Python | 3025L | 84 symbols | 29 imports | 97 comments
 > Path: `src/aibar/aibar/cli.py`
 - @brief Command-line interface for aibar.
 - @details Defines command parsing, provider dispatch, formatted output, setup helpers, login flows, and UI launch hooks.
@@ -489,7 +415,9 @@ import asyncio
 import email.utils
 import json
 import math
+import os
 import re
+import shutil
 import subprocess
 import sys
 import textwrap
@@ -516,7 +444,7 @@ from aibar.providers.geminiai import GEMINIAI_OAUTH_SCOPES, GeminiAICredentialSt
 
 ## Definitions
 
-### class `class RetrievalPipelineOutput` `@dataclass(frozen=True)` (L93-120)
+### class `class RetrievalPipelineOutput` `@dataclass(frozen=True)` (L97-124)
 - @brief Define shared provider-retrieval pipeline output.
 - @details Encodes deterministic retrieval state produced by the shared cache-based pipeline used by `show` and Text UI refresh execution. The pipeline enforces force-flag handling, idle-time gating, conditional refresh into `cache.json`, and deterministic payload projection for rendering.
 - @note `payload` contains cache JSON sections: `payload` and `status`.
@@ -532,7 +460,7 @@ from aibar.providers.geminiai import GEMINIAI_OAUTH_SCOPES, GeminiAICredentialSt
 - @satisfies REQ-046
 - @satisfies REQ-047
 
-### class `class StartupReleaseCheckResponse` `@dataclass(frozen=True)` (L122-141)
+### class `class StartupReleaseCheckResponse` `@dataclass(frozen=True)` (L126-145)
 - @brief Represent one startup GitHub release-check execution result.
 - @details Encodes normalized response state for startup preflight control-flow. `latest_version` is populated only on successful metadata retrieval. `status_code`, `error_message`, and `retry_after_seconds` carry normalized failure metadata used by 429 idle-time expansion and bright-red diagnostics.
 - @note Immutable dataclass to keep preflight decisions deterministic.
@@ -541,40 +469,40 @@ from aibar.providers.geminiai import GEMINIAI_OAUTH_SCOPES, GeminiAICredentialSt
 - @satisfies REQ-074
 - @satisfies REQ-075
 
-### fn `def _startup_idle_state_path() -> Path` `priv` (L142-152)
+### fn `def _startup_idle_state_path() -> Path` `priv` (L146-156)
 - @brief Resolve startup update idle-state JSON path.
 - @details Builds `$HOME/.github_api_idle-time.aibar` using the configured program identifier. Path is user-scoped and outside project directories.
 - @return {Path} Absolute path for startup idle-state persistence.
 - @satisfies CTN-013
 
-### fn `def _startup_human_timestamp(epoch_seconds: int) -> str` `priv` (L153-165)
+### fn `def _startup_human_timestamp(epoch_seconds: int) -> str` `priv` (L157-169)
 - @brief Convert epoch seconds to UTC ISO-8601 timestamp text.
 - @details Normalizes negative input to zero and emits timezone-aware UTC values so startup idle-state JSON remains machine-parseable and stable.
 - @param epoch_seconds {int} Epoch timestamp in seconds.
 - @return {str} UTC ISO-8601 timestamp string.
 - @satisfies CTN-013
 
-### fn `def _startup_parse_int(value: object, default: int = 0) -> int` `priv` (L166-183)
+### fn `def _startup_parse_int(value: object, default: int = 0) -> int` `priv` (L170-187)
 - @brief Parse integer-like values for startup idle-state normalization.
 - @details Supports int, float, and numeric strings; invalid values return provided default. Parsed values are clamped to non-negative integers.
 - @param value {object} Raw decoded value from JSON or headers.
 - @param default {int} Fallback integer when parsing fails.
 - @return {int} Non-negative parsed integer or fallback default.
 
-### fn `def _load_startup_idle_state() -> dict[str, object] | None` `priv` (L184-203)
+### fn `def _load_startup_idle_state() -> dict[str, object] | None` `priv` (L188-207)
 - @brief Load startup update idle-state JSON from disk.
 - @details Reads `$HOME/.github_api_idle-time.aibar` and returns decoded JSON object when valid. Corrupt, missing, or unreadable files normalize to None.
 - @return {dict[str, object] | None} Parsed idle-state mapping or None.
 - @satisfies CTN-013
 
-### fn `def _startup_idle_epochs(state: dict[str, object] | None) -> tuple[int, int]` `priv` (L204-225)
+### fn `def _startup_idle_epochs(state: dict[str, object] | None) -> tuple[int, int]` `priv` (L208-229)
 - @brief Extract normalized startup idle-state epoch timestamps.
 - @details Reads `last_success_at_epoch` and `idle_until_epoch` from decoded state object and normalizes missing/invalid values to zero.
 - @param state {dict[str, object] | None} Decoded startup idle-state mapping.
 - @return {tuple[int, int]} Tuple `(last_success_epoch, idle_until_epoch)`.
 - @satisfies CTN-013
 
-### fn `def _save_startup_idle_state(last_success_epoch: int, idle_until_epoch: int) -> None` `priv` (L226-256)
+### fn `def _save_startup_idle_state(last_success_epoch: int, idle_until_epoch: int) -> None` `priv` (L230-260)
 - @brief Persist startup update idle-state JSON.
 - @details Writes epoch and UTC human-readable values for last successful startup release check and idle-disable-until timestamp to `$HOME/.github_api_idle-time.aibar`.
 - @param last_success_epoch {int} Last successful startup check epoch.
@@ -584,7 +512,7 @@ from aibar.providers.geminiai import GEMINIAI_OAUTH_SCOPES, GeminiAICredentialSt
 - @satisfies CTN-013
 - @satisfies REQ-072
 
-### fn `def _emit_startup_preflight_message(message: str, color_code: str, err: bool = False) -> None` `priv` (L257-271)
+### fn `def _emit_startup_preflight_message(message: str, color_code: str, err: bool = False) -> None` `priv` (L261-275)
 - @brief Emit colorized startup preflight diagnostics.
 - @details Wraps message text with ANSI bright color escape sequences so update availability notices and failures are visually distinct in terminal output.
 - @param message {str} Rendered diagnostic message text.
@@ -594,21 +522,21 @@ from aibar.providers.geminiai import GEMINIAI_OAUTH_SCOPES, GeminiAICredentialSt
 - @satisfies REQ-073
 - @satisfies REQ-074
 
-### fn `def _parse_retry_after_header(retry_after_raw: str | None) -> int` `priv` (L272-296)
+### fn `def _parse_retry_after_header(retry_after_raw: str | None) -> int` `priv` (L276-300)
 - @brief Parse HTTP Retry-After header to delay seconds.
 - @details Supports integer-second values and HTTP-date formats. Date values are converted to seconds relative to current UTC time and clamped to zero.
 - @param retry_after_raw {str | None} Retry-After header value.
 - @return {int} Non-negative delay seconds.
 - @satisfies REQ-075
 
-### fn `def _normalize_release_version(raw_version: object) -> str | None` `priv` (L297-313)
+### fn `def _normalize_release_version(raw_version: object) -> str | None` `priv` (L301-317)
 - @brief Normalize release tag text extracted from GitHub API payload.
 - @details Accepts string-like values, trims whitespace, and returns None for empty/invalid payload values.
 - @param raw_version {object} Decoded `tag_name` value from release JSON.
 - @return {str | None} Normalized release version string.
 - @satisfies REQ-073
 
-### fn `def _fetch_startup_latest_release() -> StartupReleaseCheckResponse` `priv` (L314-368)
+### fn `def _fetch_startup_latest_release() -> StartupReleaseCheckResponse` `priv` (L318-372)
 - @brief Fetch latest GitHub release metadata for startup preflight.
 - @details Executes one HTTP request to the canonical releases/latest endpoint with hardcoded timeout. Success returns normalized latest version tag. Failures return status/error metadata and parsed retry-after delay.
 - @return {StartupReleaseCheckResponse} Normalized startup release-check result.
@@ -618,14 +546,14 @@ from aibar.providers.geminiai import GEMINIAI_OAUTH_SCOPES, GeminiAICredentialSt
 - @satisfies REQ-074
 - @satisfies REQ-075
 
-### fn `def _parse_version_triplet(version_text: str) -> tuple[int, int, int] | None` `priv` (L369-387)
+### fn `def _parse_version_triplet(version_text: str) -> tuple[int, int, int] | None` `priv` (L373-391)
 - @brief Parse semantic version tuple from version text.
 - @details Accepts optional `v` prefix and optional suffix metadata. Returns first `major.minor.patch` triplet or None when parsing fails.
 - @param version_text {str} Raw version string.
 - @return {tuple[int, int, int] | None} Parsed semantic version tuple.
 - @satisfies REQ-073
 
-### fn `def _is_newer_release(installed_version: str, latest_version: str) -> bool` `priv` (L388-404)
+### fn `def _is_newer_release(installed_version: str, latest_version: str) -> bool` `priv` (L392-408)
 - @brief Compare installed and latest release semantic versions.
 - @details Uses normalized `major.minor.patch` tuples. Invalid version formats disable upgrade notice emission to avoid false positives.
 - @param installed_version {str} Installed program version text.
@@ -633,7 +561,7 @@ from aibar.providers.geminiai import GEMINIAI_OAUTH_SCOPES, GeminiAICredentialSt
 - @return {bool} True when latest release is newer than installed version.
 - @satisfies REQ-073
 
-### fn `def _run_startup_update_preflight() -> None` `priv` (L405-472)
+### fn `def _run_startup_update_preflight() -> None` `priv` (L409-476)
 - @brief Execute startup update-check preflight with idle-time gating.
 - @details Evaluates startup idle-state file; skips HTTP calls while idle is active; performs latest-release fetch when idle expires or file is missing; prints bright-green update notice for newer releases; prints bright-red error diagnostics on failures; updates idle-state after success and HTTP 429.
 - @return {None} Function return value.
@@ -646,7 +574,7 @@ from aibar.providers.geminiai import GEMINIAI_OAUTH_SCOPES, GeminiAICredentialSt
 - @satisfies REQ-074
 - @satisfies REQ-075
 
-### fn `def _execute_lifecycle_subprocess(command: list[str]) -> int` `priv` (L473-495)
+### fn `def _execute_lifecycle_subprocess(command: list[str]) -> int` `priv` (L477-499)
 - @brief Execute lifecycle subprocess command for upgrade/uninstall options.
 - @details Runs provided command via `subprocess.run` and returns subprocess exit code. Command execution failures return non-zero status with red error.
 - @param command {list[str]} Lifecycle command argv.
@@ -655,9 +583,9 @@ from aibar.providers.geminiai import GEMINIAI_OAUTH_SCOPES, GeminiAICredentialSt
 - @satisfies REQ-076
 - @satisfies REQ-077
 
-### fn `def _handle_upgrade_option(` `priv` (L496-497)
+### fn `def _handle_upgrade_option(` `priv` (L500-501)
 
-### fn `def _handle_uninstall_option(` `priv` (L527-528)
+### fn `def _handle_uninstall_option(` `priv` (L531-532)
 - @brief Handle eager `--upgrade` lifecycle option callback.
 - @details Executes required `uv tool install ... --force` command and exits
 current Click context with subprocess return code when option is provided.
@@ -668,7 +596,7 @@ current Click context with subprocess return code when option is provided.
 - @satisfies CTN-015
 - @satisfies REQ-076
 
-### fn `def _handle_version_option(` `priv` (L548-549)
+### fn `def _handle_version_option(` `priv` (L552-553)
 - @brief Handle eager `--uninstall` lifecycle option callback.
 - @details Executes required `uv tool uninstall aibar` command and exits Click
 context with subprocess return code when option is provided.
@@ -679,7 +607,7 @@ context with subprocess return code when option is provided.
 - @satisfies CTN-015
 - @satisfies REQ-077
 
-### class `class StartupPreflightGroup(click.Group)` : click.Group (L568-610)
+### class `class StartupPreflightGroup(click.Group)` : click.Group (L572-614)
 - @brief Handle eager `--version` and `--ver` option callback.
 - @brief Click group subclass that enforces startup preflight ordering.
 - @details Prints installed package version and exits before command dispatch
@@ -691,43 +619,43 @@ when either version flag is present.
 - @return {None} Function return value.
 - @satisfies REQ-078
 - @satisfies REQ-070
-- fn `def main(` (L577-584)
+- fn `def main(` (L581-588)
   - @brief Click group subclass that enforces startup preflight ordering.
   - @details Executes startup update-check preflight before Click argument
 parsing and command dispatch. This guarantees preflight execution even when
 invocation later fails due to invalid arguments.
   - @satisfies REQ-070
 
-### fn `def _normalize_utc(value: datetime) -> datetime` `priv` (L611-623)
+### fn `def _normalize_utc(value: datetime) -> datetime` `priv` (L615-627)
 - @brief Normalize datetime values to timezone-aware UTC instances.
 - @details Ensures consistent timestamp arithmetic for idle-time persistence and refresh-delay computations when source datetimes are naive or non-UTC.
 - @param value {datetime} Source datetime to normalize.
 - @return {datetime} Timezone-aware UTC datetime.
 
-### fn `def _apply_api_call_delay(throttle_state: dict[str, float | int] | None) -> None` `priv` (L624-653)
+### fn `def _apply_api_call_delay(throttle_state: dict[str, float | int] | None) -> None` `priv` (L628-657)
 - @brief Enforce minimum spacing between consecutive provider API calls.
 - @details Uses monotonic clock values in `throttle_state` to sleep before a live API request when elapsed time is below configured delay.
 - @param throttle_state {dict[str, float | int] | None} Mutable state containing `delay_milliseconds` and `last_call_started`.
 - @return {None} Function return value.
 - @satisfies REQ-040
 
-### fn `def _extract_retry_after_seconds(result: ProviderResult) -> int` `priv` (L654-672)
+### fn `def _extract_retry_after_seconds(result: ProviderResult) -> int` `priv` (L658-676)
 - @brief Extract normalized retry-after seconds from provider error payload.
 - @details Reads `raw.retry_after_seconds` and clamps to non-negative integer seconds. Invalid or missing values normalize to zero.
 - @param result {ProviderResult} Provider result to inspect.
 - @return {int} Non-negative retry-after delay in seconds.
 - @satisfies REQ-041
 
-### fn `def _is_http_429_result(result: ProviderResult) -> bool` `priv` (L673-683)
+### fn `def _is_http_429_result(result: ProviderResult) -> bool` `priv` (L677-687)
 - @brief Check whether result payload represents HTTP 429 rate limiting.
 - @details Uses normalized raw payload marker `status_code == 429`.
 - @param result {ProviderResult} Provider result to classify.
 - @return {bool} True when result indicates HTTP 429.
 - @satisfies REQ-041
 
-### fn `def _serialize_results_payload(` `priv` (L684-685)
+### fn `def _serialize_results_payload(` `priv` (L688-689)
 
-### fn `def _empty_cache_document() -> dict[str, object]` `priv` (L699-713)
+### fn `def _empty_cache_document() -> dict[str, object]` `priv` (L703-717)
 - @brief Serialize ProviderResult mapping to `show --json` payload schema.
 - @brief Build empty cache document in canonical sectioned schema.
 - @details Converts each provider result to JSON-safe dict using Pydantic
@@ -741,7 +669,7 @@ serialization with stable key structure.
 - @satisfies CTN-004
 - @satisfies REQ-003
 
-### fn `def _normalize_cache_document(cache_document: dict[str, object] | None) -> dict[str, object]` `priv` (L714-735)
+### fn `def _normalize_cache_document(cache_document: dict[str, object] | None) -> dict[str, object]` `priv` (L718-739)
 - @brief Normalize decoded cache payload to canonical sectioned schema.
 - @details Accepts decoded cache document and enforces object-typed `payload` and `status` sections. Missing or invalid sections normalize to empty objects.
 - @param cache_document {dict[str, object] | None} Decoded cache payload from disk.
@@ -749,28 +677,28 @@ serialization with stable key structure.
 - @satisfies CTN-004
 - @satisfies REQ-003
 
-### fn `def _cache_payload_section(cache_document: dict[str, object]) -> dict[str, object]` `priv` (L736-748)
+### fn `def _cache_payload_section(cache_document: dict[str, object]) -> dict[str, object]` `priv` (L740-752)
 - @brief Extract payload section from canonical cache document.
 - @details Returns mutable provider-result mapping from normalized document.
 - @param cache_document {dict[str, object]} Canonical cache document.
 - @return {dict[str, object]} Provider payload section.
 
-### fn `def _cache_status_section(cache_document: dict[str, object]) -> dict[str, object]` `priv` (L749-761)
+### fn `def _cache_status_section(cache_document: dict[str, object]) -> dict[str, object]` `priv` (L753-765)
 - @brief Extract status section from canonical cache document.
 - @details Returns mutable provider/window status mapping from normalized document.
 - @param cache_document {dict[str, object]} Canonical cache document.
 - @return {dict[str, object]} Provider/window status section.
 
-### fn `def _serialize_attempt_status(result: ProviderResult) -> dict[str, object]` `priv` (L762-780)
+### fn `def _serialize_attempt_status(result: ProviderResult) -> dict[str, object]` `priv` (L766-784)
 - @brief Serialize one provider/window fetch attempt status for cache persistence.
 - @details Converts ProviderResult error state to status object using `OK`/`FAIL`, preserving error text, update timestamp, and optional HTTP status code.
 - @param result {ProviderResult} Provider result from current refresh attempt.
 - @return {dict[str, object]} Attempt-status payload.
 - @satisfies REQ-044
 
-### fn `def _record_attempt_status(` `priv` (L781-783)
+### fn `def _record_attempt_status(` `priv` (L785-787)
 
-### fn `def _extract_claude_snapshot_from_cache_document(` `priv` (L803-804)
+### fn `def _extract_claude_snapshot_from_cache_document(` `priv` (L807-808)
 - @brief Persist one provider/window attempt status into cache status section.
 - @details Upserts `status[provider][window]` with serialized attempt metadata and
 preserves statuses for untouched providers/windows.
@@ -780,7 +708,7 @@ preserves statuses for untouched providers/windows.
 - @satisfies REQ-044
 - @satisfies REQ-046
 
-### fn `def _get_window_attempt_status(` `priv` (L819-822)
+### fn `def _get_window_attempt_status(` `priv` (L823-826)
 - @brief Extract persisted Claude dual-window payload from cache document.
 - @details Reads Claude entry from cache `payload` section and normalizes it into
 a dual-window raw payload (`five_hour`, `seven_day`) for HTTP 429 restoration.
@@ -788,7 +716,7 @@ a dual-window raw payload (`five_hour`, `seven_day`) for HTTP 429 restoration.
 - @return {dict[str, object] | None} Normalized dual-window payload or None.
 - @satisfies REQ-047
 
-### fn `def _is_failed_http_429_status(status_entry: dict[str, object] | None) -> bool` `priv` (L842-856)
+### fn `def _is_failed_http_429_status(status_entry: dict[str, object] | None) -> bool` `priv` (L846-860)
 - @brief Read provider/window attempt status from cache status section.
 - @brief Check whether status entry represents failed HTTP 429 attempt.
 - @details Resolves nested `status[provider][window]` object and validates mapping
@@ -801,9 +729,9 @@ shape before returning it to projection helpers.
 - @return {dict[str, object] | None} Attempt status object or None.
 - @return {bool} True when status marks failed HTTP 429 attempt.
 
-### fn `def _overlay_cached_failure_status(` `priv` (L857-861)
+### fn `def _overlay_cached_failure_status(` `priv` (L861-865)
 
-### fn `def _filter_cached_payload(` `priv` (L907-909)
+### fn `def _filter_cached_payload(` `priv` (L911-913)
 - @brief Overlay cached failure status onto projected result for GeminiAI.
 - @details Reads `status[provider][window]`; when status marks `FAIL` with a
 non-empty error string, returns a copy of projected result carrying the cached
@@ -816,7 +744,7 @@ error and optional status code while preserving payload metrics.
 - @satisfies REQ-060
 - @satisfies REQ-061
 
-### fn `def _project_cached_window(` `priv` (L942-945)
+### fn `def _project_cached_window(` `priv` (L946-949)
 - @brief Filter canonical cache document by optional provider selector.
 - @details Filters both cache sections (`payload`, `status`) so selected-provider
 output contains only relevant provider nodes while preserving schema keys.
@@ -824,7 +752,7 @@ output contains only relevant provider nodes while preserving schema keys.
 - @param provider_filter {ProviderName | None} Optional provider selector.
 - @return {dict[str, object]} Filtered cache document with canonical sections.
 
-### fn `def _load_cached_results(` `priv` (L976-980)
+### fn `def _load_cached_results(` `priv` (L980-984)
 - @brief Project cached raw payload to requested window without network I/O.
 - @details Attempts provider-specific `_parse_response` projection when cached
 window differs from requested window; returns original result on projection
@@ -836,7 +764,7 @@ failure or when parser is unavailable.
 - @satisfies REQ-009
 - @satisfies REQ-042
 
-### fn `def _update_idle_time_after_refresh(` `priv` (L1037-1039)
+### fn `def _update_idle_time_after_refresh(` `priv` (L1041-1043)
 - @brief Decode cached JSON payload into ProviderResult mapping.
 - @details Validates cached payload entries using `ProviderResult` schema, applies
 provider filtering, and projects cached windows to requested window when possible.
@@ -853,7 +781,7 @@ section onto projected payload result for surface-level error rendering.
 - @satisfies REQ-046
 - @satisfies REQ-060
 
-### fn `def _project_next_reset(resets_at_str: str, window: WindowPeriod) -> datetime | None` `priv` (L1118-1149)
+### fn `def _project_next_reset(resets_at_str: str, window: WindowPeriod) -> datetime | None` `priv` (L1122-1153)
 - @brief Persist provider-scoped idle-time metadata after refresh completion.
 - @brief Compute the next reset boundary after a stale resets_at timestamp.
 - @details Computes per-provider `idle_until` from provider-local
@@ -872,7 +800,7 @@ expands only that provider entry using
 - @satisfies REQ-041
 - @satisfies REQ-002
 
-### fn `def _apply_reset_projection(result: ProviderResult) -> ProviderResult` `priv` (L1150-1184)
+### fn `def _apply_reset_projection(result: ProviderResult) -> ProviderResult` `priv` (L1154-1188)
 - @brief Return a copy of `result` with `metrics.reset_at` set to the projected next reset boundary when it is currently None but the raw payload contains a parseable past `resets_at` string for the result's window.
 - @details When a ProviderResult is obtained from stale disk cache (last-good path) or from a cross-window raw re-parse, `_parse_response` correctly sets `reset_at=None` for past timestamps. This function recovers the display information by projecting the next future reset boundary from the raw payload's `resets_at` field, ensuring the 'Resets in:' countdown is shown even when the cached timestamp has already elapsed. If `reset_at` is already non-None, or the raw payload has no parseable `resets_at` for the window, or projection fails, the original result is returned unchanged.
 - @param result {ProviderResult} Candidate result whose reset_at may require projection.
@@ -880,28 +808,28 @@ expands only that provider entry using
 - @see _project_next_reset
 - @satisfies REQ-002
 
-### fn `def get_providers() -> dict[ProviderName, BaseProvider]` (L1185-1200)
+### fn `def get_providers() -> dict[ProviderName, BaseProvider]` (L1189-1204)
 - @brief Execute get providers.
 - @details Applies get providers logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {dict[ProviderName, BaseProvider]} Function return value.
 
-### fn `def parse_window(window: str) -> WindowPeriod` (L1201-1220)
+### fn `def parse_window(window: str) -> WindowPeriod` (L1205-1224)
 - @brief Execute parse window.
 - @details Applies parse window logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param window {str} Input parameter `window`.
 - @return {WindowPeriod} Function return value.
 - @throws {Exception} Propagates explicit raised error states from internal validation or provider operations.
 
-### fn `def parse_provider(provider: str) -> ProviderName | None` (L1221-1237)
+### fn `def parse_provider(provider: str) -> ProviderName | None` (L1225-1241)
 - @brief Execute parse provider.
 - @details Applies parse provider logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param provider {str} Input parameter `provider`.
 - @return {ProviderName | None} Function return value.
 - @throws {Exception} Propagates explicit raised error states from internal validation or provider operations.
 
-### fn `def _fetch_result(` `priv` (L1238-1241)
+### fn `def _fetch_result(` `priv` (L1242-1245)
 
-### fn `def _fetch_claude_dual(` `priv` (L1281-1284)
+### fn `def _fetch_claude_dual(` `priv` (L1285-1288)
 - @brief Execute one provider refresh call without legacy TTL cache reuse.
 - @details Executes throttled provider fetch and returns normalized success/error
 results. Claude 5h/7d requests are routed through `_fetch_claude_dual` so one
@@ -915,7 +843,7 @@ used to enforce inter-call spacing for live API requests.
 - @satisfies REQ-043
 - @satisfies REQ-040
 
-### fn `def _extract_claude_dual_payload(` `priv` (L1340-1342)
+### fn `def _extract_claude_dual_payload(` `priv` (L1344-1346)
 - @brief Fetch Claude 5h and 7d results via a single API call.
 - @details Executes ClaudeOAuthProvider.fetch_all_windows for 5h and 7d on each invocation.
 If Claude returns HTTP 429 for both windows, normalize to a partial-window state
@@ -929,7 +857,7 @@ dual-window payload loaded from `cache.json`.
 - @return {tuple[ProviderResult, ProviderResult]} (5h_result, 7d_result).
 - @satisfies REQ-002, REQ-036, REQ-037, CTN-004, REQ-040, REQ-043, REQ-047
 
-### fn `def _normalize_claude_dual_payload(payload: object) -> dict[str, object] | None` `priv` (L1364-1386)
+### fn `def _normalize_claude_dual_payload(payload: object) -> dict[str, object] | None` `priv` (L1368-1390)
 - @brief Extract dual-window Claude payload dictionary from successful results.
 - @brief Normalize persisted Claude payload shape into dual-window raw dictionary.
 - @details Returns first raw payload containing both `five_hour` and `seven_day`
@@ -944,9 +872,9 @@ mapping objects. Returns None when payload shape is invalid.
 - @satisfies REQ-047
 - @satisfies REQ-036
 
-### fn `def _extract_snapshot_reset_at(` `priv` (L1387-1389)
+### fn `def _extract_snapshot_reset_at(` `priv` (L1391-1393)
 
-### fn `def _extract_snapshot_utilization(` `priv` (L1412-1414)
+### fn `def _extract_snapshot_utilization(` `priv` (L1416-1418)
 - @brief Resolve projected reset timestamp from persisted Claude snapshot payload.
 - @details Uses window-specific `resets_at` string from persisted payload and
 projects next reset boundary through `_project_next_reset`.
@@ -955,7 +883,7 @@ projects next reset boundary through `_project_next_reset`.
 - @return {datetime | None} Projected reset timestamp or None.
 - @satisfies REQ-036
 
-### fn `def _is_claude_rate_limited_result(result: ProviderResult) -> bool` `priv` (L1443-1458)
+### fn `def _is_claude_rate_limited_result(result: ProviderResult) -> bool` `priv` (L1447-1462)
 - @brief Resolve utilization percentage from persisted Claude snapshot payload.
 - @brief Check whether a ProviderResult represents Claude HTTP 429.
 - @details Reads window-specific `utilization`, validates finite range, and clamps
@@ -969,9 +897,9 @@ values to [0.0, 100.0] for deterministic percentage rendering.
 - @satisfies REQ-036
 - @satisfies REQ-036
 
-### fn `def _build_claude_rate_limited_partial_result(` `priv` (L1459-1462)
+### fn `def _build_claude_rate_limited_partial_result(` `priv` (L1463-1466)
 
-### fn `def _refresh_and_persist_cache_payload(` `priv` (L1507-1510)
+### fn `def _refresh_and_persist_cache_payload(` `priv` (L1511-1514)
 - @brief Build Claude 429 partial-window result using persisted payload when available.
 - @details For 5h window, usage is always forced to 100.0% while reset time is read
 from persisted payload (`five_hour.resets_at`) when possible. For 7d window,
@@ -985,7 +913,7 @@ available; otherwise synthetic window-based fallback values are used.
 - @satisfies REQ-036
 - @satisfies REQ-037
 
-### fn `def retrieve_results_via_cache_pipeline(` (L1598-1602)
+### fn `def retrieve_results_via_cache_pipeline(` (L1602-1606)
 - @brief Refresh provider data and persist updates into `cache.json`.
 - @details Executes provider fetches for configured providers only, records
 per-provider/window attempt status, updates payload only for successful
@@ -1006,7 +934,7 @@ content change, and updates idle-time metadata.
 - @satisfies REQ-047
 - @satisfies REQ-066
 
-### fn `def _build_cached_dual_window_results(` `priv` (L1714-1717)
+### fn `def _build_cached_dual_window_results(` `priv` (L1718-1721)
 - @brief Execute shared cache-based retrieval pipeline for CLI and Text UI.
 - @details Applies required operation order: force-flag handling, provider-scoped
 idle-time evaluation, per-provider conditional refresh/update of `cache.json`, then decode of
@@ -1026,13 +954,13 @@ effective cache payload for downstream rendering without redundant reload.
 - @satisfies REQ-047
 - @satisfies REQ-066
 
-### fn `def main(ctx: click.Context) -> None` `@click.pass_context` (L1815-1825)
+### fn `def main(ctx: click.Context) -> None` `@click.pass_context` (L1819-1829)
 - @brief Execute main.
 - @details Applies main logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 - @satisfies REQ-068
 
-### fn `def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> None` (L1858-1974)
+### fn `def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> None` (L1862-1978)
 - @brief Execute `show` with idle-time cache gating and throttled provider refresh.
 - @details Delegates provider retrieval to a shared cache-based pipeline that applies force handling, idle-time gating, conditional cache refresh, and deterministic readback from `cache.json` before rendering. When `--provider` is `geminiai` and `--window` is omitted, effective window defaults to `30d`.
 - @param provider {str} CLI provider selector string.
@@ -1050,34 +978,34 @@ effective cache payload for downstream rendering without redundant reload.
 - @satisfies REQ-043
 - @satisfies REQ-067
 
-### fn `def _provider_display_name(provider_name: ProviderName) -> str` `priv` (L1975-1989)
+### fn `def _provider_display_name(provider_name: ProviderName) -> str` `priv` (L1979-1993)
 - @brief Resolve human-facing provider title for terminal panel rendering.
 - @details Maps machine-readable provider keys to display names aligned with CLI and GNOME extension output surfaces; applies uppercase `GEMINIAI` override for provider key `geminiai`.
 - @param provider_name {ProviderName} Provider enum key.
 - @return {str} Human-facing provider display name.
 - @satisfies REQ-062
 
-### fn `def _provider_panel_color_code(provider_name: ProviderName) -> str` `priv` (L1990-1999)
+### fn `def _provider_panel_color_code(provider_name: ProviderName) -> str` `priv` (L1994-2003)
 - @brief Resolve ANSI color code for one provider output surface.
 - @param provider_name {ProviderName} Provider enum key.
 - @return {str} ANSI foreground color code.
 - @satisfies REQ-067
 
-### fn `def _strip_ansi_sequences(value: str) -> str` `priv` (L2000-2011)
+### fn `def _strip_ansi_sequences(value: str) -> str` `priv` (L2004-2015)
 - @brief Remove ANSI SGR color escape sequences from terminal text.
 - @details Strips `\x1b[...m` segments so panel width calculations can use visible glyph length instead of byte length with hidden control codes.
 - @param value {str} Input string that may include ANSI color escapes.
 - @return {str} String with ANSI SGR escapes removed.
 - @satisfies REQ-067
 
-### fn `def _visible_text_length(value: str) -> int` `priv` (L2012-2023)
+### fn `def _visible_text_length(value: str) -> int` `priv` (L2016-2027)
 - @brief Compute visible text length for terminal panel alignment.
 - @details Calculates string length after ANSI SGR stripping to keep bordered-panel width deterministic for colored progress bar rows.
 - @param value {str} Input string potentially containing ANSI escapes.
 - @return {int} Visible glyph count used by panel width and padding logic.
 - @satisfies REQ-067
 
-### fn `def _ansi_ljust(value: str, width: int) -> str` `priv` (L2024-2036)
+### fn `def _ansi_ljust(value: str, width: int) -> str` `priv` (L2028-2040)
 - @brief Left-pad ANSI-colored text to one visible width.
 - @details Appends trailing spaces using visible-length semantics so rows that include ANSI escapes align with border columns exactly.
 - @param value {str} Source text rendered inside one panel cell.
@@ -1085,7 +1013,7 @@ effective cache payload for downstream rendering without redundant reload.
 - @return {str} Padded terminal text preserving existing ANSI sequences.
 - @satisfies REQ-067
 
-### fn `def _wrap_panel_lines(body_lines: list[str], wrap_width: int) -> list[str]` `priv` (L2037-2061)
+### fn `def _wrap_panel_lines(body_lines: list[str], wrap_width: int) -> list[str]` `priv` (L2041-2065)
 - @brief Wrap panel body lines to one deterministic visible width.
 - @details Applies ANSI-aware wrapping: lines containing ANSI SGR sequences are measured by visible glyph length and wrapped on stripped text only when needed.
 - @param body_lines {list[str]} Raw panel body lines.
@@ -1093,7 +1021,7 @@ effective cache payload for downstream rendering without redundant reload.
 - @return {list[str]} Wrapped panel lines ready for width calculation/rendering.
 - @satisfies REQ-067
 
-### fn `def _panel_content_width(title: str, body_lines: list[str]) -> int` `priv` (L2062-2081)
+### fn `def _panel_content_width(title: str, body_lines: list[str]) -> int` `priv` (L2066-2085)
 - @brief Resolve one panel visible content width from title and body lines.
 - @details Computes width from wrapped visible-line lengths and clamps to configured min/max panel boundaries.
 - @param title {str} Panel title string.
@@ -1101,9 +1029,9 @@ effective cache payload for downstream rendering without redundant reload.
 - @return {int} Content width used for bordered panel rendering.
 - @satisfies REQ-067
 
-### fn `def _resolve_shared_panel_content_width(` `priv` (L2082-2083)
+### fn `def _resolve_shared_panel_content_width(` `priv` (L2086-2087)
 
-### fn `def _emit_provider_panel(` `priv` (L2098-2102)
+### fn `def _emit_provider_panel(` `priv` (L2102-2106)
 - @brief Resolve shared panel width for one CLI show rendering cycle.
 - @details Selects the largest computed content width across all rendered
 provider panels, then applies that width to every panel in the cycle.
@@ -1111,7 +1039,7 @@ provider panels, then applies that width to every panel in the cycle.
 - @return {int} Shared content width used by all emitted panels.
 - @satisfies REQ-067
 
-### fn `def _build_result_panel(` `priv` (L2141-2144)
+### fn `def _build_result_panel(` `priv` (L2145-2148)
 - @brief Render provider-colored ANSI bordered output panel with wrapped content lines.
 - @details Creates fixed-width terminal panels aligned with GNOME extension
 card layout, preserving deterministic borders and line wrapping behavior.
@@ -1123,7 +1051,7 @@ Border and title color use provider-specific ANSI palette.
 - @return {None} Function return value.
 - @satisfies REQ-067
 
-### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L2262-2280)
+### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L2266-2284)
 - @brief Build one provider panel title/body payload for CLI text rendering.
 - @brief Render CLI text output for one provider result.
 - @details Formats deterministic panel lines for one provider/window result and
@@ -1146,15 +1074,15 @@ preserves provider-specific metrics/error rendering rules used by `show`.
 - @satisfies REQ-051
 - @satisfies REQ-067
 
-### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L2281-2296)
+### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L2285-2300)
 - @brief Execute format reset duration.
 - @details Applies format reset duration logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param seconds {float} Input parameter `seconds`.
 - @return {str} Function return value.
 
-### fn `def _should_render_metrics_after_error(` `priv` (L2297-2299)
+### fn `def _should_render_metrics_after_error(` `priv` (L2301-2303)
 
-### fn `def _should_print_claude_reset_pending_hint(` `priv` (L2317-2319)
+### fn `def _should_print_claude_reset_pending_hint(` `priv` (L2321-2323)
 - @brief Check whether CLI output must render metrics after printing an error line.
 - @details Allows continuation only for Claude HTTP 429 partial-window state so the
 5h section can include `Error:` and still display usage/reset lines.
@@ -1163,7 +1091,7 @@ preserves provider-specific metrics/error rendering rules used by `show`.
 - @return {bool} True when metrics should still be rendered after error line.
 - @satisfies REQ-036
 
-### fn `def _is_displayed_zero_percent(percent: float | None) -> bool` `priv` (L2339-2355)
+### fn `def _is_displayed_zero_percent(percent: float | None) -> bool` `priv` (L2343-2359)
 - @brief Determine whether CLI output must render the reset-pending fallback hint.
 - @brief Check whether a percentage renders as `0.0%` in one-decimal UI output.
 - @details The hint is only valid for Claude windows when no reset timestamp is
@@ -1179,7 +1107,7 @@ providers other than Claude.
 - @satisfies REQ-002
 - @satisfies REQ-002
 
-### fn `def _progress_bar(percent: float, provider_name: ProviderName, width: int = 20) -> str` `priv` (L2356-2371)
+### fn `def _progress_bar(percent: float, provider_name: ProviderName, width: int = 20) -> str` `priv` (L2360-2375)
 - @brief Execute progress bar.
 - @details Applies progress bar logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param percent {float} Input parameter `percent`.
@@ -1187,17 +1115,17 @@ providers other than Claude.
 - @param width {int} Input parameter `width`.
 - @return {str} Function return value.
 
-### fn `def doctor() -> None` (L2376-2428)
+### fn `def doctor() -> None` (L2380-2432)
 - @brief Execute doctor.
 - @details Applies doctor logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def env() -> None` (L2433-2441)
+### fn `def env() -> None` (L2437-2445)
 - @brief Execute env.
 - @details Applies env logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def setup() -> None` (L2446-2645)
+### fn `def setup() -> None` (L2450-2649)
 - @brief Execute setup.
 - @details Prompts for `idle_delay_seconds`, `api_call_delay_milliseconds`, `gnome_refresh_interval_seconds`, and `billing_data` in order, then prompts for provider currency symbols including `geminiai` (choices: `$`, `£`, `€`, default `$`), then persists all values to `~/.config/aibar/config.json`. GeminiAI OAuth source supports `skip`, `file`, `paste`, and `login` (re-authorization with current scopes). Also prompts for provider API keys and writes them to `~/.config/aibar/env`.
 - @return {None} Function return value.
@@ -1207,113 +1135,136 @@ providers other than Claude.
 - @satisfies REQ-056
 - @satisfies REQ-059
 
-### fn `def login(provider: str) -> None` (L2707-2725)
+### fn `def login(provider: str) -> None` (L2711-2729)
 - @brief Execute login.
 - @details Applies login logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param provider {str} Input parameter `provider`.
 - @return {None} Function return value.
 
-### fn `def _login_claude() -> None` `priv` (L2726-2774)
+### fn `def _login_claude() -> None` `priv` (L2730-2778)
 - @brief Execute login claude.
 - @details Applies login claude logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_copilot() -> None` `priv` (L2775-2802)
+### fn `def _login_copilot() -> None` `priv` (L2779-2806)
 - @brief Execute login copilot.
 - @details Applies login copilot logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_geminiai() -> None` `priv` (L2803-2839)
+### fn `def _login_geminiai() -> None` `priv` (L2807-2843)
 - @brief Execute GeminiAI OAuth login flow.
 - @details Reuses persisted OAuth client configuration to launch browser-based authorization and persist refresh-capable Google credentials.
 - @return {None} Function return value.
 - @satisfies REQ-055
 - @satisfies REQ-056
 
+### fn `def _resolve_extension_source_dir() -> Path` `priv` (L2844-2855)
+- @brief Resolve GNOME extension source directory from installed package location.
+- @details Navigates from the `aibar` package directory (`__file__` parent) up one level to the package root, then into `gnome-extension/aibar@aibar.panel/`. Works both in development (git checkout) and installed package (pip/uv) layouts.
+- @return {Path} Absolute path to the extension source directory.
+- @satisfies REQ-025
+
+### fn `def gnome_install() -> None` (L2866-2950)
+- @brief Install or update the AIBar GNOME Shell extension to the user's local extensions directory.
+- @details Resolves extension source from the installed package path, validates source directory contains `metadata.json` and is non-empty, creates target directory if absent, copies all extension files replacing existing ones, and enables the extension via `gnome-extensions enable`. Produces colored Click-styled terminal output for all status messages.
+- @return {None} Function return value.
+- @throws {SystemExit} Exits with code 1 on prerequisite validation failure.
+- @satisfies PRJ-008, REQ-025, REQ-026, REQ-027, REQ-028, REQ-029, REQ-030, REQ-032
+
+### fn `def gnome_uninstall() -> None` (L2960-3023)
+- @brief Remove the AIBar GNOME Shell extension from the user's local extensions directory.
+- @details Disables the extension via `gnome-extensions disable`, then removes the entire extension directory at `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/`. Exits with code 1 if the extension directory does not exist. Produces colored Click-styled terminal output for all status messages.
+- @return {None} Function return value.
+- @throws {SystemExit} Exits with code 1 when extension directory does not exist.
+- @satisfies REQ-028, REQ-080, REQ-081, REQ-082
+
 ## Symbol Index
 |Symbol|Kind|Vis|Lines|Sig|
 |---|---|---|---|---|
-|`RetrievalPipelineOutput`|class|pub|93-120|class RetrievalPipelineOutput|
-|`StartupReleaseCheckResponse`|class|pub|122-141|class StartupReleaseCheckResponse|
-|`_startup_idle_state_path`|fn|priv|142-152|def _startup_idle_state_path() -> Path|
-|`_startup_human_timestamp`|fn|priv|153-165|def _startup_human_timestamp(epoch_seconds: int) -> str|
-|`_startup_parse_int`|fn|priv|166-183|def _startup_parse_int(value: object, default: int = 0) -...|
-|`_load_startup_idle_state`|fn|priv|184-203|def _load_startup_idle_state() -> dict[str, object] | None|
-|`_startup_idle_epochs`|fn|priv|204-225|def _startup_idle_epochs(state: dict[str, object] | None)...|
-|`_save_startup_idle_state`|fn|priv|226-256|def _save_startup_idle_state(last_success_epoch: int, idl...|
-|`_emit_startup_preflight_message`|fn|priv|257-271|def _emit_startup_preflight_message(message: str, color_c...|
-|`_parse_retry_after_header`|fn|priv|272-296|def _parse_retry_after_header(retry_after_raw: str | None...|
-|`_normalize_release_version`|fn|priv|297-313|def _normalize_release_version(raw_version: object) -> st...|
-|`_fetch_startup_latest_release`|fn|priv|314-368|def _fetch_startup_latest_release() -> StartupReleaseChec...|
-|`_parse_version_triplet`|fn|priv|369-387|def _parse_version_triplet(version_text: str) -> tuple[in...|
-|`_is_newer_release`|fn|priv|388-404|def _is_newer_release(installed_version: str, latest_vers...|
-|`_run_startup_update_preflight`|fn|priv|405-472|def _run_startup_update_preflight() -> None|
-|`_execute_lifecycle_subprocess`|fn|priv|473-495|def _execute_lifecycle_subprocess(command: list[str]) -> int|
-|`_handle_upgrade_option`|fn|priv|496-497|def _handle_upgrade_option(|
-|`_handle_uninstall_option`|fn|priv|527-528|def _handle_uninstall_option(|
-|`_handle_version_option`|fn|priv|548-549|def _handle_version_option(|
-|`StartupPreflightGroup`|class|pub|568-610|class StartupPreflightGroup(click.Group)|
-|`StartupPreflightGroup.main`|fn|pub|577-584|def main(|
-|`_normalize_utc`|fn|priv|611-623|def _normalize_utc(value: datetime) -> datetime|
-|`_apply_api_call_delay`|fn|priv|624-653|def _apply_api_call_delay(throttle_state: dict[str, float...|
-|`_extract_retry_after_seconds`|fn|priv|654-672|def _extract_retry_after_seconds(result: ProviderResult) ...|
-|`_is_http_429_result`|fn|priv|673-683|def _is_http_429_result(result: ProviderResult) -> bool|
-|`_serialize_results_payload`|fn|priv|684-685|def _serialize_results_payload(|
-|`_empty_cache_document`|fn|priv|699-713|def _empty_cache_document() -> dict[str, object]|
-|`_normalize_cache_document`|fn|priv|714-735|def _normalize_cache_document(cache_document: dict[str, o...|
-|`_cache_payload_section`|fn|priv|736-748|def _cache_payload_section(cache_document: dict[str, obje...|
-|`_cache_status_section`|fn|priv|749-761|def _cache_status_section(cache_document: dict[str, objec...|
-|`_serialize_attempt_status`|fn|priv|762-780|def _serialize_attempt_status(result: ProviderResult) -> ...|
-|`_record_attempt_status`|fn|priv|781-783|def _record_attempt_status(|
-|`_extract_claude_snapshot_from_cache_document`|fn|priv|803-804|def _extract_claude_snapshot_from_cache_document(|
-|`_get_window_attempt_status`|fn|priv|819-822|def _get_window_attempt_status(|
-|`_is_failed_http_429_status`|fn|priv|842-856|def _is_failed_http_429_status(status_entry: dict[str, ob...|
-|`_overlay_cached_failure_status`|fn|priv|857-861|def _overlay_cached_failure_status(|
-|`_filter_cached_payload`|fn|priv|907-909|def _filter_cached_payload(|
-|`_project_cached_window`|fn|priv|942-945|def _project_cached_window(|
-|`_load_cached_results`|fn|priv|976-980|def _load_cached_results(|
-|`_update_idle_time_after_refresh`|fn|priv|1037-1039|def _update_idle_time_after_refresh(|
-|`_project_next_reset`|fn|priv|1118-1149|def _project_next_reset(resets_at_str: str, window: Windo...|
-|`_apply_reset_projection`|fn|priv|1150-1184|def _apply_reset_projection(result: ProviderResult) -> Pr...|
-|`get_providers`|fn|pub|1185-1200|def get_providers() -> dict[ProviderName, BaseProvider]|
-|`parse_window`|fn|pub|1201-1220|def parse_window(window: str) -> WindowPeriod|
-|`parse_provider`|fn|pub|1221-1237|def parse_provider(provider: str) -> ProviderName | None|
-|`_fetch_result`|fn|priv|1238-1241|def _fetch_result(|
-|`_fetch_claude_dual`|fn|priv|1281-1284|def _fetch_claude_dual(|
-|`_extract_claude_dual_payload`|fn|priv|1340-1342|def _extract_claude_dual_payload(|
-|`_normalize_claude_dual_payload`|fn|priv|1364-1386|def _normalize_claude_dual_payload(payload: object) -> di...|
-|`_extract_snapshot_reset_at`|fn|priv|1387-1389|def _extract_snapshot_reset_at(|
-|`_extract_snapshot_utilization`|fn|priv|1412-1414|def _extract_snapshot_utilization(|
-|`_is_claude_rate_limited_result`|fn|priv|1443-1458|def _is_claude_rate_limited_result(result: ProviderResult...|
-|`_build_claude_rate_limited_partial_result`|fn|priv|1459-1462|def _build_claude_rate_limited_partial_result(|
-|`_refresh_and_persist_cache_payload`|fn|priv|1507-1510|def _refresh_and_persist_cache_payload(|
-|`retrieve_results_via_cache_pipeline`|fn|pub|1598-1602|def retrieve_results_via_cache_pipeline(|
-|`_build_cached_dual_window_results`|fn|priv|1714-1717|def _build_cached_dual_window_results(|
-|`main`|fn|pub|1815-1825|def main(ctx: click.Context) -> None|
-|`show`|fn|pub|1858-1974|def show(provider: str, window: str, output_json: bool, f...|
-|`_provider_display_name`|fn|priv|1975-1989|def _provider_display_name(provider_name: ProviderName) -...|
-|`_provider_panel_color_code`|fn|priv|1990-1999|def _provider_panel_color_code(provider_name: ProviderNam...|
-|`_strip_ansi_sequences`|fn|priv|2000-2011|def _strip_ansi_sequences(value: str) -> str|
-|`_visible_text_length`|fn|priv|2012-2023|def _visible_text_length(value: str) -> int|
-|`_ansi_ljust`|fn|priv|2024-2036|def _ansi_ljust(value: str, width: int) -> str|
-|`_wrap_panel_lines`|fn|priv|2037-2061|def _wrap_panel_lines(body_lines: list[str], wrap_width: ...|
-|`_panel_content_width`|fn|priv|2062-2081|def _panel_content_width(title: str, body_lines: list[str...|
-|`_resolve_shared_panel_content_width`|fn|priv|2082-2083|def _resolve_shared_panel_content_width(|
-|`_emit_provider_panel`|fn|priv|2098-2102|def _emit_provider_panel(|
-|`_build_result_panel`|fn|priv|2141-2144|def _build_result_panel(|
-|`_print_result`|fn|priv|2262-2280|def _print_result(name: ProviderName, result, label: str ...|
-|`_format_reset_duration`|fn|priv|2281-2296|def _format_reset_duration(seconds: float) -> str|
-|`_should_render_metrics_after_error`|fn|priv|2297-2299|def _should_render_metrics_after_error(|
-|`_should_print_claude_reset_pending_hint`|fn|priv|2317-2319|def _should_print_claude_reset_pending_hint(|
-|`_is_displayed_zero_percent`|fn|priv|2339-2355|def _is_displayed_zero_percent(percent: float | None) -> ...|
-|`_progress_bar`|fn|priv|2356-2371|def _progress_bar(percent: float, provider_name: Provider...|
-|`doctor`|fn|pub|2376-2428|def doctor() -> None|
-|`env`|fn|pub|2433-2441|def env() -> None|
-|`setup`|fn|pub|2446-2645|def setup() -> None|
-|`login`|fn|pub|2707-2725|def login(provider: str) -> None|
-|`_login_claude`|fn|priv|2726-2774|def _login_claude() -> None|
-|`_login_copilot`|fn|priv|2775-2802|def _login_copilot() -> None|
-|`_login_geminiai`|fn|priv|2803-2839|def _login_geminiai() -> None|
+|`RetrievalPipelineOutput`|class|pub|97-124|class RetrievalPipelineOutput|
+|`StartupReleaseCheckResponse`|class|pub|126-145|class StartupReleaseCheckResponse|
+|`_startup_idle_state_path`|fn|priv|146-156|def _startup_idle_state_path() -> Path|
+|`_startup_human_timestamp`|fn|priv|157-169|def _startup_human_timestamp(epoch_seconds: int) -> str|
+|`_startup_parse_int`|fn|priv|170-187|def _startup_parse_int(value: object, default: int = 0) -...|
+|`_load_startup_idle_state`|fn|priv|188-207|def _load_startup_idle_state() -> dict[str, object] | None|
+|`_startup_idle_epochs`|fn|priv|208-229|def _startup_idle_epochs(state: dict[str, object] | None)...|
+|`_save_startup_idle_state`|fn|priv|230-260|def _save_startup_idle_state(last_success_epoch: int, idl...|
+|`_emit_startup_preflight_message`|fn|priv|261-275|def _emit_startup_preflight_message(message: str, color_c...|
+|`_parse_retry_after_header`|fn|priv|276-300|def _parse_retry_after_header(retry_after_raw: str | None...|
+|`_normalize_release_version`|fn|priv|301-317|def _normalize_release_version(raw_version: object) -> st...|
+|`_fetch_startup_latest_release`|fn|priv|318-372|def _fetch_startup_latest_release() -> StartupReleaseChec...|
+|`_parse_version_triplet`|fn|priv|373-391|def _parse_version_triplet(version_text: str) -> tuple[in...|
+|`_is_newer_release`|fn|priv|392-408|def _is_newer_release(installed_version: str, latest_vers...|
+|`_run_startup_update_preflight`|fn|priv|409-476|def _run_startup_update_preflight() -> None|
+|`_execute_lifecycle_subprocess`|fn|priv|477-499|def _execute_lifecycle_subprocess(command: list[str]) -> int|
+|`_handle_upgrade_option`|fn|priv|500-501|def _handle_upgrade_option(|
+|`_handle_uninstall_option`|fn|priv|531-532|def _handle_uninstall_option(|
+|`_handle_version_option`|fn|priv|552-553|def _handle_version_option(|
+|`StartupPreflightGroup`|class|pub|572-614|class StartupPreflightGroup(click.Group)|
+|`StartupPreflightGroup.main`|fn|pub|581-588|def main(|
+|`_normalize_utc`|fn|priv|615-627|def _normalize_utc(value: datetime) -> datetime|
+|`_apply_api_call_delay`|fn|priv|628-657|def _apply_api_call_delay(throttle_state: dict[str, float...|
+|`_extract_retry_after_seconds`|fn|priv|658-676|def _extract_retry_after_seconds(result: ProviderResult) ...|
+|`_is_http_429_result`|fn|priv|677-687|def _is_http_429_result(result: ProviderResult) -> bool|
+|`_serialize_results_payload`|fn|priv|688-689|def _serialize_results_payload(|
+|`_empty_cache_document`|fn|priv|703-717|def _empty_cache_document() -> dict[str, object]|
+|`_normalize_cache_document`|fn|priv|718-739|def _normalize_cache_document(cache_document: dict[str, o...|
+|`_cache_payload_section`|fn|priv|740-752|def _cache_payload_section(cache_document: dict[str, obje...|
+|`_cache_status_section`|fn|priv|753-765|def _cache_status_section(cache_document: dict[str, objec...|
+|`_serialize_attempt_status`|fn|priv|766-784|def _serialize_attempt_status(result: ProviderResult) -> ...|
+|`_record_attempt_status`|fn|priv|785-787|def _record_attempt_status(|
+|`_extract_claude_snapshot_from_cache_document`|fn|priv|807-808|def _extract_claude_snapshot_from_cache_document(|
+|`_get_window_attempt_status`|fn|priv|823-826|def _get_window_attempt_status(|
+|`_is_failed_http_429_status`|fn|priv|846-860|def _is_failed_http_429_status(status_entry: dict[str, ob...|
+|`_overlay_cached_failure_status`|fn|priv|861-865|def _overlay_cached_failure_status(|
+|`_filter_cached_payload`|fn|priv|911-913|def _filter_cached_payload(|
+|`_project_cached_window`|fn|priv|946-949|def _project_cached_window(|
+|`_load_cached_results`|fn|priv|980-984|def _load_cached_results(|
+|`_update_idle_time_after_refresh`|fn|priv|1041-1043|def _update_idle_time_after_refresh(|
+|`_project_next_reset`|fn|priv|1122-1153|def _project_next_reset(resets_at_str: str, window: Windo...|
+|`_apply_reset_projection`|fn|priv|1154-1188|def _apply_reset_projection(result: ProviderResult) -> Pr...|
+|`get_providers`|fn|pub|1189-1204|def get_providers() -> dict[ProviderName, BaseProvider]|
+|`parse_window`|fn|pub|1205-1224|def parse_window(window: str) -> WindowPeriod|
+|`parse_provider`|fn|pub|1225-1241|def parse_provider(provider: str) -> ProviderName | None|
+|`_fetch_result`|fn|priv|1242-1245|def _fetch_result(|
+|`_fetch_claude_dual`|fn|priv|1285-1288|def _fetch_claude_dual(|
+|`_extract_claude_dual_payload`|fn|priv|1344-1346|def _extract_claude_dual_payload(|
+|`_normalize_claude_dual_payload`|fn|priv|1368-1390|def _normalize_claude_dual_payload(payload: object) -> di...|
+|`_extract_snapshot_reset_at`|fn|priv|1391-1393|def _extract_snapshot_reset_at(|
+|`_extract_snapshot_utilization`|fn|priv|1416-1418|def _extract_snapshot_utilization(|
+|`_is_claude_rate_limited_result`|fn|priv|1447-1462|def _is_claude_rate_limited_result(result: ProviderResult...|
+|`_build_claude_rate_limited_partial_result`|fn|priv|1463-1466|def _build_claude_rate_limited_partial_result(|
+|`_refresh_and_persist_cache_payload`|fn|priv|1511-1514|def _refresh_and_persist_cache_payload(|
+|`retrieve_results_via_cache_pipeline`|fn|pub|1602-1606|def retrieve_results_via_cache_pipeline(|
+|`_build_cached_dual_window_results`|fn|priv|1718-1721|def _build_cached_dual_window_results(|
+|`main`|fn|pub|1819-1829|def main(ctx: click.Context) -> None|
+|`show`|fn|pub|1862-1978|def show(provider: str, window: str, output_json: bool, f...|
+|`_provider_display_name`|fn|priv|1979-1993|def _provider_display_name(provider_name: ProviderName) -...|
+|`_provider_panel_color_code`|fn|priv|1994-2003|def _provider_panel_color_code(provider_name: ProviderNam...|
+|`_strip_ansi_sequences`|fn|priv|2004-2015|def _strip_ansi_sequences(value: str) -> str|
+|`_visible_text_length`|fn|priv|2016-2027|def _visible_text_length(value: str) -> int|
+|`_ansi_ljust`|fn|priv|2028-2040|def _ansi_ljust(value: str, width: int) -> str|
+|`_wrap_panel_lines`|fn|priv|2041-2065|def _wrap_panel_lines(body_lines: list[str], wrap_width: ...|
+|`_panel_content_width`|fn|priv|2066-2085|def _panel_content_width(title: str, body_lines: list[str...|
+|`_resolve_shared_panel_content_width`|fn|priv|2086-2087|def _resolve_shared_panel_content_width(|
+|`_emit_provider_panel`|fn|priv|2102-2106|def _emit_provider_panel(|
+|`_build_result_panel`|fn|priv|2145-2148|def _build_result_panel(|
+|`_print_result`|fn|priv|2266-2284|def _print_result(name: ProviderName, result, label: str ...|
+|`_format_reset_duration`|fn|priv|2285-2300|def _format_reset_duration(seconds: float) -> str|
+|`_should_render_metrics_after_error`|fn|priv|2301-2303|def _should_render_metrics_after_error(|
+|`_should_print_claude_reset_pending_hint`|fn|priv|2321-2323|def _should_print_claude_reset_pending_hint(|
+|`_is_displayed_zero_percent`|fn|priv|2343-2359|def _is_displayed_zero_percent(percent: float | None) -> ...|
+|`_progress_bar`|fn|priv|2360-2375|def _progress_bar(percent: float, provider_name: Provider...|
+|`doctor`|fn|pub|2380-2432|def doctor() -> None|
+|`env`|fn|pub|2437-2445|def env() -> None|
+|`setup`|fn|pub|2450-2649|def setup() -> None|
+|`login`|fn|pub|2711-2729|def login(provider: str) -> None|
+|`_login_claude`|fn|priv|2730-2778|def _login_claude() -> None|
+|`_login_copilot`|fn|priv|2779-2806|def _login_copilot() -> None|
+|`_login_geminiai`|fn|priv|2807-2843|def _login_geminiai() -> None|
+|`_resolve_extension_source_dir`|fn|priv|2844-2855|def _resolve_extension_source_dir() -> Path|
+|`gnome_install`|fn|pub|2866-2950|def gnome_install() -> None|
+|`gnome_uninstall`|fn|pub|2960-3023|def gnome_uninstall() -> None|
 
 
 ---

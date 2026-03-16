@@ -8,7 +8,9 @@ import asyncio
 import email.utils
 import json
 import math
+import os
 import re
+import shutil
 import subprocess
 import sys
 import textwrap
@@ -87,6 +89,8 @@ _STARTUP_IDLE_STATE_LAST_SUCCESS_EPOCH_KEY = "last_success_at_epoch"
 _STARTUP_IDLE_STATE_LAST_SUCCESS_HUMAN_KEY = "last_success_at_human"
 _STARTUP_IDLE_STATE_IDLE_UNTIL_EPOCH_KEY = "idle_until_epoch"
 _STARTUP_IDLE_STATE_IDLE_UNTIL_HUMAN_KEY = "idle_until_human"
+_EXT_UUID = "aibar@aibar.panel"
+_EXT_TARGET_DIR = Path.home() / ".local" / "share" / "gnome-shell" / "extensions" / _EXT_UUID
 
 
 @dataclass(frozen=True)
@@ -2835,6 +2839,186 @@ def _login_geminiai() -> None:
         click.echo(f"  Access token: {credentials.token[:12]}...")
     click.echo()
     click.echo("You can now run: aibar show --provider geminiai")
+
+
+def _resolve_extension_source_dir() -> Path:
+    """
+    @brief Resolve GNOME extension source directory from installed package location.
+    @details Navigates from the `aibar` package directory (`__file__` parent) up one level
+    to the package root, then into `gnome-extension/aibar@aibar.panel/`. Works both
+    in development (git checkout) and installed package (pip/uv) layouts.
+    @return {Path} Absolute path to the extension source directory.
+    @satisfies REQ-025
+    """
+    return Path(__file__).resolve().parent.parent / "gnome-extension" / _EXT_UUID
+
+
+@main.command(
+    name="gnome-install",
+    short_help="Install or update the GNOME Shell extension.",
+    help=(
+        "Install or update the AIBar GNOME Shell extension.\n"
+        "Copies extension files from the package source directory to "
+        "~/.local/share/gnome-shell/extensions/aibar@aibar.panel/ "
+        "and enables the extension via gnome-extensions enable."
+    ),
+)
+def gnome_install() -> None:
+    """
+    @brief Install or update the AIBar GNOME Shell extension to the user's local extensions directory.
+    @details Resolves extension source from the installed package path, validates source directory
+    contains `metadata.json` and is non-empty, creates target directory if absent, copies all
+    extension files replacing existing ones, and enables the extension via `gnome-extensions enable`.
+    Produces colored Click-styled terminal output for all status messages.
+    @return {None} Function return value.
+    @throws {SystemExit} Exits with code 1 on prerequisite validation failure.
+    @satisfies PRJ-008, REQ-025, REQ-026, REQ-027, REQ-028, REQ-029, REQ-030, REQ-032
+    """
+    click.echo()
+    click.echo(click.style("  AIBar GNOME Extension Installer", fg="blue", bold=True))
+    click.echo()
+
+    src_dir = _resolve_extension_source_dir()
+    click.echo(click.style("  [1/4] ", bold=True) + "Validating extension source...")
+    if not src_dir.is_dir():
+        click.echo(click.style("  [FAIL] ", fg="red") + f"Source directory not found: {src_dir}")
+        sys.exit(1)
+    metadata_path = src_dir / "metadata.json"
+    if not metadata_path.is_file():
+        click.echo(click.style("  [FAIL] ", fg="red") + f"metadata.json not found in: {src_dir}")
+        sys.exit(1)
+    source_files = [f for f in src_dir.iterdir() if f.is_file()]
+    if not source_files:
+        click.echo(click.style("  [FAIL] ", fg="red") + f"Source directory is empty: {src_dir}")
+        sys.exit(1)
+    click.echo(
+        click.style("  [  OK] ", fg="green")
+        + f"Source valid: {src_dir} ({len(source_files)} files)"
+    )
+
+    click.echo(click.style("  [2/4] ", bold=True) + "Preparing target directory...")
+    target_dir = _EXT_TARGET_DIR
+    if target_dir.is_dir():
+        click.echo(click.style("  [INFO] ", fg="cyan") + f"Target directory exists: {target_dir}")
+    else:
+        os.makedirs(target_dir, exist_ok=True)
+        click.echo(click.style("  [  OK] ", fg="green") + f"Created: {target_dir}")
+
+    click.echo(click.style("  [3/4] ", bold=True) + "Installing extension files...")
+    for src_file in source_files:
+        shutil.copy2(str(src_file), str(target_dir / src_file.name))
+    click.echo(
+        click.style("  [  OK] ", fg="green") + f"Copied {len(source_files)} files to target"
+    )
+
+    click.echo(click.style("  [4/4] ", bold=True) + "Enabling extension...")
+    if shutil.which("gnome-extensions") is not None:
+        result = subprocess.run(
+            ["gnome-extensions", "enable", _EXT_UUID],
+            capture_output=True,
+        )
+        if result.returncode == 0:
+            click.echo(
+                click.style("  [  OK] ", fg="green") + f"Extension enabled: {_EXT_UUID}"
+            )
+        else:
+            click.echo(
+                click.style("  [WARN] ", fg="yellow")
+                + "Could not enable extension (GNOME Shell may not be running)"
+            )
+    else:
+        click.echo(
+            click.style("  [WARN] ", fg="yellow")
+            + "gnome-extensions CLI not found; enable manually after GNOME Shell restart"
+        )
+
+    click.echo()
+    click.echo(click.style("  Installation complete!", fg="green", bold=True))
+    click.echo()
+    click.echo(click.style("  [INFO] ", fg="cyan") + f"Extension UUID : {_EXT_UUID}")
+    click.echo(click.style("  [INFO] ", fg="cyan") + f"Installed to   : {target_dir}")
+    click.echo()
+    click.echo(
+        click.style("  [WARN] ", fg="yellow") + "Restart GNOME Shell to load the extension:"
+    )
+    click.echo(click.style("  [INFO] ", fg="cyan") + "  Wayland : Log out and log back in")
+    click.echo(
+        click.style("  [INFO] ", fg="cyan") + "  X11     : Press Alt+F2, type r, press Enter"
+    )
+    click.echo()
+
+
+@main.command(
+    name="gnome-uninstall",
+    short_help="Remove the GNOME Shell extension.",
+    help=(
+        "Remove the AIBar GNOME Shell extension.\n"
+        "Disables the extension via gnome-extensions disable and removes "
+        "the extension directory ~/.local/share/gnome-shell/extensions/aibar@aibar.panel/."
+    ),
+)
+def gnome_uninstall() -> None:
+    """
+    @brief Remove the AIBar GNOME Shell extension from the user's local extensions directory.
+    @details Disables the extension via `gnome-extensions disable`, then removes the entire
+    extension directory at `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/`.
+    Exits with code 1 if the extension directory does not exist. Produces colored
+    Click-styled terminal output for all status messages.
+    @return {None} Function return value.
+    @throws {SystemExit} Exits with code 1 when extension directory does not exist.
+    @satisfies REQ-028, REQ-080, REQ-081, REQ-082
+    """
+    click.echo()
+    click.echo(click.style("  AIBar GNOME Extension Uninstaller", fg="blue", bold=True))
+    click.echo()
+
+    target_dir = _EXT_TARGET_DIR
+
+    click.echo(click.style("  [1/3] ", bold=True) + "Checking extension installation...")
+    if not target_dir.is_dir():
+        click.echo(
+            click.style("  [FAIL] ", fg="red")
+            + f"Extension directory not found: {target_dir}"
+        )
+        sys.exit(1)
+    click.echo(click.style("  [  OK] ", fg="green") + f"Extension found: {target_dir}")
+
+    click.echo(click.style("  [2/3] ", bold=True) + "Disabling extension...")
+    if shutil.which("gnome-extensions") is not None:
+        result = subprocess.run(
+            ["gnome-extensions", "disable", _EXT_UUID],
+            capture_output=True,
+        )
+        if result.returncode == 0:
+            click.echo(
+                click.style("  [  OK] ", fg="green") + f"Extension disabled: {_EXT_UUID}"
+            )
+        else:
+            click.echo(
+                click.style("  [WARN] ", fg="yellow")
+                + "Could not disable extension (GNOME Shell may not be running)"
+            )
+    else:
+        click.echo(
+            click.style("  [WARN] ", fg="yellow")
+            + "gnome-extensions CLI not found; extension may remain enabled until restart"
+        )
+
+    click.echo(click.style("  [3/3] ", bold=True) + "Removing extension files...")
+    shutil.rmtree(str(target_dir))
+    click.echo(click.style("  [  OK] ", fg="green") + f"Removed: {target_dir}")
+
+    click.echo()
+    click.echo(click.style("  Uninstallation complete!", fg="green", bold=True))
+    click.echo()
+    click.echo(
+        click.style("  [WARN] ", fg="yellow") + "Restart GNOME Shell to apply changes:"
+    )
+    click.echo(click.style("  [INFO] ", fg="cyan") + "  Wayland : Log out and log back in")
+    click.echo(
+        click.style("  [INFO] ", fg="cyan") + "  X11     : Press Alt+F2, type r, press Enter"
+    )
+    click.echo()
 
 
 if __name__ == "__main__":

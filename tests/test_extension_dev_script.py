@@ -2,7 +2,7 @@
 @file
 @brief GNOME extension test launcher regressions.
 @details Ensures the test script launches a nested GNOME Shell at 1024x800,
-invokes install-gnome-extension.sh before launch, and accepts no subcommand
+invokes `aibar gnome-install` before launch, and accepts no subcommand
 parameters per REQ-033.
 @satisfies TST-004, REQ-031, REQ-033
 """
@@ -27,7 +27,7 @@ def test_script_includes_1024x800_dummy_mode_spec() -> None:
 
 def test_install_invoked_before_nested_shell_launch() -> None:
     """
-    @brief Verify install script is invoked before the nested shell launch command.
+    @brief Verify aibar gnome-install is invoked before the nested shell launch command.
     @satisfies REQ-031
     """
     source = DEV_SCRIPT_PATH.read_text(encoding="utf-8")
@@ -37,13 +37,13 @@ def test_install_invoked_before_nested_shell_launch() -> None:
     assert update_call_idx < mutter_idx, "update_extension must be called before nested shell launch"
 
 
-def test_update_extension_calls_install_script() -> None:
+def test_update_extension_calls_aibar_gnome_install() -> None:
     """
-    @brief Verify update_extension function references install-gnome-extension.sh.
+    @brief Verify update_extension function invokes `aibar gnome-install`.
     @satisfies REQ-031
     """
     source = DEV_SCRIPT_PATH.read_text(encoding="utf-8")
-    assert "install-gnome-extension.sh" in source
+    assert "aibar gnome-install" in source
 
 
 def test_script_does_not_use_case_dispatch() -> None:
