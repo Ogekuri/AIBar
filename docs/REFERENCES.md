@@ -8,28 +8,25 @@
 │   └── test-gnome-extension.sh
 └── src
     └── aibar
-        ├── aibar
-        │   ├── __init__.py
-        │   ├── __main__.py
-        │   ├── cache.py
-        │   ├── claude_cli_auth.py
-        │   ├── cli.py
-        │   ├── config.py
-        │   ├── gnome-extension
-        │   │   └── aibar@aibar.panel
-        │   │       └── extension.js
-        │   └── providers
-        │       ├── __init__.py
-        │       ├── base.py
-        │       ├── claude_oauth.py
-        │       ├── codex.py
-        │       ├── copilot.py
-        │       ├── geminiai.py
-        │       ├── openai_usage.py
-        │       └── openrouter.py
-        └── gnome-extension
-            └── aibar@aibar.panel
-                └── extension.js
+        └── aibar
+            ├── __init__.py
+            ├── __main__.py
+            ├── cache.py
+            ├── claude_cli_auth.py
+            ├── cli.py
+            ├── config.py
+            ├── gnome-extension
+            │   └── aibar@aibar.panel
+            │       └── extension.js
+            └── providers
+                ├── __init__.py
+                ├── base.py
+                ├── claude_oauth.py
+                ├── codex.py
+                ├── copilot.py
+                ├── geminiai.py
+                ├── openai_usage.py
+                └── openrouter.py
 ```
 
 # aibar.sh | Shell | 49L | 6 symbols | 2 imports | 18 comments
