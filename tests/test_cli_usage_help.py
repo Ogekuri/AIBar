@@ -25,6 +25,9 @@ def test_main_invocation_without_subcommand_prints_human_usage() -> None:
     assert "show --force" in result.output
     assert "gnome-install" in result.output
     assert "gnome-uninstall" in result.output
+    assert "--version" in result.output
+    assert "--upgrade" in result.output
+    assert "--uninstall" in result.output
     assert "@brief" not in result.output
     assert "@details" not in result.output
 
@@ -44,6 +47,9 @@ def test_top_level_help_lists_commands_without_doxygen_fragments() -> None:
     assert "setup" in result.output
     assert "gnome-install" in result.output
     assert "gnome-uninstall" in result.output
+    assert "--version" in result.output
+    assert "--upgrade" in result.output
+    assert "--uninstall" in result.output
     assert "@return" not in result.output
 
 

@@ -1809,7 +1809,10 @@ def _build_cached_dual_window_results(
         "  aibar show --force           Bypass idle-time gating\n"
         "  aibar setup                  Interactive configuration\n"
         "  aibar gnome-install          Install GNOME extension\n"
-        "  aibar gnome-uninstall        Remove GNOME extension"
+        "  aibar gnome-uninstall        Remove GNOME extension\n"
+        "  aibar --version              Show installed version\n"
+        "  aibar --upgrade              Upgrade via uv\n"
+        "  aibar --uninstall            Uninstall via uv"
     ),
 )
 @click.option(
