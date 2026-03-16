@@ -59,31 +59,6 @@ source ${VENVDIR}/bin/activate
 
 ---
 
-# check-js-syntax.sh | Shell | 37L | 2 symbols | 0 imports | 15 comments
-> Path: `scripts/check-js-syntax.sh`
-
-## Definitions
-
-- var `FILE="$1"` (L24)
-- @brief Syntax-only JavaScript checker for GJS (GNOME JavaScript) source files.
-- @details Preprocesses GNOME Shell extension JS files before syntax validation with Node.js.
-Replaces gi:// and resource:// import statements (GJS-only URL schemes) with equivalent
-const stub declarations so that Node.js syntax checking succeeds without requiring the
-GNOME Shell runtime. The original file is never modified.
-- @param $1 Path to the .js file to syntax-check.
-- @retval 0 Syntax is valid.
-- @retval 1 File argument missing, sed preprocessing failed, or syntax error detected.
-- @note GJS supports gi:// (GObject introspection) and resource:// (GNOME Shell UI modules)
-- var `TMP=$(mktemp /tmp/check-js-syntax-XXXXXX.js)` (L25)
-## Symbol Index
-|Symbol|Kind|Vis|Lines|Sig|
-|---|---|---|---|---|
-|`FILE`|var||24||
-|`TMP`|var||25||
-
-
----
-
 # claude_token_refresh.sh | Shell | 174L | 12 symbols | 0 imports | 35 comments
 > Path: `scripts/claude_token_refresh.sh`
 
