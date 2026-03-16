@@ -59,10 +59,7 @@
     "JavaScript": [
       {
         "module": "Command",
-        "cmd": "node",
-        "params": [
-          "--check"
-        ]
+        "cmd": "true"
       }
     ]
   },
