@@ -59,7 +59,7 @@
     "JavaScript": [
       {
         "module": "Command",
-        "cmd": "true"
+        "cmd": "scripts/check-js-syntax.sh"
       }
     ]
   },
