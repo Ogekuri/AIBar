@@ -3,7 +3,6 @@
 .
 ├── scripts
 │   ├── aibar.sh
-│   ├── check-js-syntax.sh
 │   ├── claude_token_refresh.sh
 │   └── test-gnome-extension.sh
 └── src
