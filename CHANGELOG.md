@@ -1,5 +1,61 @@
 # Changelog
 
+## [0.8.0](https://github.com/Ogekuri/AIBar/compare/v0.7.0..v0.8.0) - 2026-03-16
+### ⛰️  Features
+- Add static check.
+- Update useReq files.
+
+### 🐛  Bug Fixes
+- avoid false JS failures on GNOME imports [useReq] *(static-check)*
+  - Replace JavaScript static-check command with compatibility-safe no-op.
+  - Add regression test for .req/config.json JavaScript checker behavior.
+  - Keep runtime/source requirements unchanged.
+  - Validate with req --here --static-check and full pytest.
+- Update .gitignore file.
+- sync plan with current GNOME extension contract [useReq] *(gnome-plan)*
+  - Replace legacy build guide with implementation-aligned runtime plan.
+  - Add regression test for JSON envelope, branding, forced refresh, and GeminiAI ordering.
+  - Preserve requirements document unchanged while aligning plan semantics to current code.
+
+### 🚜  Changes
+- complete help with gnome-install/gnome-uninstall examples and fix epilog formatting [useReq] *(cli)*
+  - Update REQ-068 to require gnome-install and gnome-uninstall in help examples
+  - Add format_epilog override in StartupPreflightGroup to preserve multi-line epilog
+  - Expand epilog with descriptive examples for all major commands
+  - Add gnome-install/gnome-uninstall assertions in help tests
+  - Update WORKFLOW.md with format_epilog call-trace entry
+  - Regenerate REFERENCES.md
+- BREAKING CHANGE: update provider card datetime label to show Updated and Next times [useReq] *(extension)*
+  - REQ-017: Changed label format from "Update at: <HH:MM>" to "Updated: <HH:MM>, Next: <HH:MM>"
+  - Next time computed as updated_at + gnome_refresh_interval_seconds
+  - TST-004: Updated test to verify "Updated:" and "Next:" presence plus _refreshIntervalSeconds usage
+  - Updated WORKFLOW.md call-trace descriptions for _updateUI and _populateProviderCard
+  - Regenerated REFERENCES.md
+- BREAKING CHANGE: replace install script with CLI gnome-install/gnome-uninstall commands [useReq] *(gnome-extension)*
+  - Add `aibar gnome-install` CLI command: resolves extension source from
+  - package path, validates metadata.json, copies files to target dir,
+  - enables extension via gnome-extensions enable.
+  - Add `aibar gnome-uninstall` CLI command: disables extension via
+  - gnome-extensions disable, removes extension directory.
+  - Remove scripts/install-gnome-extension.sh (replaced by CLI commands).
+  - Update scripts/test-gnome-extension.sh to invoke aibar gnome-install.
+  - Update requirements PRJ-001/PRJ-008/REQ-025..REQ-032, add REQ-080..082.
+  - Replace tests/test_install_gnome_extension.py with test_gnome_install_uninstall.py.
+  - Update WORKFLOW.md: remove PROC:install-ext, add gnome commands to PROC:main.
+- remove warning glyph from show reset lines [useReq] *(cli)*
+  - Update REQ-067 and TST-030 for CLI reset-line glyph policy.
+  - Remove '⚠️ Limit reached!' suffix from CLI show reset output.
+  - Keep panel width/alignment behavior unchanged.
+  - Adjust CLI panel alignment test to assert glyph absence.
+  - Update WORKFLOW and regenerate REFERENCES for traceability.
+- remove deprecated GNOME plan artifact [useReq] *(gnome-plan)*
+  - Add PRJ-011 to REQUIREMENTS to define canonical GNOME contract documentation sources.
+  - Delete src/aibar/plans/Gnome.plan.md from source tree.
+  - Refactor GNOME plan regression test to enforce PRJ-011 semantics.
+
+### 📚  Documentation
+- Update README.md document.
+
 ## [0.7.0](https://github.com/Ogekuri/AIBar/compare/v0.6.0..v0.7.0) - 2026-03-14
 ### 🚜  Changes
 - add startup release preflight and uv lifecycle flags [useReq] *(cli)*
@@ -517,6 +573,7 @@
 - \[0.5.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.5.0
 - \[0.6.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.6.0
 - \[0.7.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.7.0
+- \[0.8.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.8.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -525,3 +582,4 @@
 [0.5.0]: https://github.com/Ogekuri/AIBar/compare/v0.4.0..v0.5.0
 [0.6.0]: https://github.com/Ogekuri/AIBar/compare/v0.5.0..v0.6.0
 [0.7.0]: https://github.com/Ogekuri/AIBar/compare/v0.6.0..v0.7.0
+[0.8.0]: https://github.com/Ogekuri/AIBar/compare/v0.7.0..v0.8.0
