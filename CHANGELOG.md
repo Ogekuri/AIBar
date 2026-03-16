@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.0](https://github.com/Ogekuri/AIBar/compare/v0.8.0..v0.9.0) - 2026-03-16
+### 🚜  Changes
+- add lifecycle options to help epilog and update REQ-068 [useReq] *(cli)*
+  - Update REQ-068 to require --version/--ver, --upgrade, --uninstall in help examples
+  - Add lifecycle option examples to CLI epilog (--version, --upgrade, --uninstall)
+  - Update test_cli_usage_help.py to verify lifecycle flags appear in help output
+  - Regenerate docs/REFERENCES.md with updated symbol inventory
+
 ## [0.8.0](https://github.com/Ogekuri/AIBar/compare/v0.7.0..v0.8.0) - 2026-03-16
 ### ⛰️  Features
 - Add static check.
@@ -574,6 +582,7 @@
 - \[0.6.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.6.0
 - \[0.7.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.7.0
 - \[0.8.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.8.0
+- \[0.9.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.9.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -583,3 +592,4 @@
 [0.6.0]: https://github.com/Ogekuri/AIBar/compare/v0.5.0..v0.6.0
 [0.7.0]: https://github.com/Ogekuri/AIBar/compare/v0.6.0..v0.7.0
 [0.8.0]: https://github.com/Ogekuri/AIBar/compare/v0.7.0..v0.8.0
+[0.9.0]: https://github.com/Ogekuri/AIBar/compare/v0.8.0..v0.9.0
