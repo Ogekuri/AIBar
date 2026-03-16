@@ -119,9 +119,10 @@ def test_refresh_now_popup_action_executes_forced_cli_refresh() -> None:
 
 def test_provider_card_renders_update_at_label_bottom_right() -> None:
     """
-    @brief Verify provider card contains bottom-right Update at label sourced from updated_at.
+    @brief Verify provider card contains bottom-right Updated/Next label sourced from updated_at and refresh interval.
     @details Asserts extension source creates an `updateAtLabel` in the card and populates
-    it from `data.updated_at` using `HH:MM` formatted output, with right-aligned row layout.
+    it from `data.updated_at` and `this._refreshIntervalSeconds` using `HH:MM` formatted output
+    as `Updated: <HH:MM>, Next: <HH:MM>`, with right-aligned row layout.
     @satisfies REQ-017
     @satisfies TST-004
     """
@@ -131,7 +132,9 @@ def test_provider_card_renders_update_at_label_bottom_right() -> None:
     assert "aibar-update-at-row" in source
     assert "updateAtSpacer" in source
     assert "data.updated_at" in source
-    assert "Update at:" in source
+    assert "Updated:" in source
+    assert "Next:" in source
+    assert "this._refreshIntervalSeconds" in source
 
 
 def test_panel_percentage_labels_use_fixed_order_provider_styles_and_primary_bold() -> None:

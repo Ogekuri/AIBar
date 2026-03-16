@@ -5,7 +5,6 @@
 │   ├── aibar.sh
 │   ├── check-js-syntax.sh
 │   ├── claude_token_refresh.sh
-│   ├── install-gnome-extension.sh
 │   └── test-gnome-extension.sh
 └── src
     └── aibar
@@ -2575,7 +2574,7 @@ from aibar.config import resolve_currency_symbol
 
 ---
 
-# extension.js | JavaScript | 1419L | 21 symbols | 9 imports | 29 comments
+# extension.js | JavaScript | 1420L | 21 symbols | 9 imports | 29 comments
 > Path: `src/aibar/gnome-extension/aibar@aibar.panel/extension.js`
 - @brief GNOME Shell panel extension for aibar metrics.
 - @details Collects usage JSON from the aibar CLI and renders provider-specific quota/cost cards in the GNOME panel popup.
@@ -2662,7 +2661,7 @@ full usage for limit-reached warning rendering.
 
 ### fn `const showResetPendingHint = () =>` (L755-757)
 
-### fn `const toPercent = (value) =>` (L1160-1165)
+### fn `const toPercent = (value) =>` (L1161-1166)
 - @brief Execute update u i.
 - @details Applies update u i logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 Resolves provider-window failure metadata from cache `status` section and forwards it
@@ -2672,9 +2671,9 @@ to card renderers. Panel status row renders fixed-order percentages and per-prov
 - @satisfies REQ-053
 - @satisfies REQ-069
 
-### fn `const getPanelUsageValues = (providerName, data) =>` (L1167-1224)
+### fn `const getPanelUsageValues = (providerName, data) =>` (L1168-1225)
 
-### class `export default class AIBarExtension extends Extension` : Extension (L1393-1419)
+### class `export default class AIBarExtension extends Extension` : Extension (L1394-1420)
 - @brief GNOME extension lifecycle adapter for AIBarIndicator registration.
 - @brief Execute enable.
 - @details Extends Extension (GNOME Shell 45+ API) to integrate with the extension lifecycle.
@@ -2704,7 +2703,7 @@ Uses this.uuid (provided by the Extension base class) as the status-area key.
 |`updateWindowBar`|fn||732-790|const updateWindowBar = (bar, pct, resetTime, useDays) =>|
 |`setResetLabel`|fn||738-744|const setResetLabel = (baseText) =>|
 |`showResetPendingHint`|fn||755-757|const showResetPendingHint = () =>|
-|`toPercent`|fn||1160-1165|const toPercent = (value) =>|
-|`getPanelUsageValues`|fn||1167-1224|const getPanelUsageValues = (providerName, data) =>|
-|`AIBarExtension`|class||1393-1419|export default class AIBarExtension extends Extension|
+|`toPercent`|fn||1161-1166|const toPercent = (value) =>|
+|`getPanelUsageValues`|fn||1168-1225|const getPanelUsageValues = (providerName, data) =>|
+|`AIBarExtension`|class||1394-1420|export default class AIBarExtension extends Extension|
 

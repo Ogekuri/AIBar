@@ -940,10 +940,11 @@ class AIBarIndicator extends PanelMenu.Button {
         if (data.updated_at) {
             try {
                 const updatedDate = new Date(data.updated_at);
-                card.updateAtLabel.text = `Update at: ${updatedDate.toLocaleTimeString('en-US', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                })}`;
+                const timeFmt = {hour: '2-digit', minute: '2-digit'};
+                const updatedStr = updatedDate.toLocaleTimeString('en-US', timeFmt);
+                const nextDate = new Date(updatedDate.getTime() + this._refreshIntervalSeconds * 1000);
+                const nextStr = nextDate.toLocaleTimeString('en-US', timeFmt);
+                card.updateAtLabel.text = `Updated: ${updatedStr}, Next: ${nextStr}`;
             } catch (_e) {
                 card.updateAtLabel.text = '';
             }
