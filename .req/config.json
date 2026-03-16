@@ -60,6 +60,13 @@
       {
         "module": "Command",
         "cmd": "scripts/check-js-syntax.sh"
+      },
+      {
+        "module": "Command",
+        "cmd": "node",
+        "params": [
+          "--check"
+        ]
       }
     ]
   },
