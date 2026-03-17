@@ -1,5 +1,59 @@
 # Changelog
 
+## [0.11.0](https://github.com/Ogekuri/AIBar/compare/v0.10.0..v0.11.0) - 2026-03-17
+### ⛰️  Features
+- Update .g.conf file.
+
+### 🐛  Bug Fixes
+- make req static-check pass [useReq] *(static-check)*
+  - Add tracked Pyright config with src/aibar include and extraPaths for first-party imports.
+  - Add targeted regression test for static-check configuration presence.
+  - Suppress known Click entrypoint call-issue at module __main__ call sites only.
+  - Unignore pyrightconfig.json in .gitignore for persistent repository behavior.
+- Fix .gitignore file.
+- Remove pyrightconfig.json.
+
+### 🚜  Changes
+- unify fail-state error rendering [useReq] *(show)*
+  - Update requirements for error-only fail rendering in CLI and GNOME cards.
+  - Suppress statistics lines on FAIL and normalize status/retry output format.
+  - Persist retry_after_seconds in cache status and propagate to renderers.
+  - Remove Claude 429 partial metric fallback paths from active flow.
+  - Update regression tests for CLI/GNOME error parity and retry metadata.
+  - Refresh WORKFLOW and regenerate REFERENCES documentation.
+- localize Updated/Next datetime output [useReq] *(core)*
+  - Update requirements for local-time freshness labels with YYYY-MM-DD HH:MM format.
+  - Switch CLI show freshness rendering to runtime local timezone format.
+  - Switch GNOME extension freshness formatter to local-time YYYY-MM-DD HH:MM.
+  - Adjust CLI/extension regression tests and refresh WORKFLOW/REFERENCES docs.
+- gate lifecycle uv commands to Linux runtime [useReq] *(cli)*
+  - Update requirements for Linux-only --upgrade/--uninstall execution and non-Linux guidance.
+  - Implement OS-gated lifecycle handlers that skip subprocess execution off Linux.
+  - Add regression tests for Linux subprocess path and non-Linux manual guidance path.
+  - Refresh WORKFLOW and regenerate REFERENCES documentation.
+- include pytest in runtime dependencies [useReq] *(pyproject)*
+  - update CTN-007 and TST-008 in docs/REQUIREMENTS.md
+  - add pytest to [project].dependencies in pyproject.toml
+  - refresh uv.lock after dependency update
+  - extend tests/test_pyproject_metadata.py to assert pytest presence
+- migrate runtime to uv-only workflow [useReq] *(launcher)*
+  - Update SRS for uv-only launcher/runtime and lockfile policy.
+  - Replace scripts/aibar.sh virtualenv bootstrap with uv-run delegation.
+  - Track uv.lock, remove requirements.txt from repo and allowlist rules.
+  - Update README requirements/install guidance and requirements export snippet.
+  - Adjust release workflow build step to uv-run build toolchain.
+  - Add regression tests for launcher, repository surfaces, and GeminiAI dependency manifest.
+- resolve TST id collision [useReq] *(requirements)*
+  - Rename new show-status test requirement from TST-037 to TST-038.
+  - Update test docstring satisfies tags to keep ID traceability consistent.
+- align datetime/status error rendering [useReq] *(show)*
+  - Update requirements for show/auth visibility and datetime formatting parity.
+  - Implement CLI Updated/Next datetime line and cached status-error surfacing.
+  - Apply idle-time failure scheduling with max(idle delay, retry-after).
+  - Update GNOME extension datetime formatter to UTC date+time labels.
+  - Add and adjust tests for auth failures, datetime output, and status rendering.
+  - Regenerate WORKFLOW and REFERENCES docs for traceability.
+
 ## [0.10.0](https://github.com/Ogekuri/AIBar/compare/v0.9.0..v0.10.0) - 2026-03-16
 ### 🐛  Bug Fixes
 - add pyrightconfig.json and pytest pythonpath for src-based imports [useReq] *(config)*
@@ -625,6 +679,7 @@
 - \[0.8.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.8.0
 - \[0.9.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.9.0
 - \[0.10.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.10.0
+- \[0.11.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.11.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -636,3 +691,4 @@
 [0.8.0]: https://github.com/Ogekuri/AIBar/compare/v0.7.0..v0.8.0
 [0.9.0]: https://github.com/Ogekuri/AIBar/compare/v0.8.0..v0.9.0
 [0.10.0]: https://github.com/Ogekuri/AIBar/compare/v0.9.0..v0.10.0
+[0.11.0]: https://github.com/Ogekuri/AIBar/compare/v0.10.0..v0.11.0
