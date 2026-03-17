@@ -25,7 +25,7 @@
 !env_example
 !setup.py
 !pyproject.toml
-!requirements.txt
+!uv.lock
 !.g.conf
 !src/
 !src/**/*

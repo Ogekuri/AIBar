@@ -28,32 +28,8 @@
                 └── openrouter.py
 ```
 
-# aibar.sh | Shell | 49L | 6 symbols | 2 imports | 18 comments
+# aibar.sh | Shell | 21L | 0 symbols | 0 imports | 11 comments
 > Path: `scripts/aibar.sh`
-
-## Imports
-```
-source ${VENVDIR}/bin/activate
-source ${VENVDIR}/bin/activate
-```
-
-## Definitions
-
-- var `FULL_PATH=$(readlink -f "$0")` (L9)
-- var `SCRIPT_PATH=$(dirname "$FULL_PATH")` (L12)
-- var `SCRIPT_NAME=$(basename "$FULL_PATH")` (L15)
-- var `BASE_DIR=$(dirname "$SCRIPT_PATH")` (L18)
-- var `VENVDIR="${BASE_DIR}/.venv"` (L26)
-- var `PYTHONPATH="${BASE_DIR}/src/aibar:${PYTHONPATH}" \` (L48)
-## Symbol Index
-|Symbol|Kind|Vis|Lines|Sig|
-|---|---|---|---|---|
-|`FULL_PATH`|var||9||
-|`SCRIPT_PATH`|var||12||
-|`SCRIPT_NAME`|var||15||
-|`BASE_DIR`|var||18||
-|`VENVDIR`|var||26||
-|`PYTHONPATH`|var||48||
 
 
 ---

@@ -15,6 +15,7 @@ AIBar aggregates usage metrics for Claude, OpenAI, OpenRouter, GitHub Copilot, C
 
 <p align="center">
   <a href="#quick-start">Quick Start</a> |
+  <a href="#requirements-uv">Requirements (uv)</a> |
   <a href="#installation-uv">Installation (uv)</a> |
   <a href="#feature-highlights">Feature Highlights</a> |
   <a href="#usage">Usage</a> |
@@ -45,19 +46,24 @@ AIBar aggregates usage metrics for Claude, OpenAI, OpenRouter, GitHub Copilot, C
 ## Quick Start
 
 ```bash
-# 1) From the repository root, run the launcher (creates .venv on first run)
-./aibar --help
+# 1) From the repository root, run the launcher
+./scripts/aibar.sh --help
 
 # 2) Configure credentials interactively
-./aibar setup
+./scripts/aibar.sh setup
 
 # 3) Verify provider configuration and connectivity
-./aibar doctor
+./scripts/aibar.sh doctor
 
 # 4) Show usage
-./aibar show
-./aibar show --json
+./scripts/aibar.sh show
+./scripts/aibar.sh show --json
 ```
+
+## Requirements (uv)
+
+AIBar requires [Astral uv](https://docs.astral.sh/uv/) for all local launcher/runtime workflows.
+Do not create or manage external virtual environments for repository execution.
 
 
 ## Installation (uv)
@@ -70,7 +76,7 @@ AIBar aggregates usage metrics for Claude, OpenAI, OpenRouter, GitHub Copilot, C
 uv tool install aibar --force --from git+https://github.com/Ogekuri/AIBar.git
 ```
 
-After installation the `aibar` command is available system-wide (or in the active virtual environment):
+After installation the `aibar` command is available system-wide:
 
 ```bash
 aibar --help
@@ -88,6 +94,12 @@ uvx --from "git+https://github.com/Ogekuri/AIBar.git" aibar show --json
 uvx --from "git+https://github.com/Ogekuri/AIBar.git" aibar doctor
 ```
 
+### Export requirements.txt (optional)
+
+```bash
+uv export --format requirements-txt > requirements.txt
+```
+
 ### Uninstall
 
 ```bash
@@ -99,24 +111,24 @@ uv tool uninstall aibar
 
 ```bash
 # Show all configured providers (default window: 7d)
-./aibar show
+./scripts/aibar.sh show
 
 # Show one provider and select window
-./aibar show --provider claude --window 5h
+./scripts/aibar.sh show --provider claude --window 5h
 
 # JSON output
-./aibar show --json
+./scripts/aibar.sh show --json
 
 # Print required environment variables
-./aibar env
+./scripts/aibar.sh env
 
 # Interactive setup wizard
-./aibar setup
+./scripts/aibar.sh setup
 
 # Provider login helpers
-./aibar login --provider claude
-./aibar login --provider copilot
-./aibar login --provider geminiai
+./scripts/aibar.sh login --provider claude
+./scripts/aibar.sh login --provider copilot
+./scripts/aibar.sh login --provider geminiai
 
 ```
 
@@ -179,4 +191,3 @@ To enable GeminiAI features, configure Google Cloud before running `aibar setup`
 ### OpenAI API
 
 [![Screenshot09](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot09.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot07.png)
-

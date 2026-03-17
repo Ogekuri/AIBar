@@ -16,6 +16,14 @@
   - `defining_files: src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`
   - `thread_model: no explicit threads detected`
 
+- `id: PROC:aibar-launcher`
+  - `type: Process`
+  - `parent_process: null`
+  - `role: Repository launcher process delegating CLI execution through uv`
+  - `entrypoint_symbols: main script body`
+  - `defining_files: scripts/aibar.sh`
+  - `thread_model: no explicit threads detected`
+
 - `id: PROC:test-ext`
   - `type: Process`
   - `parent_process: null`
@@ -32,7 +40,30 @@
   - `defining_files: scripts/claude_token_refresh.sh`
   - `thread_model: no explicit threads detected`
 
+- `id: PROC:release-uvx-extension`
+  - `type: Process`
+  - `parent_process: null`
+  - `role: GitHub Actions release pipeline for Python package and GNOME extension assets`
+  - `entrypoint_symbols: workflow trigger (push tag), check-branch job, build-release job`
+  - `defining_files: .github/workflows/release-uvx+extension.yml`
+  - `thread_model: no explicit threads detected`
+
 ## Execution Units
+
+### PROC:aibar-launcher
+- `Entrypoints`
+  - main script body: direct execution [`scripts/aibar.sh`]
+- `Lifecycle/Trigger`
+  - Starts when user invokes `scripts/aibar.sh`.
+  - Resolves repository root from script path and delegates execution to `uv run --project <root> python -m aibar.cli`.
+- `Internal Call-Trace Tree`
+  - main script body: direct execution [`scripts/aibar.sh`]
+    - path resolution block: derive `full_path`, `script_dir`, and `project_root` [`scripts/aibar.sh`]
+    - project-root switch: `cd "$project_root"` [`scripts/aibar.sh`]
+    - launcher delegation: `exec uv run --project "$project_root" python -m aibar.cli "$@"` [`scripts/aibar.sh`]
+      - External boundary: `uv` subprocess resolves project environment and starts CLI runtime (`PROC:main`).
+- `External Boundaries`
+  - `uv` CLI runtime orchestration.
 
 ### PROC:test-ext
 - `Entrypoints`
@@ -56,7 +87,7 @@
   - `StartupPreflightGroup.format_epilog(...)`: renders epilog text preserving explicit line breaks for help examples [`src/aibar/aibar/cli.py`]
   - `main(...)`: Click command-group callback (prints usage/help when invoked without subcommand) [`src/aibar/aibar/cli.py`]
 - `Lifecycle/Trigger`
-  - Starts when `aibar` is invoked by a user shell or by subprocess spawn from `PROC:gnome-shell`.
+  - Starts when `aibar` is invoked by a user shell, by launcher delegation from `PROC:aibar-launcher`, or by subprocess spawn from `PROC:gnome-shell`.
   - Executes startup update preflight before CLI argument validation and command dispatch.
   - Executes one command route (`show`, `doctor`, `env`, `setup`, `login`, `gnome-install`, `gnome-uninstall`) or exits early via lifecycle flags (`--version`, `--ver`, `--upgrade`, `--uninstall`).
   - Exits after command completion.
@@ -283,7 +314,33 @@
   - `aibar` CLI (optional, PATH-dependent).
   - `nohup` for daemon detachment.
 
+### PROC:release-uvx-extension
+- `Entrypoints`
+  - workflow trigger: push tags matching `v[0-9]+.[0-9]+.[0-9]+` [`.github/workflows/release-uvx+extension.yml`]
+- `Lifecycle/Trigger`
+  - Starts when a matching release tag is pushed.
+  - Runs `check-branch` gate job and, when tag SHA is on `master`, runs `build-release` packaging job.
+- `Internal Call-Trace Tree`
+  - workflow trigger dispatch [`.github/workflows/release-uvx+extension.yml`]
+    - `check-branch` job: checkout + `git branch -r --contains ${GITHUB_SHA}` gate [`.github/workflows/release-uvx+extension.yml`]
+    - `build-release` job: checkout + python/uv setup [`.github/workflows/release-uvx+extension.yml`]
+      - build step: `uv run --with build --with setuptools --with wheel python -m build` [`.github/workflows/release-uvx+extension.yml`]
+      - extension asset step: zip `src/aibar/aibar/gnome-extension/aibar@aibar.panel` into release artifact [`.github/workflows/release-uvx+extension.yml`]
+      - release publication steps: attest provenance and publish GitHub release assets [`.github/workflows/release-uvx+extension.yml`]
+- `External Boundaries`
+  - GitHub Actions runtime and hosted runners.
+  - `uv`, `python`, `git`, `zip`, and GitHub release APIs/actions.
+
 ## Communication Edges
+
+- `id: EDGE-005`
+  - `source: PROC:aibar-launcher`
+  - `destination: PROC:main`
+  - `direction: request-response`
+  - `mechanism: uv subprocess delegation`
+  - `endpoint_or_channel: argv [uv, run, --project, <repo-root>, python, -m, aibar.cli, ...]`
+  - `payload_data_shape: forwarded CLI argv tokens and inherited environment`
+  - `declaration_files: scripts/aibar.sh, src/aibar/aibar/cli.py`
 
 - `id: EDGE-004`
   - `source: PROC:test-ext`

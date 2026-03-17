@@ -2,7 +2,7 @@
 @file
 @brief GeminiAI cross-surface integration source assertions.
 @details Verifies GeminiAI registration across CLI, setup/config, GNOME extension,
-and dependency manifests.
+and uv-based dependency manifests.
 @satisfies REQ-054
 @satisfies REQ-059
 @satisfies REQ-060
@@ -26,7 +26,7 @@ EXTENSION_PATH = (
     / "extension.js"
 )
 PYPROJECT_PATH = PROJECT_ROOT / "pyproject.toml"
-REQUIREMENTS_PATH = PROJECT_ROOT / "requirements.txt"
+UV_LOCK_PATH = PROJECT_ROOT / "uv.lock"
 
 
 def test_cli_registers_geminiai_provider_and_login_paths() -> None:
@@ -64,7 +64,7 @@ def test_extension_and_dependencies_include_geminiai_support() -> None:
     """
     extension_source = EXTENSION_PATH.read_text(encoding="utf-8")
     pyproject_source = PYPROJECT_PATH.read_text(encoding="utf-8")
-    requirements_source = REQUIREMENTS_PATH.read_text(encoding="utf-8")
+    uv_lock_source = UV_LOCK_PATH.read_text(encoding="utf-8")
 
     assert "this._providerOrder = ['claude', 'openrouter', 'copilot', 'codex', 'geminiai'];" in extension_source
     assert "geminiai: 'GEMINIAI'" in extension_source
@@ -72,7 +72,7 @@ def test_extension_and_dependencies_include_geminiai_support() -> None:
     assert "google-cloud-bigquery" in pyproject_source
     assert "google-auth-oauthlib" in pyproject_source
     assert "google-auth-httplib2" in pyproject_source
-    assert "google-api-python-client" in requirements_source
-    assert "google-cloud-bigquery" in requirements_source
-    assert "google-auth-oauthlib" in requirements_source
-    assert "google-auth-httplib2" in requirements_source
+    assert 'name = "google-api-python-client"' in uv_lock_source
+    assert 'name = "google-cloud-bigquery"' in uv_lock_source
+    assert 'name = "google-auth-oauthlib"' in uv_lock_source
+    assert 'name = "google-auth-httplib2"' in uv_lock_source

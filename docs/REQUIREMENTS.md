@@ -1,7 +1,7 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.3.23"
+version: "0.3.24"
 date: "2026-03-17"
 author: "req-change"
 scope:
@@ -85,8 +85,8 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **PRJ-002**: MUST aggregate provider metrics through a normalized provider contract for `claude`, `openai`, `openrouter`, `copilot`, and `codex`.
 - **PRJ-004**: MUST provide a GNOME Shell panel extension named `AIBar Monitor` that executes `aibar show --json`, renders provider-specific cards, sets metadata owner identifiers (`url`, `github`) to `Ogekuri`, and forces `scripts/test-gnome-extension.sh` nested-shell resolution to `1024x800` via `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800`.
 - **PRJ-005**: MUST maintain a machine-readable symbol inventory for repository code documentation under `docs/REFERENCES.md`.
-- **PRJ-006**: MUST provide a PEP 621-compliant `pyproject.toml` at repository root enabling installation via `uv pip install` and live execution via `uvx --from git+https://github.com/Ogekuri/AIBar.git aibar <command>`.
-- **PRJ-007**: MUST document in `README.md` a dedicated section covering `uv`-based installation, removal, and `uvx` live execution instructions, plus GeminiAI prerequisites (Desktop OAuth client, BigQuery dataset, required APIs).
+- **PRJ-006**: MUST provide a PEP 621-compliant `pyproject.toml` at repository root enabling `uv tool install` distribution execution and `uv run`/`uvx` live execution without external virtualenv bootstrap scripts.
+- **PRJ-007**: MUST document in `README.md` dedicated sections for `uv`-based requirements, installation/removal, `uv run`/`uvx` execution, and optional `requirements.txt` export command, plus GeminiAI prerequisites.
 - **PRJ-008**: MUST provide `aibar gnome-install` CLI command that installs or updates GNOME extension files from the installed package source directory to `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/` and enables the extension via `gnome-extensions enable`.
 - **PRJ-009**: MUST execute startup update checks and lifecycle flags `--upgrade`, `--uninstall`, `--version`, and `--ver` for program `aibar`.
 - **PRJ-010**: MUST package all runtime files required by `aibar` so local execution and `uv tool install` execution remain behaviorally equivalent.
@@ -205,6 +205,8 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-082**: MUST exit with non-zero status and descriptive error message when the extension directory does not exist in `gnome-uninstall`.
 - **REQ-084**: CLI text `show` MUST render per-provider freshness line as `Updated: <datetime last update>, Next: <datetime next update>` where datetime includes date and time and uses the same formatting rule as GNOME extension provider cards.
 - **REQ-085**: CLI text `show` MUST render per-provider last-attempt authentication and refresh-rate-limit failures from cached status errors, including invalid or expired OAuth tokens and HTTP `429` refresh-limit diagnostics.
+- **REQ-086**: `scripts/aibar.sh` MUST execute CLI via `uv run python -m aibar.cli` and MUST NOT create, activate, or install dependencies into repository-local or system virtual environments.
+- **REQ-087**: Repository root MUST track `uv.lock`, MUST NOT track `requirements.txt`, and MUST keep `README.md` instructions for optional export command `uv export --format requirements-txt > requirements.txt`.
 
 ## 4. Test Requirements
 
@@ -246,6 +248,8 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-035**: MUST verify `--upgrade` and `--uninstall` invoke required `uv tool` commands and propagate subprocess exit codes.
 - **TST-036**: MUST verify `--version` and `--ver` print installed version and bypass subcommand execution.
 - **TST-038**: MUST verify CLI text `show` renders `Updated: <datetime last update>, Next: <datetime next update>` with date-and-time formatting aligned to GNOME extension and surfaces cached authentication or refresh-rate-limit status errors per provider/window.
+- **TST-039**: MUST verify `scripts/aibar.sh` invokes `uv run python -m aibar.cli`, forwards CLI arguments, and contains no virtualenv creation/activation or `pip install -r requirements.txt` commands.
+- **TST-040**: MUST verify `.gitignore` includes `uv.lock` and excludes `requirements.txt` from allowlist, repository file `requirements.txt` is absent, and README contains uv-tool requirement plus export command snippet.
 - **TST-037**: MUST verify `pyproject.toml` wheel `packages` setting includes the `aibar` package containing `gnome-extension/` subtree, and sdist `include` covers `src/aibar/aibar/gnome-extension/**` and `scripts/**` for `.github/workflows/release-uvx+extension.yml` builds.
 
 ## 5. Evidence
@@ -256,8 +260,8 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | PRJ-002 | `src/aibar/aibar/cli.py` + `get_providers` + returns Claude/OpenAI/OpenRouter/Copilot/Codex provider instances keyed by `ProviderName`. |
 | PRJ-004 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/metadata.json` + `name` set to `AIBar Monitor` and `url/github` owner `Ogekuri`, `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_refreshData/_updateProviderCard` provider-card rendering behavior, and `scripts/test-gnome-extension.sh` exports `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800`. |
 | PRJ-005 | `docs/REFERENCES.md` + repository-wide symbol sections + machine-readable file/symbol index entries. |
-| PRJ-006 | `pyproject.toml` + `[build-system]`/`[project]`/`[project.scripts]` sections + `aibar = "aibar.cli:main"` console entry point enabling `uv pip install` and `uvx` execution. |
-| PRJ-007 | `README.md` + `## Installation (uv)` section + `uv pip install`, `uv pip uninstall`, `uvx --from` commands. |
+| PRJ-006 | `pyproject.toml` + `[build-system]`/`[project]`/`[project.scripts]` sections + `aibar = "aibar.cli:main"` console entry point used by `uv tool install`, `uv run`, and `uvx` execution without external virtualenv bootstrap. |
+| PRJ-007 | `README.md` + dedicated `Requirements (uv)` and `Installation (uv)` sections + `uv tool`/`uv run`/`uvx` instructions and optional `uv export --format requirements-txt > requirements.txt` snippet. |
 | PRJ-011 | `docs/REQUIREMENTS.md`, `docs/WORKFLOW.md`, and `docs/REFERENCES.md` + GNOME contract documentation sources; repository tree excludes `src/aibar/plans/Gnome.plan.md`. |
 | CTN-001 | `src/aibar/aibar/config.py` + `Config.get_token` + env var -> env file -> provider-specific stores (`ClaudeCLIAuth`, `CodexCredentialStore`, `CopilotCredentialStore`). |
 | CTN-002 | `src/aibar/aibar/providers/base.py` + `ProviderResult` model + fields `provider/window/metrics/updated_at/raw/error`; `UsageMetrics` + `currency_symbol` field. |
@@ -359,3 +363,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-084 | `src/aibar/aibar/cli.py` + `_print_result` + per-provider freshness line renders `Updated: <datetime>, Next: <datetime>` with date-and-time formatting aligned to extension cards. |
 | REQ-085 | `src/aibar/aibar/cli.py` + text renderer surfaces authentication and refresh-rate-limit status failures from cached per-provider/per-window status errors. |
 | TST-038 | `tests/test_cli_show_status_messages.py` + verifies CLI `show` freshness line format parity with extension datetime formatter and visibility of authentication/rate-limit status failures. |
+| REQ-086 | `scripts/aibar.sh` + launcher executes `uv run python -m aibar.cli "$@"` and removes repository virtualenv bootstrap/install commands. |
+| REQ-087 | `.gitignore` + allowlist tracks `uv.lock` and drops `requirements.txt`; repository root no longer includes `requirements.txt`; `README.md` includes optional `uv export --format requirements-txt > requirements.txt` command. |
+| TST-039 | `tests/test_launcher_uv_only.py` + source-level assertions for `scripts/aibar.sh` uv-run invocation and absence of virtualenv/pip install logic. |
+| TST-040 | `tests/test_uv_requirements_surface.py` + assertions for `.gitignore` allowlist change, `requirements.txt` absence, and README uv requirements/export command content. |

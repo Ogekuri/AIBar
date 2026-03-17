@@ -1,49 +1,21 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # -*- coding: utf-8 -*-
 # VERSION: 0.10.0
 # AUTHORS: Ogekuri
+#
+# @file
+# @brief Repository launcher for AIBar CLI using Astral uv runtime orchestration.
+# @details Resolves repository root from script path and executes
+# `uv run --project <root> python -m aibar.cli` while forwarding all CLI arguments.
+# MUST NOT bootstrap or mutate any virtual environment.
+# @satisfies REQ-086
 
-now=$(date '+%Y-%m-%d_%H-%M-%S')
+set -euo pipefail
 
-# 1. Get the full absolute path of the file (resolving symbolic links)
-FULL_PATH=$(readlink -f "$0")
+full_path="$(readlink -f "$0")"
+script_dir="$(dirname "$full_path")"
+project_root="$(dirname "$script_dir")"
 
-# 2. Extract the directory (the path without the filename)
-SCRIPT_PATH=$(dirname "$FULL_PATH")
+cd "$project_root"
 
-# 3. Extract the filename
-SCRIPT_NAME=$(basename "$FULL_PATH")
-
-# 4. Extract the base directory
-BASE_DIR=$(dirname "$SCRIPT_PATH")
-
-# --- Output tests (can be removed) ---
-#echo "Full path:          $FULL_PATH"
-#echo "Directory:          $SCRIPT_PATH"
-#echo "Script name:        $SCRIPT_NAME"
-#echo "Base Directory:     $BASE_DIR"
-
-VENVDIR="${BASE_DIR}/.venv"
-#echo ${VENVDIR}
-
-# If ${VENVDIR} does not exist, create it
-if ! [ -d "${VENVDIR}/" ]; then
-  echo -n "Create virtual environment ..."
-  mkdir ${VENVDIR}/
-  virtualenv --python=python3 ${VENVDIR}/ >/dev/null
-  echo "done."
-
-  # Install Python requirements
-  source ${VENVDIR}/bin/activate
-
-  echo -n "Install python requirements ..."
-  ${VENVDIR}/bin/pip install -r "${BASE_DIR}/requirements.txt" >/dev/null
-  echo "done." 
-else
-  # echo "Virtual environment found."
-  source ${VENVDIR}/bin/activate
-fi
-
-# Execute the application from src/aibar/aibar:
-PYTHONPATH="${BASE_DIR}/src/aibar:${PYTHONPATH}" \
-    exec ${VENVDIR}/bin/python3 -m aibar.cli "$@"
+exec uv run --project "$project_root" python -m aibar.cli "$@"
