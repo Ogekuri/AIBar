@@ -3170,4 +3170,4 @@ def gnome_uninstall() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    main()  # pyright: ignore[reportCallIssue]

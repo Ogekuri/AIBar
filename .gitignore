@@ -25,6 +25,7 @@
 !env_example
 !setup.py
 !pyproject.toml
+!pyrightconfig.json
 !uv.lock
 !.g.conf
 !src/
