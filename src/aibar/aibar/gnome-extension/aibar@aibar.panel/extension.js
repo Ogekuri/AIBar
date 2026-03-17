@@ -50,18 +50,22 @@ function _getProviderDisplayName(providerName) {
 }
 
 /**
- * @brief Format one Date object as UTC datetime for provider freshness labels.
- * @details Produces `YYYY-MM-DD HH:MM UTC`; invalid Date values return null.
+ * @brief Format one Date object as local datetime for provider freshness labels.
+ * @details Produces `%Y-%m-%d %H:%M` in runtime local timezone; invalid Date values return null.
  * @param {Date} value Date object to format.
- * @returns {string | null} Formatted UTC datetime string or null.
+ * @returns {string | null} Formatted local datetime string or null.
  */
-function _formatUtcDateTime(value) {
+function _formatLocalDateTime(value) {
     if (!(value instanceof Date))
         return null;
     if (Number.isNaN(value.getTime()))
         return null;
-    const isoValue = value.toISOString();
-    return `${isoValue.slice(0, 16).replace('T', ' ')} UTC`;
+    const year = value.getFullYear().toString().padStart(4, '0');
+    const month = (value.getMonth() + 1).toString().padStart(2, '0');
+    const day = value.getDate().toString().padStart(2, '0');
+    const hours = value.getHours().toString().padStart(2, '0');
+    const minutes = value.getMinutes().toString().padStart(2, '0');
+    return `${year}-${month}-${day} ${hours}:${minutes}`;
 }
 
 /**
@@ -956,8 +960,8 @@ class AIBarIndicator extends PanelMenu.Button {
             try {
                 const updatedDate = new Date(data.updated_at);
                 const nextDate = new Date(updatedDate.getTime() + this._refreshIntervalSeconds * 1000);
-                const updatedStr = _formatUtcDateTime(updatedDate);
-                const nextStr = _formatUtcDateTime(nextDate);
+                const updatedStr = _formatLocalDateTime(updatedDate);
+                const nextStr = _formatLocalDateTime(nextDate);
                 if (updatedStr === null || nextStr === null) {
                     card.updateAtLabel.text = '';
                     return;

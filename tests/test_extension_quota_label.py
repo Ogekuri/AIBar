@@ -121,9 +121,9 @@ def test_provider_card_renders_update_at_label_bottom_right() -> None:
     """
     @brief Verify provider card contains bottom-right Updated/Next label sourced from updated_at and refresh interval.
     @details Asserts extension source creates an `updateAtLabel` in the card and populates
-    it from `data.updated_at` and `this._refreshIntervalSeconds` using UTC datetime output
-    as `Updated: <YYYY-MM-DD HH:MM UTC>, Next: <YYYY-MM-DD HH:MM UTC>`, with
-    right-aligned row layout.
+    it from `data.updated_at` and `this._refreshIntervalSeconds` using runtime local-time
+    `%Y-%m-%d %H:%M` output as `Updated: <YYYY-MM-DD HH:MM>, Next: <YYYY-MM-DD HH:MM>`,
+    with right-aligned row layout.
     @satisfies REQ-017
     @satisfies TST-004
     """
@@ -133,10 +133,11 @@ def test_provider_card_renders_update_at_label_bottom_right() -> None:
     assert "aibar-update-at-row" in source
     assert "updateAtSpacer" in source
     assert "data.updated_at" in source
-    assert "_formatUtcDateTime" in source
+    assert "_formatLocalDateTime" in source
     assert "Updated:" in source
     assert "Next:" in source
-    assert "toISOString()" in source
+    assert "getFullYear()" in source
+    assert "getHours()" in source
     assert "this._refreshIntervalSeconds" in source
 
 

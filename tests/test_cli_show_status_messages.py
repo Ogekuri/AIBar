@@ -43,7 +43,7 @@ def test_show_renders_updated_next_datetime_with_runtime_refresh_interval(
     """
     @brief Verify CLI `show` renders date+time `Updated/Next` labels.
     @details Uses deterministic `updated_at` plus runtime refresh interval to assert
-    `Updated: <datetime>, Next: <datetime>` output format in UTC.
+    `Updated: <datetime>, Next: <datetime>` output format in runtime local timezone.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
     @param tmp_path {Path} Temporary path fixture.
     @return {None} Function return value.
@@ -85,10 +85,12 @@ def test_show_renders_updated_next_datetime_with_runtime_refresh_interval(
     runner = CliRunner()
     result = runner.invoke(main, ["show", "--provider", "openai", "--window", "7d"])
     assert result.exit_code == 0
-    assert (
-        "Updated: 2026-03-17 08:00 UTC, Next: 2026-03-17 08:02 UTC"
-        in result.output
+    expected_freshness_line = (
+        "Updated: "
+        f"{updated_at.astimezone().strftime('%Y-%m-%d %H:%M')}, "
+        f"Next: {(updated_at + timedelta(seconds=120)).astimezone().strftime('%Y-%m-%d %H:%M')}"
     )
+    assert expected_freshness_line in result.output
 
 
 def test_show_renders_cached_authentication_failure_from_status_section(

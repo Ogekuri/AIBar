@@ -705,6 +705,19 @@ def _normalize_utc(value: datetime) -> datetime:
     return value.astimezone(timezone.utc)
 
 
+def _format_local_datetime(value: datetime) -> str:
+    """
+    @brief Format one datetime in local timezone with `%Y-%m-%d %H:%M`.
+    @details Normalizes source datetime to UTC, projects it to runtime local
+    timezone, and emits minute-precision text for CLI freshness labels.
+    @param value {datetime} Source datetime to format.
+    @return {str} Local timezone datetime string.
+    @satisfies REQ-084
+    """
+    local_datetime = _normalize_utc(value).astimezone()
+    return local_datetime.strftime("%Y-%m-%d %H:%M")
+
+
 def _apply_api_call_delay(throttle_state: dict[str, float | int] | None) -> None:
     """
     @brief Enforce minimum spacing between consecutive provider API calls.
@@ -2296,8 +2309,8 @@ def _build_result_panel(
         f"Window: {window_label}",
         (
             "Updated: "
-            f"{updated_at_utc.strftime('%Y-%m-%d %H:%M UTC')}, "
-            f"Next: {next_update_utc.strftime('%Y-%m-%d %H:%M UTC')}"
+            f"{_format_local_datetime(updated_at_utc)}, "
+            f"Next: {_format_local_datetime(next_update_utc)}"
         ),
     ]
     if result.is_error:
