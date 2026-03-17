@@ -9,6 +9,7 @@ import email.utils
 import json
 import math
 import os
+import platform
 import re
 import shutil
 import subprocess
@@ -91,6 +92,16 @@ _STARTUP_IDLE_STATE_IDLE_UNTIL_EPOCH_KEY = "idle_until_epoch"
 _STARTUP_IDLE_STATE_IDLE_UNTIL_HUMAN_KEY = "idle_until_human"
 _EXT_UUID = "aibar@aibar.panel"
 _EXT_TARGET_DIR = Path.home() / ".local" / "share" / "gnome-shell" / "extensions" / _EXT_UUID
+_UPGRADE_LIFECYCLE_COMMAND: list[str] = [
+    "uv",
+    "tool",
+    "install",
+    "aibar",
+    "--force",
+    "--from",
+    "git+https://github.com/Ogekuri/AIBar.git",
+]
+_UNINSTALL_LIFECYCLE_COMMAND: list[str] = ["uv", "tool", "uninstall", "aibar"]
 
 
 @dataclass(frozen=True)
@@ -497,34 +508,73 @@ def _execute_lifecycle_subprocess(command: list[str]) -> int:
     return int(completed.returncode)
 
 
+def _is_linux_runtime() -> bool:
+    """
+    @brief Determine whether lifecycle subprocess execution is allowed.
+    @details Returns true only for Linux runtimes. Lifecycle subprocesses for
+    `--upgrade` and `--uninstall` are Linux-only and must be skipped elsewhere.
+    @return {bool} True when current runtime platform is Linux.
+    @satisfies REQ-076
+    @satisfies REQ-077
+    @satisfies REQ-088
+    """
+    return sys.platform.startswith("linux")
+
+
+def _emit_non_linux_lifecycle_guidance(option_name: str, command: Sequence[str]) -> int:
+    """
+    @brief Emit manual lifecycle command guidance for non-Linux platforms.
+    @details Builds one deterministic warning message containing detected
+    operating-system label and exact manual command text, then emits it through
+    startup preflight styled diagnostics with stderr routing.
+    @param option_name {str} Lifecycle option token (`--upgrade` or `--uninstall`).
+    @param command {Sequence[str]} Lifecycle command argv to present as manual guidance.
+    @return {int} Deterministic non-zero exit code indicating command was not executed.
+    @satisfies CTN-015
+    @satisfies REQ-088
+    @satisfies REQ-089
+    """
+    detected_platform = platform.system() or sys.platform
+    manual_command = " ".join(command)
+    _emit_startup_preflight_message(
+        message=(
+            f"{option_name} is supported only on Linux. "
+            f"Detected OS: {detected_platform}. "
+            f"Run manually: {manual_command}"
+        ),
+        color_code=_ANSI_BRIGHT_RED,
+        err=True,
+    )
+    return 1
+
+
 def _handle_upgrade_option(
     ctx: click.Context, param: click.Parameter, value: bool
 ) -> None:
     """
     @brief Handle eager `--upgrade` lifecycle option callback.
-    @details Executes required `uv tool install ... --force` command and exits
-    current Click context with subprocess return code when option is provided.
+    @details Executes required lifecycle subprocess on Linux and exits with
+    propagated subprocess code; on non-Linux emits manual command guidance and
+    exits without subprocess execution.
     @param ctx {click.Context} Active Click context.
     @param param {click.Parameter} Option metadata (unused).
     @param value {bool} Parsed `--upgrade` flag value.
     @return {None} Function return value.
     @satisfies CTN-015
     @satisfies REQ-076
+    @satisfies REQ-088
+    @satisfies REQ-089
     """
     del param
     if not value or ctx.resilient_parsing:
         return
-    exit_code = _execute_lifecycle_subprocess(
-        [
-            "uv",
-            "tool",
-            "install",
-            "aibar",
-            "--force",
-            "--from",
-            "git+https://github.com/Ogekuri/AIBar.git",
-        ]
-    )
+    if _is_linux_runtime():
+        exit_code = _execute_lifecycle_subprocess(_UPGRADE_LIFECYCLE_COMMAND)
+    else:
+        exit_code = _emit_non_linux_lifecycle_guidance(
+            option_name="--upgrade",
+            command=_UPGRADE_LIFECYCLE_COMMAND,
+        )
     ctx.exit(exit_code)
 
 
@@ -533,19 +583,28 @@ def _handle_uninstall_option(
 ) -> None:
     """
     @brief Handle eager `--uninstall` lifecycle option callback.
-    @details Executes required `uv tool uninstall aibar` command and exits Click
-    context with subprocess return code when option is provided.
+    @details Executes required lifecycle subprocess on Linux and exits with
+    propagated subprocess code; on non-Linux emits manual command guidance and
+    exits without subprocess execution.
     @param ctx {click.Context} Active Click context.
     @param param {click.Parameter} Option metadata (unused).
     @param value {bool} Parsed `--uninstall` flag value.
     @return {None} Function return value.
     @satisfies CTN-015
     @satisfies REQ-077
+    @satisfies REQ-088
+    @satisfies REQ-089
     """
     del param
     if not value or ctx.resilient_parsing:
         return
-    exit_code = _execute_lifecycle_subprocess(["uv", "tool", "uninstall", "aibar"])
+    if _is_linux_runtime():
+        exit_code = _execute_lifecycle_subprocess(_UNINSTALL_LIFECYCLE_COMMAND)
+    else:
+        exit_code = _emit_non_linux_lifecycle_guidance(
+            option_name="--uninstall",
+            command=_UNINSTALL_LIFECYCLE_COMMAND,
+        )
     ctx.exit(exit_code)
 
 

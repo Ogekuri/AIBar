@@ -9,6 +9,7 @@ option behavior for `--version` and `--ver`.
 @satisfies TST-033
 @satisfies TST-034
 @satisfies TST-035
+@satisfies TST-041
 @satisfies TST-036
 """
 
@@ -255,11 +256,77 @@ def test_lifecycle_flags_execute_uv_commands_and_propagate_exit_code(
         return subprocess.CompletedProcess(command, returncode=7)
 
     monkeypatch.setattr(cli_module.subprocess, "run", _fake_run)
+    monkeypatch.setattr(cli_module, "_is_linux_runtime", lambda: True)
     runner = CliRunner()
     result = runner.invoke(main, [flag])
 
     assert result.exit_code == 7
     assert observed_commands == [expected_command]
+
+
+@pytest.mark.parametrize(
+    ("flag", "expected_command", "detected_os"),
+    [
+        (
+            "--upgrade",
+            [
+                "uv",
+                "tool",
+                "install",
+                "aibar",
+                "--force",
+                "--from",
+                "git+https://github.com/Ogekuri/AIBar.git",
+            ],
+            "Darwin",
+        ),
+        (
+            "--uninstall",
+            ["uv", "tool", "uninstall", "aibar"],
+            "Windows",
+        ),
+    ],
+)
+def test_lifecycle_flags_on_non_linux_emit_manual_guidance_without_subprocess(
+    monkeypatch: pytest.MonkeyPatch,
+    flag: str,
+    expected_command: list[str],
+    detected_os: str,
+) -> None:
+    """
+    @brief Verify lifecycle flags on non-Linux emit manual guidance only.
+    @details Forces non-Linux runtime branch, asserts command subprocess is not
+    executed, and validates guidance includes detected OS and required command.
+    @param monkeypatch {pytest.MonkeyPatch} Pytest monkeypatch fixture.
+    @param flag {str} Lifecycle flag under test.
+    @param expected_command {list[str]} Expected manual command argv text.
+    @param detected_os {str} Stubbed non-Linux operating-system label.
+    @return {None} Function return value.
+    @satisfies TST-041
+    """
+    observed_commands: list[list[str]] = []
+
+    def _fake_run(command: list[str], check: bool) -> subprocess.CompletedProcess[str]:
+        """
+        @brief Capture unexpected subprocess invocation in non-Linux branch.
+        @param command {list[str]} Subprocess argv.
+        @param check {bool} Subprocess check argument.
+        @return {subprocess.CompletedProcess[str]} Completed process stub.
+        """
+        observed_commands.append(command)
+        return subprocess.CompletedProcess(command, returncode=0)
+
+    monkeypatch.setattr(cli_module.subprocess, "run", _fake_run)
+    monkeypatch.setattr(cli_module, "_is_linux_runtime", lambda: False)
+    monkeypatch.setattr(cli_module.platform, "system", lambda: detected_os)
+    runner = CliRunner()
+    result = runner.invoke(main, [flag])
+
+    assert result.exit_code == 1
+    assert observed_commands == []
+    assert f"{flag} is supported only on Linux." in result.output
+    assert f"Detected OS: {detected_os}." in result.output
+    assert f"Run manually: {' '.join(expected_command)}" in result.output
 
 
 def test_version_and_ver_print_installed_version_without_dispatch() -> None:

@@ -89,7 +89,7 @@
 - `Lifecycle/Trigger`
   - Starts when `aibar` is invoked by a user shell, by launcher delegation from `PROC:aibar-launcher`, or by subprocess spawn from `PROC:gnome-shell`.
   - Executes startup update preflight before CLI argument validation and command dispatch.
-  - Executes one command route (`show`, `doctor`, `env`, `setup`, `login`, `gnome-install`, `gnome-uninstall`) or exits early via lifecycle flags (`--version`, `--ver`, `--upgrade`, `--uninstall`).
+  - Executes one command route (`show`, `doctor`, `env`, `setup`, `login`, `gnome-install`, `gnome-uninstall`) or exits early via lifecycle flags (`--version`, `--ver`, `--upgrade`, `--uninstall`) with Linux-only subprocess execution and non-Linux manual guidance.
   - Exits after command completion.
 - `Internal Call-Trace Tree`
   - `StartupPreflightGroup.main(...)`: startup preflight wrapper around Click parser/dispatcher [`src/aibar/aibar/cli.py`]
@@ -104,10 +104,14 @@
       - `_save_startup_idle_state(...)`: persist startup idle-state JSON with epoch and human-readable fields [`src/aibar/aibar/cli.py`]
       - `_emit_startup_preflight_message(...)`: emit bright-green/bright-red startup diagnostics [`src/aibar/aibar/cli.py`]
     - `_handle_version_option(...)`: eager `--version`/`--ver` callback that prints installed version and exits [`src/aibar/aibar/cli.py`]
-    - `_handle_upgrade_option(...)`: eager `--upgrade` callback that executes uv install command and exits [`src/aibar/aibar/cli.py`]
-      - `_execute_lifecycle_subprocess(...)`: subprocess execution wrapper with exit-code propagation [`src/aibar/aibar/cli.py`]
-    - `_handle_uninstall_option(...)`: eager `--uninstall` callback that executes uv uninstall command and exits [`src/aibar/aibar/cli.py`]
-      - `_execute_lifecycle_subprocess(...)`: subprocess execution wrapper with exit-code propagation [`src/aibar/aibar/cli.py`]
+    - `_handle_upgrade_option(...)`: eager `--upgrade` callback with Linux-gated lifecycle execution and non-Linux guidance [`src/aibar/aibar/cli.py`]
+      - `_is_linux_runtime(...)`: runtime platform gate for lifecycle subprocess execution [`src/aibar/aibar/cli.py`]
+      - `_execute_lifecycle_subprocess(...)`: Linux branch subprocess execution wrapper with exit-code propagation [`src/aibar/aibar/cli.py`]
+      - `_emit_non_linux_lifecycle_guidance(...)`: non-Linux branch warning with manual command text [`src/aibar/aibar/cli.py`]
+    - `_handle_uninstall_option(...)`: eager `--uninstall` callback with Linux-gated lifecycle execution and non-Linux guidance [`src/aibar/aibar/cli.py`]
+      - `_is_linux_runtime(...)`: runtime platform gate for lifecycle subprocess execution [`src/aibar/aibar/cli.py`]
+      - `_execute_lifecycle_subprocess(...)`: Linux branch subprocess execution wrapper with exit-code propagation [`src/aibar/aibar/cli.py`]
+      - `_emit_non_linux_lifecycle_guidance(...)`: non-Linux branch warning with manual command text [`src/aibar/aibar/cli.py`]
     - `main(...)`: CLI command router callback [`src/aibar/aibar/cli.py`]
     - `show(...)`: usage fetch/report route with shared cache pipeline [`src/aibar/aibar/cli.py`]
       - `parse_window(...)`: CLI window selector normalization [`src/aibar/aibar/cli.py`]
@@ -234,7 +238,7 @@
 - `External Boundaries`
   - Click command parsing and dispatch.
   - GitHub Releases latest endpoint (`https://api.github.com/repos/Ogekuri/AIBar/releases/latest`) for startup update checks.
-  - `uv` subprocess execution for lifecycle flags (`--upgrade`, `--uninstall`).
+  - Linux-only `uv` subprocess execution for lifecycle flags (`--upgrade`, `--uninstall`) plus non-Linux stderr guidance output.
   - HTTP network interactions through provider endpoints.
   - Browser-based OAuth consent flow and loopback callback for GeminiAI Google credentials.
   - Google Cloud Monitoring API HTTPS endpoints.

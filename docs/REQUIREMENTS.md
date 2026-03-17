@@ -107,7 +107,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **CTN-012**: MUST use hardcoded startup update-check constants `idle_delay_seconds=300` and `http_timeout_seconds=2`.
 - **CTN-013**: MUST persist startup update-check idle state in `$HOME/.github_api_idle-time.aibar` JSON with epoch and human-readable `last_success_at` and `idle_until`.
 - **CTN-014**: MUST perform at most one startup update HTTP check per 300 seconds unless `$HOME/.github_api_idle-time.aibar` is missing or expired.
-- **CTN-015**: MUST execute lifecycle subprocess commands exactly as `uv tool install aibar --force --from git+https://github.com/Ogekuri/AIBar.git` and `uv tool uninstall aibar`.
+- **CTN-015**: MUST use lifecycle command strings exactly as `uv tool install aibar --force --from git+https://github.com/Ogekuri/AIBar.git` and `uv tool uninstall aibar`.
 
 ## 3. Requirements
 
@@ -196,8 +196,10 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-073**: MUST print a bright-green message containing installed version and latest available version when the latest GitHub release is newer.
 - **REQ-074**: MUST print bright-red error diagnostics when startup update checks fail, including HTTP status details such as `403`.
 - **REQ-075**: MUST process startup update HTTP `429` responses by updating idle-time with `max(300, max_retry_after_seconds_observed)`.
-- **REQ-076**: MUST execute `uv tool install aibar --force --from git+https://github.com/Ogekuri/AIBar.git` when `--upgrade` is provided and propagate subprocess exit status.
-- **REQ-077**: MUST execute `uv tool uninstall aibar` when `--uninstall` is provided and propagate subprocess exit status.
+- **REQ-076**: MUST execute `uv tool install aibar --force --from git+https://github.com/Ogekuri/AIBar.git` only on Linux when `--upgrade` is provided and MUST propagate subprocess exit status.
+- **REQ-077**: MUST execute `uv tool uninstall aibar` only on Linux when `--uninstall` is provided and MUST propagate subprocess exit status.
+- **REQ-088**: MUST NOT execute lifecycle `uv tool` subprocess commands for `--upgrade` or `--uninstall` on non-Linux operating systems.
+- **REQ-089**: MUST print explicit manual command guidance for the current non-Linux operating system when `--upgrade` or `--uninstall` is provided.
 - **REQ-078**: MUST print installed program version and exit when `--version` or `--ver` is provided.
 - **REQ-079**: MUST include runtime files required by startup update-check behavior in `pyproject.toml` package configuration used by `.github/workflows/release-uvx+extension.yml`.
 - **REQ-080**: MUST disable the extension via `gnome-extensions disable aibar@aibar.panel` before removing files in `gnome-uninstall` with colored status output.
@@ -245,7 +247,8 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-032**: MUST verify startup update idle-time gating skips HTTP calls until `idle_until` expires and resumes checks when the idle-state file is missing or expired.
 - **TST-033**: MUST verify successful startup update checks write `$HOME/.github_api_idle-time.aibar` with epoch and human-readable `last_success_at` and `idle_until`.
 - **TST-034**: MUST verify repeated startup update HTTP `429` responses compute idle-time using `max(300, max(retry-after values))`.
-- **TST-035**: MUST verify `--upgrade` and `--uninstall` invoke required `uv tool` commands and propagate subprocess exit codes.
+- **TST-035**: MUST verify Linux `--upgrade` and `--uninstall` invoke required `uv tool` subprocess commands and propagate subprocess exit codes.
+- **TST-041**: MUST verify non-Linux `--upgrade` and `--uninstall` skip lifecycle subprocess execution and print manual command guidance.
 - **TST-036**: MUST verify `--version` and `--ver` print installed version and bypass subcommand execution.
 - **TST-038**: MUST verify CLI text `show` renders `Updated: <datetime last update>, Next: <datetime next update>` with date-and-time formatting aligned to GNOME extension and surfaces cached authentication or refresh-rate-limit status errors per provider/window.
 - **TST-039**: MUST verify `scripts/aibar.sh` invokes `uv run python -m aibar.cli`, forwards CLI arguments, and contains no virtualenv creation/activation or `pip install -r requirements.txt` commands.
