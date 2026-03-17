@@ -46,7 +46,10 @@ def test_rate_limit_failures_render_error_banner_with_http_retry_metadata() -> N
     assert "return `HTTP status: ${statusCode}, Retry after: ${retryAfter} sec.`;" in source
     assert "const isError = effectiveError !== null && effectiveError !== undefined;" in source
     assert "const statusRetryLabel = _buildHttpStatusRetryLabel(statusCode, retryAfterSeconds);" in source
-    assert "⚠️ ${effectiveError}\\n${statusRetryLabel}" in source
+    assert "'Status: FAIL'" in source
+    assert "`Window: ${windowLabel}`" in source
+    assert "`Error: ${effectiveError}`" in source
+    assert "card.errorLabel.text = errorLines.join('\\n');" in source
     assert "const isRateLimitQuotaError = (" not in source
 
 

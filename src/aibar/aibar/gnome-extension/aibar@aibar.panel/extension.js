@@ -777,9 +777,15 @@ class AIBarIndicator extends PanelMenu.Button {
                 ? statusEntry.retry_after_seconds
                 : raw.retry_after_seconds;
             const statusRetryLabel = _buildHttpStatusRetryLabel(statusCode, retryAfterSeconds);
-            card.errorLabel.text = statusRetryLabel.length > 0
-                ? `⚠️ ${effectiveError}\n${statusRetryLabel}`
-                : `⚠️ ${effectiveError}`;
+            const windowLabel = typeof data.window === 'string' ? data.window : 'n/a';
+            const errorLines = [
+                'Status: FAIL',
+                `Window: ${windowLabel}`,
+                `Error: ${effectiveError}`,
+            ];
+            if (statusRetryLabel.length > 0)
+                errorLines.push(statusRetryLabel);
+            card.errorLabel.text = errorLines.join('\n');
             card.errorLabel.show();
             card.costLabel.text = '';
             card.byokLabel.text = '';

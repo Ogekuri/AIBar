@@ -1969,6 +1969,7 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
         return
 
     rendered_panels: list[tuple[ProviderName, str, list[str]]] = []
+    status_section = _cache_status_section(retrieval.payload)
     for name, prov in providers.items():
         if not prov.is_configured():
             if provider_filter is None or provider_filter == name:
@@ -2001,7 +2002,19 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
             )
             if dual_results is not None:
                 result_5h, result_7d = dual_results
-                if result.is_error:
+                result_5h = _overlay_cached_failure_status(
+                    provider_key=provider_name.value,
+                    target_window=WindowPeriod.HOUR_5,
+                    projected_result=result_5h,
+                    status_section=status_section,
+                )
+                result_7d = _overlay_cached_failure_status(
+                    provider_key=provider_name.value,
+                    target_window=WindowPeriod.DAY_7,
+                    projected_result=result_7d,
+                    status_section=status_section,
+                )
+                if result.is_error and not result_5h.is_error and not result_7d.is_error:
                     result_raw = dict(result.raw)
                     if result.window == WindowPeriod.HOUR_5:
                         result_5h = result_5h.model_copy(

@@ -17,6 +17,7 @@ from click.testing import CliRunner
 from aibar import config as config_module
 from aibar.cli import RetrievalPipelineOutput, main
 from aibar.providers.base import ProviderName, ProviderResult, UsageMetrics, WindowPeriod
+from aibar.providers.claude_oauth import ClaudeOAuthProvider
 
 
 def _patch_config_paths(monkeypatch, tmp_path: Path) -> None:
@@ -159,3 +160,94 @@ def test_show_renders_cached_failure_error_only_with_retry_metadata(
     assert "Cost:" not in result.output
     assert "Usage:" not in result.output
     assert "Remaining credits:" not in result.output
+
+
+def test_show_dual_window_cached_fail_status_renders_fail_only_blocks(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """
+    @brief Verify Claude dual-window text output renders `FAIL` blocks only from cached status errors.
+    @details Seeds successful Claude dual-window payload with cached `status[claude][5h|7d]=FAIL`,
+    activates idle-time cache read path, and asserts both rendered windows emit only failure lines
+    (`Status`, `Window`, `Updated/Next`, `Error`, optional HTTP diagnostics) with statistics suppressed.
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @param tmp_path {Path} Temporary path fixture.
+    @return {None} Function return value.
+    @satisfies REQ-085
+    @satisfies TST-038
+    """
+    _patch_config_paths(monkeypatch, tmp_path)
+    config_module.save_runtime_config(
+        config_module.RuntimeConfig(
+            idle_delay_seconds=300,
+            api_call_delay_milliseconds=20,
+            gnome_refresh_interval_seconds=120,
+        )
+    )
+    cached_success = ProviderResult(
+        provider=ProviderName.CLAUDE,
+        window=WindowPeriod.DAY_7,
+        metrics=UsageMetrics(remaining=65.0, limit=100.0),
+        raw={
+            "five_hour": {
+                "utilization": 35.0,
+                "resets_at": "2026-03-20T08:00:00+00:00",
+            },
+            "seven_day": {
+                "utilization": 45.0,
+                "resets_at": "2026-03-24T08:00:00+00:00",
+            },
+        },
+    )
+    status_updated_at = datetime.now(timezone.utc).isoformat()
+    config_module.save_cli_cache(
+        {
+            "payload": {"claude": cached_success.model_dump(mode="json")},
+            "status": {
+                "claude": {
+                    "5h": {
+                        "result": "FAIL",
+                        "error": "Invalid or expired OAuth token",
+                        "updated_at": status_updated_at,
+                        "status_code": 401,
+                        "retry_after_seconds": 300,
+                    },
+                    "7d": {
+                        "result": "FAIL",
+                        "error": "Invalid or expired OAuth token",
+                        "updated_at": status_updated_at,
+                        "status_code": 401,
+                        "retry_after_seconds": 300,
+                    },
+                }
+            },
+        }
+    )
+    now_utc = datetime.now(timezone.utc)
+    config_module.save_idle_time(
+        {
+            ProviderName.CLAUDE.value: config_module.build_idle_time_state(
+                now_utc,
+                now_utc + timedelta(minutes=5),
+            )
+        }
+    )
+    provider = ClaudeOAuthProvider(token="sk-ant-test-token")
+    monkeypatch.setattr(
+        "aibar.cli.get_providers",
+        lambda: {ProviderName.CLAUDE: provider},
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["show", "--provider", "claude"])
+    assert result.exit_code == 0
+    assert result.output.count("Status: FAIL") == 2
+    assert "Status: OK" not in result.output
+    assert result.output.count("Error: Invalid or expired OAuth token") == 2
+    assert "Usage:" not in result.output
+    assert "Cost:" not in result.output
+    assert "Remaining credits:" not in result.output
+    assert "Requests:" not in result.output
+    assert "Tokens:" not in result.output
+    assert "Resets in:" not in result.output
