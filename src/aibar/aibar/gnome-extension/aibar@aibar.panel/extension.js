@@ -50,6 +50,21 @@ function _getProviderDisplayName(providerName) {
 }
 
 /**
+ * @brief Format one Date object as UTC datetime for provider freshness labels.
+ * @details Produces `YYYY-MM-DD HH:MM UTC`; invalid Date values return null.
+ * @param {Date} value Date object to format.
+ * @returns {string | null} Formatted UTC datetime string or null.
+ */
+function _formatUtcDateTime(value) {
+    if (!(value instanceof Date))
+        return null;
+    if (Number.isNaN(value.getTime()))
+        return null;
+    const isoValue = value.toISOString();
+    return `${isoValue.slice(0, 16).replace('T', ' ')} UTC`;
+}
+
+/**
  * @brief Resolve aibar executable path.
  * @details Prefers PATH discovery and falls back to AIBAR_PATH from the env file.
  * @returns {string} Resolved executable path or fallback command name.
@@ -940,10 +955,13 @@ class AIBarIndicator extends PanelMenu.Button {
         if (data.updated_at) {
             try {
                 const updatedDate = new Date(data.updated_at);
-                const timeFmt = {hour: '2-digit', minute: '2-digit'};
-                const updatedStr = updatedDate.toLocaleTimeString('en-US', timeFmt);
                 const nextDate = new Date(updatedDate.getTime() + this._refreshIntervalSeconds * 1000);
-                const nextStr = nextDate.toLocaleTimeString('en-US', timeFmt);
+                const updatedStr = _formatUtcDateTime(updatedDate);
+                const nextStr = _formatUtcDateTime(nextDate);
+                if (updatedStr === null || nextStr === null) {
+                    card.updateAtLabel.text = '';
+                    return;
+                }
                 card.updateAtLabel.text = `Updated: ${updatedStr}, Next: ${nextStr}`;
             } catch (_e) {
                 card.updateAtLabel.text = '';

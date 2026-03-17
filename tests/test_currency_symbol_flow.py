@@ -236,4 +236,5 @@ class TestCliPrintResultUsesCurrencySymbol:
         assert "└" in captured.out
         assert "Usage:" in captured.out
         assert "█" in captured.out
-        assert "Updated at:" in captured.out
+        assert "Updated:" in captured.out
+        assert "Next:" in captured.out

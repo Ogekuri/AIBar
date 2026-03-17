@@ -886,7 +886,7 @@ def _overlay_cached_failure_status(
     status_section: dict[str, object],
 ) -> ProviderResult:
     """
-    @brief Overlay cached failure status onto projected result for GeminiAI.
+    @brief Overlay cached failure status onto projected result.
     @details Reads `status[provider][window]`; when status marks `FAIL` with a
     non-empty error string, returns a copy of projected result carrying the cached
     error and optional status code while preserving payload metrics.
@@ -895,12 +895,10 @@ def _overlay_cached_failure_status(
     @param projected_result {ProviderResult} Cached payload result after projection.
     @param status_section {dict[str, object]} Cache status section.
     @return {ProviderResult} Result with overlaid cached error state when applicable.
+    @satisfies REQ-085
     @satisfies REQ-060
     @satisfies REQ-061
     """
-    if provider_key != ProviderName.GEMINIAI.value:
-        return projected_result
-
     status_entry = _get_window_attempt_status(status_section, provider_key, target_window)
     if not isinstance(status_entry, dict):
         return projected_result
@@ -1065,10 +1063,10 @@ def _update_idle_time_after_refresh(
 ) -> None:
     """
     @brief Persist provider-scoped idle-time metadata after refresh completion.
-    @details Computes per-provider `idle_until` from provider-local
-    `last_success_at + idle_delay_seconds`; for provider-local HTTP 429 results,
-    expands only that provider entry using
-    `max(idle_delay_seconds, retry_after_seconds)`.
+    @details Computes per-provider idle-time state after refresh execution.
+    Successful-only provider cycles schedule `idle_until = last_success_at + idle_delay_seconds`.
+    Provider cycles containing failures schedule
+    `idle_until = last_attempt_at + max(idle_delay_seconds, retry_after_seconds_or_0)`.
     @param fetched_results {list[ProviderResult]} Live results produced by refresh calls.
     @param runtime_config {RuntimeConfig} Runtime delay configuration.
     @return {None} Function return value.
@@ -1078,7 +1076,6 @@ def _update_idle_time_after_refresh(
     if not fetched_results:
         return
 
-    now_utc = datetime.now(timezone.utc)
     persisted_idle_time_state = load_idle_time()
     updated_idle_time_state = dict(persisted_idle_time_state)
     did_change = False
@@ -1090,9 +1087,7 @@ def _update_idle_time_after_refresh(
 
     for provider_key, provider_results in results_by_provider.items():
         successful_results = [result for result in provider_results if not result.is_error]
-        rate_limited_results = [
-            result for result in provider_results if _is_http_429_result(result)
-        ]
+        failed_results = [result for result in provider_results if result.is_error]
 
         last_success_at: datetime | None = None
         if successful_results:
@@ -1106,26 +1101,25 @@ def _update_idle_time_after_refresh(
                     previous_state.last_success_timestamp,
                     tz=timezone.utc,
                 )
-            elif rate_limited_results:
-                last_success_at = now_utc
-
-        if last_success_at is None:
-            continue
-
-        base_idle_until = last_success_at + timedelta(
-            seconds=runtime_config.idle_delay_seconds
-        )
-        idle_until = base_idle_until
-        if rate_limited_results:
-            max_retry_after_seconds = max(
-                _extract_retry_after_seconds(result)
-                for result in rate_limited_results
+        if failed_results:
+            last_attempt_at = max(
+                _normalize_utc(result.updated_at) for result in provider_results
             )
-            retry_idle_until = now_utc + timedelta(
+            max_retry_after_seconds = max(
+                _extract_retry_after_seconds(result) for result in failed_results
+            )
+            last_success_at = last_attempt_at
+            idle_until = last_attempt_at + timedelta(
                 seconds=max(runtime_config.idle_delay_seconds, max_retry_after_seconds)
             )
-            idle_until = max(base_idle_until, retry_idle_until)
+        else:
+            if last_success_at is None:
+                continue
+            idle_until = last_success_at + timedelta(
+                seconds=runtime_config.idle_delay_seconds
+            )
 
+        assert last_success_at is not None
         next_state = build_idle_time_state(
             last_success_at=last_success_at,
             idle_until=idle_until,
@@ -1905,6 +1899,8 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
     @satisfies REQ-041
     @satisfies REQ-042
     @satisfies REQ-043
+    @satisfies REQ-084
+    @satisfies REQ-085
     @satisfies REQ-067
     """
     provider_filter = parse_provider(provider)
@@ -1941,9 +1937,10 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
             click.echo("Cache unavailable while idle-time is active.")
         return
 
+    runtime_cfg = load_runtime_config()
+    refresh_interval_seconds = runtime_cfg.gnome_refresh_interval_seconds
     if output_json:
         output_doc = dict(retrieval.payload)
-        runtime_cfg = load_runtime_config()
         output_doc[_CACHE_EXTENSION_SECTION_KEY] = {
             "gnome_refresh_interval_seconds": runtime_cfg.gnome_refresh_interval_seconds,
         }
@@ -1983,14 +1980,49 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
             )
             if dual_results is not None:
                 result_5h, result_7d = dual_results
+                if result.is_error:
+                    result_raw = dict(result.raw)
+                    if result.window == WindowPeriod.HOUR_5:
+                        result_5h = result_5h.model_copy(
+                            update={"error": result.error, "raw": result_raw}
+                        )
+                    else:
+                        result_7d = result_7d.model_copy(
+                            update={"error": result.error, "raw": result_raw}
+                        )
                 rendered_panels.append(
-                    (provider_name, *_build_result_panel(provider_name, result_5h, label="5h"))
+                    (
+                        provider_name,
+                        *_build_result_panel(
+                            provider_name,
+                            result_5h,
+                            label="5h",
+                            refresh_interval_seconds=refresh_interval_seconds,
+                        ),
+                    )
                 )
                 rendered_panels.append(
-                    (provider_name, *_build_result_panel(provider_name, result_7d, label="7d"))
+                    (
+                        provider_name,
+                        *_build_result_panel(
+                            provider_name,
+                            result_7d,
+                            label="7d",
+                            refresh_interval_seconds=refresh_interval_seconds,
+                        ),
+                    )
                 )
                 continue
-        rendered_panels.append((provider_name, *_build_result_panel(provider_name, result)))
+        rendered_panels.append(
+            (
+                provider_name,
+                *_build_result_panel(
+                    provider_name,
+                    result,
+                    refresh_interval_seconds=refresh_interval_seconds,
+                ),
+            )
+        )
 
     shared_content_width = _resolve_shared_panel_content_width(rendered_panels)
     for provider_name, title, body_lines in rendered_panels:
@@ -2172,6 +2204,7 @@ def _build_result_panel(
     name: ProviderName,
     result: ProviderResult,
     label: str | None = None,
+    refresh_interval_seconds: int = 60,
 ) -> tuple[str, list[str]]:
     """
     @brief Build one provider panel title/body payload for CLI text rendering.
@@ -2180,10 +2213,14 @@ def _build_result_panel(
     @param name {ProviderName} Provider name enum value.
     @param result {ProviderResult} Provider result to render.
     @param label {str | None} Optional window label suffix (e.g. `"5h"`, `"7d"`).
+    @param refresh_interval_seconds {int} Refresh cadence (seconds) used to compute
+        the `Next` datetime label.
     @return {tuple[str, list[str]]} Panel title and body lines.
+    @satisfies REQ-084
     @satisfies REQ-034
     @satisfies REQ-035
     @satisfies REQ-051
+    @satisfies REQ-084
     @satisfies REQ-067
     """
     title = _provider_display_name(name)
@@ -2191,16 +2228,27 @@ def _build_result_panel(
     if label:
         title = f"{title} ({label})"
 
+    updated_at_utc = _normalize_utc(result.updated_at)
+    next_update_utc = updated_at_utc + timedelta(
+        seconds=max(0, int(refresh_interval_seconds))
+    )
     lines: list[str] = [
         f"Status: {'FAIL' if result.is_error else 'OK'}",
         f"Window: {window_label}",
         (
-            "Updated at: "
-            f"{result.updated_at.astimezone(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}"
+            "Updated: "
+            f"{updated_at_utc.strftime('%Y-%m-%d %H:%M UTC')}, "
+            f"Next: {next_update_utc.strftime('%Y-%m-%d %H:%M UTC')}"
         ),
     ]
     if result.is_error:
         lines.append(f"Error: {result.error}")
+        status_code = result.raw.get("status_code")
+        if isinstance(status_code, int):
+            lines.append(f"HTTP status: {status_code}")
+        retry_after = result.raw.get("retry_after_seconds")
+        if isinstance(retry_after, (int, float)) and retry_after > 0:
+            lines.append(f"Retry after: {float(retry_after):.1f}s")
         if not _should_render_metrics_after_error(name, result):
             return title, lines
 
@@ -2279,12 +2327,13 @@ def _build_result_panel(
             if isinstance(services, list):
                 lines.append(f"Billing services: {len(services)}")
 
-    status_code = result.raw.get("status_code")
-    if isinstance(status_code, int):
-        lines.append(f"HTTP status: {status_code}")
-    retry_after = result.raw.get("retry_after_seconds")
-    if isinstance(retry_after, (int, float)) and retry_after > 0:
-        lines.append(f"Retry after: {float(retry_after):.1f}s")
+    if not result.is_error:
+        status_code = result.raw.get("status_code")
+        if isinstance(status_code, int):
+            lines.append(f"HTTP status: {status_code}")
+        retry_after = result.raw.get("retry_after_seconds")
+        if isinstance(retry_after, (int, float)) and retry_after > 0:
+            lines.append(f"Retry after: {float(retry_after):.1f}s")
 
     return title, lines
 

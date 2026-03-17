@@ -1,8 +1,8 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.3.22"
-date: "2026-03-14"
+version: "0.3.23"
+date: "2026-03-17"
 author: "req-change"
 scope:
   paths:
@@ -137,7 +137,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-014**: MUST attempt Codex token refresh when refresh token exists and `last_refresh` age is at least eight days.
 - **REQ-015**: SHOULD continue Codex fetch with existing credentials when non-authentication refresh exceptions occur, leaving refresh failures non-fatal.
 - **REQ-016**: MUST load `~/.config/aibar/env` into subprocess environment before GNOME extension executes `aibar show --json` and before popup `Refresh Now` executes `aibar show --json --force`.
-- **REQ-017**: Quota-only cards MUST render `Remaining credits: <remaining>/<limit>` with `<remaining>` in bold; reset labels in extension cards MUST start with `Reset in:` and append `⚠️ Limit reached!` at displayed `100.0%`; rate-limit quota payloads MUST NOT render `Error: Rate limited. Try again later.`; Copilot cards MUST render a `30d` window bar with reset text directly below that bar and before remaining-credits text; popup header/action labels MUST render `AIBar` branding (`AIBar`, `Open AIBar Report`); each provider card tab MUST render `Updated: <HH:MM>, Next: <HH:MM>` aligned bottom-right using `aibar-reset-label` font/color, where `Updated` is sourced from provider `updated_at` and `Next` is computed as `updated_at + gnome_refresh_interval_seconds`.
+- **REQ-017**: Quota-only cards MUST render `Remaining credits: <remaining>/<limit>` with `<remaining>` in bold; reset labels in extension cards MUST start with `Reset in:` and append `⚠️ Limit reached!` at displayed `100.0%`; rate-limit quota payloads MUST NOT render `Error: Rate limited. Try again later.`; Copilot cards MUST render a `30d` window bar with reset text directly below that bar and before remaining-credits text; popup header/action labels MUST render `AIBar` branding (`AIBar`, `Open AIBar Report`); each provider card tab MUST render `Updated: <datetime>, Next: <datetime>` aligned bottom-right using `aibar-reset-label` font/color, where `Updated` is sourced from provider `updated_at`, `Next` is computed as `updated_at + gnome_refresh_interval_seconds`, and datetime format MUST include date and time and match CLI `show` output formatting.
 - **REQ-018**: MUST set GNOME panel label to `Err` and truncate popup error text to 40 characters when command execution or JSON parsing fails.
 - **REQ-019**: SHOULD order extension provider tabs/cards by `claude`, `openrouter`, `copilot`, `codex`, with providers not listed in ordering array appended alphabetically.
 - **REQ-020**: MUST include each discovered source symbol in `docs/REFERENCES.md` with file path, symbol kind, line-range evidence, and parsed Doxygen fields (`@brief`, `@param`, `@return`, `@raises`) when present in source declarations.
@@ -162,7 +162,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-038**: MUST update only the refreshed provider idle-time entry after success by setting `last_success_at` to refresh completion time and `idle_until` to `last_success_at + idle_delay_seconds`, then persist epoch and human-readable values in `~/.cache/aibar/idle-time.json`.
 - **REQ-039**: MUST support force-refresh handling that deletes `~/.cache/aibar/idle-time.json`, bypasses idle-time gating for the current execution, and executes a fresh provider refresh before loading `~/.cache/aibar/cache.json`.
 - **REQ-040**: MUST enforce at least `api_call_delay_milliseconds` between consecutive provider API requests during refresh execution, with default `1000` milliseconds when configuration is missing.
-- **REQ-041**: MUST update idle-time only for the rate-limited provider on HTTP `429` using `max(retry_after_seconds, idle_delay_seconds)`; non-rate-limited providers MUST continue scheduling with `idle_delay_seconds`.
+- **REQ-041**: MUST update idle-time for each provider refresh failure in `~/.cache/aibar/idle-time.json` using `idle_until = last_attempt_at + max(idle_delay_seconds, retry_after_seconds_or_0)`, where `retry_after_seconds_or_0` is parsed from API error metadata when available.
 - **REQ-042**: MUST minimize provider API requests and cache I/O by reusing in-memory cache and idle-time state within each refresh cycle and persisting `cache.json` or `idle-time.json` only when content changes.
 - **REQ-043**: MUST centralize refresh and load logic for `~/.cache/aibar/cache.json` into shared internal functions reused by CLI `show` refresh and output workflows.
 - **REQ-044**: MUST persist per-provider, per-window last-attempt status in `cache.json` with fields `result`, `error`, and `updated_at`, where `result` is `OK` or `FAIL`.
@@ -203,6 +203,8 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-080**: MUST disable the extension via `gnome-extensions disable aibar@aibar.panel` before removing files in `gnome-uninstall` with colored status output.
 - **REQ-081**: MUST remove the extension directory `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/` and all its contents in `gnome-uninstall`.
 - **REQ-082**: MUST exit with non-zero status and descriptive error message when the extension directory does not exist in `gnome-uninstall`.
+- **REQ-084**: CLI text `show` MUST render per-provider freshness line as `Updated: <datetime last update>, Next: <datetime next update>` where datetime includes date and time and uses the same formatting rule as GNOME extension provider cards.
+- **REQ-085**: CLI text `show` MUST render per-provider last-attempt authentication and refresh-rate-limit failures from cached status errors, including invalid or expired OAuth tokens and HTTP `429` refresh-limit diagnostics.
 
 ## 4. Test Requirements
 
@@ -211,14 +213,14 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-001**: MUST verify `show` rejects unsupported window/provider values with non-zero exit and Click `BadParameter` diagnostics.
 - **TST-002**: MUST verify credential precedence by asserting env vars override env-file values and provider stores for at least one provider.
 - **TST-003**: MUST verify successful refresh writes `~/.cache/aibar/cache.json` with payload and last-attempt status sections used by `show --json`, and writes provider-keyed `last_success_at`/`idle_until` epoch and human-readable fields in `~/.cache/aibar/idle-time.json`.
-- **TST-004**: MUST verify GNOME extension error path sets panel text `Err`, caps displayed error string length to 40 characters, renders quota-only card labels as `Remaining credits: <remaining>/<limit>` with bold `<remaining>`, renders reset labels with `Reset in:` prefix, suppresses `Error: Rate limited. Try again later.` for rate-limit quota payloads, appends `⚠️ Limit reached!` after reset countdown at displayed `100.0%`, renders Copilot `30d` bar/reset placement before remaining-credits text, renders popup labels `AIBar` and `Open AIBar Report`, verifies popup `Refresh Now` executes with `--force`, verifies `scripts/test-gnome-extension.sh` includes `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800`, and verifies each provider card renders `Updated: <HH:MM>, Next: <HH:MM>` label bottom-right sourced from `updated_at` and `gnome_refresh_interval_seconds`.
+- **TST-004**: MUST verify GNOME extension error path sets panel text `Err`, caps displayed error string length to 40 characters, renders quota-only card labels as `Remaining credits: <remaining>/<limit>` with bold `<remaining>`, renders reset labels with `Reset in:` prefix, suppresses `Error: Rate limited. Try again later.` for rate-limit quota payloads, appends `⚠️ Limit reached!` after reset countdown at displayed `100.0%`, renders Copilot `30d` bar/reset placement before remaining-credits text, renders popup labels `AIBar` and `Open AIBar Report`, verifies popup `Refresh Now` executes with `--force`, verifies `scripts/test-gnome-extension.sh` includes `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800`, and verifies each provider card renders `Updated: <datetime>, Next: <datetime>` label bottom-right sourced from `updated_at` and `gnome_refresh_interval_seconds` with date-and-time formatting identical to CLI `show`.
 - **TST-005**: MUST verify Copilot provider always returns `window=30d` regardless of requested window argument.
 - **TST-006**: MUST verify `req --here --references` reproduces `docs/REFERENCES.md` without missing symbol entries and preserves Doxygen field extraction for documented symbols.
 - **TST-007**: MUST verify GNOME panel status labels render in the REQ-021 order (including OpenAI cost), enforce provider style classes and color mapping, verify dynamic icon color/blink thresholds, render zero-cost labels with provider currency symbol, and omit unavailable labels when source metrics are unavailable.
 - **TST-008**: MUST verify `pyproject.toml` declares `[build-system]` with `hatchling`, `[project.scripts]` entry `aibar = "aibar.cli:main"`, runtime `dependencies` list, and `requires-python` constraint.
 - **TST-009**: MUST verify `gnome-install` resolves extension source from package location, validates source directory, copies files to target, enables the extension, and exits non-zero on missing source; MUST verify `gnome-uninstall` removes extension directory, disables the extension, and exits non-zero when extension directory does not exist.
 - **TST-010**: MUST verify `Remaining credits: <remaining> / <limit>` appears for Claude, Codex, and Copilot when both quota values exist.
-- **TST-011**: MUST verify HTTP `429` handling updates idle-time only for rate-limited providers using `max(retry_after_seconds, idle_delay_seconds)` while non-rate-limited providers keep `idle_until = last_success_at + idle_delay_seconds`.
+- **TST-011**: MUST verify every provider refresh failure updates provider-scoped idle-time using `idle_until = last_attempt_at + max(idle_delay_seconds, retry_after_seconds_or_0)`, including HTTP `429` and authentication failures without `retry_after` metadata.
 - **TST-013**: MUST verify `setup` prompts idle-delay first, API-call delay milliseconds second (default `1000`), `gnome_refresh_interval_seconds` third, `billing_data` fourth (default `billing_data`), then per-provider currency symbol prompts, and persists all values into `~/.config/aibar/config.json`.
 - **TST-014**: MUST verify `show` evaluates idle-time per provider, serves `~/.cache/aibar/cache.json` for providers with future `idle_until`, and refreshes only providers with missing or expired idle-time state.
 - **TST-015**: MUST verify `show --force` removes `~/.cache/aibar/idle-time.json`, bypasses idle-time gating for current execution, refreshes providers, and recreates idle-time metadata before loading `~/.cache/aibar/cache.json`.
@@ -243,6 +245,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-034**: MUST verify repeated startup update HTTP `429` responses compute idle-time using `max(300, max(retry-after values))`.
 - **TST-035**: MUST verify `--upgrade` and `--uninstall` invoke required `uv tool` commands and propagate subprocess exit codes.
 - **TST-036**: MUST verify `--version` and `--ver` print installed version and bypass subcommand execution.
+- **TST-037**: MUST verify CLI text `show` renders `Updated: <datetime last update>, Next: <datetime next update>` with date-and-time formatting aligned to GNOME extension and surfaces cached authentication or refresh-rate-limit status errors per provider/window.
 - **TST-037**: MUST verify `pyproject.toml` wheel `packages` setting includes the `aibar` package containing `gnome-extension/` subtree, and sdist `include` covers `src/aibar/aibar/gnome-extension/**` and `scripts/**` for `.github/workflows/release-uvx+extension.yml` builds.
 
 ## 5. Evidence
@@ -293,7 +296,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-014 | `src/aibar/aibar/providers/codex.py` + `CodexCredentials.needs_refresh` + threshold `age.days >= 8`; `CodexProvider.fetch` calls refresher. |
 | REQ-015 | `src/aibar/aibar/providers/codex.py` + `fetch` + catches generic refresh exception and continues (`pass  # Continue with existing token`). |
 | REQ-016 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_refreshData` and popup `Refresh Now` handler + loads env file and `launcher.setenv(key, value, true)` before command spawn, including `--force` manual refresh path. |
-| REQ-017 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_updateUI/_populateProviderCard/_buildPopupMenu` + panel label fallback chain; quota-only cards with bold remaining credits; `Reset in:` prefix; `⚠️ Limit reached!` suffix at displayed `100.0%`; suppression of `Error: Rate limited. Try again later.` for rate-limit quota payloads; Copilot `30d` reset placement; popup labels `AIBar` and `Open AIBar Report`; `Updated: <HH:MM>, Next: <HH:MM>` label bottom-right per provider card sourced from `updated_at` and `this._refreshIntervalSeconds`. |
+| REQ-017 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_updateUI/_populateProviderCard/_buildPopupMenu` + panel label fallback chain; quota-only cards with bold remaining credits; `Reset in:` prefix; `⚠️ Limit reached!` suffix at displayed `100.0%`; suppression of `Error: Rate limited. Try again later.` for rate-limit quota payloads; Copilot `30d` reset placement; popup labels `AIBar` and `Open AIBar Report`; `Updated: <datetime>, Next: <datetime>` label bottom-right per provider card sourced from `updated_at` and `this._refreshIntervalSeconds` using date-and-time formatting aligned with CLI `show`. |
 | REQ-018 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_handleError` + `this._panelLabel.set_text('Err')` and `message.substring(0, 40)`. |
 | REQ-019 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_providerOrder` and `_updateUI` sorting + unknown providers rank `999` then lexical order. |
 | REQ-020 | `docs/REFERENCES.md` + per-symbol entries containing symbol identifier, file path, and line-range spans. |
@@ -308,7 +311,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-038 | `src/aibar/aibar/cli.py` + successful refresh path computes per-provider `idle_until = last_success_at + idle_delay_seconds` and writes provider-keyed epoch/human-readable values to `~/.cache/aibar/idle-time.json`. |
 | REQ-039 | `src/aibar/aibar/cli.py` + shared force-refresh handling removes `~/.cache/aibar/idle-time.json`, bypasses idle-time gate, and refreshes before loading `cache.json`. |
 | REQ-040 | `src/aibar/aibar/cli.py` + refresh scheduler enforces configured `api_call_delay_seconds` between consecutive provider API requests. |
-| REQ-041 | `src/aibar/aibar/cli.py` + HTTP 429 handling uses `retry-after` and `idle_delay_seconds` to update only the rate-limited provider idle-time entry. |
+| REQ-041 | `src/aibar/aibar/cli.py` + refresh-failure handling computes provider-scoped `idle_until = last_attempt_at + max(idle_delay_seconds, retry_after_seconds_or_0)` and persists the failed provider state in `~/.cache/aibar/idle-time.json`. |
 | REQ-042 | `src/aibar/aibar/cli.py` + retrieval pipeline uses only `cache.json` and `idle-time.json` persisted artifacts for idle-time-gated API minimization. |
 | REQ-043 | `src/aibar/aibar/cli.py` + shared cache refresh/load helpers provide one retrieval implementation for CLI retrieval and render flows. |
 | REQ-044 | `src/aibar/aibar/cache.py` + cache status-write helpers persist per-provider/window `result` (`OK`/`FAIL`), `error`, and `updated_at` fields. |
@@ -318,13 +321,13 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | TST-001 | `src/aibar/aibar/cli.py` + `parse_window/parse_provider` provide validation points for invalid input diagnostics. |
 | TST-002 | `src/aibar/aibar/config.py` + `get_token` implements explicit precedence chain requiring regression coverage. |
 | TST-003 | `tests/test_cli_idle_cache.py` and `tests/test_cli_idle_force.py` + assertions for cache schema parity with `show --json` and provider-keyed idle-time epoch/human-readable field persistence under `~/.cache/aibar/`. |
-| TST-004 | `tests/test_extension_quota_label.py` + popup-label assertions (`AIBar`, `Open AIBar Report`), reset-prefix and `⚠️ Limit reached!` assertions, rate-limit error-string suppression assertions, `Updated:` and `Next:` provider-card label assertions, and popup `Refresh Now` `--force` assertion; `tests/test_extension_dev_script.py` + `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800`; `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_handleError/_populateProviderCard/_buildPopupMenu` coverage. |
+| TST-004 | `tests/test_extension_quota_label.py` + popup-label assertions (`AIBar`, `Open AIBar Report`), reset-prefix and `⚠️ Limit reached!` assertions, rate-limit error-string suppression assertions, and `Updated: <datetime>, Next: <datetime>` provider-card label assertions with date-and-time formatting parity against CLI `show`; `tests/test_extension_dev_script.py` + `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800`; `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_handleError/_populateProviderCard/_buildPopupMenu` coverage. |
 | TST-005 | `src/aibar/aibar/providers/copilot.py` + `fetch` hard-codes `effective_window` to `WindowPeriod.DAY_30`. |
 | TST-006 | `docs/REFERENCES.md` + generated symbol coverage for tracked `src/` files validates documentation inventory completeness. |
 | TST-007 | `tests/test_extension_quota_label.py` + panel-segment order assertions (including OpenAI cost), provider style classes, zero-cost currency-label visibility checks, bold primary percentages, and missing-metric omission behavior. |
 | TST-008 | `tests/test_pyproject_metadata.py` + assertions for `[build-system]` backend, `[project.scripts]` entry, `dependencies` list, and `requires-python` constraint in `pyproject.toml`. |
 | TST-010 | `tests/test_reset_pending_message.py` and `src/aibar/aibar/cli.py` + verify remaining-credits rendering path in text output for quota providers. |
-| TST-011 | `tests/test_cli_idle_time_429.py` + rate-limit scenarios verify provider-scoped `max(retry_after_seconds, idle_delay_seconds)` updates while non-rate-limited providers retain default idle-delay scheduling. |
+| TST-011 | `tests/test_cli_idle_time_429.py` + provider failure scenarios verify provider-scoped `idle_until = last_attempt_at + max(idle_delay_seconds, retry_after_seconds_or_0)` updates across HTTP `429` and auth failures without retry-after metadata. |
 | TST-013 | `tests/test_setup_runtime_config.py` + setup prompt-order/default assertions and `~/.config/aibar/config.json` persistence checks for idle delay, API delay, and gnome_refresh_interval_seconds. |
 | TST-014 | `tests/test_cli_idle_cache.py` + provider-scoped idle-time future/missing/expired branches verify per-provider cache-serving behavior and refresh gating in `show`. |
 | TST-015 | `tests/test_cli_idle_force.py` + force-refresh path verifies idle-time deletion, gate bypass, refresh invocation, and idle-time regeneration before cache load. |
@@ -353,3 +356,6 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | TST-022 | `tests/test_claude_token_refresh_script.py` + source-level assertion that `do_refresh()` body contains `LOG_FILE` truncation before any `log` invocation. |
 | TST-023 | `tests/test_currency_symbol_flow.py` + assertions for `currency_symbol` field in `UsageMetrics`, CLI `_print_result` cost formatting, and GNOME extension panel label using metrics symbol. |
 | TST-030 | `tests/test_cli_show_panel_alignment.py` + CLI panel output assertions verify all rendered panels share identical visible width within one `show` execution. |
+| REQ-084 | `src/aibar/aibar/cli.py` + `_print_result` + per-provider freshness line renders `Updated: <datetime>, Next: <datetime>` with date-and-time formatting aligned to extension cards. |
+| REQ-085 | `src/aibar/aibar/cli.py` + text renderer surfaces authentication and refresh-rate-limit status failures from cached per-provider/per-window status errors. |
+| TST-037 | `tests/test_cli_show_status_messages.py` + verifies CLI `show` freshness line format parity with extension datetime formatter and visibility of authentication/rate-limit status failures. |

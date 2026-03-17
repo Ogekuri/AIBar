@@ -2,7 +2,7 @@
 @file
 @brief HTTP 429 idle-time update tests for CLI refresh.
 @details Verifies provider-scoped idle-time persistence uses
-max(idle-delay, retry-after) only for rate-limited providers, while non-rate-limited
+max(idle-delay, retry-after) for provider refresh failures, while successful
 providers keep idle-delay scheduling.
 @satisfies REQ-041
 @satisfies TST-011
@@ -72,6 +72,21 @@ def _make_success_provider_result(provider_name: ProviderName) -> ProviderResult
         window=WindowPeriod.DAY_7,
         metrics=UsageMetrics(cost=1.0, remaining=80.0, limit=100.0),
         raw={"status_code": 200},
+    )
+
+
+def _make_auth_failure_provider_result(provider_name: ProviderName) -> ProviderResult:
+    """
+    @brief Build deterministic authentication failure result fixture.
+    @param provider_name {ProviderName} Provider identifier.
+    @return {ProviderResult} Authentication failure result.
+    """
+    return ProviderResult(
+        provider=provider_name,
+        window=WindowPeriod.DAY_7,
+        metrics=UsageMetrics(),
+        error="Invalid or expired OAuth token",
+        raw={"status_code": 401},
     )
 
 
@@ -182,4 +197,46 @@ def test_429_only_affects_rate_limited_provider_idle_time(
     )
     codex_delta = codex_state["idle_until_timestamp"] - codex_state["last_success_timestamp"]
     assert 899 <= openrouter_delta <= 901
+    assert 299 <= codex_delta <= 301
+
+
+def test_auth_failure_updates_idle_time_with_idle_delay_floor(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """
+    @brief Verify authentication failures still update provider idle-time metadata.
+    @details Executes one provider refresh failure without retry-after metadata and
+    asserts idle-time uses configured idle-delay floor (`retry_after=0` path).
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @param tmp_path {Path} Temporary path fixture.
+    @return {None} Function return value.
+    @satisfies REQ-041
+    @satisfies TST-011
+    """
+    _patch_config_paths(monkeypatch, tmp_path)
+    config_module.save_runtime_config(
+        config_module.RuntimeConfig(idle_delay_seconds=300, api_call_delay_milliseconds=20)
+    )
+
+    codex = MagicMock()
+    codex.name = ProviderName.CODEX
+    codex.is_configured.return_value = True
+    codex.fetch = AsyncMock(
+        return_value=_make_auth_failure_provider_result(ProviderName.CODEX)
+    )
+
+    monkeypatch.setattr(
+        "aibar.cli.get_providers",
+        lambda: {ProviderName.CODEX: codex},
+    )
+    monkeypatch.setattr("aibar.cli._apply_api_call_delay", lambda state: None)
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["show", "--json", "--force"])
+    assert result.exit_code == 0
+
+    idle_state = json.loads(config_module.IDLE_TIME_PATH.read_text(encoding="utf-8"))
+    codex_state = idle_state[ProviderName.CODEX.value]
+    codex_delta = codex_state["idle_until_timestamp"] - codex_state["last_success_timestamp"]
     assert 299 <= codex_delta <= 301
