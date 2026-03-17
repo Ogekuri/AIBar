@@ -17,6 +17,7 @@ dependencies = [
     "google-auth-oauthlib",
     "httpx",
     "pydantic",
+    "pytest",
 ]
 
 [project.scripts]

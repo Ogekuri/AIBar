@@ -1,7 +1,7 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.3.24"
+version: "0.3.25"
 date: "2026-03-17"
 author: "req-change"
 scope:
@@ -99,7 +99,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **CTN-004**: MUST persist `~/.cache/aibar/cache.json` as the canonical store for per-provider, per-window last-success payload snapshots and last-attempt status metadata.
 - **CTN-005**: MAY depend on unofficial/internal endpoints when official usage APIs are unavailable for Claude, Copilot, or Codex integrations.
 - **CTN-006**: MUST keep `docs/REFERENCES.md` synchronized with symbols defined under `src/` and `.github/workflows/`.
-- **CTN-007**: MUST declare `hatchling` as `[build-system]` backend in `pyproject.toml` with `[project]` metadata including `name`, `version`, `requires-python`, `dependencies`, and `[project.scripts]` console entry point.
+- **CTN-007**: MUST declare `hatchling` as `[build-system]` backend in `pyproject.toml` with `[project]` metadata including `name`, `version`, `requires-python`, `[project.scripts]`, and `dependencies` containing `pytest`.
 - **CTN-008**: MUST persist runtime configuration in `~/.config/aibar/config.json` with keys `idle_delay_seconds`, `api_call_delay_milliseconds`, `gnome_refresh_interval_seconds`, `billing_data`, and `currency_symbols` (mapping provider name → currency symbol string; default `"$"` per provider when key is absent).
 - **CTN-009**: MUST persist provider-scoped idle-time state in `~/.cache/aibar/idle-time.json`, where each provider key stores epoch and human-readable `last_success_at` and `idle_until` fields.
 - **CTN-010**: MUST update `cache.json` payload fields only after successful fetch for the same provider/window and MUST preserve previous payload fields on failed fetch attempts, including HTTP `429`.
@@ -219,7 +219,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-005**: MUST verify Copilot provider always returns `window=30d` regardless of requested window argument.
 - **TST-006**: MUST verify `req --here --references` reproduces `docs/REFERENCES.md` without missing symbol entries and preserves Doxygen field extraction for documented symbols.
 - **TST-007**: MUST verify GNOME panel status labels render in the REQ-021 order (including OpenAI cost), enforce provider style classes and color mapping, verify dynamic icon color/blink thresholds, render zero-cost labels with provider currency symbol, and omit unavailable labels when source metrics are unavailable.
-- **TST-008**: MUST verify `pyproject.toml` declares `[build-system]` with `hatchling`, `[project.scripts]` entry `aibar = "aibar.cli:main"`, runtime `dependencies` list, and `requires-python` constraint.
+- **TST-008**: MUST verify `pyproject.toml` declares `[build-system]` with `hatchling`, `[project.scripts]` entry `aibar = "aibar.cli:main"`, `requires-python`, and `dependencies` list containing `pytest`.
 - **TST-009**: MUST verify `gnome-install` resolves extension source from package location, validates source directory, copies files to target, enables the extension, and exits non-zero on missing source; MUST verify `gnome-uninstall` removes extension directory, disables the extension, and exits non-zero when extension directory does not exist.
 - **TST-010**: MUST verify `Remaining credits: <remaining> / <limit>` appears for Claude, Codex, and Copilot when both quota values exist.
 - **TST-011**: MUST verify every provider refresh failure updates provider-scoped idle-time using `idle_until = last_attempt_at + max(idle_delay_seconds, retry_after_seconds_or_0)`, including HTTP `429` and authentication failures without `retry_after` metadata.
@@ -269,7 +269,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | CTN-004 | `src/aibar/aibar/cache.py` + cache schema helpers and `src/aibar/aibar/cli.py` + `cache.json` as canonical store for payload snapshots and attempt statuses. |
 | CTN-005 | `src/aibar/aibar/config.py` + `PROVIDER_INFO` notes + entries describing unofficial/internal usage for Claude, Copilot, and Codex. |
 | CTN-006 | `docs/REFERENCES.md` + full symbol index grouped by source file, regenerated from repository code. |
-| CTN-007 | `pyproject.toml` + `[build-system] requires = ["hatchling"]` + `[project]` metadata fields `name`, `version`, `requires-python`, `dependencies`, `[project.scripts]`. |
+| CTN-007 | `pyproject.toml` + `[build-system] requires = ["hatchling"]` + `[project]` metadata fields `name`, `version`, `requires-python`, `dependencies` (including `pytest`), and `[project.scripts]`. |
 | CTN-008 | `src/aibar/aibar/config.py` + `RuntimeConfig` model + `idle_delay_seconds`, `api_call_delay_seconds`, `gnome_refresh_interval_seconds`, and `currency_symbols` fields persisted in `~/.config/aibar/config.json`. |
 | CTN-009 | `src/aibar/aibar/config.py` + `load_idle_time/save_idle_time` and `src/aibar/aibar/cli.py` + provider-scoped idle-time lifecycle handling in `~/.cache/aibar/idle-time.json`. |
 | CTN-010 | `src/aibar/aibar/cache.py` + conditional payload-write helpers guarantee payload replacement only on successful provider/window fetch and payload preservation on failed attempts including HTTP `429`. |
@@ -329,7 +329,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | TST-005 | `src/aibar/aibar/providers/copilot.py` + `fetch` hard-codes `effective_window` to `WindowPeriod.DAY_30`. |
 | TST-006 | `docs/REFERENCES.md` + generated symbol coverage for tracked `src/` files validates documentation inventory completeness. |
 | TST-007 | `tests/test_extension_quota_label.py` + panel-segment order assertions (including OpenAI cost), provider style classes, zero-cost currency-label visibility checks, bold primary percentages, and missing-metric omission behavior. |
-| TST-008 | `tests/test_pyproject_metadata.py` + assertions for `[build-system]` backend, `[project.scripts]` entry, `dependencies` list, and `requires-python` constraint in `pyproject.toml`. |
+| TST-008 | `tests/test_pyproject_metadata.py` + assertions for `[build-system]` backend, `[project.scripts]` entry, `requires-python`, and `dependencies` list containing `pytest` in `pyproject.toml`. |
 | TST-010 | `tests/test_reset_pending_message.py` and `src/aibar/aibar/cli.py` + verify remaining-credits rendering path in text output for quota providers. |
 | TST-011 | `tests/test_cli_idle_time_429.py` + provider failure scenarios verify provider-scoped `idle_until = last_attempt_at + max(idle_delay_seconds, retry_after_seconds_or_0)` updates across HTTP `429` and auth failures without retry-after metadata. |
 | TST-013 | `tests/test_setup_runtime_config.py` + setup prompt-order/default assertions and `~/.config/aibar/config.json` persistence checks for idle delay, API delay, and gnome_refresh_interval_seconds. |
