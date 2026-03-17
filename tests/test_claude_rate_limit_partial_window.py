@@ -1,13 +1,13 @@
 """
 @file
-@brief Claude HTTP 429 partial-window rendering tests.
-@details Verifies the CLI dual-window Claude path keeps rate-limit error text in
-the 5h section while restoring 7d usage/reset values from persisted Claude payload.
+@brief Claude HTTP 429 error-only rendering tests.
+@details Verifies Claude dual-window fetch preserves explicit errors for both
+windows and CLI output suppresses metric/statistic lines on failed states.
 @satisfies REQ-036
-@satisfies TST-011
+@satisfies REQ-037
+@satisfies TST-038
 """
 
-from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, patch
 
 from aibar.cli import _fetch_claude_dual, _print_result
@@ -26,50 +26,21 @@ def _make_429_result(window: WindowPeriod) -> ProviderResult:
         window=window,
         metrics=UsageMetrics(),
         error="Rate limited. Try again later.",
-        raw={"status_code": 429},
+        raw={"status_code": 429, "retry_after_seconds": 300},
     )
 
 
-def _build_claude_snapshot_payload(
-    reset_5h: datetime,
-    reset_7d: datetime,
-) -> dict[str, object]:
+def test_claude_429_renders_error_only_output_for_both_windows(capsys) -> None:
     """
-    @brief Build synthetic Claude dual-window payload for 429 fallback tests.
-    @param reset_5h {datetime} Future reset timestamp for five-hour window.
-    @param reset_7d {datetime} Future reset timestamp for seven-day window.
-    @return {dict[str, object]} Serializable Claude dual-window raw payload.
-    """
-    return {
-        "five_hour": {
-            "utilization": 40.0,
-            "resets_at": reset_5h.isoformat(),
-        },
-        "seven_day": {
-            "utilization": 40.0,
-            "resets_at": reset_7d.isoformat(),
-        },
-    }
-
-
-def test_claude_429_renders_partial_window_output(capsys) -> None:
-    """
-    @brief Verify Claude dual-window CLI output on HTTP 429 keeps persisted 7d metrics.
-    @details Asserts 5h keeps rate-limit error and `100.0%` usage, while 7d restores
-    usage from persisted payload (`40.0%`) and both windows render reset lines.
+    @brief Verify Claude dual-window CLI output suppresses all statistics on HTTP 429.
+    @details Asserts both windows remain in failed state and only render error plus
+    combined HTTP status/retry diagnostics.
     @param capsys {_pytest.capture.CaptureFixture[str]} Output capture fixture.
     @return {None} Function return value.
     @satisfies REQ-036
-    @satisfies TST-011
+    @satisfies REQ-037
+    @satisfies TST-038
     """
-    now = datetime.now(timezone.utc)
-    reset_5h = now + timedelta(hours=1, minutes=25)
-    reset_7d = now + timedelta(hours=12, minutes=25)
-    snapshot_payload = _build_claude_snapshot_payload(
-        reset_5h=reset_5h,
-        reset_7d=reset_7d,
-    )
-
     provider = ClaudeOAuthProvider(token="sk-ant-test-token")
     live_429 = {
         WindowPeriod.HOUR_5: _make_429_result(WindowPeriod.HOUR_5),
@@ -81,29 +52,17 @@ def test_claude_429_renders_partial_window_output(capsys) -> None:
         "fetch_all_windows",
         new=AsyncMock(return_value=live_429),
     ):
-        result_5h, result_7d = _fetch_claude_dual(
-            provider,
-            snapshot_payload=snapshot_payload,
-        )
+        result_5h, result_7d = _fetch_claude_dual(provider)
 
     assert result_5h.is_error
-    assert not result_7d.is_error
-    assert result_5h.metrics.usage_percent == 100.0
-    assert result_7d.metrics.usage_percent == 40.0
-    assert result_5h.metrics.reset_at is not None
-    assert result_7d.metrics.reset_at is not None
-
-    delta_5h = result_5h.metrics.reset_at - now
-    delta_7d = result_7d.metrics.reset_at - now
-    assert 83 * 60 <= delta_5h.total_seconds() <= 86 * 60
-    assert 743 * 60 <= delta_7d.total_seconds() <= 746 * 60
+    assert result_7d.is_error
 
     _print_result(ProviderName.CLAUDE, result_5h, label="5h")
     _print_result(ProviderName.CLAUDE, result_7d, label="7d")
     output = capsys.readouterr().out
 
-    assert output.count("Error: Rate limited. Try again later.") == 1
-    assert output.count("Usage:") == 2
-    assert "100.0%" in output
-    assert "40.0%" in output
-    assert output.count("Resets in:") == 2
+    assert output.count("Error: Rate limited. Try again later.") == 2
+    assert output.count("HTTP status: 429, Retry after: 300 sec.") == 2
+    assert "Usage:" not in output
+    assert "Resets in:" not in output
+    assert "Remaining credits:" not in output

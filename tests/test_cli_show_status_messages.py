@@ -93,14 +93,15 @@ def test_show_renders_updated_next_datetime_with_runtime_refresh_interval(
     assert expected_freshness_line in result.output
 
 
-def test_show_renders_cached_authentication_failure_from_status_section(
+def test_show_renders_cached_failure_error_only_with_retry_metadata(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
     """
-    @brief Verify CLI `show` surfaces cached authentication failures for non-Gemini providers.
+    @brief Verify CLI `show` renders failed status blocks without statistics lines.
     @details Writes OpenRouter cache payload with `status[openrouter][7d]=FAIL` and
-    asserts text output prints cached authentication error during idle-time serving.
+    asserts output prints cached error plus combined HTTP status/retry metadata while
+    suppressing stale payload metrics.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
     @param tmp_path {Path} Temporary path fixture.
     @return {None} Function return value.
@@ -127,6 +128,7 @@ def test_show_renders_cached_authentication_failure_from_status_section(
                         "error": "Invalid or expired OAuth token",
                         "updated_at": datetime.now(timezone.utc).isoformat(),
                         "status_code": 401,
+                        "retry_after_seconds": 300,
                     }
                 }
             },
@@ -153,4 +155,7 @@ def test_show_renders_cached_authentication_failure_from_status_section(
     assert result.exit_code == 0
     assert "Status: FAIL" in result.output
     assert "Error: Invalid or expired OAuth token" in result.output
-    assert "HTTP status: 401" in result.output
+    assert "HTTP status: 401, Retry after: 300 sec." in result.output
+    assert "Cost:" not in result.output
+    assert "Usage:" not in result.output
+    assert "Remaining credits:" not in result.output

@@ -748,6 +748,27 @@ def _apply_api_call_delay(throttle_state: dict[str, float | int] | None) -> None
     throttle_state["last_call_started"] = time.monotonic()
 
 
+def _coerce_retry_after_seconds(value: object) -> int | None:
+    """
+    @brief Normalize retry-after metadata to positive integer seconds.
+    @details Accepts integer/float/string payload values and converts them to
+    integer seconds; non-numeric, invalid, and non-positive values return None.
+    @param value {object} Retry-after candidate value.
+    @return {int | None} Positive retry-after seconds or None when unavailable.
+    @satisfies REQ-037
+    @satisfies REQ-041
+    """
+    if not isinstance(value, (int, float, str)):
+        return None
+    try:
+        parsed = int(float(value))
+    except (TypeError, ValueError):
+        return None
+    if parsed <= 0:
+        return None
+    return parsed
+
+
 def _extract_retry_after_seconds(result: ProviderResult) -> int:
     """
     @brief Extract normalized retry-after seconds from provider error payload.
@@ -757,14 +778,10 @@ def _extract_retry_after_seconds(result: ProviderResult) -> int:
     @return {int} Non-negative retry-after delay in seconds.
     @satisfies REQ-041
     """
-    value = result.raw.get("retry_after_seconds")
-    if not isinstance(value, (int, float, str)):
+    parsed = _coerce_retry_after_seconds(result.raw.get("retry_after_seconds"))
+    if parsed is None:
         return 0
-    try:
-        parsed = int(float(value))
-    except (TypeError, ValueError):
-        return 0
-    return max(0, parsed)
+    return parsed
 
 
 def _is_http_429_result(result: ProviderResult) -> bool:
@@ -867,11 +884,13 @@ def _serialize_attempt_status(result: ProviderResult) -> dict[str, object]:
     """
     status_code_raw = result.raw.get("status_code")
     status_code = status_code_raw if isinstance(status_code_raw, int) else None
+    retry_after_seconds = _extract_retry_after_seconds(result)
     return {
         "result": _ATTEMPT_RESULT_FAIL if result.is_error else _ATTEMPT_RESULT_OK,
         "error": result.error,
         "updated_at": _normalize_utc(result.updated_at).isoformat(),
         "status_code": status_code,
+        "retry_after_seconds": retry_after_seconds if retry_after_seconds > 0 else None,
     }
 
 
@@ -936,21 +955,6 @@ def _get_window_attempt_status(
     return window_status
 
 
-def _is_failed_http_429_status(status_entry: dict[str, object] | None) -> bool:
-    """
-    @brief Check whether status entry represents failed HTTP 429 attempt.
-    @details Requires `result=FAIL` and integer `status_code=429` in the window
-    status object to trigger Claude partial-window overlay rendering.
-    @param status_entry {dict[str, object] | None} Provider/window status object.
-    @return {bool} True when status marks failed HTTP 429 attempt.
-    """
-    if not isinstance(status_entry, dict):
-        return False
-    if status_entry.get("result") != _ATTEMPT_RESULT_FAIL:
-        return False
-    return status_entry.get("status_code") == 429
-
-
 def _overlay_cached_failure_status(
     provider_key: str,
     target_window: WindowPeriod,
@@ -984,6 +988,11 @@ def _overlay_cached_failure_status(
     status_code = status_entry.get("status_code")
     if isinstance(status_code, int):
         raw_update["status_code"] = status_code
+    retry_after_seconds = _coerce_retry_after_seconds(
+        status_entry.get("retry_after_seconds")
+    )
+    if retry_after_seconds is not None:
+        raw_update["retry_after_seconds"] = retry_after_seconds
     raw_update["cache_status_error"] = status_error
 
     updated_at = projected_result.updated_at
@@ -1102,19 +1111,6 @@ def _load_cached_results(
             validated = ProviderResult.model_validate(raw_result)
         except ValidationError:
             continue
-        if provider_key == ProviderName.CLAUDE.value:
-            status_entry = _get_window_attempt_status(
-                filtered_status,
-                provider_key,
-                target_window,
-            )
-            if _is_failed_http_429_status(status_entry):
-                cached_results[provider_key] = _build_claude_rate_limited_partial_result(
-                    window=target_window,
-                    include_error=target_window == WindowPeriod.HOUR_5,
-                    snapshot_payload=_normalize_claude_dual_payload(validated.raw),
-                )
-                continue
         projected_result = _project_cached_window(
             validated,
             target_window,
@@ -1372,21 +1368,17 @@ def _fetch_result(
 def _fetch_claude_dual(
     provider: ClaudeOAuthProvider,
     throttle_state: dict[str, float | int] | None = None,
-    snapshot_payload: dict[str, object] | None = None,
 ) -> tuple[ProviderResult, ProviderResult]:
     """
     @brief Fetch Claude 5h and 7d results via a single API call.
     @details Executes ClaudeOAuthProvider.fetch_all_windows for 5h and 7d on each invocation.
-    If Claude returns HTTP 429 for both windows, normalize to a partial-window state
-    that preserves 5h error visibility and restores persisted reset/utilization
-    values for deterministic cache-backed rendering.
+    Returns normalized provider results exactly as fetched (or synthesized error
+    results on exception) without partial-window metric fallback.
     @param provider {ClaudeOAuthProvider} Claude provider instance.
     @param throttle_state {dict[str, float | int] | None} Mutable throttling state
         used to enforce inter-call spacing for live API requests.
-    @param snapshot_payload {dict[str, object] | None} Last successful Claude
-        dual-window payload loaded from `cache.json`.
     @return {tuple[ProviderResult, ProviderResult]} (5h_result, 7d_result).
-    @satisfies REQ-002, REQ-036, REQ-037, CTN-004, REQ-040, REQ-043, REQ-047
+    @satisfies REQ-002, REQ-036, REQ-037, CTN-004, REQ-040, REQ-043
     """
     _apply_api_call_delay(throttle_state)
     windows = [WindowPeriod.HOUR_5, WindowPeriod.DAY_7]
@@ -1408,22 +1400,6 @@ def _fetch_claude_dual(
     result_7d = fetched.get(WindowPeriod.DAY_7) or provider._make_error_result(
         window=WindowPeriod.DAY_7, error="Missing 7d result"
     )
-
-    if _is_claude_rate_limited_result(result_5h) and _is_claude_rate_limited_result(
-        result_7d
-    ):
-        return (
-            _build_claude_rate_limited_partial_result(
-                WindowPeriod.HOUR_5,
-                include_error=True,
-                snapshot_payload=snapshot_payload,
-            ),
-            _build_claude_rate_limited_partial_result(
-                WindowPeriod.DAY_7,
-                include_error=False,
-                snapshot_payload=snapshot_payload,
-            ),
-        )
 
     return result_5h, result_7d
 
@@ -1639,13 +1615,9 @@ def _refresh_and_persist_cache_payload(
             WindowPeriod.HOUR_5,
             WindowPeriod.DAY_7,
         }:
-            claude_snapshot_payload = _extract_claude_snapshot_from_cache_document(
-                cache_document
-            )
             result_5h, result_7d = _fetch_claude_dual(
                 provider=provider,
                 throttle_state=throttle_state,
-                snapshot_payload=claude_snapshot_payload,
             )
             fetched_results.extend([result_5h, result_7d])
             _record_attempt_status(status_section, result_5h)
@@ -1809,9 +1781,8 @@ def _build_cached_dual_window_results(
 ) -> tuple[ProviderResult, ProviderResult] | None:
     """
     @brief Build Claude/Codex dual-window display results from cached payload data.
-    @details For cached Claude partial-rate-limit payloads, reconstructs the 5h
-    error window and 7d restored-metrics window using persisted snapshot data.
-    For other payloads, attempts parser-based 5h/7d projection from cached raw.
+    @details Attempts parser-based 5h/7d projection from cached raw payload when
+    provider parser is available.
     @param provider_name {ProviderName} Provider associated with cached result.
     @param result {ProviderResult} Cached provider result.
     @param providers {dict[ProviderName, BaseProvider]} Provider registry.
@@ -1821,28 +1792,6 @@ def _build_cached_dual_window_results(
     @satisfies REQ-036
     @satisfies REQ-043
     """
-    if (
-        provider_name == ProviderName.CLAUDE
-        and isinstance(result.raw, dict)
-        and result.raw.get("rate_limit_partial")
-    ):
-        snapshot_payload = result.raw.get("snapshot_payload")
-        normalized_snapshot = (
-            snapshot_payload if isinstance(snapshot_payload, dict) else None
-        )
-        return (
-            _build_claude_rate_limited_partial_result(
-                WindowPeriod.HOUR_5,
-                include_error=True,
-                snapshot_payload=normalized_snapshot,
-            ),
-            _build_claude_rate_limited_partial_result(
-                WindowPeriod.DAY_7,
-                include_error=False,
-                snapshot_payload=normalized_snapshot,
-            ),
-        )
-
     provider = providers.get(provider_name)
     parser = getattr(provider, "_parse_response", None)
     if not callable(parser) or not isinstance(result.raw, dict):
@@ -2272,6 +2221,30 @@ def _emit_provider_panel(
     click.echo()
 
 
+def _format_http_status_retry_line(
+    status_code_raw: object,
+    retry_after_raw: object,
+) -> str | None:
+    """
+    @brief Build normalized HTTP status/retry diagnostic line for text output.
+    @details Returns one deterministic line matching requirement wording:
+    `HTTP status: <code>, Retry after: <seconds> sec.` when both values exist.
+    @param status_code_raw {object} Status code candidate from result raw payload.
+    @param retry_after_raw {object} Retry-after candidate from result raw payload.
+    @return {str | None} Diagnostic line or None when both values are missing.
+    @satisfies REQ-037
+    """
+    status_code = status_code_raw if isinstance(status_code_raw, int) else None
+    retry_after_seconds = _coerce_retry_after_seconds(retry_after_raw)
+    if status_code is not None and retry_after_seconds is not None:
+        return f"HTTP status: {status_code}, Retry after: {retry_after_seconds} sec."
+    if status_code is not None:
+        return f"HTTP status: {status_code}"
+    if retry_after_seconds is not None:
+        return f"Retry after: {retry_after_seconds} sec."
+    return None
+
+
 def _build_result_panel(
     name: ProviderName,
     result: ProviderResult,
@@ -2315,14 +2288,13 @@ def _build_result_panel(
     ]
     if result.is_error:
         lines.append(f"Error: {result.error}")
-        status_code = result.raw.get("status_code")
-        if isinstance(status_code, int):
-            lines.append(f"HTTP status: {status_code}")
-        retry_after = result.raw.get("retry_after_seconds")
-        if isinstance(retry_after, (int, float)) and retry_after > 0:
-            lines.append(f"Retry after: {float(retry_after):.1f}s")
-        if not _should_render_metrics_after_error(name, result):
-            return title, lines
+        status_retry_line = _format_http_status_retry_line(
+            result.raw.get("status_code"),
+            result.raw.get("retry_after_seconds"),
+        )
+        if status_retry_line is not None:
+            lines.append(status_retry_line)
+        return title, lines
 
     m = result.metrics
     if m.usage_percent is not None:
@@ -2400,12 +2372,12 @@ def _build_result_panel(
                 lines.append(f"Billing services: {len(services)}")
 
     if not result.is_error:
-        status_code = result.raw.get("status_code")
-        if isinstance(status_code, int):
-            lines.append(f"HTTP status: {status_code}")
-        retry_after = result.raw.get("retry_after_seconds")
-        if isinstance(retry_after, (int, float)) and retry_after > 0:
-            lines.append(f"Retry after: {float(retry_after):.1f}s")
+        status_retry_line = _format_http_status_retry_line(
+            result.raw.get("status_code"),
+            result.raw.get("retry_after_seconds"),
+        )
+        if status_retry_line is not None:
+            lines.append(status_retry_line)
 
     return title, lines
 
@@ -2443,26 +2415,6 @@ def _format_reset_duration(seconds: float) -> str:
     if days > 0:
         return f"{days}d {hours}h {minutes}m"
     return f"{hours}h {minutes}m"
-
-
-def _should_render_metrics_after_error(
-    provider_name: ProviderName,
-    result: ProviderResult,
-) -> bool:
-    """
-    @brief Check whether CLI output must render metrics after printing an error line.
-    @details Allows continuation only for Claude HTTP 429 partial-window state so the
-    5h section can include `Error:` and still display usage/reset lines.
-    @param provider_name {ProviderName} Provider associated with rendered section.
-    @param result {ProviderResult} Result being rendered.
-    @return {bool} True when metrics should still be rendered after error line.
-    @satisfies REQ-036
-    """
-    if provider_name != ProviderName.CLAUDE:
-        return False
-    if result.raw.get("status_code") != 429:
-        return False
-    return result.metrics.limit is not None and result.metrics.remaining is not None
 
 
 def _should_print_claude_reset_pending_hint(

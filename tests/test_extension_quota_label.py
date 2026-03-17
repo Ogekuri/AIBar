@@ -34,18 +34,20 @@ def test_reset_labels_use_reset_in_prefix_with_colon() -> None:
     assert "Resets in " not in source
 
 
-def test_rate_limit_quota_payloads_do_not_render_error_banner() -> None:
+def test_rate_limit_failures_render_error_banner_with_http_retry_metadata() -> None:
     """
-    @brief Verify rate-limit quota payloads bypass extension error-card rendering.
+    @brief Verify extension error rendering includes status and retry-after diagnostics.
     @satisfies REQ-017
+    @satisfies REQ-037
+    @satisfies REQ-090
     """
     source = EXTENSION_PATH.read_text(encoding="utf-8")
-    assert "const RATE_LIMIT_ERROR_MESSAGE = 'Rate limited. Try again later.';" in source
-    assert "const isRateLimitQuotaError = (" in source
-    assert (
-        "const isError = effectiveError !== null && effectiveError !== undefined && !isRateLimitQuotaError;"
-        in source
-    )
+    assert "function _buildHttpStatusRetryLabel(statusCodeRaw, retryAfterRaw)" in source
+    assert "return `HTTP status: ${statusCode}, Retry after: ${retryAfter} sec.`;" in source
+    assert "const isError = effectiveError !== null && effectiveError !== undefined;" in source
+    assert "const statusRetryLabel = _buildHttpStatusRetryLabel(statusCode, retryAfterSeconds);" in source
+    assert "⚠️ ${effectiveError}\\n${statusRetryLabel}" in source
+    assert "const isRateLimitQuotaError = (" not in source
 
 
 def test_limit_reached_suffix_is_appended_to_reset_labels_at_displayed_full_usage() -> None:
@@ -139,6 +141,7 @@ def test_provider_card_renders_update_at_label_bottom_right() -> None:
     assert "getFullYear()" in source
     assert "getHours()" in source
     assert "this._refreshIntervalSeconds" in source
+    assert source.index("if (data.updated_at)") < source.index("if (isError)")
 
 
 def test_panel_percentage_labels_use_fixed_order_provider_styles_and_primary_bold() -> None:
@@ -344,3 +347,4 @@ def test_extension_uses_cached_status_error_for_provider_cards() -> None:
     assert "const statusEntry = (" in source
     assert "const statusError = (" in source
     assert "const effectiveError = statusError || data.error;" in source
+    assert "statusEntry.retry_after_seconds" in source

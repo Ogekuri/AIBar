@@ -69,6 +69,42 @@ function _formatLocalDateTime(value) {
 }
 
 /**
+ * @brief Normalize retry-after value to positive integer seconds.
+ * @param {any} value Retry-after candidate value.
+ * @returns {number | null} Integer retry-after seconds or null when unavailable.
+ */
+function _coerceRetryAfterSeconds(value) {
+    if (value === null || value === undefined)
+        return null;
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric))
+        return null;
+    const parsed = Math.floor(numeric);
+    if (parsed <= 0)
+        return null;
+    return parsed;
+}
+
+/**
+ * @brief Build normalized HTTP status/retry metadata label.
+ * @param {any} statusCodeRaw HTTP status candidate value.
+ * @param {any} retryAfterRaw Retry-after candidate value.
+ * @returns {string} Diagnostic label text or empty string.
+ * @satisfies REQ-037
+ */
+function _buildHttpStatusRetryLabel(statusCodeRaw, retryAfterRaw) {
+    const statusCode = Number.isInteger(statusCodeRaw) ? statusCodeRaw : null;
+    const retryAfter = _coerceRetryAfterSeconds(retryAfterRaw);
+    if (statusCode !== null && retryAfter !== null)
+        return `HTTP status: ${statusCode}, Retry after: ${retryAfter} sec.`;
+    if (statusCode !== null)
+        return `HTTP status: ${statusCode}`;
+    if (retryAfter !== null)
+        return `Retry after: ${retryAfter} sec.`;
+    return '';
+}
+
+/**
  * @brief Resolve aibar executable path.
  * @details Prefers PATH discovery and falls back to AIBAR_PATH from the env file.
  * @returns {string} Resolved executable path or fallback command name.
@@ -700,6 +736,22 @@ class AIBarIndicator extends PanelMenu.Button {
     _populateProviderCard(card, providerName, data, statusEntry = null) {
         const metrics = data.metrics || {};
         const raw = data.raw || {};
+        if (data.updated_at) {
+            try {
+                const updatedDate = new Date(data.updated_at);
+                const nextDate = new Date(updatedDate.getTime() + this._refreshIntervalSeconds * 1000);
+                const updatedStr = _formatLocalDateTime(updatedDate);
+                const nextStr = _formatLocalDateTime(nextDate);
+                if (updatedStr === null || nextStr === null)
+                    card.updateAtLabel.text = '';
+                else
+                    card.updateAtLabel.text = `Updated: ${updatedStr}, Next: ${nextStr}`;
+            } catch (_e) {
+                card.updateAtLabel.text = '';
+            }
+        } else {
+            card.updateAtLabel.text = '';
+        }
         const statusError = (
             statusEntry &&
             statusEntry.result === 'FAIL' &&
@@ -709,15 +761,25 @@ class AIBarIndicator extends PanelMenu.Button {
             ? statusEntry.error
             : null;
         const effectiveError = statusError || data.error;
-        const isRateLimitQuotaError = (
-            effectiveError === RATE_LIMIT_ERROR_MESSAGE &&
-            metrics.limit !== null && metrics.limit !== undefined &&
-            metrics.remaining !== null && metrics.remaining !== undefined
-        );
-        const isError = effectiveError !== null && effectiveError !== undefined && !isRateLimitQuotaError;
+        const isError = effectiveError !== null && effectiveError !== undefined;
 
         if (isError) {
-            card.errorLabel.text = `⚠️ ${effectiveError}`;
+            const statusCode = (
+                statusEntry &&
+                Number.isInteger(statusEntry.status_code)
+            )
+                ? statusEntry.status_code
+                : raw.status_code;
+            const retryAfterSeconds = (
+                statusEntry &&
+                statusEntry.retry_after_seconds !== undefined
+            )
+                ? statusEntry.retry_after_seconds
+                : raw.retry_after_seconds;
+            const statusRetryLabel = _buildHttpStatusRetryLabel(statusCode, retryAfterSeconds);
+            card.errorLabel.text = statusRetryLabel.length > 0
+                ? `⚠️ ${effectiveError}\n${statusRetryLabel}`
+                : `⚠️ ${effectiveError}`;
             card.errorLabel.show();
             card.costLabel.text = '';
             card.byokLabel.text = '';
@@ -730,7 +792,7 @@ class AIBarIndicator extends PanelMenu.Button {
             card.windowBars.hide();
             card.fiveHourBar.container.hide();
             card.sevenDayBar.container.hide();
-            card.progressContainer.show();
+            card.progressContainer.hide();
             return;
         }
 
@@ -956,23 +1018,6 @@ class AIBarIndicator extends PanelMenu.Button {
             card.resetsLabel.text = '';
         }
 
-        if (data.updated_at) {
-            try {
-                const updatedDate = new Date(data.updated_at);
-                const nextDate = new Date(updatedDate.getTime() + this._refreshIntervalSeconds * 1000);
-                const updatedStr = _formatLocalDateTime(updatedDate);
-                const nextStr = _formatLocalDateTime(nextDate);
-                if (updatedStr === null || nextStr === null) {
-                    card.updateAtLabel.text = '';
-                    return;
-                }
-                card.updateAtLabel.text = `Updated: ${updatedStr}, Next: ${nextStr}`;
-            } catch (_e) {
-                card.updateAtLabel.text = '';
-            }
-        } else {
-            card.updateAtLabel.text = '';
-        }
     }
 
     /**
