@@ -5,7 +5,7 @@
 surfaces cached authentication/rate-limit status failures in text output.
 @satisfies REQ-084
 @satisfies REQ-085
-@satisfies TST-037
+@satisfies TST-038
 """
 
 from datetime import datetime, timedelta, timezone
@@ -48,7 +48,7 @@ def test_show_renders_updated_next_datetime_with_runtime_refresh_interval(
     @param tmp_path {Path} Temporary path fixture.
     @return {None} Function return value.
     @satisfies REQ-084
-    @satisfies TST-037
+    @satisfies TST-038
     """
     _patch_config_paths(monkeypatch, tmp_path)
     config_module.save_runtime_config(
@@ -103,7 +103,7 @@ def test_show_renders_cached_authentication_failure_from_status_section(
     @param tmp_path {Path} Temporary path fixture.
     @return {None} Function return value.
     @satisfies REQ-085
-    @satisfies TST-037
+    @satisfies TST-038
     """
     _patch_config_paths(monkeypatch, tmp_path)
     config_module.save_runtime_config(

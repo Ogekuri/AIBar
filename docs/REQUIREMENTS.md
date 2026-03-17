@@ -245,7 +245,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-034**: MUST verify repeated startup update HTTP `429` responses compute idle-time using `max(300, max(retry-after values))`.
 - **TST-035**: MUST verify `--upgrade` and `--uninstall` invoke required `uv tool` commands and propagate subprocess exit codes.
 - **TST-036**: MUST verify `--version` and `--ver` print installed version and bypass subcommand execution.
-- **TST-037**: MUST verify CLI text `show` renders `Updated: <datetime last update>, Next: <datetime next update>` with date-and-time formatting aligned to GNOME extension and surfaces cached authentication or refresh-rate-limit status errors per provider/window.
+- **TST-038**: MUST verify CLI text `show` renders `Updated: <datetime last update>, Next: <datetime next update>` with date-and-time formatting aligned to GNOME extension and surfaces cached authentication or refresh-rate-limit status errors per provider/window.
 - **TST-037**: MUST verify `pyproject.toml` wheel `packages` setting includes the `aibar` package containing `gnome-extension/` subtree, and sdist `include` covers `src/aibar/aibar/gnome-extension/**` and `scripts/**` for `.github/workflows/release-uvx+extension.yml` builds.
 
 ## 5. Evidence
@@ -358,4 +358,4 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | TST-030 | `tests/test_cli_show_panel_alignment.py` + CLI panel output assertions verify all rendered panels share identical visible width within one `show` execution. |
 | REQ-084 | `src/aibar/aibar/cli.py` + `_print_result` + per-provider freshness line renders `Updated: <datetime>, Next: <datetime>` with date-and-time formatting aligned to extension cards. |
 | REQ-085 | `src/aibar/aibar/cli.py` + text renderer surfaces authentication and refresh-rate-limit status failures from cached per-provider/per-window status errors. |
-| TST-037 | `tests/test_cli_show_status_messages.py` + verifies CLI `show` freshness line format parity with extension datetime formatter and visibility of authentication/rate-limit status failures. |
+| TST-038 | `tests/test_cli_show_status_messages.py` + verifies CLI `show` freshness line format parity with extension datetime formatter and visibility of authentication/rate-limit status failures. |
