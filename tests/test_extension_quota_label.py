@@ -154,12 +154,12 @@ def test_provider_card_renders_update_at_label_bottom_right_from_freshness() -> 
     assert "updateAtRow.add_child(updateAtLabel);" in source
 
 
-def test_popup_wraps_provider_cards_in_scroll_view_for_overflowed_cards() -> None:
+def test_popup_scroll_view_uses_gnome_compatible_child_attachment() -> None:
     """
-    @brief Verify popup wraps provider cards in a scroll view to avoid clipping freshness labels.
-    @details Asserts `_buildPopupMenu` creates a `St.ScrollView` wrapper for the provider-card
-    container so long provider cards (quota bars, reset labels, cost, API counters, freshness)
-    remain accessible without truncating the bottom `Updated/Next` row.
+    @brief Verify popup scroll-view child wiring avoids runtime TypeError on GNOME Shell.
+    @details Asserts `_buildPopupMenu` attaches the provider container through GNOME-compatible
+    API checks (`set_child` preferred; guarded `add_actor` fallback) so extension startup does
+    not crash on runtimes where `St.ScrollView.add_actor` is unavailable.
     @return {None} Function return value.
     @satisfies REQ-017
     @satisfies TST-004
@@ -168,6 +168,9 @@ def test_popup_wraps_provider_cards_in_scroll_view_for_overflowed_cards() -> Non
     assert "this._providersScrollView = new St.ScrollView({" in source
     assert "style_class: 'aibar-providers-scroll'" in source
     assert "this._providersScrollView.set_policy(St.PolicyType.NEVER, St.PolicyType.AUTOMATIC);" in source
+    assert "if (typeof this._providersScrollView.set_child === 'function')" in source
+    assert "this._providersScrollView.set_child(this._providersContainer);" in source
+    assert "else if (typeof this._providersScrollView.add_actor === 'function')" in source
     assert "this._providersScrollView.add_actor(this._providersContainer);" in source
     assert "providersItem.add_child(this._providersScrollView);" in source
 

@@ -431,7 +431,12 @@ class AIBarIndicator extends PanelMenu.Button {
             style_class: 'aibar-providers-scroll',
         });
         this._providersScrollView.set_policy(St.PolicyType.NEVER, St.PolicyType.AUTOMATIC);
-        this._providersScrollView.add_actor(this._providersContainer);
+        if (typeof this._providersScrollView.set_child === 'function')
+            this._providersScrollView.set_child(this._providersContainer);
+        else if (typeof this._providersScrollView.add_actor === 'function')
+            this._providersScrollView.add_actor(this._providersContainer);
+        else
+            throw new Error('St.ScrollView child attachment API unavailable');
 
         let providersItem = new PopupMenu.PopupBaseMenuItem({reactive: false});
         providersItem.add_child(this._providersScrollView);
