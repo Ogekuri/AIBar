@@ -37,6 +37,7 @@ const PANEL_ICON_COLORS = {
 const PROVIDER_DISPLAY_NAMES = {
     geminiai: 'GEMINIAI',
 };
+const API_COUNTER_PROVIDERS = new Set(['openai', 'openrouter', 'codex', 'geminiai']);
 
 /**
  * @brief Resolve provider label text for GNOME tab/card rendering.
@@ -47,6 +48,18 @@ function _getProviderDisplayName(providerName) {
     if (providerName in PROVIDER_DISPLAY_NAMES)
         return PROVIDER_DISPLAY_NAMES[providerName];
     return providerName.toUpperCase();
+}
+
+/**
+ * @brief Check whether provider cards must render API counter labels.
+ * @details API-counter providers render `requests` and `tokens` labels on OK states
+ * with null/undefined counters normalized to zero.
+ * @param {string} providerName Provider key from JSON payload.
+ * @returns {boolean} True when provider requires API counter label rendering.
+ * @satisfies REQ-017
+ */
+function _providerSupportsApiCounters(providerName) {
+    return API_COUNTER_PROVIDERS.has(providerName);
 }
 
 /**
@@ -1019,16 +1032,40 @@ class AIBarIndicator extends PanelMenu.Button {
             card.byokLabel.text = '';
         }
 
-        if (metrics.requests !== null && metrics.requests !== undefined)
-            card.requestsLabel.text = `${metrics.requests.toLocaleString()} requests`;
-        else
-            card.requestsLabel.text = '';
-
-        if (metrics.input_tokens !== null || metrics.output_tokens !== null) {
-            let total = (metrics.input_tokens || 0) + (metrics.output_tokens || 0);
-            card.tokensLabel.text = `${total.toLocaleString()} tokens`;
+        const shouldRenderApiCounters = _providerSupportsApiCounters(providerName);
+        if (shouldRenderApiCounters) {
+            const requestCount = (
+                metrics.requests !== null &&
+                metrics.requests !== undefined
+            )
+                ? metrics.requests
+                : 0;
+            const inputTokens = (
+                metrics.input_tokens !== null &&
+                metrics.input_tokens !== undefined
+            )
+                ? metrics.input_tokens
+                : 0;
+            const outputTokens = (
+                metrics.output_tokens !== null &&
+                metrics.output_tokens !== undefined
+            )
+                ? metrics.output_tokens
+                : 0;
+            const totalTokens = inputTokens + outputTokens;
+            card.requestsLabel.text = `${requestCount.toLocaleString()} requests`;
+            card.tokensLabel.text = `${totalTokens.toLocaleString()} tokens`;
         } else {
-            card.tokensLabel.text = '';
+            if (metrics.requests !== null && metrics.requests !== undefined)
+                card.requestsLabel.text = `${metrics.requests.toLocaleString()} requests`;
+            else
+                card.requestsLabel.text = '';
+            if (metrics.input_tokens !== null || metrics.output_tokens !== null) {
+                let total = (metrics.input_tokens || 0) + (metrics.output_tokens || 0);
+                card.tokensLabel.text = `${total.toLocaleString()} tokens`;
+            } else {
+                card.tokensLabel.text = '';
+            }
         }
 
         if (metrics.reset_at) {

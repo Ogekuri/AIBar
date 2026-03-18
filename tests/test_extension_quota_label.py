@@ -151,6 +151,29 @@ def test_provider_card_renders_update_at_label_bottom_right() -> None:
     assert source.index("if (idleTimeState") < source.index("if (isError)")
 
 
+def test_provider_cards_render_zero_api_counters_for_null_metrics() -> None:
+    """
+    @brief Verify extension cards normalize null API counter metrics to zero for supported providers.
+    @details Asserts source defines provider gating for `openai/openrouter/codex/geminiai`
+    and renders `requests`/`tokens` labels with explicit null-to-zero fallback logic.
+    @return {None} Function return value.
+    @satisfies REQ-017
+    @satisfies TST-004
+    """
+    source = EXTENSION_PATH.read_text(encoding="utf-8")
+    assert "const API_COUNTER_PROVIDERS = new Set(['openai', 'openrouter', 'codex', 'geminiai']);" in source
+    assert "function _providerSupportsApiCounters(providerName)" in source
+    assert "const shouldRenderApiCounters = _providerSupportsApiCounters(providerName);" in source
+    assert "const requestCount = (" in source
+    assert "? metrics.requests" in source
+    assert ": 0;" in source
+    assert "const inputTokens = (" in source
+    assert "const outputTokens = (" in source
+    assert "const totalTokens = inputTokens + outputTokens;" in source
+    assert "card.requestsLabel.text = `${requestCount.toLocaleString()} requests`;" in source
+    assert "card.tokensLabel.text = `${totalTokens.toLocaleString()} tokens`;" in source
+
+
 def test_panel_percentage_labels_use_fixed_order_provider_styles_and_primary_bold() -> None:
     """
     @brief Verify panel percentage label order, provider styles, and primary bold classes.

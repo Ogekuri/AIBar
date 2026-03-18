@@ -84,6 +84,14 @@ _PROVIDER_PANEL_COLOR_CODES: dict[ProviderName, str] = {
     ProviderName.OPENAI: "\033[94m",
     ProviderName.GEMINIAI: "\033[95m",
 }
+_API_COUNTER_PROVIDERS: frozenset[ProviderName] = frozenset(
+    {
+        ProviderName.OPENAI,
+        ProviderName.OPENROUTER,
+        ProviderName.CODEX,
+        ProviderName.GEMINIAI,
+    }
+)
 _STARTUP_UPDATE_PROGRAM = "aibar"
 _STARTUP_UPDATE_URL = "https://api.github.com/repos/Ogekuri/AIBar/releases/latest"
 _STARTUP_IDLE_DELAY_SECONDS = 300
@@ -2248,6 +2256,18 @@ def _provider_panel_color_code(provider_name: ProviderName) -> str:
     return _PROVIDER_PANEL_COLOR_CODES.get(provider_name, "\033[94m")
 
 
+def _provider_supports_api_counters(provider_name: ProviderName) -> bool:
+    """
+    @brief Determine whether provider panels always render API counter lines.
+    @details Returns true for providers that expose requests/token counters in
+    CLI and GNOME output surfaces, enforcing null-to-zero normalization.
+    @param provider_name {ProviderName} Provider enum key.
+    @return {bool} True when requests/tokens lines must render on OK state.
+    @satisfies REQ-036
+    """
+    return provider_name in _API_COUNTER_PROVIDERS
+
+
 def _strip_ansi_sequences(value: str) -> str:
     """
     @brief Remove ANSI SGR color escape sequences from terminal text.
@@ -2432,6 +2452,7 @@ def _build_result_panel(
     @satisfies REQ-084
     @satisfies REQ-034
     @satisfies REQ-035
+    @satisfies REQ-036
     @satisfies REQ-051
     @satisfies REQ-067
     """
@@ -2489,14 +2510,21 @@ def _build_result_panel(
         else:
             lines.append(f"Cost: {m.currency_symbol}{m.cost:.4f}")
 
-    if m.requests is not None:
-        lines.append(f"Requests: {m.requests:,}")
-
-    if m.input_tokens is not None or m.output_tokens is not None:
-        total = (m.input_tokens or 0) + (m.output_tokens or 0)
-        lines.append(
-            f"Tokens: {total:,} ({m.input_tokens or 0:,} in / {m.output_tokens or 0:,} out)"
-        )
+    if _provider_supports_api_counters(name):
+        requests_count = m.requests if m.requests is not None else 0
+        input_tokens = m.input_tokens if m.input_tokens is not None else 0
+        output_tokens = m.output_tokens if m.output_tokens is not None else 0
+        total_tokens = input_tokens + output_tokens
+        lines.append(f"Requests: {requests_count:,}")
+        lines.append(f"Tokens: {total_tokens:,} ({input_tokens:,} in / {output_tokens:,} out)")
+    else:
+        if m.requests is not None:
+            lines.append(f"Requests: {m.requests:,}")
+        if m.input_tokens is not None or m.output_tokens is not None:
+            total = (m.input_tokens or 0) + (m.output_tokens or 0)
+            lines.append(
+                f"Tokens: {total:,} ({m.input_tokens or 0:,} in / {m.output_tokens or 0:,} out)"
+            )
 
     raw_data = result.raw.get("data")
     if name == ProviderName.OPENROUTER and isinstance(raw_data, dict):

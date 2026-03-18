@@ -15,7 +15,7 @@ from unittest.mock import MagicMock
 from click.testing import CliRunner
 
 from aibar import config as config_module
-from aibar.cli import RetrievalPipelineOutput, main
+from aibar.cli import RetrievalPipelineOutput, _build_result_panel, main
 from aibar.providers.base import ProviderName, ProviderResult, UsageMetrics, WindowPeriod
 from aibar.providers.claude_oauth import ClaudeOAuthProvider
 
@@ -253,3 +253,34 @@ def test_show_dual_window_cached_fail_status_renders_fail_only_blocks(
     assert "Requests:" not in result.output
     assert "Tokens:" not in result.output
     assert "Resets in:" not in result.output
+
+
+def test_build_result_panel_renders_zero_api_counters_for_null_metrics() -> None:
+    """
+    @brief Verify API-counter providers render `Requests` and `Tokens` lines as zero on null metrics.
+    @details Builds panel lines for `openai`, `openrouter`, `codex`, and `geminiai` with null
+    requests/input/output counters and asserts deterministic null-to-zero text rendering.
+    @return {None} Function return value.
+    @satisfies REQ-036
+    @satisfies TST-038
+    """
+    provider_names = (
+        ProviderName.OPENAI,
+        ProviderName.OPENROUTER,
+        ProviderName.CODEX,
+        ProviderName.GEMINIAI,
+    )
+    for provider_name in provider_names:
+        result_payload = ProviderResult(
+            provider=provider_name,
+            window=WindowPeriod.DAY_7,
+            metrics=UsageMetrics(
+                requests=None,
+                input_tokens=None,
+                output_tokens=None,
+            ),
+            raw={"status_code": 200},
+        )
+        _title, lines = _build_result_panel(provider_name, result_payload)
+        assert "Requests: 0" in lines
+        assert "Tokens: 0 (0 in / 0 out)" in lines
