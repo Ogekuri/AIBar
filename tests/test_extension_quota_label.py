@@ -151,6 +151,7 @@ def test_provider_card_renders_update_at_label_bottom_right_from_freshness() -> 
     assert source.index("if (freshnessState") < source.index("if (isError)")
     assert "style_class: 'aibar-reset-label aibar-update-at-label'" in source
     assert "x_align: Clutter.ActorAlign.END" in source
+    assert "x_expand: true" in source
     assert "updateAtRow.add_child(updateAtLabel);" in source
 
 
@@ -195,7 +196,8 @@ def test_provider_cards_render_zero_api_counters_for_null_metrics() -> None:
     assert "const outputTokens = (" in source
     assert "const totalTokens = inputTokens + outputTokens;" in source
     assert "card.requestsLabel.text = `${requestCount.toLocaleString()} requests`;" in source
-    assert "card.tokensLabel.text = `${totalTokens.toLocaleString()} tokens`;" in source
+    assert "card.tokensLabel.text = (" in source
+    assert "(${inputTokens.toLocaleString()} in / ${outputTokens.toLocaleString()} out)" in source
 
 
 def test_panel_percentage_labels_use_fixed_order_provider_styles_and_primary_bold() -> None:
@@ -329,7 +331,7 @@ def test_extension_auto_refresh_uses_configurable_interval() -> None:
 def test_geminiai_extension_tab_order_label_and_bright_pink_styles() -> None:
     """
     @brief Verify GeminiAI extension integration uses expected order, label, and colors.
-    @details Asserts provider ordering array places `geminiai` after `codex`,
+    @details Asserts provider ordering array places `openai` before `geminiai` with GeminiAI last,
     display-name mapping renders `GEMINIAI`, and stylesheet defines bright-purple
     tab/card classes for GeminiAI.
     @satisfies REQ-061
@@ -339,7 +341,7 @@ def test_geminiai_extension_tab_order_label_and_bright_pink_styles() -> None:
     extension_source = EXTENSION_PATH.read_text(encoding="utf-8")
     stylesheet_source = STYLESHEET_PATH.read_text(encoding="utf-8")
 
-    assert "this._providerOrder = ['claude', 'openrouter', 'copilot', 'codex', 'geminiai'];" in extension_source
+    assert "this._providerOrder = ['claude', 'openrouter', 'copilot', 'codex', 'openai', 'geminiai'];" in extension_source
     assert "const PROVIDER_DISPLAY_NAMES = {" in extension_source
     assert "geminiai: 'GEMINIAI'" in extension_source
     assert "_getProviderDisplayName(providerName)" in extension_source

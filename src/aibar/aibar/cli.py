@@ -93,6 +93,14 @@ _API_COUNTER_PROVIDERS: frozenset[ProviderName] = frozenset(
         ProviderName.GEMINIAI,
     }
 )
+_SHOW_PROVIDER_ORDER: tuple[ProviderName, ...] = (
+    ProviderName.CLAUDE,
+    ProviderName.OPENROUTER,
+    ProviderName.COPILOT,
+    ProviderName.CODEX,
+    ProviderName.OPENAI,
+    ProviderName.GEMINIAI,
+)
 _STARTUP_UPDATE_PROGRAM = "aibar"
 _STARTUP_UPDATE_URL = "https://api.github.com/repos/Ogekuri/AIBar/releases/latest"
 _STARTUP_IDLE_DELAY_SECONDS = 300
@@ -2241,6 +2249,7 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
             )
         )
 
+    rendered_panels.sort(key=lambda panel: _provider_panel_sort_key(panel[0]))
     shared_content_width = _resolve_shared_panel_content_width(rendered_panels)
     for provider_name, title, body_lines in rendered_panels:
         _emit_provider_panel(
@@ -2264,6 +2273,22 @@ def _provider_display_name(provider_name: ProviderName) -> str:
     if provider_name == ProviderName.GEMINIAI:
         return "GEMINIAI"
     return provider_name.value.upper()
+
+
+def _provider_panel_sort_key(provider_name: ProviderName) -> tuple[int, str]:
+    """
+    @brief Build deterministic provider sort key for CLI `show` panel ordering.
+    @details Applies canonical provider order `claude/openrouter/copilot/codex/openai/geminiai`;
+    unknown providers are appended after known providers using lexical fallback.
+    @param provider_name {ProviderName} Provider enum key.
+    @return {tuple[int, str]} `(rank, provider_name.value)` sort key.
+    @satisfies REQ-067
+    @satisfies TST-030
+    """
+    try:
+        return (_SHOW_PROVIDER_ORDER.index(provider_name), provider_name.value)
+    except ValueError:
+        return (len(_SHOW_PROVIDER_ORDER), provider_name.value)
 
 
 def _provider_panel_color_code(provider_name: ProviderName) -> str:
@@ -2481,33 +2506,31 @@ def _build_result_panel(
     if label:
         title = f"{title} ({label})"
 
-    lines: list[str] = [
-        f"Status: {'FAIL' if result.is_error else 'OK'}",
-        f"Window: {window_label}",
-        _build_freshness_line(result=result, freshness_state=freshness_state),
-    ]
+    status_line = f"Status: {'FAIL' if result.is_error else 'OK'}"
+    freshness_line = _build_freshness_line(result=result, freshness_state=freshness_state)
+    detail_lines: list[str] = [f"Window: {window_label}"]
     if result.is_error:
-        lines.append(f"Error: {result.error}")
+        detail_lines.append(f"Error: {result.error}")
         status_retry_line = _format_http_status_retry_line(
             result.raw.get("status_code"),
             result.raw.get("retry_after_seconds"),
         )
         if status_retry_line is not None:
-            lines.append(status_retry_line)
-        return title, lines
+            detail_lines.append(status_retry_line)
+        return title, [status_line, "", *detail_lines, "", freshness_line]
 
     m = result.metrics
     if m.usage_percent is not None:
         pct = m.usage_percent
-        lines.append(f"Usage: {pct:.1f}% {_progress_bar(pct, name)}")
+        detail_lines.append(f"Usage: {pct:.1f}% {_progress_bar(pct, name)}")
 
     if m.reset_at:
         delta = m.reset_at - datetime.now(timezone.utc)
         if delta.total_seconds() > 0:
             reset_value = _format_reset_duration(delta.total_seconds())
-            lines.append(f"Resets in: {reset_value}")
+            detail_lines.append(f"Resets in: {reset_value}")
     elif _should_print_claude_reset_pending_hint(name, m):
-        lines.append(f"Resets in: {_RESET_PENDING_MESSAGE}")
+        detail_lines.append(f"Resets in: {_RESET_PENDING_MESSAGE}")
 
     if (
         name in (
@@ -2519,30 +2542,32 @@ def _build_result_panel(
         and m.remaining is not None
         and m.limit is not None
     ):
-        lines.append(f"Remaining credits: {m.remaining:.1f} / {m.limit:.1f}")
+        detail_lines.append(f"Remaining credits: {m.remaining:.1f} / {m.limit:.1f}")
 
     if m.cost is not None:
         if name == ProviderName.OPENROUTER and m.limit is not None:
-            lines.append(
+            detail_lines.append(
                 f"Cost: {m.currency_symbol}{m.cost:.4f} / "
                 f"{m.currency_symbol}{m.limit:.2f}"
             )
         else:
-            lines.append(f"Cost: {m.currency_symbol}{m.cost:.4f}")
+            detail_lines.append(f"Cost: {m.currency_symbol}{m.cost:.4f}")
 
     if _provider_supports_api_counters(name):
         requests_count = m.requests if m.requests is not None else 0
         input_tokens = m.input_tokens if m.input_tokens is not None else 0
         output_tokens = m.output_tokens if m.output_tokens is not None else 0
         total_tokens = input_tokens + output_tokens
-        lines.append(f"Requests: {requests_count:,}")
-        lines.append(f"Tokens: {total_tokens:,} ({input_tokens:,} in / {output_tokens:,} out)")
+        detail_lines.append(f"Requests: {requests_count:,}")
+        detail_lines.append(
+            f"Tokens: {total_tokens:,} ({input_tokens:,} in / {output_tokens:,} out)"
+        )
     else:
         if m.requests is not None:
-            lines.append(f"Requests: {m.requests:,}")
+            detail_lines.append(f"Requests: {m.requests:,}")
         if m.input_tokens is not None or m.output_tokens is not None:
             total = (m.input_tokens or 0) + (m.output_tokens or 0)
-            lines.append(
+            detail_lines.append(
                 f"Tokens: {total:,} ({m.input_tokens or 0:,} in / {m.output_tokens or 0:,} out)"
             )
 
@@ -2555,7 +2580,7 @@ def _build_result_panel(
         }
         byok_raw = raw_data.get(byok_key_map.get(result.window, "byok_usage_weekly"))
         if isinstance(byok_raw, (int, float)) and byok_raw > 0:
-            lines.append(f"BYOK: {m.currency_symbol}{float(byok_raw):.4f}")
+            detail_lines.append(f"BYOK: {m.currency_symbol}{float(byok_raw):.4f}")
 
     if name == ProviderName.GEMINIAI:
         monitoring_raw = result.raw.get("monitoring")
@@ -2563,20 +2588,20 @@ def _build_result_panel(
             latency_total = monitoring_raw.get("latency_total")
             error_total = monitoring_raw.get("error_total")
             if isinstance(latency_total, (int, float)):
-                lines.append(f"Monitoring latency total: {float(latency_total):.2f}")
+                detail_lines.append(f"Monitoring latency total: {float(latency_total):.2f}")
             if isinstance(error_total, (int, float)):
-                lines.append(f"Monitoring error total: {float(error_total):.2f}")
+                detail_lines.append(f"Monitoring error total: {float(error_total):.2f}")
         billing_raw = result.raw.get("billing")
         if isinstance(billing_raw, dict):
             table_id = billing_raw.get("table_id")
             table_path = billing_raw.get("table_path")
             services = billing_raw.get("services")
             if isinstance(table_id, str) and table_id:
-                lines.append(f"Billing table: {table_id}")
+                detail_lines.append(f"Billing table: {table_id}")
             if isinstance(table_path, str) and table_path:
-                lines.append(f"Billing path: {table_path}")
+                detail_lines.append(f"Billing path: {table_path}")
             if isinstance(services, list):
-                lines.append(f"Billing services: {len(services)}")
+                detail_lines.append(f"Billing services: {len(services)}")
 
     if not result.is_error:
         status_retry_line = _format_http_status_retry_line(
@@ -2584,9 +2609,9 @@ def _build_result_panel(
             result.raw.get("retry_after_seconds"),
         )
         if status_retry_line is not None:
-            lines.append(status_retry_line)
+            detail_lines.append(status_retry_line)
 
-    return title, lines
+    return title, [status_line, "", *detail_lines, "", freshness_line]
 
 
 def _build_dual_window_panel(
@@ -2622,20 +2647,51 @@ def _build_dual_window_panel(
         label="7d",
         freshness_state=freshness_state,
     )
-    lines_5h = [line for line in lines_5h if not line.startswith("Updated: ")]
-    lines_7d = [line for line in lines_7d if not line.startswith("Updated: ")]
-    shared_lines: list[str] = [
-        _build_freshness_line(result=result_7d, freshness_state=freshness_state)
+    details_5h = [
+        line
+        for line in lines_5h
+        if line
+        and not line.startswith("Status: ")
+        and not line.startswith("Updated: ")
+        and not line.startswith("Window: ")
     ]
-    lines_7d_set = set(lines_7d)
-    for line in lines_5h:
-        if line in lines_7d_set and not line.startswith("Window: ") and line not in shared_lines:
-            shared_lines.append(line)
+    details_7d = [
+        line
+        for line in lines_7d
+        if line
+        and not line.startswith("Status: ")
+        and not line.startswith("Updated: ")
+        and not line.startswith("Window: ")
+    ]
+    metric_prefixes = ("Cost: ", "Requests: ", "Tokens: ")
+    footer_lines: list[str] = []
+    if name == ProviderName.CODEX:
+        footer_lines = [
+            line for line in details_7d if line.startswith(metric_prefixes)
+        ]
+        details_5h = [
+            line for line in details_5h if not line.startswith(metric_prefixes)
+        ]
+        details_7d = [
+            line for line in details_7d if not line.startswith(metric_prefixes)
+        ]
+    details_7d_set = set(details_7d)
+    shared_lines = [line for line in details_5h if line in details_7d_set]
     shared_line_set = set(shared_lines)
-    section_5h = [line for line in lines_5h if line not in shared_line_set]
-    section_7d = [line for line in lines_7d if line not in shared_line_set]
-    body_lines = list(shared_lines)
-    body_lines.extend(["", "5h:", *section_5h, "", "7d:", *section_7d])
+    section_5h = [line for line in details_5h if line not in shared_line_set]
+    section_7d = [line for line in details_7d if line not in shared_line_set]
+    status_line = (
+        "Status: FAIL" if (result_5h.is_error or result_7d.is_error) else "Status: OK"
+    )
+    freshness_line = _build_freshness_line(result=result_7d, freshness_state=freshness_state)
+    body_lines = [status_line, ""]
+    if shared_lines:
+        body_lines.extend(shared_lines)
+        body_lines.append("")
+    body_lines.extend(["5h:", *section_5h, "", "7d:", *section_7d])
+    if footer_lines:
+        body_lines.extend(["", *footer_lines])
+    body_lines.extend(["", freshness_line])
     return title, body_lines
 
 

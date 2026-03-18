@@ -307,14 +307,17 @@ def test_show_dual_window_cached_fail_status_renders_fail_only_blocks(
     assert result.output.count("Error: Invalid or expired OAuth token") == 1
     assert "5h:" in result.output
     assert "7d:" in result.output
-    assert result.output.count("Window: 5h") == 1
-    assert result.output.count("Window: 7d") == 1
+    assert "Window: 5h" not in result.output
+    assert "Window: 7d" not in result.output
     assert "Usage:" not in result.output
     assert "Cost:" not in result.output
     assert "Remaining credits:" not in result.output
     assert "Requests:" not in result.output
     assert "Tokens:" not in result.output
     assert "Resets in:" not in result.output
+    status_idx = result.output.index("Status: FAIL")
+    updated_idx = result.output.index("Updated:")
+    assert status_idx < result.output.index("5h:") < result.output.index("7d:") < updated_idx
 
 
 def test_build_result_panel_renders_zero_api_counters_for_null_metrics() -> None:

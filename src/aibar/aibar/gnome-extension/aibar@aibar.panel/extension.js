@@ -252,7 +252,7 @@ class AIBarIndicator extends PanelMenu.Button {
         this._providerTabs = {};
         this._refreshIntervalSeconds = REFRESH_INTERVAL_SECONDS;
         this._activeProvider = null;
-        this._providerOrder = ['claude', 'openrouter', 'copilot', 'codex', 'geminiai'];
+        this._providerOrder = ['claude', 'openrouter', 'copilot', 'codex', 'openai', 'geminiai'];
         this._iconBlinkTimeout = null;
         this._iconBlinkOn = false;
 
@@ -736,13 +736,14 @@ class AIBarIndicator extends PanelMenu.Button {
 
         let updateAtRow = new St.BoxLayout({
             vertical: false,
-            x_expand: false,
+            x_expand: true,
             x_align: Clutter.ActorAlign.END,
             style_class: 'aibar-update-at-row',
         });
 
         let updateAtLabel = new St.Label({
             text: '',
+            x_expand: true,
             x_align: Clutter.ActorAlign.END,
             style_class: 'aibar-reset-label aibar-update-at-label',
         });
@@ -1066,7 +1067,10 @@ class AIBarIndicator extends PanelMenu.Button {
                 : 0;
             const totalTokens = inputTokens + outputTokens;
             card.requestsLabel.text = `${requestCount.toLocaleString()} requests`;
-            card.tokensLabel.text = `${totalTokens.toLocaleString()} tokens`;
+            card.tokensLabel.text = (
+                `${totalTokens.toLocaleString()} tokens `
+                + `(${inputTokens.toLocaleString()} in / ${outputTokens.toLocaleString()} out)`
+            );
         } else {
             if (metrics.requests !== null && metrics.requests !== undefined)
                 card.requestsLabel.text = `${metrics.requests.toLocaleString()} requests`;
