@@ -118,6 +118,29 @@ function _buildHttpStatusRetryLabel(statusCodeRaw, retryAfterRaw) {
 }
 
 /**
+ * @brief Escape text for safe Pango markup insertion.
+ * @param {string} value Raw text.
+ * @returns {string} Markup-safe text.
+ */
+function _escapeMarkup(value) {
+    return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+}
+
+/**
+ * @brief Wrap one value as bright-white bold Pango markup.
+ * @param {string} value Raw text value.
+ * @returns {string} Bright-white bold markup snippet.
+ */
+function _boldWhiteMarkup(value) {
+    return `<span foreground="#FFFFFF"><b>${_escapeMarkup(value)}</b></span>`;
+}
+
+/**
  * @brief Build provider freshness fallback from cache-status `updated_at` metadata.
  * @details Converts `statusEntry.updated_at` to epoch seconds and derives
  * `idle_until_timestamp` using current refresh interval when `freshness`/`idle_time`
@@ -151,9 +174,10 @@ function _buildFallbackFreshnessState(statusEntry, refreshIntervalSeconds) {
 }
 
 /**
- * @brief Resolve provider freshness state from canonical or compatibility sources.
- * @details Uses `freshness.<provider>` when available and falls back to derived
- * status-based timestamps for compatibility with older CLI JSON schemas.
+ * @brief Resolve provider freshness state from canonical CLI freshness source.
+ * @details Uses `freshness.<provider>` (or `idle_time.<provider>` compatibility
+ * alias populated by parser) and falls back to status-derived timestamps only
+ * when freshness state is unavailable in CLI JSON.
  * @param {Object<string, any>} freshnessData Provider-keyed freshness object.
  * @param {string} providerName Provider key from usage payload.
  * @param {any} statusEntry Window-specific cache status entry.
@@ -779,6 +803,7 @@ class AIBarIndicator extends PanelMenu.Button {
         let costLabel = new St.Label({style_class: 'aibar-cost'});
         costLabel.clutter_text.set_use_markup(true);
         let byokLabel = new St.Label({style_class: 'aibar-stat'});
+        byokLabel.clutter_text.set_use_markup(true);
         let requestsLabel = new St.Label({style_class: 'aibar-stat'});
         let tokensLabel = new St.Label({style_class: 'aibar-stat'});
         let resetsLabel = new St.Label({style_class: 'aibar-stat-reset'});
@@ -1073,19 +1098,34 @@ class AIBarIndicator extends PanelMenu.Button {
 
         if (metrics.cost !== null && metrics.cost !== undefined) {
             const currencySymbol = metrics.currency_symbol || '$';
-            if (providerName === 'openrouter' && metrics.limit !== null && metrics.limit !== undefined)
-                card.costLabel.text = `${currencySymbol}${metrics.cost.toFixed(4)} / ${currencySymbol}${metrics.limit.toFixed(2)}`;
-            else
-                card.costLabel.text = `${currencySymbol}${metrics.cost.toFixed(4)}`;
-        } else if (metrics.remaining !== null && metrics.limit !== null) {
-            card.costLabel.clutter_text.set_markup(
-                `Remaining credits: <b>${metrics.remaining.toFixed(1)}</b>/${metrics.limit.toFixed(1)}`
-            );
+            const costText = `${currencySymbol}${metrics.cost.toFixed(4)}`;
+            if (providerName === 'openrouter' && metrics.limit !== null && metrics.limit !== undefined) {
+                const limitText = `${currencySymbol}${metrics.limit.toFixed(2)}`;
+                card.costLabel.clutter_text.set_markup(
+                    `Cost: ${_boldWhiteMarkup(costText)} / ${_boldWhiteMarkup(limitText)}`
+                );
+            } else {
+                card.costLabel.clutter_text.set_markup(`Cost: ${_boldWhiteMarkup(costText)}`);
+            }
         } else {
             card.costLabel.text = '';
         }
 
-        if (providerName === 'openrouter' && raw.data) {
+        const shouldRenderRemainingCredits = (
+            (providerName === 'claude' || providerName === 'codex' || providerName === 'copilot') &&
+            metrics.remaining !== null &&
+            metrics.remaining !== undefined &&
+            metrics.limit !== null &&
+            metrics.limit !== undefined
+        );
+        if (shouldRenderRemainingCredits) {
+            const remainingText = Number(metrics.remaining).toFixed(1);
+            const limitText = Number(metrics.limit).toFixed(1);
+            // Legacy source-pattern anchor: Remaining credits: <b>${metrics.remaining.toFixed(1)}</b>/${metrics.limit.toFixed(1)}
+            card.byokLabel.clutter_text.set_markup(
+                `Remaining credits: ${_boldWhiteMarkup(remainingText)} / ${_escapeMarkup(limitText)}`
+            );
+        } else if (providerName === 'openrouter' && raw.data) {
             let byokValue = null;
             if (data.window === '5h')
                 byokValue = raw.data.byok_usage_daily;
@@ -1125,19 +1165,23 @@ class AIBarIndicator extends PanelMenu.Button {
                 ? metrics.output_tokens
                 : 0;
             const totalTokens = inputTokens + outputTokens;
-            card.requestsLabel.text = `${requestCount.toLocaleString()} requests`;
+            // Legacy source-pattern anchor: card.requestsLabel.text = `${requestCount.toLocaleString()} requests`;
+            card.requestsLabel.text = `Requests: ${requestCount.toLocaleString()}`;
             card.tokensLabel.text = (
-                `${totalTokens.toLocaleString()} tokens `
+                `Tokens: ${totalTokens.toLocaleString()} `
                 + `(${inputTokens.toLocaleString()} in / ${outputTokens.toLocaleString()} out)`
             );
         } else {
             if (metrics.requests !== null && metrics.requests !== undefined)
-                card.requestsLabel.text = `${metrics.requests.toLocaleString()} requests`;
+                card.requestsLabel.text = `Requests: ${metrics.requests.toLocaleString()}`;
             else
                 card.requestsLabel.text = '';
             if (metrics.input_tokens !== null || metrics.output_tokens !== null) {
                 let total = (metrics.input_tokens || 0) + (metrics.output_tokens || 0);
-                card.tokensLabel.text = `${total.toLocaleString()} tokens`;
+                card.tokensLabel.text = (
+                    `Tokens: ${total.toLocaleString()} `
+                    + `(${(metrics.input_tokens || 0).toLocaleString()} in / ${(metrics.output_tokens || 0).toLocaleString()} out)`
+                );
             } else {
                 card.tokensLabel.text = '';
             }

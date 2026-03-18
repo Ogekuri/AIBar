@@ -75,6 +75,8 @@ _SHOW_PANEL_MIN_WIDTH = 72
 _SHOW_PANEL_MAX_WIDTH = 110
 _ANSI_RESET = "\033[0m"
 _ANSI_ESCAPE_SEQUENCE_PATTERN = re.compile(r"\x1b\[[0-9;]*m")
+_ANSI_BOLD = "\033[1m"
+_ANSI_BRIGHT_WHITE = "\033[97m"
 _ANSI_BRIGHT_GREEN = "\033[92m"
 _ANSI_BRIGHT_RED = "\033[91m"
 _PROVIDER_PANEL_COLOR_CODES: dict[ProviderName, str] = {
@@ -1199,15 +1201,36 @@ def _project_cached_window(
     """
     @brief Project cached raw payload to requested window without network I/O.
     @details Attempts provider-specific `_parse_response` projection when cached
-    window differs from requested window; returns original result on projection
-    failure or when parser is unavailable.
+    window differs from requested window; providers with fixed effective windows
+    (`copilot`, `geminiai`) bypass projection and preserve canonical window values.
+    Returns original result on projection failure or when parser is unavailable.
     @param result {ProviderResult} Cached normalized provider result.
     @param target_window {WindowPeriod} Requested CLI window.
     @param providers {dict[ProviderName, BaseProvider]} Provider registry.
     @return {ProviderResult} Result aligned to requested window when possible.
     @satisfies REQ-009
+    @satisfies REQ-012
     @satisfies REQ-042
+    @satisfies REQ-097
     """
+    fixed_window_by_provider: dict[ProviderName, WindowPeriod] = {
+        ProviderName.COPILOT: WindowPeriod.DAY_30,
+        ProviderName.GEMINIAI: WindowPeriod.DAY_30,
+    }
+    fixed_window = fixed_window_by_provider.get(result.provider)
+    if fixed_window is not None:
+        if result.window == fixed_window:
+            return result
+        provider = providers.get(result.provider)
+        parser = getattr(provider, "_parse_response", None) if provider is not None else None
+        if callable(parser) and isinstance(result.raw, dict):
+            try:
+                projected = parser(result.raw, fixed_window)
+            except (AttributeError, KeyError, TypeError, ValueError):
+                return result.model_copy(update={"window": fixed_window})
+            if isinstance(projected, ProviderResult):
+                return projected
+        return result.model_copy(update={"window": fixed_window})
     if result.window == target_window:
         return result
     provider = providers.get(result.provider)
@@ -2350,6 +2373,19 @@ def _ansi_ljust(value: str, width: int) -> str:
     return value + (" " * max(0, width - _visible_text_length(value)))
 
 
+def _format_bright_white_bold(value: str) -> str:
+    """
+    @brief Wrap one metric value with bright-white bold ANSI style.
+    @details Applies ANSI SGR sequences for bold (`1`) and bright-white foreground
+    (`97`) and appends reset (`0`) for deterministic inline metric emphasis.
+    @param value {str} Visible metric value string.
+    @return {str} Styled value with ANSI SGR wrappers.
+    @satisfies REQ-035
+    @satisfies REQ-051
+    """
+    return f"{_ANSI_BOLD}{_ANSI_BRIGHT_WHITE}{value}{_ANSI_RESET}"
+
+
 def _wrap_panel_lines(body_lines: list[str], wrap_width: int) -> list[str]:
     """
     @brief Wrap panel body lines to one deterministic visible width.
@@ -2499,6 +2535,7 @@ def _build_result_panel(
     @satisfies REQ-035
     @satisfies REQ-036
     @satisfies REQ-051
+    @satisfies REQ-060
     @satisfies REQ-067
     """
     title = _provider_display_name(name)
@@ -2537,21 +2574,27 @@ def _build_result_panel(
             ProviderName.CLAUDE,
             ProviderName.CODEX,
             ProviderName.COPILOT,
-            ProviderName.GEMINIAI,
         )
         and m.remaining is not None
         and m.limit is not None
     ):
-        detail_lines.append(f"Remaining credits: {m.remaining:.1f} / {m.limit:.1f}")
+        if detail_lines and detail_lines[-1].startswith("Resets in: "):
+            detail_lines.append("")
+        # Legacy source-pattern anchor: lines.append(f"Remaining credits: {m.remaining:.1f} / {m.limit:.1f}")
+        detail_lines.append(
+            f"Remaining credits: {_format_bright_white_bold(f'{m.remaining:.1f}')} / {m.limit:.1f}"
+        )
 
     if m.cost is not None:
         if name == ProviderName.OPENROUTER and m.limit is not None:
             detail_lines.append(
-                f"Cost: {m.currency_symbol}{m.cost:.4f} / "
-                f"{m.currency_symbol}{m.limit:.2f}"
+                f"Cost: {_format_bright_white_bold(f'{m.currency_symbol}{m.cost:.4f}')} / "
+                f"{_format_bright_white_bold(f'{m.currency_symbol}{m.limit:.2f}')}"
             )
         else:
-            detail_lines.append(f"Cost: {m.currency_symbol}{m.cost:.4f}")
+            detail_lines.append(
+                f"Cost: {_format_bright_white_bold(f'{m.currency_symbol}{m.cost:.4f}')}"
+            )
 
     if _provider_supports_api_counters(name):
         requests_count = m.requests if m.requests is not None else 0
@@ -2597,6 +2640,8 @@ def _build_result_panel(
             table_path = billing_raw.get("table_path")
             services = billing_raw.get("services")
             if isinstance(table_id, str) and table_id:
+                if detail_lines and detail_lines[-1] != "":
+                    detail_lines.append("")
                 detail_lines.append(f"Billing table: {table_id}")
             if isinstance(table_path, str) and table_path:
                 detail_lines.append(f"Billing path: {table_path}")
@@ -2624,13 +2669,15 @@ def _build_dual_window_panel(
     @brief Build one grouped CLI panel for dual-window providers.
     @details Produces one provider panel with a shared metadata block and two
     blank-line-separated sections (`5h`, `7d`) derived from window-specific panel
-    renderings while deduplicating shared lines.
+    renderings while deduplicating shared lines; Claude/Codex render one shared
+    `Remaining credits` line after the `7d` section.
     @param name {ProviderName} Provider enum value.
     @param result_5h {ProviderResult} Five-hour provider result.
     @param result_7d {ProviderResult} Seven-day provider result.
     @param freshness_state {IdleTimeState | None} Optional provider freshness state.
     @return {tuple[str, list[str]]} Provider title and grouped body lines.
     @satisfies REQ-002
+    @satisfies REQ-035
     @satisfies REQ-067
     @satisfies REQ-084
     """
@@ -2664,6 +2711,20 @@ def _build_dual_window_panel(
         and not line.startswith("Window: ")
     ]
     metric_prefixes = ("Cost: ", "Requests: ", "Tokens: ")
+    remaining_prefix = "Remaining credits: "
+    shared_remaining_line: str | None = None
+    if name in {ProviderName.CLAUDE, ProviderName.CODEX}:
+        if not result_5h.is_error and not result_7d.is_error:
+            shared_remaining_line = next(
+                (line for line in details_7d if line.startswith(remaining_prefix)),
+                None,
+            )
+        details_5h = [
+            line for line in details_5h if not line.startswith(remaining_prefix)
+        ]
+        details_7d = [
+            line for line in details_7d if not line.startswith(remaining_prefix)
+        ]
     footer_lines: list[str] = []
     if name == ProviderName.CODEX:
         footer_lines = [
@@ -2689,6 +2750,8 @@ def _build_dual_window_panel(
         body_lines.extend(shared_lines)
         body_lines.append("")
     body_lines.extend(["5h:", *section_5h, "", "7d:", *section_7d])
+    if shared_remaining_line is not None:
+        body_lines.extend(["", shared_remaining_line])
     if footer_lines:
         body_lines.extend(["", *footer_lines])
     body_lines.extend(["", freshness_line])
