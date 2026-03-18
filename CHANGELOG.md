@@ -1,5 +1,126 @@
 # Changelog
 
+## [0.12.0](https://github.com/Ogekuri/AIBar/compare/v0.11.0..v0.12.0) - 2026-03-18
+### 🐛  Bug Fixes
+- restore Updated/Next with legacy CLI JSON [useReq] *(gnome-extension)*
+  - Add freshness fallback derived from status.updated_at when freshness/idle_time is absent.
+  - Preserve bottom-right Updated/Next card row using resolved provider freshness state.
+  - Add targeted failing reproducer and assertions for fallback freshness logic.
+  - Update WORKFLOW runtime trace and regenerate REFERENCES.
+- guard ScrollView child API for GNOME runtime [useReq] *(gnome-extension)*
+  - Add a GNOME-compatible child attachment path in _buildPopupMenu.
+  - Prefer set_child and use add_actor only as guarded fallback.
+  - Add/adjust reproducer test for the TypeError regression.
+  - Update workflow narrative and regenerate references.
+- prevent freshness label clipping in popup cards [useReq] *(gnome-extension)*
+  - Reproduce missing Updated/Next row with a targeted failing test.
+  - Wrap provider card area in a vertical scroll view for overflowed cards.
+  - Add stylesheet max-height for provider scroll container.
+  - Update workflow and regenerate references for runtime/documentation parity.
+- align freshness footer bottom-left [useReq] *(gnome-extension)*
+  - enforce START alignment for Updated/Next footer row in provider cards
+  - keep footer sourcing from freshness.last_success_timestamp and idle_until_timestamp
+  - add regression assertion for explicit left alignment
+  - refresh WORKFLOW/REFERENCES evidence
+- align FAIL rendering for cached auth/429 states [useReq] *(cli-show)*
+  - Apply per-window cached FAIL overlays for Claude/Codex dual-window text panels.
+  - Render GNOME fail cards with CLI-equivalent Status/Window/Error plus HTTP retry lines.
+  - Add reproducer test for dual-window cached FAIL regression and update extension assertions.
+  - Regenerate docs/REFERENCES.md and update docs/WORKFLOW.md call-trace details.
+
+### 🚜  Changes
+- wire window labels and bold costs [useReq] *(gnome-extension)*
+  - Update REQ-003/REQ-017/TST-004 for GNOME visual fixes.
+  - show --json extension now exports provider window_labels.
+  - Extension parses window_labels and shows fixed-window labels on bar rows.
+  - Costs values now render bold bright white like CLI show values.
+  - Provider cards keep no-empty-row behavior after Costs for quota providers.
+  - Updated JSON/extension regression tests and regenerated workflow references.
+- align window headings and GNOME costs UI [useReq] *(show)*
+  - Update REQ-017/067/084 and related test requirements for CLI+GNOME formatting.
+  - CLI show now renders Window <window>: headings and right-aligns Updated/Next rows.
+  - Grouped Claude/Codex panels now label sections as Window 5h:/Window 7d:.
+  - GNOME provider cards now render Costs: with non-bold values and hide empty BYOK spacer rows.
+  - Added/updated regression tests for headings, right alignment, and extension cost styling.
+- enforce 30d windows and GNOME freshness source [useReq] *(cli)*
+  - Update REQ-003/010/011/017 and TST-004 requirement definitions.
+  - Force OpenAI/OpenRouter/Copilot/GeminiAI effective show window to 30d.
+  - Export extension.idle_delay_seconds in show --json for extension fallback.
+  - Use idle-delay-based Updated/Next fallback and 30d bars in GNOME cards.
+  - Remove Open AIBar Report popup action from GNOME extension UI.
+  - Update unit tests, WORKFLOW.md, and regenerate REFERENCES.md.
+- align show and GNOME metric rendering [useReq] *(cli)*
+  - Update REQUIREMENTS for shared remaining-credits layout and metric labels.
+  - Implement CLI formatting: bright/bold remaining and cost values, Copilot 30d canonical window, Gemini billing-table spacing.
+  - Implement GNOME card formatting: Cost prefix + bright/bold values, Codex remaining-credits row, Requests/Tokens label format alignment.
+  - Refresh WORKFLOW and REFERENCES for updated call-trace and symbol evidence.
+- align CLI/GNOME panel layout and provider order [useReq] *(show)*
+  - Update requirements for CLI status/freshness row placement and provider order.
+  - Implement deterministic CLI panel ordering and grouped CODEX footer metrics.
+  - Move GNOME GeminiAI tab to last and enforce API counter tokens as total/in/out.
+  - Keep provider-card freshness label right-aligned bottom row in extension cards.
+  - Add/adjust regression tests for panel order, grouped layout, and GNOME token labels.
+  - Refresh WORKFLOW and regenerate REFERENCES for updated runtime/symbol traceability.
+- group Claude/Codex dual windows [useReq] *(cli-show)*
+  - Update REQ-002 and TST-030 to require grouped dual-window provider panels.
+  - Render default-window Claude and Codex output in one panel per provider.
+  - Deduplicate shared lines and keep 5h/7d sections separated by blank lines.
+  - Update CLI regression tests, workflow model, and regenerated references.
+- align freshness label bottom-right [useReq] *(gnome-extension)*
+  - Update REQ-017/TST-004 alignment semantics for provider-card freshness label.
+  - Place extension Updated/Next label at bottom-right in each provider card.
+  - Keep freshness label style parity with Reset in label class.
+  - Refresh workflow trace wording and extension quota-label test expectations.
+- enforce update disable-copy-enable flow [useReq] *(gnome-install)*
+  - update PRJ-008/REQ-032/TST-009 and add REQ-099 for masked update disable failures
+  - implement gnome-install install/update branching with update disable->copy->enable ordering
+  - keep gnome-uninstall disable-before-remove semantics and refresh docs references
+  - extend gnome install/uninstall tests for update ordering and masked-missing-extension behavior
+- align freshness schema for GNOME [useReq] *(show-json)*
+  - update REQ-003/REQ-017/REQ-084 and TST-004/TST-038 mappings
+  - export top-level freshness in show --json with local-time strings
+  - parse/render Updated/Next from freshness in GNOME bottom-left row
+  - update CLI and extension regression tests for schema/layout parity
+- remove gnome-install from nested GNOME launcher [useReq] *(test-ext)*
+  - Update REQ-031 to require UI-only nested shell execution in test-gnome-extension.sh.
+  - Align TST-004 and evidence mapping for no gnome-install invocation.
+  - Simplify script to launch nested GNOME Shell directly with fixed 1024x800 dummy mode.
+  - Adjust script regression tests and regenerate WORKFLOW/REFERENCES docs.
+- force 30d window and current-month monitoring [useReq] *(geminiai)*
+  - Update REQ-060 and add REQ-097/REQ-098 for GeminiAI 30d semantics.
+  - Force show --provider geminiai to effective window 30d even with explicit non-30d --window.
+  - Align GeminiAI monitoring interval to UTC month-start through now for current-month scope.
+  - Update CLI/provider and targeted GeminiAI regressions; refresh WORKFLOW and REFERENCES docs.
+- normalize null API counters to zero [useReq] *(show)*
+  - Update REQ-017/REQ-036 and related TST requirements for API counters.
+  - Render Requests/Tokens for openai/openrouter/codex/geminiai on OK states.
+  - Normalize null requests/input_tokens/output_tokens to zero in CLI and GNOME.
+  - Add regression coverage in CLI and extension tests for null-to-zero rendering.
+  - Update WORKFLOW runtime model and regenerate REFERENCES index.
+- align freshness with idle-time state [useReq] *(show)*
+  - Update requirements for idle_time freshness source and local-time human fields.
+  - Persist idle-time human timestamps in local timezone.
+  - Expose idle_time section in show --json and use it for CLI panel freshness.
+  - Read idle_time in GNOME extension and render Updated/Next from idle timestamps.
+  - Adjust regression tests for CLI/JSON/extension freshness behavior.
+- refactor show pipeline, single cache write, configurable timeout [useReq] *(cli)*
+  - Refactor retrieve_results_via_cache_pipeline to sequential flow:
+  - idle-time check → modular API calls → memory persist → cache read → present
+  - Enforce single cache.json write point via _refresh_and_persist_cache_payload
+  - Minimize cache reads to one load_cli_cache per execution path
+  - Add api_call_timeout_milliseconds config (default 3000ms, REQ-095)
+  - Change api_call_delay default from 1000 to 100ms (REQ-096)
+  - All httpx-based providers use get_api_call_timeout_seconds() (CTN-003)
+  - Setup prompt order: idle_delay → api_call_delay → api_call_timeout → gnome_refresh
+  - Update requirements REQ-091..REQ-096, CTN-003, CTN-008, REQ-005, REQ-040
+  - Update WORKFLOW.md call-traces and REFERENCES.md symbol index
+- move startup idle file and uninstall cleanup [useReq] *(cli)*
+  - Update requirements for startup idle-state path to ~/.cache/aibar/check_version_idle-time.json.
+  - Implement CLI startup idle-state path migration in runtime code.
+  - Add Linux --uninstall cleanup of startup idle file and cache directory.
+  - Extend startup preflight tests for path creation and uninstall cleanup behavior.
+  - Refresh WORKFLOW and REFERENCES docs for updated call trace and symbols.
+
 ## [0.11.0](https://github.com/Ogekuri/AIBar/compare/v0.10.0..v0.11.0) - 2026-03-17
 ### ⛰️  Features
 - Update .g.conf file.
@@ -680,6 +801,7 @@
 - \[0.9.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.9.0
 - \[0.10.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.10.0
 - \[0.11.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.11.0
+- \[0.12.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.12.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -692,3 +814,4 @@
 [0.9.0]: https://github.com/Ogekuri/AIBar/compare/v0.8.0..v0.9.0
 [0.10.0]: https://github.com/Ogekuri/AIBar/compare/v0.9.0..v0.10.0
 [0.11.0]: https://github.com/Ogekuri/AIBar/compare/v0.10.0..v0.11.0
+[0.12.0]: https://github.com/Ogekuri/AIBar/compare/v0.11.0..v0.12.0
