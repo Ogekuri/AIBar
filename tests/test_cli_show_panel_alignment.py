@@ -7,6 +7,7 @@ when body lines contain ANSI-colored progress bars.
 """
 
 import re
+from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
 from click.testing import CliRunner
@@ -117,3 +118,100 @@ def test_show_uses_one_shared_panel_width_for_all_rendered_providers(monkeypatch
     top_borders = [line for line in visible_lines if line.startswith("┌") and line.endswith("┐")]
     assert len(top_borders) == 2
     assert len({len(line) for line in top_borders}) == 1
+
+
+def test_show_default_window_groups_dual_windows_into_one_panel_per_provider(
+    monkeypatch,
+) -> None:
+    """
+    @brief Verify default-window `show` groups Claude/Codex dual windows in single provider panels.
+    @details Mocks Claude and Codex parser paths so each provider emits one grouped panel
+    containing blank-line-separated `5h` and `7d` sections with shared `Updated/Next`
+    metadata rendered once per provider panel.
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @return {None} Function return value.
+    @satisfies REQ-002
+    @satisfies TST-030
+    """
+    shared_updated_at = datetime(2026, 3, 18, 9, 0, tzinfo=timezone.utc)
+
+    def _build_dual_parser(provider_name: ProviderName):
+        def _parse(_raw: dict, window: WindowPeriod) -> ProviderResult:
+            usage_by_window = {
+                WindowPeriod.HOUR_5: 35.0,
+                WindowPeriod.DAY_7: 55.0,
+            }
+            return ProviderResult(
+                provider=provider_name,
+                window=window,
+                metrics=UsageMetrics(
+                    usage_percent=usage_by_window[window],
+                    remaining=65.0,
+                    limit=100.0,
+                ),
+                updated_at=shared_updated_at,
+                raw={"status_code": 200},
+            )
+
+        return _parse
+
+    claude_provider = MagicMock()
+    claude_provider.is_configured.return_value = True
+    claude_provider._parse_response = _build_dual_parser(ProviderName.CLAUDE)
+
+    codex_provider = MagicMock()
+    codex_provider.is_configured.return_value = True
+    codex_provider._parse_response = _build_dual_parser(ProviderName.CODEX)
+
+    monkeypatch.setattr(
+        "aibar.cli.get_providers",
+        lambda: {
+            ProviderName.CLAUDE: claude_provider,
+            ProviderName.CODEX: codex_provider,
+        },
+    )
+    monkeypatch.setattr(
+        "aibar.cli.retrieve_results_via_cache_pipeline",
+        lambda **_: RetrievalPipelineOutput(
+            payload={},
+            results={
+                ProviderName.CLAUDE.value: ProviderResult(
+                    provider=ProviderName.CLAUDE,
+                    window=WindowPeriod.DAY_7,
+                    metrics=UsageMetrics(remaining=65.0, limit=100.0),
+                    updated_at=shared_updated_at,
+                    raw={"status_code": 200},
+                ),
+                ProviderName.CODEX.value: ProviderResult(
+                    provider=ProviderName.CODEX,
+                    window=WindowPeriod.DAY_7,
+                    metrics=UsageMetrics(remaining=65.0, limit=100.0),
+                    updated_at=shared_updated_at,
+                    raw={"status_code": 200},
+                ),
+            },
+            idle_time_by_provider={},
+            idle_active=False,
+            cache_available=True,
+        ),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["show"])
+    assert result.exit_code == 0
+
+    visible_lines = [
+        _strip_ansi_sequences(line)
+        for line in result.output.splitlines()
+        if line.strip()
+    ]
+    top_borders = [line for line in visible_lines if line.startswith("┌") and line.endswith("┐")]
+    assert len(top_borders) == 2
+    assert len({len(line) for line in top_borders}) == 1
+    assert "CLAUDE (5h)" not in result.output
+    assert "CLAUDE (7d)" not in result.output
+    assert "CODEX (5h)" not in result.output
+    assert "CODEX (7d)" not in result.output
+    assert result.output.count("5h:") == 2
+    assert result.output.count("7d:") == 2
+    assert result.output.count("Updated:") == 2

@@ -2094,6 +2094,7 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
     @param force_refresh {bool} When True, bypass idle-time gate for this execution.
     @return {None} Function return value.
     @satisfies REQ-003
+    @satisfies REQ-002
     @satisfies REQ-009
     @satisfies REQ-038
     @satisfies REQ-039
@@ -2216,23 +2217,10 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
                 rendered_panels.append(
                     (
                         provider_name,
-                        *_build_result_panel(
+                        *_build_dual_window_panel(
                             provider_name,
                             result_5h,
-                            label="5h",
-                            freshness_state=retrieval.idle_time_by_provider.get(
-                                provider_name.value
-                            ),
-                        ),
-                    )
-                )
-                rendered_panels.append(
-                    (
-                        provider_name,
-                        *_build_result_panel(
-                            provider_name,
                             result_7d,
-                            label="7d",
                             freshness_state=retrieval.idle_time_by_provider.get(
                                 provider_name.value
                             ),
@@ -2599,6 +2587,56 @@ def _build_result_panel(
             lines.append(status_retry_line)
 
     return title, lines
+
+
+def _build_dual_window_panel(
+    name: ProviderName,
+    result_5h: ProviderResult,
+    result_7d: ProviderResult,
+    freshness_state: IdleTimeState | None = None,
+) -> tuple[str, list[str]]:
+    """
+    @brief Build one grouped CLI panel for dual-window providers.
+    @details Produces one provider panel with a shared metadata block and two
+    blank-line-separated sections (`5h`, `7d`) derived from window-specific panel
+    renderings while deduplicating shared lines.
+    @param name {ProviderName} Provider enum value.
+    @param result_5h {ProviderResult} Five-hour provider result.
+    @param result_7d {ProviderResult} Seven-day provider result.
+    @param freshness_state {IdleTimeState | None} Optional provider freshness state.
+    @return {tuple[str, list[str]]} Provider title and grouped body lines.
+    @satisfies REQ-002
+    @satisfies REQ-067
+    @satisfies REQ-084
+    """
+    title = _provider_display_name(name)
+    _title_5h, lines_5h = _build_result_panel(
+        name=name,
+        result=result_5h,
+        label="5h",
+        freshness_state=freshness_state,
+    )
+    _title_7d, lines_7d = _build_result_panel(
+        name=name,
+        result=result_7d,
+        label="7d",
+        freshness_state=freshness_state,
+    )
+    lines_5h = [line for line in lines_5h if not line.startswith("Updated: ")]
+    lines_7d = [line for line in lines_7d if not line.startswith("Updated: ")]
+    shared_lines: list[str] = [
+        _build_freshness_line(result=result_7d, freshness_state=freshness_state)
+    ]
+    lines_7d_set = set(lines_7d)
+    for line in lines_5h:
+        if line in lines_7d_set and not line.startswith("Window: ") and line not in shared_lines:
+            shared_lines.append(line)
+    shared_line_set = set(shared_lines)
+    section_5h = [line for line in lines_5h if line not in shared_line_set]
+    section_7d = [line for line in lines_7d if line not in shared_line_set]
+    body_lines = list(shared_lines)
+    body_lines.extend(["", "5h:", *section_5h, "", "7d:", *section_7d])
+    return title, body_lines
 
 
 def _print_result(name: ProviderName, result, label: str | None = None) -> None:

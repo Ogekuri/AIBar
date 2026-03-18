@@ -227,10 +227,10 @@ def test_show_dual_window_cached_fail_status_renders_fail_only_blocks(
     tmp_path: Path,
 ) -> None:
     """
-    @brief Verify Claude dual-window text output renders `FAIL` blocks only from cached status errors.
+    @brief Verify Claude grouped dual-window panel renders deduplicated `FAIL` diagnostics.
     @details Seeds successful Claude dual-window payload with cached `status[claude][5h|7d]=FAIL`,
-    activates idle-time cache read path, and asserts both rendered windows emit only failure lines
-    (`Status`, `Window`, `Updated/Next`, `Error`, optional HTTP diagnostics) with statistics suppressed.
+    activates idle-time cache read path, and asserts one grouped panel contains `5h`/`7d`
+    sections while shared failure diagnostics (`Status`, `Updated/Next`, `Error`) render once.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
     @param tmp_path {Path} Temporary path fixture.
     @return {None} Function return value.
@@ -302,9 +302,13 @@ def test_show_dual_window_cached_fail_status_renders_fail_only_blocks(
     runner = CliRunner()
     result = runner.invoke(main, ["show", "--provider", "claude"])
     assert result.exit_code == 0
-    assert result.output.count("Status: FAIL") == 2
+    assert result.output.count("Status: FAIL") == 1
     assert "Status: OK" not in result.output
-    assert result.output.count("Error: Invalid or expired OAuth token") == 2
+    assert result.output.count("Error: Invalid or expired OAuth token") == 1
+    assert "5h:" in result.output
+    assert "7d:" in result.output
+    assert result.output.count("Window: 5h") == 1
+    assert result.output.count("Window: 7d") == 1
     assert "Usage:" not in result.output
     assert "Cost:" not in result.output
     assert "Remaining credits:" not in result.output

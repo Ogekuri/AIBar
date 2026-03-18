@@ -123,7 +123,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 
 ### 3.2 Functions
 - **REQ-001**: MUST skip unconfigured providers in `show` output and print missing environment-variable hints when text mode is used.
-- **REQ-002**: MUST print both 5-hour and 7-day outputs for Claude and Codex when `show` runs with default window and non-JSON mode.
+- **REQ-002**: MUST render Claude and Codex default-window text output as one provider panel each containing blank-line-separated `5h` and `7d` sections, with identical section lines emitted once in a shared header or footer.
 - **REQ-003**: MUST emit pretty-printed JSON (`indent=2`) for `show --json` with top-level sections `payload`, `status`, `idle_time`, `freshness`, and `extension`, where `freshness` is provider-keyed and aligned to extension parsing using `last_success_timestamp`/`idle_until_timestamp` and local-time `%Y-%m-%d %H:%M` strings.
 - **REQ-004**: MUST run provider health checks in `doctor` using the 5-hour window and report per-provider configuration and test status.
 - **REQ-005**: MUST prompt `setup` for `idle_delay_seconds` (default `300`) first, `api_call_delay_milliseconds` (default `100`) second, `api_call_timeout_milliseconds` (default `3000`) third, `gnome_refresh_interval_seconds` (default `60`) fourth, and `billing_data` (default `billing_data`) fifth, then persist values in `~/.config/aibar/config.json`.
@@ -252,7 +252,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-027**: MUST verify GeminiAI HTTP `429`, quota-exhaustion, and missing billing-export-table failures preserve cached payload snapshots, mark status `FAIL`, and update only GeminiAI idle-time state according to rate-limit retry policy.
 - **TST-028**: MUST verify `setup` currency prompts exclude `geminiai` and GeminiAI rendering in CLI text and JSON payload includes latest-available billing-period monetary cost values when billing data exists.
 - **TST-029**: MUST verify GNOME extension renders GeminiAI provider tab/card with bright-purple style class assignment, provider title `GEMINIAI`, provider ordering immediately after `codex`, and GeminiAI cost/error status propagation from cache payload.
-- **TST-030**: MUST verify CLI `show` renders all provider panels with identical visible width in one execution, where the shared width equals the widest rendered panel content width, and reset lines contain no `⚠️` glyph suffix.
+- **TST-030**: MUST verify CLI `show` renders one Claude panel and one Codex panel on default window with blank-line-separated `5h` and `7d` sections, shared panel width, and deduplicated shared section lines emitted once per provider panel.
 - **TST-031**: MUST verify startup update preflight executes before invalid-argument diagnostics and before subcommand handlers run.
 - **TST-032**: MUST verify startup update idle-time gating skips HTTP calls until `idle_until` expires and resumes checks when the idle-state file is missing or expired.
 - **TST-033**: MUST verify successful startup update checks create `~/.cache/aibar/` when missing and write `check_version_idle-time.json` with epoch and human-readable `last_success_at` and `idle_until`.
@@ -294,7 +294,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | DES-005 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_loadEnvFromFile` + parses `export KEY=VALUE`, handles quotes/comments/semicolon cleanup. |
 | DES-006 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + scheduler-driven `_startAutoRefresh/_refreshData` using `this._refreshIntervalSeconds` read from `json.extension.gnome_refresh_interval_seconds`, popup `Refresh Now` command uses `aibar show --json --force`, interval updated on each successful refresh. |
 | REQ-001 | `src/aibar/aibar/cli.py` + `show` loop + `if not prov.is_configured(): ... continue` and text hint `Set {config.ENV_VARS.get(name)}`. |
-| REQ-002 | `src/aibar/aibar/cli.py` + `show` + default-window Claude/Codex dual fetch output rendering. |
+| REQ-002 | `src/aibar/aibar/cli.py` + `show/_build_dual_window_panel` + default-window Claude/Codex rendering emits one provider panel each with grouped `5h`/`7d` sections and shared-line deduplication. |
 | REQ-003 | `src/aibar/aibar/cli.py` + `show` JSON renderer emits `indent=2` with `payload`, `status`, `idle_time`, `freshness`, and `extension` sections; `freshness` exports provider-keyed timestamps and local-time strings for extension parity. |
 | REQ-004 | `src/aibar/aibar/cli.py` + `doctor` + configuration status and `_fetch_result(provider, WindowPeriod.HOUR_5)` health check. |
 | REQ-005 | `src/aibar/aibar/cli.py` + `setup` prompts `idle_delay_seconds`, `api_call_delay_milliseconds`, `api_call_timeout_milliseconds`, and `gnome_refresh_interval_seconds` with defaults `300`, `100`, `3000`, and `60`, then persists `~/.config/aibar/config.json`. |
@@ -374,7 +374,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-048 | `scripts/claude_token_refresh.sh` + `do_refresh()` + `> "$LOG_FILE"` truncation statement before first `log` call. |
 | TST-022 | `tests/test_claude_token_refresh_script.py` + source-level assertion that `do_refresh()` body contains `LOG_FILE` truncation before any `log` invocation. |
 | TST-023 | `tests/test_currency_symbol_flow.py` + assertions for `currency_symbol` field in `UsageMetrics`, CLI `_print_result` cost formatting, and GNOME extension panel label using metrics symbol. |
-| TST-030 | `tests/test_cli_show_panel_alignment.py` + CLI panel output assertions verify all rendered panels share identical visible width within one `show` execution. |
+| TST-030 | `tests/test_cli_show_panel_alignment.py` + CLI output assertions verify one Claude and one Codex panel for default-window rendering, grouped `5h`/`7d` sections, deduplicated shared lines, and identical visible panel width. |
 | REQ-084 | `src/aibar/aibar/cli.py` + `_build_result_panel/show` + per-provider freshness line renders `Updated: <datetime>, Next: <datetime>` from provider `idle_time` timestamps with local-timezone `%Y-%m-%d %H:%M`; `show --json` exports equivalent provider freshness under top-level `freshness` for extension alignment. |
 | REQ-085 | `src/aibar/aibar/cli.py` + text renderer surfaces cached authentication/rate-limit failures and suppresses statistics lines for `FAIL` states. |
 | REQ-090 | `src/aibar/aibar/cli.py` + `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + both renderers consume identical cached error/status/retry-after payload semantics for failed provider/window states. |
