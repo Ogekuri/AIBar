@@ -2061,7 +2061,7 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
     @details Delegates provider retrieval to a shared cache-based pipeline that
     applies force handling, idle-time gating, conditional cache refresh, and
     deterministic readback from `cache.json` before rendering. When `--provider`
-    is `geminiai` and `--window` is omitted, effective window defaults to `30d`.
+    is `geminiai`, effective window is forced to `30d` regardless of `--window`.
     @param provider {str} CLI provider selector string.
     @param window {str} CLI window period string.
     @param output_json {bool} When True, emit JSON output instead of formatted text.
@@ -2078,17 +2078,14 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
     @satisfies REQ-084
     @satisfies REQ-085
     @satisfies REQ-067
+    @satisfies REQ-097
     """
     provider_filter = parse_provider(provider)
     window_period = parse_window(window)
-
     ctx = click.get_current_context()
     window_source = ctx.get_parameter_source("window")
-    if (
-        window_source == ParameterSource.DEFAULT
-        and provider_filter is not None
-        and provider_filter == ProviderName.GEMINIAI
-    ):
+
+    if provider_filter is not None and provider_filter == ProviderName.GEMINIAI:
         window_period = WindowPeriod.DAY_30
     providers = get_providers()
 

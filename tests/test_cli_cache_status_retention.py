@@ -289,12 +289,13 @@ def test_geminiai_cached_fail_status_is_rendered_in_show_output(
     """
     @brief Verify GeminiAI cached FAIL status propagates to CLI text output.
     @details Writes cache payload with successful GeminiAI metrics plus status FAIL
-    for 7d window, activates idle-time gating, and asserts `aibar show` prints the
-    cached status error message.
+    for 30d window, activates idle-time gating, and asserts `aibar show` prints the
+    cached status error message and renders effective GeminiAI window `30d` even with
+    explicit `--window 7d`.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
     @param tmp_path {Path} Temporary path fixture.
     @return {None} Function return value.
-    @satisfies REQ-060
+    @satisfies REQ-097
     """
     _patch_config_paths(monkeypatch, tmp_path)
     config_module.save_runtime_config(
@@ -303,7 +304,7 @@ def test_geminiai_cached_fail_status_is_rendered_in_show_output(
 
     cached_success = ProviderResult(
         provider=ProviderName.GEMINIAI,
-        window=WindowPeriod.DAY_7,
+        window=WindowPeriod.DAY_30,
         metrics=UsageMetrics(cost=2.75, requests=120, input_tokens=1024, currency_symbol="€"),
         raw={"project_id": "demo-project", "billing": {"table_id": "gcp_billing_export_v1_001"}},
     )
@@ -312,7 +313,7 @@ def test_geminiai_cached_fail_status_is_rendered_in_show_output(
             "payload": {"geminiai": cached_success.model_dump(mode="json")},
             "status": {
                 "geminiai": {
-                    "7d": {
+                    "30d": {
                         "result": "FAIL",
                         "error": "GeminiAI billing export table was not found in dataset 'billing_data'.",
                         "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -342,6 +343,7 @@ def test_geminiai_cached_fail_status_is_rendered_in_show_output(
     runner = CliRunner()
     result = runner.invoke(main, ["show", "--provider", "geminiai", "--window", "7d"])
     assert result.exit_code == 0
+    assert "Window: 30d" in result.output
     assert "Error: GeminiAI billing export table was not found in dataset 'billing_data'." in result.output
 
 

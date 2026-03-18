@@ -12,7 +12,7 @@ import asyncio
 import json
 import os
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
 
@@ -648,18 +648,22 @@ class GeminiAIProvider(BaseProvider):
 
     def _build_window_range(self, window: WindowPeriod) -> GeminiAIWindowRange:
         """
-        @brief Build UTC time interval used for Monitoring queries.
-        @param window {WindowPeriod} Requested window period.
+        @brief Build current-month UTC interval used for Monitoring queries.
+        @details Uses `[UTC month start, current UTC time]` to align Monitoring
+        usage aggregation with current-month GeminiAI billing semantics.
+        @param window {WindowPeriod} Requested window period (ignored by interval policy).
         @return {GeminiAIWindowRange} Start/end UTC timestamps.
+        @satisfies REQ-098
         """
+        del window
         now = datetime.now(timezone.utc)
-        if window == WindowPeriod.HOUR_5:
-            start = now - timedelta(hours=5)
-        elif window == WindowPeriod.DAY_30:
-            start = now - timedelta(days=30)
-        else:
-            start = now - timedelta(days=7)
-        return GeminiAIWindowRange(start_time=start, end_time=now)
+        month_start = datetime(
+            year=now.year,
+            month=now.month,
+            day=1,
+            tzinfo=timezone.utc,
+        )
+        return GeminiAIWindowRange(start_time=month_start, end_time=now)
 
     def _resolve_project_id(self) -> str | None:
         """

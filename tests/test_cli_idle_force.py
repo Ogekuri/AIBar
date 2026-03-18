@@ -132,18 +132,18 @@ def test_show_force_bypasses_idle_time_and_recreates_state(
     )
 
 
-def test_show_geminiai_defaults_to_30d_when_window_is_omitted(
+def test_show_geminiai_forces_30d_even_when_window_is_explicitly_7d(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
     """
-    @brief Verify `show --provider geminiai` defaults to effective window `30d`.
-    @details Invokes `show` without `--window` and asserts GeminiAI fetch is called
-    with `WindowPeriod.DAY_30`.
+    @brief Verify `show --provider geminiai` forces effective window `30d`.
+    @details Invokes `show` with explicit `--window 7d` and asserts GeminiAI fetch
+    still executes with `WindowPeriod.DAY_30`.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
     @param tmp_path {Path} Temporary path fixture.
     @return {None} Function return value.
-    @satisfies REQ-060
+    @satisfies REQ-097
     """
     _patch_config_paths(monkeypatch, tmp_path)
     config_module.save_runtime_config(
@@ -174,6 +174,8 @@ def test_show_geminiai_defaults_to_30d_when_window_is_omitted(
             "show",
             "--provider",
             "geminiai",
+            "--window",
+            "7d",
             "--json",
             "--force",
         ],

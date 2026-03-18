@@ -15,6 +15,7 @@ and Monitoring time-series aggregation behavior.
 """
 
 import asyncio
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
 
@@ -252,6 +253,34 @@ def test_geminiai_fetch_supports_consumed_api_metric_series(monkeypatch) -> None
     assert 'resource.type="consumed_api"' in result.raw["monitoring"]["request_metric_filter"]
     assert result.raw["monitoring"]["token_metric_filter"] is not None
     assert 'resource.type="consumed_api"' in result.raw["monitoring"]["token_metric_filter"]
+
+
+def test_geminiai_monitoring_window_range_uses_current_utc_month_bounds() -> None:
+    """
+    @brief Verify GeminiAI Monitoring range uses current UTC month start and current UTC time.
+    @details Asserts `_build_window_range` ignores requested window selector and returns
+    an interval whose start is `YYYY-MM-01T00:00:00+00:00` in UTC and whose end is current UTC.
+    @return {None} Function return value.
+    @satisfies REQ-098
+    @satisfies TST-026
+    """
+    provider = GeminiAIProvider(
+        credential_store=_FakeCredentialStore(),
+        project_id="demo-project",
+    )
+    range_7d = provider._build_window_range(WindowPeriod.DAY_7)
+    range_30d = provider._build_window_range(WindowPeriod.DAY_30)
+    now_utc = datetime.now(timezone.utc)
+    expected_month_start = datetime(
+        year=now_utc.year,
+        month=now_utc.month,
+        day=1,
+        tzinfo=timezone.utc,
+    )
+    assert range_7d.start_time == expected_month_start
+    assert range_30d.start_time == expected_month_start
+    assert expected_month_start <= range_7d.end_time <= now_utc
+    assert expected_month_start <= range_30d.end_time <= now_utc
 
 
 def test_geminiai_fetch_converts_http_429_to_rate_limit_error(monkeypatch) -> None:
