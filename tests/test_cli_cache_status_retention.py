@@ -51,7 +51,7 @@ def _make_openrouter_success(source: str) -> ProviderResult:
     """
     return ProviderResult(
         provider=ProviderName.OPENROUTER,
-        window=WindowPeriod.DAY_7,
+        window=WindowPeriod.DAY_30,
         metrics=UsageMetrics(cost=2.0, remaining=80.0, limit=100.0),
         raw={"status_code": 200, "source": source},
     )
@@ -64,7 +64,7 @@ def _make_openrouter_429() -> ProviderResult:
     """
     return ProviderResult(
         provider=ProviderName.OPENROUTER,
-        window=WindowPeriod.DAY_7,
+        window=WindowPeriod.DAY_30,
         metrics=UsageMetrics(),
         error="Rate limited. Try again later.",
         raw={"status_code": 429, "retry_after_seconds": 120},
@@ -116,14 +116,14 @@ def _make_claude_429(window: WindowPeriod) -> ProviderResult:
 def _make_geminiai_success(source: str) -> ProviderResult:
     """
     @brief Build deterministic successful GeminiAI ProviderResult fixture.
-    @details Creates 7-day payload with stable monitoring/billing fields and
+    @details Creates 30-day payload with stable monitoring/billing fields and
     caller-provided raw-source marker for cache-retention assertions.
     @param source {str} Marker stored in raw payload.
     @return {ProviderResult} Successful GeminiAI result.
     """
     return ProviderResult(
         provider=ProviderName.GEMINIAI,
-        window=WindowPeriod.DAY_7,
+        window=WindowPeriod.DAY_30,
         metrics=UsageMetrics(cost=3.0, requests=90, input_tokens=600, currency_symbol="€"),
         raw={"status_code": 200, "source": source, "project_id": "demo-project"},
     )
@@ -139,7 +139,7 @@ def _make_geminiai_429(retry_after_seconds: int) -> ProviderResult:
     """
     return ProviderResult(
         provider=ProviderName.GEMINIAI,
-        window=WindowPeriod.DAY_7,
+        window=WindowPeriod.DAY_30,
         metrics=UsageMetrics(),
         error="Rate limited. Try again later.",
         raw={"status_code": 429, "retry_after_seconds": retry_after_seconds},
@@ -187,9 +187,9 @@ def test_failed_refresh_preserves_previous_payload_and_records_fail_status(
 
     output = json.loads(result.output)
     assert output["payload"]["openrouter"]["raw"]["source"] == "cached-success"
-    assert output["status"]["openrouter"]["7d"]["result"] == "FAIL"
-    assert output["status"]["openrouter"]["7d"]["error"] == "Rate limited. Try again later."
-    assert isinstance(output["status"]["openrouter"]["7d"]["updated_at"], str)
+    assert output["status"]["openrouter"]["30d"]["result"] == "FAIL"
+    assert output["status"]["openrouter"]["30d"]["error"] == "Rate limited. Try again later."
+    assert isinstance(output["status"]["openrouter"]["30d"]["updated_at"], str)
 
 
 def test_partial_claude_refresh_records_mixed_window_statuses(
@@ -400,8 +400,8 @@ def test_geminiai_rate_limit_preserves_payload_and_updates_only_its_idle_state(
 
     output = json.loads(result.output)
     assert output["payload"]["geminiai"]["raw"]["source"] == "cached-geminiai"
-    assert output["status"]["geminiai"]["7d"]["result"] == "FAIL"
-    assert output["status"]["geminiai"]["7d"]["status_code"] == 429
+    assert output["status"]["geminiai"]["30d"]["result"] == "FAIL"
+    assert output["status"]["geminiai"]["30d"]["status_code"] == 429
 
     idle_state = json.loads(config_module.IDLE_TIME_PATH.read_text(encoding="utf-8"))
     geminiai_state = idle_state[ProviderName.GEMINIAI.value]

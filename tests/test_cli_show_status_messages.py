@@ -59,7 +59,7 @@ def test_show_renders_updated_next_datetime_from_idle_time_state(
     idle_until = datetime(2026, 3, 18, 8, 59, tzinfo=timezone.utc)
     result_payload = ProviderResult(
         provider=ProviderName.OPENAI,
-        window=WindowPeriod.DAY_7,
+        window=WindowPeriod.DAY_30,
         metrics=UsageMetrics(cost=1.25),
         updated_at=payload_updated_at,
         raw={"status_code": 200},
@@ -117,7 +117,7 @@ def test_show_json_exports_freshness_with_local_datetime_parity(
     idle_until = datetime(2026, 3, 18, 8, 59, tzinfo=timezone.utc)
     result_payload = ProviderResult(
         provider=ProviderName.OPENAI,
-        window=WindowPeriod.DAY_7,
+        window=WindowPeriod.DAY_30,
         metrics=UsageMetrics(cost=1.25),
         updated_at=payload_updated_at,
         raw={"status_code": 200},
@@ -175,7 +175,7 @@ def test_show_renders_cached_failure_error_only_with_retry_metadata(
     )
     cached_success = ProviderResult(
         provider=ProviderName.OPENROUTER,
-        window=WindowPeriod.DAY_7,
+        window=WindowPeriod.DAY_30,
         metrics=UsageMetrics(cost=2.75),
         raw={"status_code": 200, "source": "cached-success"},
     )
@@ -184,7 +184,7 @@ def test_show_renders_cached_failure_error_only_with_retry_metadata(
             "payload": {"openrouter": cached_success.model_dump(mode="json")},
             "status": {
                 "openrouter": {
-                    "7d": {
+                    "30d": {
                         "result": "FAIL",
                         "error": "Invalid or expired OAuth token",
                         "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -215,6 +215,8 @@ def test_show_renders_cached_failure_error_only_with_retry_metadata(
     result = runner.invoke(main, ["show", "--provider", "openrouter", "--window", "7d"])
     assert result.exit_code == 0
     assert "Status: FAIL" in result.output
+    assert "Window: 30d" in result.output
+    assert "Window: 7d" not in result.output
     assert "Error: Invalid or expired OAuth token" in result.output
     assert "HTTP status: 401, Retry after: 300 sec." in result.output
     assert "Cost:" not in result.output

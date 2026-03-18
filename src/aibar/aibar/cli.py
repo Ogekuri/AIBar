@@ -103,6 +103,12 @@ _SHOW_PROVIDER_ORDER: tuple[ProviderName, ...] = (
     ProviderName.OPENAI,
     ProviderName.GEMINIAI,
 )
+_FIXED_WINDOW_BY_PROVIDER: dict[ProviderName, WindowPeriod] = {
+    ProviderName.COPILOT: WindowPeriod.DAY_30,
+    ProviderName.OPENROUTER: WindowPeriod.DAY_30,
+    ProviderName.OPENAI: WindowPeriod.DAY_30,
+    ProviderName.GEMINIAI: WindowPeriod.DAY_30,
+}
 _STARTUP_UPDATE_PROGRAM = "aibar"
 _STARTUP_UPDATE_URL = "https://api.github.com/repos/Ogekuri/AIBar/releases/latest"
 _STARTUP_IDLE_DELAY_SECONDS = 300
@@ -1193,6 +1199,21 @@ def _serialize_freshness_state(
     return freshness
 
 
+def _fixed_effective_window(provider_name: ProviderName) -> WindowPeriod | None:
+    """
+    @brief Resolve provider fixed effective window override for `show` surfaces.
+    @details Returns `30d` for providers that ignore requested window arguments
+    and must expose a canonical window in payload, text, and JSON output.
+    @param provider_name {ProviderName} Provider enum key.
+    @return {WindowPeriod | None} Fixed window override, or None when provider is variable-window.
+    @satisfies REQ-010
+    @satisfies REQ-011
+    @satisfies REQ-012
+    @satisfies REQ-097
+    """
+    return _FIXED_WINDOW_BY_PROVIDER.get(provider_name)
+
+
 def _project_cached_window(
     result: ProviderResult,
     target_window: WindowPeriod,
@@ -1202,22 +1223,21 @@ def _project_cached_window(
     @brief Project cached raw payload to requested window without network I/O.
     @details Attempts provider-specific `_parse_response` projection when cached
     window differs from requested window; providers with fixed effective windows
-    (`copilot`, `geminiai`) bypass projection and preserve canonical window values.
+    (`copilot`, `openrouter`, `openai`, `geminiai`) bypass projection and preserve
+    canonical window values.
     Returns original result on projection failure or when parser is unavailable.
     @param result {ProviderResult} Cached normalized provider result.
     @param target_window {WindowPeriod} Requested CLI window.
     @param providers {dict[ProviderName, BaseProvider]} Provider registry.
     @return {ProviderResult} Result aligned to requested window when possible.
     @satisfies REQ-009
+    @satisfies REQ-010
+    @satisfies REQ-011
     @satisfies REQ-012
     @satisfies REQ-042
     @satisfies REQ-097
     """
-    fixed_window_by_provider: dict[ProviderName, WindowPeriod] = {
-        ProviderName.COPILOT: WindowPeriod.DAY_30,
-        ProviderName.GEMINIAI: WindowPeriod.DAY_30,
-    }
-    fixed_window = fixed_window_by_provider.get(result.provider)
+    fixed_window = _fixed_effective_window(result.provider)
     if fixed_window is not None:
         if result.window == fixed_window:
             return result
@@ -1289,7 +1309,7 @@ def _load_cached_results(
         )
         cached_results[provider_key] = _overlay_cached_failure_status(
             provider_key=provider_key,
-            target_window=target_window,
+            target_window=projected_result.window,
             projected_result=projected_result,
             status_section=filtered_status,
         )
@@ -1817,9 +1837,10 @@ def _refresh_and_persist_cache_payload(
                 successful_payload_results[provider_name.value] = preferred_success
             continue
 
+        effective_window = _fixed_effective_window(provider_name) or target_window
         result = _fetch_result(
             provider,
-            target_window,
+            effective_window,
             throttle_state=throttle_state,
         )
         fetched_results.append(result)
@@ -2118,7 +2139,8 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
     @details Delegates provider retrieval to a shared cache-based pipeline that
     applies force handling, idle-time gating, conditional cache refresh, and
     deterministic readback from `cache.json` before rendering. When `--provider`
-    is `geminiai`, effective window is forced to `30d` regardless of `--window`.
+    targets `copilot`, `openrouter`, `openai`, or `geminiai`, effective window is
+    forced to `30d` regardless of `--window`.
     @param provider {str} CLI provider selector string.
     @param window {str} CLI window period string.
     @param output_json {bool} When True, emit JSON output instead of formatted text.
@@ -2143,8 +2165,10 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
     ctx = click.get_current_context()
     window_source = ctx.get_parameter_source("window")
 
-    if provider_filter is not None and provider_filter == ProviderName.GEMINIAI:
-        window_period = WindowPeriod.DAY_30
+    if provider_filter is not None:
+        fixed_window = _fixed_effective_window(provider_filter)
+        if fixed_window is not None:
+            window_period = fixed_window
     providers = get_providers()
 
     # Filter to specific provider if requested
@@ -2169,6 +2193,7 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
             output_doc[_CACHE_FRESHNESS_SECTION_KEY] = {}
             output_doc[_CACHE_EXTENSION_SECTION_KEY] = {
                 "gnome_refresh_interval_seconds": runtime_cfg.gnome_refresh_interval_seconds,
+                "idle_delay_seconds": runtime_cfg.idle_delay_seconds,
             }
             click.echo(json.dumps(output_doc, indent=2))
         else:
@@ -2185,6 +2210,7 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
         )
         output_doc[_CACHE_EXTENSION_SECTION_KEY] = {
             "gnome_refresh_interval_seconds": runtime_cfg.gnome_refresh_interval_seconds,
+            "idle_delay_seconds": runtime_cfg.idle_delay_seconds,
         }
         click.echo(json.dumps(output_doc, indent=2))
         return

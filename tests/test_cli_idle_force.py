@@ -73,7 +73,7 @@ def test_show_force_bypasses_idle_time_and_recreates_state(
 
     fresh_result = ProviderResult(
         provider=ProviderName.OPENROUTER,
-        window=WindowPeriod.DAY_7,
+        window=WindowPeriod.DAY_30,
         metrics=UsageMetrics(cost=2.5, remaining=44.0, limit=100.0),
         raw={"status_code": 200, "source": "live"},
     )
@@ -103,7 +103,7 @@ def test_show_force_bypasses_idle_time_and_recreates_state(
     )
 
     assert result.exit_code == 0
-    provider.fetch.assert_awaited_once_with(WindowPeriod.DAY_7)
+    provider.fetch.assert_awaited_once_with(WindowPeriod.DAY_30)
     output_payload = json.loads(result.output)
     persisted_cache = json.loads(config_module.CACHE_FILE_PATH.read_text(encoding="utf-8"))
     output_without_extension = {

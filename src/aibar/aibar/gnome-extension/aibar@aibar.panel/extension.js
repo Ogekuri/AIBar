@@ -16,6 +16,7 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
 const REFRESH_INTERVAL_SECONDS = 60;
+const IDLE_DELAY_SECONDS = 300;
 const ENV_FILE_PATH = GLib.get_home_dir() + '/.config/aibar/env';
 const RESET_PENDING_MESSAGE = 'Starts when the first message is sent';
 const RATE_LIMIT_ERROR_MESSAGE = 'Rate limited. Try again later.';
@@ -38,6 +39,7 @@ const PROVIDER_DISPLAY_NAMES = {
     geminiai: 'GEMINIAI',
 };
 const API_COUNTER_PROVIDERS = new Set(['openai', 'openrouter', 'codex', 'geminiai']);
+const WINDOW_BAR_30D_PROVIDERS = new Set(['copilot', 'openrouter', 'openai', 'geminiai']);
 
 /**
  * @brief Resolve provider label text for GNOME tab/card rendering.
@@ -143,14 +145,14 @@ function _boldWhiteMarkup(value) {
 /**
  * @brief Build provider freshness fallback from cache-status `updated_at` metadata.
  * @details Converts `statusEntry.updated_at` to epoch seconds and derives
- * `idle_until_timestamp` using current refresh interval when `freshness`/`idle_time`
+ * `idle_until_timestamp` using configured idle-delay seconds when `freshness`/`idle_time`
  * sections are unavailable from CLI JSON output.
  * @param {any} statusEntry Window-specific cache status entry.
- * @param {number} refreshIntervalSeconds Active refresh interval in seconds.
+ * @param {number} idleDelaySeconds Active idle delay in seconds.
  * @returns {{last_success_timestamp: number, idle_until_timestamp: number} | null} Fallback freshness state or null.
  * @satisfies REQ-017
  */
-function _buildFallbackFreshnessState(statusEntry, refreshIntervalSeconds) {
+function _buildFallbackFreshnessState(statusEntry, idleDelaySeconds) {
     if (!statusEntry || typeof statusEntry !== 'object' || Array.isArray(statusEntry))
         return null;
     if (typeof statusEntry.updated_at !== 'string' || statusEntry.updated_at.length === 0)
@@ -162,10 +164,10 @@ function _buildFallbackFreshnessState(statusEntry, refreshIntervalSeconds) {
     if (!Number.isInteger(updatedTimestamp))
         return null;
     const safeIntervalSeconds = (
-        Number.isInteger(refreshIntervalSeconds) && refreshIntervalSeconds > 0
+        Number.isInteger(idleDelaySeconds) && idleDelaySeconds > 0
     )
-        ? refreshIntervalSeconds
-        : REFRESH_INTERVAL_SECONDS;
+        ? idleDelaySeconds
+        : IDLE_DELAY_SECONDS;
     const idleUntilTimestamp = updatedTimestamp + safeIntervalSeconds;
     return {
         last_success_timestamp: updatedTimestamp,
@@ -181,11 +183,11 @@ function _buildFallbackFreshnessState(statusEntry, refreshIntervalSeconds) {
  * @param {Object<string, any>} freshnessData Provider-keyed freshness object.
  * @param {string} providerName Provider key from usage payload.
  * @param {any} statusEntry Window-specific cache status entry.
- * @param {number} refreshIntervalSeconds Active refresh interval in seconds.
+ * @param {number} idleDelaySeconds Active idle delay in seconds.
  * @returns {{last_success_timestamp: number, idle_until_timestamp: number} | null} Resolved freshness state.
  * @satisfies REQ-017
  */
-function _resolveProviderFreshnessState(freshnessData, providerName, statusEntry, refreshIntervalSeconds) {
+function _resolveProviderFreshnessState(freshnessData, providerName, statusEntry, idleDelaySeconds) {
     const providerFreshness = (
         freshnessData &&
         typeof freshnessData === 'object' &&
@@ -198,7 +200,7 @@ function _resolveProviderFreshnessState(freshnessData, providerName, statusEntry
         : null;
     if (providerFreshness)
         return providerFreshness;
-    return _buildFallbackFreshnessState(statusEntry, refreshIntervalSeconds);
+    return _buildFallbackFreshnessState(statusEntry, idleDelaySeconds);
 }
 
 /**
@@ -335,6 +337,7 @@ class AIBarIndicator extends PanelMenu.Button {
         this._providerRows = {};
         this._providerTabs = {};
         this._refreshIntervalSeconds = REFRESH_INTERVAL_SECONDS;
+        this._idleDelaySeconds = IDLE_DELAY_SECONDS;
         this._activeProvider = null;
         this._providerOrder = ['claude', 'openrouter', 'copilot', 'codex', 'openai', 'geminiai'];
         this._iconBlinkTimeout = null;
@@ -536,12 +539,6 @@ class AIBarIndicator extends PanelMenu.Button {
         });
         this.menu.addMenuItem(refreshItem);
 
-        let openUiItem = new PopupMenu.PopupMenuItem('Open AIBar Report');
-        openUiItem.connect('activate', () => {
-            this._openTerminalWithCommand(`${_getAiBarPath()} show`);
-        });
-        this.menu.addMenuItem(openUiItem);
-
         this.menu.connect('open-state-changed', (_menu, isOpen) => {
             if (isOpen)
                 this._applyBarWidths();
@@ -654,7 +651,7 @@ class AIBarIndicator extends PanelMenu.Button {
                         this._freshnessData,
                         name,
                         statusEntry,
-                        this._refreshIntervalSeconds,
+                        this._idleDelaySeconds,
                     );
                     this._populateProviderCard(card, name, data, statusEntry, freshnessState);
                 }
@@ -1033,10 +1030,15 @@ class AIBarIndicator extends PanelMenu.Button {
         }
 
         let hasWindowBars = false;
-        if (providerName === 'copilot' && usagePercent !== null && usagePercent !== undefined) {
+        if (
+            WINDOW_BAR_30D_PROVIDERS.has(providerName) &&
+            usagePercent !== null &&
+            usagePercent !== undefined
+        ) {
+            const singleWindowReset = metrics.reset_at || fiveHourReset || sevenDayReset || null;
             card.fiveHourBar.label.text = '30d';
-            card._barData.fiveHour = {pct: usagePercent, resetTime: metrics.reset_at || null};
-            updateWindowBar(card.fiveHourBar, usagePercent, metrics.reset_at || null, true);
+            card._barData.fiveHour = {pct: usagePercent, resetTime: singleWindowReset};
+            updateWindowBar(card.fiveHourBar, usagePercent, singleWindowReset, true);
             card._barData.sevenDay = null;
             card.sevenDayBar.container.hide();
             hasWindowBars = true;
@@ -1277,7 +1279,7 @@ class AIBarIndicator extends PanelMenu.Button {
      * @details Parses CLI JSON output supporting canonical cache schema sections
      * (`payload`, `status`, `idle_time`, `freshness`, `extension`). Reads
      * `extension.gnome_refresh_interval_seconds` to update the auto-refresh interval and
-     * reschedules the timer when the value changes.
+     * `extension.idle_delay_seconds` for freshness fallback timestamp derivation.
      * @param {any} output Input parameter `output`.
      * @returns {any} Function return value.
      * @satisfies DES-006
@@ -1316,6 +1318,13 @@ class AIBarIndicator extends PanelMenu.Button {
                     typeof json.idle_time === 'object' &&
                     !Array.isArray(json.idle_time)
                 );
+                const extensionData = (
+                    json.extension &&
+                    typeof json.extension === 'object' &&
+                    !Array.isArray(json.extension)
+                )
+                    ? json.extension
+                    : null;
                 if (hasFreshnessSection)
                     this._freshnessData = json.freshness;
                 else if (hasIdleTimeSection)
@@ -1323,21 +1332,30 @@ class AIBarIndicator extends PanelMenu.Button {
                 else
                     this._freshnessData = {};
                 if (
-                    json.extension &&
-                    typeof json.extension === 'object' &&
-                    typeof json.extension.gnome_refresh_interval_seconds === 'number' &&
-                    json.extension.gnome_refresh_interval_seconds >= 1
+                    extensionData &&
+                    typeof extensionData.gnome_refresh_interval_seconds === 'number' &&
+                    extensionData.gnome_refresh_interval_seconds >= 1
                 ) {
-                    const newInterval = json.extension.gnome_refresh_interval_seconds;
+                    const newInterval = extensionData.gnome_refresh_interval_seconds;
                     if (newInterval !== this._refreshIntervalSeconds) {
                         this._refreshIntervalSeconds = newInterval;
                         this._startAutoRefresh();
                     }
                 }
+                if (
+                    extensionData &&
+                    typeof extensionData.idle_delay_seconds === 'number' &&
+                    extensionData.idle_delay_seconds >= 1
+                ) {
+                    this._idleDelaySeconds = Math.floor(extensionData.idle_delay_seconds);
+                } else {
+                    this._idleDelaySeconds = IDLE_DELAY_SECONDS;
+                }
             } else {
                 this._usageData = json;
                 this._statusData = {};
                 this._freshnessData = {};
+                this._idleDelaySeconds = IDLE_DELAY_SECONDS;
             }
             console.debug(`aibar: Parsed ${Object.keys(this._usageData).length} providers`);
         } catch (e) {
@@ -1579,7 +1597,7 @@ class AIBarIndicator extends PanelMenu.Button {
                 this._freshnessData,
                 providerName,
                 statusEntry,
-                this._refreshIntervalSeconds,
+                this._idleDelaySeconds,
             );
             this._updateProviderCard(providerName, data, statusEntry, freshnessState);
 

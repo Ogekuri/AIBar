@@ -57,13 +57,13 @@ def test_show_uses_cache_for_idle_provider_and_refreshes_non_idle_provider(
     _patch_config_paths(monkeypatch, tmp_path)
     cached_openrouter = ProviderResult(
         provider=ProviderName.OPENROUTER,
-        window=WindowPeriod.DAY_7,
+        window=WindowPeriod.DAY_30,
         metrics=UsageMetrics(cost=1.75, remaining=72.0, limit=100.0),
         raw={"status_code": 200, "source": "cached-openrouter"},
     )
     cached_openai = ProviderResult(
         provider=ProviderName.OPENAI,
-        window=WindowPeriod.DAY_7,
+        window=WindowPeriod.DAY_30,
         metrics=UsageMetrics(cost=0.25, remaining=95.0, limit=100.0),
         raw={"status_code": 200, "source": "cached-openai"},
     )
@@ -91,7 +91,7 @@ def test_show_uses_cache_for_idle_provider_and_refreshes_non_idle_provider(
 
     openai_live = ProviderResult(
         provider=ProviderName.OPENAI,
-        window=WindowPeriod.DAY_7,
+        window=WindowPeriod.DAY_30,
         metrics=UsageMetrics(cost=2.10, remaining=70.0, limit=100.0),
         raw={"status_code": 200, "source": "live-openai"},
     )
@@ -113,7 +113,7 @@ def test_show_uses_cache_for_idle_provider_and_refreshes_non_idle_provider(
 
     assert result.exit_code == 0
     openrouter_provider.fetch.assert_not_awaited()
-    openai_provider.fetch.assert_awaited_once_with(WindowPeriod.DAY_7)
+    openai_provider.fetch.assert_awaited_once_with(WindowPeriod.DAY_30)
 
     output = json.loads(result.output)
     assert output["payload"]["openrouter"]["raw"]["source"] == "cached-openrouter"

@@ -3,7 +3,8 @@
 @brief Tests for the `extension` section emitted by `show --json`.
 @details Verifies that `aibar show --json` includes top-level `idle_time`,
 `freshness`, and `extension` objects, with
-`extension.gnome_refresh_interval_seconds` sourced from runtime config.
+`extension.gnome_refresh_interval_seconds` and `extension.idle_delay_seconds`
+sourced from runtime config.
 @satisfies REQ-003
 @satisfies CTN-008
 @satisfies TST-004
@@ -43,7 +44,7 @@ def test_show_json_emits_extension_section_with_default_gnome_refresh_interval(
     tmp_path: Path,
 ) -> None:
     """
-    @brief Verify `show --json` emits `extension.gnome_refresh_interval_seconds` with default 60.
+    @brief Verify `show --json` emits default extension refresh and idle-delay values.
     @details Persists an empty cache, ensures no idle-time gate is active, then asserts
     the JSON output contains an `extension` section with the default refresh interval.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
@@ -84,7 +85,9 @@ def test_show_json_emits_extension_section_with_default_gnome_refresh_interval(
     assert doc["idle_time"] == {}
     assert doc["freshness"] == {}
     assert "gnome_refresh_interval_seconds" in doc["extension"]
+    assert "idle_delay_seconds" in doc["extension"]
     assert doc["extension"]["gnome_refresh_interval_seconds"] == 60
+    assert doc["extension"]["idle_delay_seconds"] == 300
 
 
 def test_show_json_emits_extension_section_with_configured_gnome_refresh_interval(
@@ -92,8 +95,8 @@ def test_show_json_emits_extension_section_with_configured_gnome_refresh_interva
     tmp_path: Path,
 ) -> None:
     """
-    @brief Verify `show --json` emits `extension.gnome_refresh_interval_seconds` from saved config.
-    @details Persists runtime config with custom `gnome_refresh_interval_seconds=120`, then asserts
+    @brief Verify `show --json` emits extension refresh and idle-delay values from config.
+    @details Persists runtime config with custom refresh and idle-delay values, then asserts
     the JSON output reflects that configured value in the `extension` section.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
     @param tmp_path {Path} Temporary path fixture.
@@ -105,7 +108,7 @@ def test_show_json_emits_extension_section_with_configured_gnome_refresh_interva
     empty_cache = {"payload": {}, "status": {}}
     config_module.save_cli_cache(empty_cache)
     config_module.save_runtime_config(
-        RuntimeConfig(gnome_refresh_interval_seconds=120)
+        RuntimeConfig(gnome_refresh_interval_seconds=120, idle_delay_seconds=420)
     )
 
     monkeypatch.setattr("aibar.cli.get_providers", lambda: {})
@@ -135,6 +138,7 @@ def test_show_json_emits_extension_section_with_configured_gnome_refresh_interva
     assert doc["idle_time"] == {}
     assert doc["freshness"] == {}
     assert doc["extension"]["gnome_refresh_interval_seconds"] == 120
+    assert doc["extension"]["idle_delay_seconds"] == 420
 
 
 def test_show_json_extension_section_does_not_appear_in_cache_payload(
@@ -180,6 +184,7 @@ def test_show_json_extension_section_does_not_appear_in_cache_payload(
     assert "extension" in doc
     assert "idle_time" in doc
     assert "freshness" in doc
+    assert doc["extension"]["idle_delay_seconds"] == 300
 
     cache_file = cache_dir / "cache.json"
     if cache_file.exists():
