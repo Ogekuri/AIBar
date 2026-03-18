@@ -37,14 +37,15 @@ def _patch_config_paths(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(config_module, "IDLE_TIME_PATH", cache_dir / "idle-time.json")
 
 
-def test_show_renders_updated_next_datetime_with_runtime_refresh_interval(
+def test_show_renders_updated_next_datetime_from_idle_time_state(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
     """
-    @brief Verify CLI `show` renders date+time `Updated/Next` labels.
-    @details Uses deterministic `updated_at` plus runtime refresh interval to assert
-    `Updated: <datetime>, Next: <datetime>` output format in runtime local timezone.
+    @brief Verify CLI `show` renders `Updated/Next` labels from provider idle-time state.
+    @details Uses deterministic `last_success_timestamp` and `idle_until_timestamp`
+    values to assert `Updated: <datetime>, Next: <datetime>` output format in runtime
+    local timezone, independent from payload `updated_at`.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
     @param tmp_path {Path} Temporary path fixture.
     @return {None} Function return value.
@@ -52,19 +53,14 @@ def test_show_renders_updated_next_datetime_with_runtime_refresh_interval(
     @satisfies TST-038
     """
     _patch_config_paths(monkeypatch, tmp_path)
-    config_module.save_runtime_config(
-        config_module.RuntimeConfig(
-            idle_delay_seconds=300,
-            api_call_delay_milliseconds=20,
-            gnome_refresh_interval_seconds=120,
-        )
-    )
-    updated_at = datetime(2026, 3, 17, 8, 0, tzinfo=timezone.utc)
+    payload_updated_at = datetime(2026, 3, 17, 8, 0, tzinfo=timezone.utc)
+    idle_last_success = datetime(2026, 3, 18, 8, 58, tzinfo=timezone.utc)
+    idle_until = datetime(2026, 3, 18, 8, 59, tzinfo=timezone.utc)
     result_payload = ProviderResult(
         provider=ProviderName.OPENAI,
         window=WindowPeriod.DAY_7,
         metrics=UsageMetrics(cost=1.25),
-        updated_at=updated_at,
+        updated_at=payload_updated_at,
         raw={"status_code": 200},
     )
     provider = MagicMock()
@@ -78,6 +74,12 @@ def test_show_renders_updated_next_datetime_with_runtime_refresh_interval(
         lambda **_: RetrievalPipelineOutput(
             payload={},
             results={ProviderName.OPENAI.value: result_payload},
+            idle_time_by_provider={
+                ProviderName.OPENAI.value: config_module.build_idle_time_state(
+                    last_success_at=idle_last_success,
+                    idle_until=idle_until,
+                )
+            },
             idle_active=False,
             cache_available=True,
         ),
@@ -88,8 +90,8 @@ def test_show_renders_updated_next_datetime_with_runtime_refresh_interval(
     assert result.exit_code == 0
     expected_freshness_line = (
         "Updated: "
-        f"{updated_at.astimezone().strftime('%Y-%m-%d %H:%M')}, "
-        f"Next: {(updated_at + timedelta(seconds=120)).astimezone().strftime('%Y-%m-%d %H:%M')}"
+        f"{idle_last_success.astimezone().strftime('%Y-%m-%d %H:%M')}, "
+        f"Next: {idle_until.astimezone().strftime('%Y-%m-%d %H:%M')}"
     )
     assert expected_freshness_line in result.output
 

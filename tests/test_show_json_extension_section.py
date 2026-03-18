@@ -1,8 +1,9 @@
 """
 @file test_show_json_extension_section.py
 @brief Tests for the `extension` section emitted by `show --json`.
-@details Verifies that `aibar show --json` includes a top-level `extension` object
-containing `gnome_refresh_interval_seconds` sourced from the runtime config.
+@details Verifies that `aibar show --json` includes top-level `idle_time` and
+`extension` objects, with `extension.gnome_refresh_interval_seconds` sourced
+from the runtime config.
 @satisfies REQ-003
 @satisfies CTN-008
 @satisfies TST-004
@@ -66,6 +67,7 @@ def test_show_json_emits_extension_section_with_default_gnome_refresh_interval(
                 "cache_available": True,
                 "payload": empty_cache,
                 "results": {},
+                "idle_time_by_provider": {},
             },
         )(),
     )
@@ -76,6 +78,8 @@ def test_show_json_emits_extension_section_with_default_gnome_refresh_interval(
     assert result.exit_code == 0, result.output
     doc = json.loads(result.output)
     assert "extension" in doc
+    assert "idle_time" in doc
+    assert doc["idle_time"] == {}
     assert "gnome_refresh_interval_seconds" in doc["extension"]
     assert doc["extension"]["gnome_refresh_interval_seconds"] == 60
 
@@ -112,6 +116,7 @@ def test_show_json_emits_extension_section_with_configured_gnome_refresh_interva
                 "cache_available": True,
                 "payload": empty_cache,
                 "results": {},
+                "idle_time_by_provider": {},
             },
         )(),
     )
@@ -122,6 +127,8 @@ def test_show_json_emits_extension_section_with_configured_gnome_refresh_interva
     assert result.exit_code == 0, result.output
     doc = json.loads(result.output)
     assert "extension" in doc
+    assert "idle_time" in doc
+    assert doc["idle_time"] == {}
     assert doc["extension"]["gnome_refresh_interval_seconds"] == 120
 
 
@@ -156,6 +163,7 @@ def test_show_json_extension_section_does_not_appear_in_cache_payload(
                 "cache_available": True,
                 "payload": empty_cache,
                 "results": {},
+                "idle_time_by_provider": {},
             },
         )(),
     )
@@ -165,6 +173,7 @@ def test_show_json_extension_section_does_not_appear_in_cache_payload(
     assert result.exit_code == 0, result.output
     doc = json.loads(result.output)
     assert "extension" in doc
+    assert "idle_time" in doc
 
     cache_file = cache_dir / "cache.json"
     if cache_file.exists():

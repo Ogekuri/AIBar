@@ -29,6 +29,7 @@ from pydantic import ValidationError
 
 from . import __version__
 from aibar.config import (
+    IdleTimeState,
     RuntimeConfig,
     build_idle_time_state,
     config,
@@ -65,6 +66,7 @@ _WINDOW_PERIOD_TIMEDELTA: dict[WindowPeriod, timedelta] = {
 _RESET_PENDING_MESSAGE = "Starts when the first message is sent"
 _CACHE_PAYLOAD_SECTION_KEY = "payload"
 _CACHE_STATUS_SECTION_KEY = "status"
+_CACHE_IDLE_TIME_SECTION_KEY = "idle_time"
 _CACHE_EXTENSION_SECTION_KEY = "extension"
 _ATTEMPT_RESULT_OK = "OK"
 _ATTEMPT_RESULT_FAIL = "FAIL"
@@ -115,6 +117,7 @@ class RetrievalPipelineOutput:
     refresh into `cache.json`, and deterministic payload projection for rendering.
     @note `payload` contains cache JSON sections: `payload` and `status`.
     @note `results` contains validated ProviderResult objects keyed by provider id.
+    @note `idle_time_by_provider` contains provider-keyed idle-time freshness state.
     @note `idle_active` indicates provider-scoped idle-time gating blocked at
     least one selected provider refresh.
     @note `cache_available` indicates `cache.json` was readable for this run.
@@ -130,6 +133,7 @@ class RetrievalPipelineOutput:
 
     payload: dict[str, object]
     results: dict[str, ProviderResult]
+    idle_time_by_provider: dict[str, IdleTimeState]
     idle_active: bool
     cache_available: bool
 
@@ -748,6 +752,42 @@ def _format_local_datetime(value: datetime) -> str:
     return local_datetime.strftime("%Y-%m-%d %H:%M")
 
 
+def _epoch_to_utc_datetime(epoch_seconds: int) -> datetime:
+    """
+    @brief Convert epoch-seconds to timezone-aware UTC datetime.
+    @param epoch_seconds {int} Epoch timestamp in seconds.
+    @return {datetime} UTC datetime from epoch.
+    """
+    return datetime.fromtimestamp(int(epoch_seconds), tz=timezone.utc)
+
+
+def _build_freshness_line(
+    result: ProviderResult,
+    freshness_state: IdleTimeState | None,
+) -> str:
+    """
+    @brief Build `Updated/Next` freshness line for CLI panel rendering.
+    @details Uses provider idle-time state when available (`last_success_timestamp`,
+    `idle_until_timestamp`) and falls back to payload `updated_at` plus runtime
+    interval fallback (`60s`) when idle-time state is unavailable.
+    @param result {ProviderResult} Provider result carrying fallback `updated_at`.
+    @param freshness_state {IdleTimeState | None} Provider idle-time state.
+    @return {str} Deterministic `Updated: ..., Next: ...` label.
+    @satisfies REQ-084
+    """
+    if freshness_state is not None:
+        updated_at_utc = _epoch_to_utc_datetime(freshness_state.last_success_timestamp)
+        next_update_utc = _epoch_to_utc_datetime(freshness_state.idle_until_timestamp)
+    else:
+        updated_at_utc = _normalize_utc(result.updated_at)
+        next_update_utc = updated_at_utc + timedelta(seconds=60)
+    return (
+        "Updated: "
+        f"{_format_local_datetime(updated_at_utc)}, "
+        f"Next: {_format_local_datetime(next_update_utc)}"
+    )
+
+
 def _apply_api_call_delay(throttle_state: dict[str, float | int] | None) -> None:
     """
     @brief Enforce minimum spacing between consecutive provider API calls.
@@ -1070,6 +1110,42 @@ def _filter_cached_payload(
     return {
         _CACHE_PAYLOAD_SECTION_KEY: filtered_payload,
         _CACHE_STATUS_SECTION_KEY: filtered_status,
+    }
+
+
+def _filter_idle_time_by_provider(
+    idle_time_by_provider: dict[str, IdleTimeState],
+    provider_filter: ProviderName | None,
+) -> dict[str, IdleTimeState]:
+    """
+    @brief Filter provider-keyed idle-time map by optional provider selector.
+    @param idle_time_by_provider {dict[str, IdleTimeState]} Provider idle-time state map.
+    @param provider_filter {ProviderName | None} Optional provider selector.
+    @return {dict[str, IdleTimeState]} Filtered provider idle-time map.
+    @satisfies REQ-003
+    @satisfies REQ-084
+    """
+    if provider_filter is None:
+        return dict(idle_time_by_provider)
+    selected = idle_time_by_provider.get(provider_filter.value)
+    if selected is None:
+        return {}
+    return {provider_filter.value: selected}
+
+
+def _serialize_idle_time_state(
+    idle_time_by_provider: dict[str, IdleTimeState],
+) -> dict[str, dict[str, object]]:
+    """
+    @brief Serialize provider-keyed idle-time state for `show --json`.
+    @param idle_time_by_provider {dict[str, IdleTimeState]} Provider idle-time map.
+    @return {dict[str, dict[str, object]]} JSON-safe provider idle-time section.
+    @satisfies REQ-003
+    @satisfies CTN-009
+    """
+    return {
+        provider_key: state.model_dump(mode="json")
+        for provider_key, state in idle_time_by_provider.items()
     }
 
 
@@ -1787,9 +1863,14 @@ def retrieve_results_via_cache_pipeline(
             return RetrievalPipelineOutput(
                 payload=_empty_cache_document(),
                 results={},
+                idle_time_by_provider=_filter_idle_time_by_provider(
+                    load_idle_time(),
+                    provider_filter,
+                ),
                 idle_active=False,
                 cache_available=False,
             )
+        refreshed_idle_state = load_idle_time()
         filtered_effective_payload = _filter_cached_payload(
             effective_payload, provider_filter
         )
@@ -1801,6 +1882,10 @@ def retrieve_results_via_cache_pipeline(
                 target_window=target_window,
                 providers=providers,
             ),
+            idle_time_by_provider=_filter_idle_time_by_provider(
+                refreshed_idle_state,
+                provider_filter,
+            ),
             idle_active=idle_active,
             cache_available=True,
         )
@@ -1810,6 +1895,10 @@ def retrieve_results_via_cache_pipeline(
         return RetrievalPipelineOutput(
             payload=_empty_cache_document(),
             results={},
+            idle_time_by_provider=_filter_idle_time_by_provider(
+                idle_state_by_provider,
+                provider_filter,
+            ),
             idle_active=idle_active,
             cache_available=False,
         )
@@ -1822,6 +1911,10 @@ def retrieve_results_via_cache_pipeline(
             provider_filter=provider_filter,
             target_window=target_window,
             providers=providers,
+        ),
+        idle_time_by_provider=_filter_idle_time_by_provider(
+            idle_state_by_provider,
+            provider_filter,
         ),
         idle_active=idle_active,
         cache_available=True,
@@ -2013,9 +2106,11 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
         return
 
     runtime_cfg = load_runtime_config()
-    refresh_interval_seconds = runtime_cfg.gnome_refresh_interval_seconds
     if output_json:
         output_doc = dict(retrieval.payload)
+        output_doc[_CACHE_IDLE_TIME_SECTION_KEY] = _serialize_idle_time_state(
+            retrieval.idle_time_by_provider
+        )
         output_doc[_CACHE_EXTENSION_SECTION_KEY] = {
             "gnome_refresh_interval_seconds": runtime_cfg.gnome_refresh_interval_seconds,
         }
@@ -2085,7 +2180,9 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
                             provider_name,
                             result_5h,
                             label="5h",
-                            refresh_interval_seconds=refresh_interval_seconds,
+                            freshness_state=retrieval.idle_time_by_provider.get(
+                                provider_name.value
+                            ),
                         ),
                     )
                 )
@@ -2096,7 +2193,9 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
                             provider_name,
                             result_7d,
                             label="7d",
-                            refresh_interval_seconds=refresh_interval_seconds,
+                            freshness_state=retrieval.idle_time_by_provider.get(
+                                provider_name.value
+                            ),
                         ),
                     )
                 )
@@ -2107,7 +2206,9 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
                 *_build_result_panel(
                     provider_name,
                     result,
-                    refresh_interval_seconds=refresh_interval_seconds,
+                    freshness_state=retrieval.idle_time_by_provider.get(
+                        provider_name.value
+                    ),
                 ),
             )
         )
@@ -2316,7 +2417,7 @@ def _build_result_panel(
     name: ProviderName,
     result: ProviderResult,
     label: str | None = None,
-    refresh_interval_seconds: int = 60,
+    freshness_state: IdleTimeState | None = None,
 ) -> tuple[str, list[str]]:
     """
     @brief Build one provider panel title/body payload for CLI text rendering.
@@ -2325,14 +2426,13 @@ def _build_result_panel(
     @param name {ProviderName} Provider name enum value.
     @param result {ProviderResult} Provider result to render.
     @param label {str | None} Optional window label suffix (e.g. `"5h"`, `"7d"`).
-    @param refresh_interval_seconds {int} Refresh cadence (seconds) used to compute
-        the `Next` datetime label.
+    @param freshness_state {IdleTimeState | None} Optional provider idle-time state
+        carrying `last_success_timestamp` and `idle_until_timestamp` freshness values.
     @return {tuple[str, list[str]]} Panel title and body lines.
     @satisfies REQ-084
     @satisfies REQ-034
     @satisfies REQ-035
     @satisfies REQ-051
-    @satisfies REQ-084
     @satisfies REQ-067
     """
     title = _provider_display_name(name)
@@ -2340,18 +2440,10 @@ def _build_result_panel(
     if label:
         title = f"{title} ({label})"
 
-    updated_at_utc = _normalize_utc(result.updated_at)
-    next_update_utc = updated_at_utc + timedelta(
-        seconds=max(0, int(refresh_interval_seconds))
-    )
     lines: list[str] = [
         f"Status: {'FAIL' if result.is_error else 'OK'}",
         f"Window: {window_label}",
-        (
-            "Updated: "
-            f"{_format_local_datetime(updated_at_utc)}, "
-            f"Next: {_format_local_datetime(next_update_utc)}"
-        ),
+        _build_freshness_line(result=result, freshness_state=freshness_state),
     ]
     if result.is_error:
         lines.append(f"Error: {result.error}")

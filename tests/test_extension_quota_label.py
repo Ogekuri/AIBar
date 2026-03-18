@@ -124,11 +124,11 @@ def test_refresh_now_popup_action_executes_forced_cli_refresh() -> None:
 
 def test_provider_card_renders_update_at_label_bottom_right() -> None:
     """
-    @brief Verify provider card contains bottom-right Updated/Next label sourced from updated_at and refresh interval.
+    @brief Verify provider card contains bottom-right Updated/Next label sourced from idle-time timestamps.
     @details Asserts extension source creates an `updateAtLabel` in the card and populates
-    it from `data.updated_at` and `this._refreshIntervalSeconds` using runtime local-time
-    `%Y-%m-%d %H:%M` output as `Updated: <YYYY-MM-DD HH:MM>, Next: <YYYY-MM-DD HH:MM>`,
-    with right-aligned row layout.
+    it from `json.idle_time.<provider>.last_success_timestamp` and
+    `json.idle_time.<provider>.idle_until_timestamp` using runtime local-time `%Y-%m-%d %H:%M`
+    output as `Updated: <YYYY-MM-DD HH:MM>, Next: <YYYY-MM-DD HH:MM>`, with right-aligned row layout.
     @satisfies REQ-017
     @satisfies TST-004
     """
@@ -137,14 +137,18 @@ def test_provider_card_renders_update_at_label_bottom_right() -> None:
     assert "aibar-update-at-label" in source
     assert "aibar-update-at-row" in source
     assert "updateAtSpacer" in source
-    assert "data.updated_at" in source
+    assert "json.idle_time" in source
+    assert "this._idleTimeData" in source
+    assert "last_success_timestamp" in source
+    assert "idle_until_timestamp" in source
+    assert "* 1000" in source
     assert "_formatLocalDateTime" in source
     assert "Updated:" in source
     assert "Next:" in source
     assert "getFullYear()" in source
     assert "getHours()" in source
-    assert "this._refreshIntervalSeconds" in source
-    assert source.index("if (data.updated_at)") < source.index("if (isError)")
+    assert "if (idleTimeState" in source
+    assert source.index("if (idleTimeState") < source.index("if (isError)")
 
 
 def test_panel_percentage_labels_use_fixed_order_provider_styles_and_primary_bold() -> None:

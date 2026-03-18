@@ -99,6 +99,7 @@ def test_show_uses_one_shared_panel_width_for_all_rendered_providers(monkeypatch
                 ProviderName.OPENROUTER.value: openrouter_result,
                 ProviderName.OPENAI.value: openai_result,
             },
+            idle_time_by_provider={},
             idle_active=False,
             cache_available=True,
         ),

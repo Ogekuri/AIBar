@@ -234,6 +234,7 @@ class AIBarIndicator extends PanelMenu.Button {
         this._timeout = null;
         this._usageData = {};
         this._statusData = {};
+        this._idleTimeData = {};
         this._providerRows = {};
         this._providerTabs = {};
         this._refreshIntervalSeconds = REFRESH_INTERVAL_SECONDS;
@@ -526,8 +527,29 @@ class AIBarIndicator extends PanelMenu.Button {
         for (let [name, card] of Object.entries(this._providerRows)) {
             if (name === providerName) {
                 card.container.show();
-                if (this._usageData[name])
-                    this._populateProviderCard(card, name, this._usageData[name]);
+                if (this._usageData[name]) {
+                    const data = this._usageData[name];
+                    const providerStatus = this._statusData[name];
+                    const windowKey = typeof data.window === 'string' ? data.window : null;
+                    const statusEntry = (
+                        providerStatus &&
+                        typeof providerStatus === 'object' &&
+                        !Array.isArray(providerStatus) &&
+                        windowKey &&
+                        providerStatus[windowKey] &&
+                        typeof providerStatus[windowKey] === 'object'
+                    )
+                        ? providerStatus[windowKey]
+                        : null;
+                    const idleTimeState = (
+                        this._idleTimeData[name] &&
+                        typeof this._idleTimeData[name] === 'object' &&
+                        !Array.isArray(this._idleTimeData[name])
+                    )
+                        ? this._idleTimeData[name]
+                        : null;
+                    this._populateProviderCard(card, name, data, statusEntry, idleTimeState);
+                }
             } else {
                 card.container.hide();
             }
@@ -542,7 +564,7 @@ class AIBarIndicator extends PanelMenu.Button {
      * @param {any} statusEntry Window-specific cached status entry from `status` section.
      * @returns {any} Function return value.
      */
-    _updateProviderCard(providerName, data, statusEntry = null) {
+    _updateProviderCard(providerName, data, statusEntry = null, idleTimeState = null) {
         let card = this._providerRows[providerName];
 
         if (!card) {
@@ -554,7 +576,7 @@ class AIBarIndicator extends PanelMenu.Button {
                 card.container.hide();
         }
 
-        this._populateProviderCard(card, providerName, data, statusEntry);
+        this._populateProviderCard(card, providerName, data, statusEntry, idleTimeState);
     }
 
     /**
@@ -731,15 +753,19 @@ class AIBarIndicator extends PanelMenu.Button {
      * @param {any} providerName Input parameter `providerName`.
      * @param {any} data Input parameter `data`.
      * @param {any} statusEntry Window-specific cached status entry.
+     * @param {any} idleTimeState Provider-scoped idle-time state entry from `idle_time` section.
      * @returns {any} Function return value.
      */
-    _populateProviderCard(card, providerName, data, statusEntry = null) {
+    _populateProviderCard(card, providerName, data, statusEntry = null, idleTimeState = null) {
         const metrics = data.metrics || {};
         const raw = data.raw || {};
-        if (data.updated_at) {
+        if (idleTimeState &&
+            Number.isInteger(idleTimeState.last_success_timestamp) &&
+            Number.isInteger(idleTimeState.idle_until_timestamp)
+        ) {
             try {
-                const updatedDate = new Date(data.updated_at);
-                const nextDate = new Date(updatedDate.getTime() + this._refreshIntervalSeconds * 1000);
+                const updatedDate = new Date(idleTimeState.last_success_timestamp * 1000);
+                const nextDate = new Date(idleTimeState.idle_until_timestamp * 1000);
                 const updatedStr = _formatLocalDateTime(updatedDate);
                 const nextStr = _formatLocalDateTime(nextDate);
                 if (updatedStr === null || nextStr === null)
@@ -1093,8 +1119,9 @@ class AIBarIndicator extends PanelMenu.Button {
     /**
      * @brief Execute parse output.
      * @details Parses CLI JSON output supporting canonical cache schema sections
-     * (`payload`, `status`, `extension`). Reads `extension.gnome_refresh_interval_seconds`
-     * to update the auto-refresh interval and reschedules the timer when the value changes.
+     * (`payload`, `status`, `idle_time`, `extension`). Reads
+     * `extension.gnome_refresh_interval_seconds` to update the auto-refresh interval and
+     * reschedules the timer when the value changes.
      * @param {any} output Input parameter `output`.
      * @returns {any} Function return value.
      * @satisfies DES-006
@@ -1124,6 +1151,15 @@ class AIBarIndicator extends PanelMenu.Button {
                     this._statusData = {};
                 }
                 if (
+                    json.idle_time &&
+                    typeof json.idle_time === 'object' &&
+                    !Array.isArray(json.idle_time)
+                ) {
+                    this._idleTimeData = json.idle_time;
+                } else {
+                    this._idleTimeData = {};
+                }
+                if (
                     json.extension &&
                     typeof json.extension === 'object' &&
                     typeof json.extension.gnome_refresh_interval_seconds === 'number' &&
@@ -1138,6 +1174,7 @@ class AIBarIndicator extends PanelMenu.Button {
             } else {
                 this._usageData = json;
                 this._statusData = {};
+                this._idleTimeData = {};
             }
             console.debug(`aibar: Parsed ${Object.keys(this._usageData).length} providers`);
         } catch (e) {
@@ -1375,7 +1412,14 @@ class AIBarIndicator extends PanelMenu.Button {
             )
                 ? providerStatus[windowKey]
                 : null;
-            this._updateProviderCard(providerName, data, statusEntry);
+            const idleTimeState = (
+                this._idleTimeData[providerName] &&
+                typeof this._idleTimeData[providerName] === 'object' &&
+                !Array.isArray(this._idleTimeData[providerName])
+            )
+                ? this._idleTimeData[providerName]
+                : null;
+            this._updateProviderCard(providerName, data, statusEntry, idleTimeState);
 
         }
 

@@ -75,8 +75,8 @@ class IdleTimeState(BaseModel):
     """
     @brief Define persisted idle-time entry for one provider.
     @details Stores provider-local last-success and idle-until timestamps in
-    epoch and ISO-8601 UTC formats. Serialized as one value under provider key
-    in `~/.cache/aibar/idle-time.json`.
+    epoch-seconds and local-timezone ISO-8601 formats. Serialized as one value
+    under provider key in `~/.cache/aibar/idle-time.json`.
     @satisfies CTN-009
     """
 
@@ -293,8 +293,9 @@ def save_cli_cache(payload: dict[str, Any]) -> None:
 def build_idle_time_state(last_success_at: datetime, idle_until: datetime) -> IdleTimeState:
     """
     @brief Build provider-local idle-time entry from UTC-compatible datetimes.
-    @details Normalizes timestamps to UTC and encodes epoch and ISO-8601 fields
-    required by provider-keyed idle-time persistence.
+    @details Normalizes timestamps to UTC for epoch conversion, then emits
+    human-readable ISO-8601 values in runtime local timezone for deterministic
+    parity with CLI/GNOME freshness rendering.
     @param last_success_at {datetime} Last successful refresh timestamp.
     @param idle_until {datetime} Timestamp until provider refresh remains gated.
     @return {IdleTimeState} Normalized provider idle-time entry.
@@ -302,11 +303,23 @@ def build_idle_time_state(last_success_at: datetime, idle_until: datetime) -> Id
     """
     last_success_utc = last_success_at.astimezone(timezone.utc)
     idle_until_utc = idle_until.astimezone(timezone.utc)
+    last_success_timestamp = int(last_success_utc.timestamp())
+    idle_until_timestamp = int(idle_until_utc.timestamp())
+    local_timezone = datetime.now().astimezone().tzinfo
+    assert local_timezone is not None
+    last_success_local = datetime.fromtimestamp(
+        last_success_timestamp,
+        tz=local_timezone,
+    )
+    idle_until_local = datetime.fromtimestamp(
+        idle_until_timestamp,
+        tz=local_timezone,
+    )
     return IdleTimeState(
-        last_success_timestamp=int(last_success_utc.timestamp()),
-        last_success_human=last_success_utc.isoformat(),
-        idle_until_timestamp=int(idle_until_utc.timestamp()),
-        idle_until_human=idle_until_utc.isoformat(),
+        last_success_timestamp=last_success_timestamp,
+        last_success_human=last_success_local.isoformat(),
+        idle_until_timestamp=idle_until_timestamp,
+        idle_until_human=idle_until_local.isoformat(),
     )
 
 
