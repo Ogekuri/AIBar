@@ -150,6 +150,7 @@ def test_provider_card_renders_update_at_label_bottom_left_from_freshness() -> N
     assert "if (freshnessState" in source
     assert source.index("if (freshnessState") < source.index("if (isError)")
     assert "style_class: 'aibar-reset-label aibar-update-at-label'" in source
+    assert "x_align: Clutter.ActorAlign.START" in source
     assert "updateAtRow.add_child(updateAtLabel);" in source
 
 
