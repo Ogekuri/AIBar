@@ -155,6 +155,27 @@ def test_provider_card_renders_update_at_label_bottom_right_from_freshness() -> 
     assert "updateAtRow.add_child(updateAtLabel);" in source
 
 
+def test_extension_builds_freshness_fallback_from_status_updated_at_when_freshness_missing() -> None:
+    """
+    @brief Verify extension derives `Updated/Next` fallback timestamps from status metadata.
+    @details Asserts source defines a fallback helper that reads `statusEntry.updated_at`,
+    converts it to epoch seconds, computes `idle_until_timestamp` using refresh interval,
+    and reuses fallback in provider-card refresh paths when `freshness` section is absent.
+    @return {None} Function return value.
+    @satisfies REQ-017
+    @satisfies TST-004
+    """
+    source = EXTENSION_PATH.read_text(encoding="utf-8")
+    assert "function _buildFallbackFreshnessState(statusEntry, refreshIntervalSeconds)" in source
+    assert "Date.parse(statusEntry.updated_at)" in source
+    assert "const updatedTimestamp = Math.floor(parsedMilliseconds / 1000);" in source
+    assert "const idleUntilTimestamp = updatedTimestamp + safeIntervalSeconds;" in source
+    assert "last_success_timestamp: updatedTimestamp," in source
+    assert "idle_until_timestamp: idleUntilTimestamp," in source
+    assert "_resolveProviderFreshnessState(" in source
+    assert "_buildFallbackFreshnessState(statusEntry, refreshIntervalSeconds);" in source
+
+
 def test_popup_scroll_view_uses_gnome_compatible_child_attachment() -> None:
     """
     @brief Verify popup scroll-view child wiring avoids runtime TypeError on GNOME Shell.

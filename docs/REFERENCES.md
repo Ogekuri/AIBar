@@ -1630,7 +1630,7 @@ with deterministic placeholder string `[REDACTED]`.
 
 ---
 
-# extension.js | JavaScript | 1597L | 26 symbols | 9 imports | 33 comments
+# extension.js | JavaScript | 1655L | 28 symbols | 9 imports | 35 comments
 > Path: `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`
 - @brief GNOME Shell panel extension for aibar metrics.
 - @details Collects usage JSON from the aibar CLI and renders provider-specific quota/cost cards in the GNOME panel popup.
@@ -1690,48 +1690,69 @@ with null/undefined counters normalized to zero.
 - @return s {string} Diagnostic label text or empty string.
 - @satisfies REQ-037
 
-### fn `function _getAiBarPath()` (L125-135)
+### fn `function _buildFallbackFreshnessState(statusEntry, refreshIntervalSeconds)` (L130-151)
+- @brief Build provider freshness fallback from cache-status `updated_at` metadata.
+- @details Converts `statusEntry.updated_at` to epoch seconds and derives
+`idle_until_timestamp` using current refresh interval when `freshness`/`idle_time`
+sections are unavailable from CLI JSON output.
+- @param {any} statusEntry Window-specific cache status entry.
+- @param {number} refreshIntervalSeconds Active refresh interval in seconds.
+- @return s {{last_success_timestamp: number, idle_until_timestamp: number} | null} Fallback freshness state or null.
+- @satisfies REQ-017
+
+### fn `function _resolveProviderFreshnessState(freshnessData, providerName, statusEntry, refreshIntervalSeconds)` (L164-178)
+- @brief Resolve provider freshness state from canonical or compatibility sources.
+- @details Uses `freshness.<provider>` when available and falls back to derived
+status-based timestamps for compatibility with older CLI JSON schemas.
+- @param {Object<string, any>} freshnessData Provider-keyed freshness object.
+- @param {string} providerName Provider key from usage payload.
+- @param {any} statusEntry Window-specific cache status entry.
+- @param {number} refreshIntervalSeconds Active refresh interval in seconds.
+- @return s {{last_success_timestamp: number, idle_until_timestamp: number} | null} Resolved freshness state.
+- @satisfies REQ-017
+
+### fn `function _getAiBarPath()` (L185-195)
 - @brief Resolve aibar executable path.
 - @details Prefers PATH discovery and falls back to AIBAR_PATH from the env file.
 - @return s {string} Resolved executable path or fallback command name.
 
-### fn `function _loadEnvFromFile()` (L142-194)
+### fn `function _loadEnvFromFile()` (L202-254)
 - @brief Load key-value environment variables from aibar env file.
 - @details Parses export syntax, quoted values, and inline comments.
 - @return s {Object<string,string>} Parsed environment map.
 
-### fn `function _getProviderProgressClass(providerName)` (L201-203)
+### fn `function _getProviderProgressClass(providerName)` (L261-263)
 - @brief Map percentage usage to CSS progress severity class.
 - @param {number} pct Usage percentage.
 - @return s {string} CSS class suffix for progress state.
 
-### fn `function _isDisplayedZeroPercent(pct)` (L212-219)
+### fn `function _isDisplayedZeroPercent(pct)` (L272-279)
 - @brief Check whether a percentage renders as `0.0%` in one-decimal UI output.
 - @details Mirrors display rounding semantics so fallback reset text is shown when
 usage is effectively zero from the user's perspective (e.g. internal 0.04 -> 0.0%).
 - @param {number} pct Usage percentage candidate.
 - @return s {boolean} True when value is finite, non-negative, and rounds to 0.0.
 
-### fn `function _isDisplayedFullPercent(pct)` (L228-233)
+### fn `function _isDisplayedFullPercent(pct)` (L288-293)
 - @brief Check whether a percentage renders as `100.0%` in one-decimal UI output.
 - @details Mirrors display rounding semantics so near-full values are treated as
 full usage for limit-reached warning rendering.
 - @param {number} pct Usage percentage candidate.
 - @return s {boolean} True when value is finite and rounds to `100.0`.
 
-### class `class AIBarIndicator extends PanelMenu.Button` : PanelMenu.Button (L237-536)
+### class `class AIBarIndicator extends PanelMenu.Button` : PanelMenu.Button (L297-596)
 - @brief Panel indicator widget that manages popup rendering and refresh lifecycle. */
 - @brief Execute init.
 - @details Applies init logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @return s {any} Function return value.
 
-### fn `const createWindowBar = (labelText) =>` (L652-698)
+### fn `const createWindowBar = (labelText) =>` (L711-757)
 - @brief Execute create provider card.
 - @details Applies create provider card logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @param {any} providerName Input parameter `providerName`.
 - @return s {any} Function return value.
 
-### fn `const updateWindowBar = (bar, pct, resetTime, useDays) =>` (L871-929)
+### fn `const updateWindowBar = (bar, pct, resetTime, useDays) =>` (L930-988)
 - @brief Execute populate provider card.
 - @details Applies populate provider card logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @param {any} card Input parameter `card`.
@@ -1741,11 +1762,11 @@ full usage for limit-reached warning rendering.
 - @param {any} freshnessState Provider-scoped freshness entry from `freshness` section.
 - @return s {any} Function return value.
 
-### fn `const setResetLabel = (baseText) =>` (L877-883)
+### fn `const setResetLabel = (baseText) =>` (L936-942)
 
-### fn `const showResetPendingHint = () =>` (L894-896)
+### fn `const showResetPendingHint = () =>` (L953-955)
 
-### fn `const toPercent = (value) =>` (L1331-1336)
+### fn `const toPercent = (value) =>` (L1390-1395)
 - @brief Execute update u i.
 - @details Applies update u i logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 Resolves provider-window failure metadata from cache `status` section and forwards it
@@ -1755,9 +1776,9 @@ to card renderers. Panel status row renders fixed-order percentages and per-prov
 - @satisfies REQ-053
 - @satisfies REQ-069
 
-### fn `const getPanelUsageValues = (providerName, data) =>` (L1338-1395)
+### fn `const getPanelUsageValues = (providerName, data) =>` (L1397-1454)
 
-### class `export default class AIBarExtension extends Extension` : Extension (L1571-1597)
+### class `export default class AIBarExtension extends Extension` : Extension (L1629-1655)
 - @brief GNOME extension lifecycle adapter for AIBarIndicator registration.
 - @brief Execute enable.
 - @details Extends Extension (GNOME Shell 45+ API) to integrate with the extension lifecycle.
@@ -1782,19 +1803,21 @@ Uses this.uuid (provided by the Extension base class) as the status-area key.
 |`_formatLocalDateTime`|fn||71-82|function _formatLocalDateTime(value)|
 |`_coerceRetryAfterSeconds`|fn||89-99|function _coerceRetryAfterSeconds(value)|
 |`_buildHttpStatusRetryLabel`|fn||108-118|function _buildHttpStatusRetryLabel(statusCodeRaw, retryA...|
-|`_getAiBarPath`|fn||125-135|function _getAiBarPath()|
-|`_loadEnvFromFile`|fn||142-194|function _loadEnvFromFile()|
-|`_getProviderProgressClass`|fn||201-203|function _getProviderProgressClass(providerName)|
-|`_isDisplayedZeroPercent`|fn||212-219|function _isDisplayedZeroPercent(pct)|
-|`_isDisplayedFullPercent`|fn||228-233|function _isDisplayedFullPercent(pct)|
-|`AIBarIndicator`|class||237-536|class AIBarIndicator extends PanelMenu.Button|
-|`createWindowBar`|fn||652-698|const createWindowBar = (labelText) =>|
-|`updateWindowBar`|fn||871-929|const updateWindowBar = (bar, pct, resetTime, useDays) =>|
-|`setResetLabel`|fn||877-883|const setResetLabel = (baseText) =>|
-|`showResetPendingHint`|fn||894-896|const showResetPendingHint = () =>|
-|`toPercent`|fn||1331-1336|const toPercent = (value) =>|
-|`getPanelUsageValues`|fn||1338-1395|const getPanelUsageValues = (providerName, data) =>|
-|`AIBarExtension`|class||1571-1597|export default class AIBarExtension extends Extension|
+|`_buildFallbackFreshnessState`|fn||130-151|function _buildFallbackFreshnessState(statusEntry, refres...|
+|`_resolveProviderFreshnessState`|fn||164-178|function _resolveProviderFreshnessState(freshnessData, pr...|
+|`_getAiBarPath`|fn||185-195|function _getAiBarPath()|
+|`_loadEnvFromFile`|fn||202-254|function _loadEnvFromFile()|
+|`_getProviderProgressClass`|fn||261-263|function _getProviderProgressClass(providerName)|
+|`_isDisplayedZeroPercent`|fn||272-279|function _isDisplayedZeroPercent(pct)|
+|`_isDisplayedFullPercent`|fn||288-293|function _isDisplayedFullPercent(pct)|
+|`AIBarIndicator`|class||297-596|class AIBarIndicator extends PanelMenu.Button|
+|`createWindowBar`|fn||711-757|const createWindowBar = (labelText) =>|
+|`updateWindowBar`|fn||930-988|const updateWindowBar = (bar, pct, resetTime, useDays) =>|
+|`setResetLabel`|fn||936-942|const setResetLabel = (baseText) =>|
+|`showResetPendingHint`|fn||953-955|const showResetPendingHint = () =>|
+|`toPercent`|fn||1390-1395|const toPercent = (value) =>|
+|`getPanelUsageValues`|fn||1397-1454|const getPanelUsageValues = (providerName, data) =>|
+|`AIBarExtension`|class||1629-1655|export default class AIBarExtension extends Extension|
 
 
 ---

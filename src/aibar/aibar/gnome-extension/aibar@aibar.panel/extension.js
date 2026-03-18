@@ -118,6 +118,66 @@ function _buildHttpStatusRetryLabel(statusCodeRaw, retryAfterRaw) {
 }
 
 /**
+ * @brief Build provider freshness fallback from cache-status `updated_at` metadata.
+ * @details Converts `statusEntry.updated_at` to epoch seconds and derives
+ * `idle_until_timestamp` using current refresh interval when `freshness`/`idle_time`
+ * sections are unavailable from CLI JSON output.
+ * @param {any} statusEntry Window-specific cache status entry.
+ * @param {number} refreshIntervalSeconds Active refresh interval in seconds.
+ * @returns {{last_success_timestamp: number, idle_until_timestamp: number} | null} Fallback freshness state or null.
+ * @satisfies REQ-017
+ */
+function _buildFallbackFreshnessState(statusEntry, refreshIntervalSeconds) {
+    if (!statusEntry || typeof statusEntry !== 'object' || Array.isArray(statusEntry))
+        return null;
+    if (typeof statusEntry.updated_at !== 'string' || statusEntry.updated_at.length === 0)
+        return null;
+    const parsedMilliseconds = Date.parse(statusEntry.updated_at);
+    if (!Number.isFinite(parsedMilliseconds))
+        return null;
+    const updatedTimestamp = Math.floor(parsedMilliseconds / 1000);
+    if (!Number.isInteger(updatedTimestamp))
+        return null;
+    const safeIntervalSeconds = (
+        Number.isInteger(refreshIntervalSeconds) && refreshIntervalSeconds > 0
+    )
+        ? refreshIntervalSeconds
+        : REFRESH_INTERVAL_SECONDS;
+    const idleUntilTimestamp = updatedTimestamp + safeIntervalSeconds;
+    return {
+        last_success_timestamp: updatedTimestamp,
+        idle_until_timestamp: idleUntilTimestamp,
+    };
+}
+
+/**
+ * @brief Resolve provider freshness state from canonical or compatibility sources.
+ * @details Uses `freshness.<provider>` when available and falls back to derived
+ * status-based timestamps for compatibility with older CLI JSON schemas.
+ * @param {Object<string, any>} freshnessData Provider-keyed freshness object.
+ * @param {string} providerName Provider key from usage payload.
+ * @param {any} statusEntry Window-specific cache status entry.
+ * @param {number} refreshIntervalSeconds Active refresh interval in seconds.
+ * @returns {{last_success_timestamp: number, idle_until_timestamp: number} | null} Resolved freshness state.
+ * @satisfies REQ-017
+ */
+function _resolveProviderFreshnessState(freshnessData, providerName, statusEntry, refreshIntervalSeconds) {
+    const providerFreshness = (
+        freshnessData &&
+        typeof freshnessData === 'object' &&
+        !Array.isArray(freshnessData) &&
+        freshnessData[providerName] &&
+        typeof freshnessData[providerName] === 'object' &&
+        !Array.isArray(freshnessData[providerName])
+    )
+        ? freshnessData[providerName]
+        : null;
+    if (providerFreshness)
+        return providerFreshness;
+    return _buildFallbackFreshnessState(statusEntry, refreshIntervalSeconds);
+}
+
+/**
  * @brief Resolve aibar executable path.
  * @details Prefers PATH discovery and falls back to AIBAR_PATH from the env file.
  * @returns {string} Resolved executable path or fallback command name.
@@ -566,13 +626,12 @@ class AIBarIndicator extends PanelMenu.Button {
                     )
                         ? providerStatus[windowKey]
                         : null;
-                    const freshnessState = (
-                        this._freshnessData[name] &&
-                        typeof this._freshnessData[name] === 'object' &&
-                        !Array.isArray(this._freshnessData[name])
-                    )
-                        ? this._freshnessData[name]
-                        : null;
+                    const freshnessState = _resolveProviderFreshnessState(
+                        this._freshnessData,
+                        name,
+                        statusEntry,
+                        this._refreshIntervalSeconds,
+                    );
                     this._populateProviderCard(card, name, data, statusEntry, freshnessState);
                 }
             } else {
@@ -1472,13 +1531,12 @@ class AIBarIndicator extends PanelMenu.Button {
             )
                 ? providerStatus[windowKey]
                 : null;
-            const freshnessState = (
-                this._freshnessData[providerName] &&
-                typeof this._freshnessData[providerName] === 'object' &&
-                !Array.isArray(this._freshnessData[providerName])
-            )
-                ? this._freshnessData[providerName]
-                : null;
+            const freshnessState = _resolveProviderFreshnessState(
+                this._freshnessData,
+                providerName,
+                statusEntry,
+                this._refreshIntervalSeconds,
+            );
             this._updateProviderCard(providerName, data, statusEntry, freshnessState);
 
         }
