@@ -425,9 +425,16 @@ class AIBarIndicator extends PanelMenu.Button {
             x_expand: true,
             style_class: 'aibar-providers',
         });
+        this._providersScrollView = new St.ScrollView({
+            x_expand: true,
+            y_expand: true,
+            style_class: 'aibar-providers-scroll',
+        });
+        this._providersScrollView.set_policy(St.PolicyType.NEVER, St.PolicyType.AUTOMATIC);
+        this._providersScrollView.add_actor(this._providersContainer);
 
         let providersItem = new PopupMenu.PopupBaseMenuItem({reactive: false});
-        providersItem.add_child(this._providersContainer);
+        providersItem.add_child(this._providersScrollView);
         this.menu.addMenuItem(providersItem);
 
         let separator2 = new PopupMenu.PopupSeparatorMenuItem();

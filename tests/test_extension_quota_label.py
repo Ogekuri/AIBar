@@ -154,6 +154,24 @@ def test_provider_card_renders_update_at_label_bottom_right_from_freshness() -> 
     assert "updateAtRow.add_child(updateAtLabel);" in source
 
 
+def test_popup_wraps_provider_cards_in_scroll_view_for_overflowed_cards() -> None:
+    """
+    @brief Verify popup wraps provider cards in a scroll view to avoid clipping freshness labels.
+    @details Asserts `_buildPopupMenu` creates a `St.ScrollView` wrapper for the provider-card
+    container so long provider cards (quota bars, reset labels, cost, API counters, freshness)
+    remain accessible without truncating the bottom `Updated/Next` row.
+    @return {None} Function return value.
+    @satisfies REQ-017
+    @satisfies TST-004
+    """
+    source = EXTENSION_PATH.read_text(encoding="utf-8")
+    assert "this._providersScrollView = new St.ScrollView({" in source
+    assert "style_class: 'aibar-providers-scroll'" in source
+    assert "this._providersScrollView.set_policy(St.PolicyType.NEVER, St.PolicyType.AUTOMATIC);" in source
+    assert "this._providersScrollView.add_actor(this._providersContainer);" in source
+    assert "providersItem.add_child(this._providersScrollView);" in source
+
+
 def test_provider_cards_render_zero_api_counters_for_null_metrics() -> None:
     """
     @brief Verify extension cards normalize null API counter metrics to zero for supported providers.
