@@ -70,10 +70,18 @@ def test_quota_providers_use_30d_window_bar_with_reset_before_credits() -> None:
     """
     source = EXTENSION_PATH.read_text(encoding="utf-8")
     assert "const WINDOW_BAR_30D_PROVIDERS = new Set(['copilot', 'openrouter', 'openai', 'geminiai']);" in source
+    assert "const DEFAULT_WINDOW_LABELS = Object.freeze({" in source
+    assert "openrouter: '30d'" in source
+    assert "openai: '30d'" in source
+    assert "geminiai: '30d'" in source
+    assert "this._windowLabels = {...DEFAULT_WINDOW_LABELS};" in source
     assert "WINDOW_BAR_30D_PROVIDERS.has(providerName)" in source
-    assert "card.fiveHourBar.label.text = '30d';" in source
+    assert "const configuredWindowLabel = (" in source
+    assert "this._windowLabels[providerName]" in source
+    assert "card.fiveHourBar.label.text = configuredWindowLabel;" in source
     assert "const singleWindowReset = metrics.reset_at || fiveHourReset || sevenDayReset || null;" in source
-    assert "updateWindowBar(card.fiveHourBar, usagePercent, singleWindowReset, true);" in source
+    assert "const effectiveUsagePercent = hasUsagePercent ? usagePercent : 0;" in source
+    assert "updateWindowBar(" in source
     assert "card._barData.sevenDay = null;" in source
     assert "card.sevenDayBar.container.hide();" in source
 
@@ -81,17 +89,17 @@ def test_quota_providers_use_30d_window_bar_with_reset_before_credits() -> None:
 def test_provider_card_cost_rows_use_costs_prefix_style_parity_and_no_empty_row() -> None:
     """
     @brief Verify extension card cost rows use `Costs:` style parity and hide empty spacer rows.
-    @details Asserts provider-card costs render `Costs:` with non-bold values using the same
-    `aibar-stat` label class style family as `Remaining credits`, and asserts empty `BYOK` rows
+    @details Asserts provider-card costs render `Costs:` with bold bright-white numeric values
+    (including currency symbol) using `_boldWhiteMarkup(...)`, and asserts empty `BYOK` rows
     are hidden so OpenRouter/OpenAI/GeminiAI cards do not leave a blank row after `Costs:`.
     @satisfies REQ-017
     @satisfies TST-004
     """
     source = EXTENSION_PATH.read_text(encoding="utf-8")
     assert "let costLabel = new St.Label({style_class: 'aibar-stat'});" in source
-    assert "`Costs: ${_escapeMarkup(costText)} / ${_escapeMarkup(limitText)}`" in source
-    assert "`Costs: ${_escapeMarkup(costText)}`" in source
-    assert "_boldWhiteMarkup(costText)" not in source
+    assert "`Costs: ${_boldWhiteMarkup(costText)} / ${_boldWhiteMarkup(limitText)}`" in source
+    assert "`Costs: ${_boldWhiteMarkup(costText)}`" in source
+    assert "_boldWhiteMarkup(costText)" in source
     assert "card.byokLabel.hide();" in source
 
 
@@ -336,8 +344,9 @@ def test_extension_reads_gnome_refresh_interval_from_json_extension_section() ->
     """
     @brief Verify extension reads gnome_refresh_interval_seconds from JSON extension section.
     @details Asserts extension source parses `json.extension.gnome_refresh_interval_seconds`,
-    validates it is a number >= 1, updates `this._refreshIntervalSeconds` when changed,
-    and reschedules the auto-refresh timer.
+    `json.extension.idle_delay_seconds`, and `json.extension.window_labels`, validates
+    interval semantics, updates `this._refreshIntervalSeconds` when changed, and
+    reschedules the auto-refresh timer.
     @satisfies DES-006
     @satisfies REQ-003
     @satisfies TST-004
@@ -350,6 +359,8 @@ def test_extension_reads_gnome_refresh_interval_from_json_extension_section() ->
     assert "this._refreshIntervalSeconds = newInterval;" in source
     assert "idle_delay_seconds" in source
     assert "this._idleDelaySeconds = Math.floor(extensionData.idle_delay_seconds);" in source
+    assert "extensionData.window_labels" in source
+    assert "this._windowLabels = {...DEFAULT_WINDOW_LABELS};" in source
 
 
 def test_extension_default_refresh_interval_is_60_seconds() -> None:

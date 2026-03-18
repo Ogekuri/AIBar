@@ -1214,6 +1214,21 @@ def _fixed_effective_window(provider_name: ProviderName) -> WindowPeriod | None:
     return _FIXED_WINDOW_BY_PROVIDER.get(provider_name)
 
 
+def _serialize_extension_window_labels() -> dict[str, str]:
+    """
+    @brief Serialize provider window labels for GNOME extension bar rendering.
+    @details Exports provider-keyed fixed window labels from canonical
+    fixed-window provider mapping for `show --json` `extension.window_labels`.
+    @return {dict[str, str]} Provider-keyed window label map.
+    @satisfies REQ-003
+    @satisfies REQ-017
+    """
+    return {
+        provider_name.value: window_period.value
+        for provider_name, window_period in _FIXED_WINDOW_BY_PROVIDER.items()
+    }
+
+
 def _project_cached_window(
     result: ProviderResult,
     target_window: WindowPeriod,
@@ -2194,6 +2209,7 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
             output_doc[_CACHE_EXTENSION_SECTION_KEY] = {
                 "gnome_refresh_interval_seconds": runtime_cfg.gnome_refresh_interval_seconds,
                 "idle_delay_seconds": runtime_cfg.idle_delay_seconds,
+                "window_labels": _serialize_extension_window_labels(),
             }
             click.echo(json.dumps(output_doc, indent=2))
         else:
@@ -2211,6 +2227,7 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
         output_doc[_CACHE_EXTENSION_SECTION_KEY] = {
             "gnome_refresh_interval_seconds": runtime_cfg.gnome_refresh_interval_seconds,
             "idle_delay_seconds": runtime_cfg.idle_delay_seconds,
+            "window_labels": _serialize_extension_window_labels(),
         }
         click.echo(json.dumps(output_doc, indent=2))
         return

@@ -40,6 +40,12 @@ const PROVIDER_DISPLAY_NAMES = {
 };
 const API_COUNTER_PROVIDERS = new Set(['openai', 'openrouter', 'codex', 'geminiai']);
 const WINDOW_BAR_30D_PROVIDERS = new Set(['copilot', 'openrouter', 'openai', 'geminiai']);
+const DEFAULT_WINDOW_LABELS = Object.freeze({
+    copilot: '30d',
+    openrouter: '30d',
+    openai: '30d',
+    geminiai: '30d',
+});
 
 /**
  * @brief Resolve provider label text for GNOME tab/card rendering.
@@ -338,6 +344,7 @@ class AIBarIndicator extends PanelMenu.Button {
         this._providerTabs = {};
         this._refreshIntervalSeconds = REFRESH_INTERVAL_SECONDS;
         this._idleDelaySeconds = IDLE_DELAY_SECONDS;
+        this._windowLabels = {...DEFAULT_WINDOW_LABELS};
         this._activeProvider = null;
         this._providerOrder = ['claude', 'openrouter', 'copilot', 'codex', 'openai', 'geminiai'];
         this._iconBlinkTimeout = null;
@@ -954,7 +961,7 @@ class AIBarIndicator extends PanelMenu.Button {
                 : null);
         const allowLimitReached = providerName === 'claude' || providerName === 'codex' || providerName === 'copilot';
 
-        const updateWindowBar = (bar, pct, resetTime, useDays) => {
+        const updateWindowBar = (bar, pct, resetTime, useDays, allowResetPendingHint = true) => {
             bar.pctLabel.text = `${pct.toFixed(1)}%`;
             bar.barFill.style_class = `aibar-progress-fill ${_getProviderProgressClass(providerName)}`;
             const shouldShowResetPending = _isDisplayedZeroPercent(pct);
@@ -999,13 +1006,23 @@ class AIBarIndicator extends PanelMenu.Button {
                     else
                         setResetLabel(`Reset in: ${days * 24 + hours}h ${mins}m`);
                 } else if (shouldShowResetPending) {
-                    showResetPendingHint();
+                    if (allowResetPendingHint) {
+                        showResetPendingHint();
+                    } else {
+                        bar.resetLabel.text = '';
+                        bar.resetLabel.hide();
+                    }
                 } else {
                     bar.resetLabel.text = '';
                     bar.resetLabel.hide();
                 }
             } else if (shouldShowResetPending) {
-                showResetPendingHint();
+                if (allowResetPendingHint) {
+                    showResetPendingHint();
+                } else {
+                    bar.resetLabel.text = '';
+                    bar.resetLabel.hide();
+                }
             } else {
                 bar.resetLabel.text = '';
                 bar.resetLabel.hide();
@@ -1035,15 +1052,26 @@ class AIBarIndicator extends PanelMenu.Button {
         }
 
         let hasWindowBars = false;
-        if (
-            WINDOW_BAR_30D_PROVIDERS.has(providerName) &&
-            usagePercent !== null &&
-            usagePercent !== undefined
-        ) {
+        if (WINDOW_BAR_30D_PROVIDERS.has(providerName)) {
+            const configuredWindowLabel = (
+                this._windowLabels &&
+                typeof this._windowLabels[providerName] === 'string' &&
+                this._windowLabels[providerName].length > 0
+            )
+                ? this._windowLabels[providerName]
+                : '30d';
             const singleWindowReset = metrics.reset_at || fiveHourReset || sevenDayReset || null;
-            card.fiveHourBar.label.text = '30d';
-            card._barData.fiveHour = {pct: usagePercent, resetTime: singleWindowReset};
-            updateWindowBar(card.fiveHourBar, usagePercent, singleWindowReset, true);
+            const hasUsagePercent = usagePercent !== null && usagePercent !== undefined;
+            const effectiveUsagePercent = hasUsagePercent ? usagePercent : 0;
+            card.fiveHourBar.label.text = configuredWindowLabel;
+            card._barData.fiveHour = {pct: effectiveUsagePercent, resetTime: singleWindowReset};
+            updateWindowBar(
+                card.fiveHourBar,
+                effectiveUsagePercent,
+                singleWindowReset,
+                true,
+                hasUsagePercent
+            );
             card._barData.sevenDay = null;
             card.sevenDayBar.container.hide();
             hasWindowBars = true;
@@ -1109,10 +1137,10 @@ class AIBarIndicator extends PanelMenu.Button {
             if (providerName === 'openrouter' && metrics.limit !== null && metrics.limit !== undefined) {
                 const limitText = `${currencySymbol}${metrics.limit.toFixed(2)}`;
                 card.costLabel.clutter_text.set_markup(
-                    `Costs: ${_escapeMarkup(costText)} / ${_escapeMarkup(limitText)}`
+                    `Costs: ${_boldWhiteMarkup(costText)} / ${_boldWhiteMarkup(limitText)}`
                 );
             } else {
-                card.costLabel.clutter_text.set_markup(`Costs: ${_escapeMarkup(costText)}`);
+                card.costLabel.clutter_text.set_markup(`Costs: ${_boldWhiteMarkup(costText)}`);
             }
             card.costLabel.show();
         } else {
@@ -1307,6 +1335,7 @@ class AIBarIndicator extends PanelMenu.Button {
      * (`payload`, `status`, `idle_time`, `freshness`, `extension`). Reads
      * `extension.gnome_refresh_interval_seconds` to update the auto-refresh interval and
      * `extension.idle_delay_seconds` for freshness fallback timestamp derivation.
+     * Parses `extension.window_labels` for provider bar left labels.
      * @param {any} output Input parameter `output`.
      * @returns {any} Function return value.
      * @satisfies DES-006
@@ -1378,11 +1407,30 @@ class AIBarIndicator extends PanelMenu.Button {
                 } else {
                     this._idleDelaySeconds = IDLE_DELAY_SECONDS;
                 }
+                if (
+                    extensionData &&
+                    extensionData.window_labels &&
+                    typeof extensionData.window_labels === 'object' &&
+                    !Array.isArray(extensionData.window_labels)
+                ) {
+                    this._windowLabels = {...DEFAULT_WINDOW_LABELS};
+                    for (const providerName of Object.keys(DEFAULT_WINDOW_LABELS)) {
+                        const providerWindowLabel = extensionData.window_labels[providerName];
+                        if (
+                            typeof providerWindowLabel === 'string' &&
+                            providerWindowLabel.length > 0
+                        )
+                            this._windowLabels[providerName] = providerWindowLabel;
+                    }
+                } else {
+                    this._windowLabels = {...DEFAULT_WINDOW_LABELS};
+                }
             } else {
                 this._usageData = json;
                 this._statusData = {};
                 this._freshnessData = {};
                 this._idleDelaySeconds = IDLE_DELAY_SECONDS;
+                this._windowLabels = {...DEFAULT_WINDOW_LABELS};
             }
             console.debug(`aibar: Parsed ${Object.keys(this._usageData).length} providers`);
         } catch (e) {
