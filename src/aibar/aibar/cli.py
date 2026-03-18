@@ -1605,17 +1605,22 @@ def _refresh_and_persist_cache_payload(
     providers: dict[ProviderName, BaseProvider],
     target_window: WindowPeriod,
     runtime_config: RuntimeConfig,
+    cache_document: dict[str, object],
 ) -> dict[str, object]:
     """
-    @brief Refresh provider data and persist updates into `cache.json`.
+    @brief Execute modular API calls, merge results into cache in memory, then persist.
     @details Executes provider fetches for configured providers only, records
-    per-provider/window attempt status, updates payload only for successful
-    provider/window outcomes, writes canonical cache document only on effective
-    content change, and updates idle-time metadata.
+    per-provider/window attempt status in memory, updates payload only for successful
+    provider/window outcomes, computes new idle-time values using
+    `idle_until = max(current_time + retry_after, current_time + idle_delay)` for errors,
+    then writes updated `cache.json` and `idle-time.json` under lock in a single write.
+    The `cache_document` parameter is the previously loaded cache content passed from
+    `retrieve_results_via_cache_pipeline` to avoid redundant disk reads.
     @param providers {dict[ProviderName, BaseProvider]} Provider scope for refresh.
     @param target_window {WindowPeriod} Requested window for refresh execution.
     @param runtime_config {RuntimeConfig} Runtime throttling configuration.
-    @return {dict[str, object]} Persisted cache document after merge.
+    @param cache_document {dict[str, object]} Previously loaded canonical cache document.
+    @return {dict[str, object]} Updated cache document after merge and persistence.
     @satisfies CTN-004
     @satisfies REQ-009
     @satisfies REQ-038
@@ -1626,8 +1631,10 @@ def _refresh_and_persist_cache_payload(
     @satisfies REQ-046
     @satisfies REQ-047
     @satisfies REQ-066
+    @satisfies REQ-091
+    @satisfies REQ-092
+    @satisfies REQ-094
     """
-    cache_document = _normalize_cache_document(load_cli_cache())
     cache_before_refresh = json.dumps(cache_document, sort_keys=True)
     payload_section = _cache_payload_section(cache_document)
     status_section = _cache_status_section(cache_document)
@@ -1681,9 +1688,11 @@ def _refresh_and_persist_cache_payload(
 
     if successful_payload_results:
         payload_section.update(_serialize_results_payload(successful_payload_results))
+
     cache_after_refresh = json.dumps(cache_document, sort_keys=True)
     if cache_after_refresh != cache_before_refresh:
         save_cli_cache(cache_document)
+
     _update_idle_time_after_refresh(fetched_results, runtime_config)
     return cache_document
 
@@ -1695,10 +1704,17 @@ def retrieve_results_via_cache_pipeline(
     providers: dict[ProviderName, BaseProvider],
 ) -> RetrievalPipelineOutput:
     """
-    @brief Execute shared cache-based retrieval pipeline for CLI and Text UI.
-    @details Applies required operation order: force-flag handling, provider-scoped
-    idle-time evaluation, per-provider conditional refresh/update of `cache.json`, then decode of
-    effective cache payload for downstream rendering without redundant reload.
+    @brief Execute shared cache-based retrieval pipeline for CLI `show`.
+    @details Implements the canonical `show` process flow:
+    (1) Evaluate idle-time per provider to determine refresh need.
+    (2) If at least one provider has expired idle-time: execute modular API calls
+        only for expired providers, collect results in memory, compute new idle-time
+        values, write updated `cache.json` and `idle-time.json` under lock file.
+    (3) Read `cache.json` under lock file (single read per execution).
+    (4) Return decoded results for presentation.
+    Performs at most one `load_cli_cache` disk read per execution when no refresh is
+    needed, and at most one read (before refresh) plus one write when refresh occurs.
+    After refresh, the in-memory cache document is used directly without a second read.
     @param provider_filter {ProviderName | None} Optional provider selector.
     @param target_window {WindowPeriod} Target window requested by caller.
     @param force_refresh {bool} Force-refresh flag for current execution.
@@ -1713,12 +1729,14 @@ def retrieve_results_via_cache_pipeline(
     @satisfies REQ-046
     @satisfies REQ-047
     @satisfies REQ-066
+    @satisfies REQ-091
+    @satisfies REQ-092
+    @satisfies REQ-093
+    @satisfies REQ-094
     """
     if force_refresh:
         remove_idle_time_file()
 
-    cached_payload_raw = load_cli_cache()
-    cached_document = _normalize_cache_document(cached_payload_raw)
     idle_state_by_provider = load_idle_time()
     now_utc = datetime.now(timezone.utc)
     if provider_filter is None:
@@ -1752,19 +1770,33 @@ def retrieve_results_via_cache_pipeline(
             if provider_name.value not in idle_blocked_provider_keys
         }
 
-    if not refresh_scope:
-        if cached_payload_raw is None:
+    if refresh_scope:
+        runtime_config = load_runtime_config()
+        cached_payload_raw = load_cli_cache()
+        cached_document = _normalize_cache_document(cached_payload_raw)
+        effective_payload = _refresh_and_persist_cache_payload(
+            providers=refresh_scope,
+            target_window=target_window,
+            runtime_config=runtime_config,
+            cache_document=cached_document,
+        )
+        cache_available = bool(_cache_payload_section(effective_payload)) or bool(
+            _cache_status_section(effective_payload)
+        )
+        if not cache_available:
             return RetrievalPipelineOutput(
                 payload=_empty_cache_document(),
                 results={},
-                idle_active=idle_active,
+                idle_active=False,
                 cache_available=False,
             )
-        filtered_cached_document = _filter_cached_payload(cached_document, provider_filter)
+        filtered_effective_payload = _filter_cached_payload(
+            effective_payload, provider_filter
+        )
         return RetrievalPipelineOutput(
-            payload=filtered_cached_document,
+            payload=filtered_effective_payload,
             results=_load_cached_results(
-                cache_document=filtered_cached_document,
+                cache_document=filtered_effective_payload,
                 provider_filter=provider_filter,
                 target_window=target_window,
                 providers=providers,
@@ -1773,28 +1805,20 @@ def retrieve_results_via_cache_pipeline(
             cache_available=True,
         )
 
-    runtime_config = load_runtime_config()
-    persisted_payload = _refresh_and_persist_cache_payload(
-        providers=refresh_scope,
-        target_window=target_window,
-        runtime_config=runtime_config,
-    )
-    effective_payload = persisted_payload
-    cache_available = bool(_cache_payload_section(effective_payload)) or bool(
-        _cache_status_section(effective_payload)
-    )
-    if not cache_available:
+    cached_payload_raw = load_cli_cache()
+    if cached_payload_raw is None:
         return RetrievalPipelineOutput(
             payload=_empty_cache_document(),
             results={},
-            idle_active=False,
+            idle_active=idle_active,
             cache_available=False,
         )
-    filtered_effective_payload = _filter_cached_payload(effective_payload, provider_filter)
+    cached_document = _normalize_cache_document(cached_payload_raw)
+    filtered_cached_document = _filter_cached_payload(cached_document, provider_filter)
     return RetrievalPipelineOutput(
-        payload=filtered_effective_payload,
+        payload=filtered_cached_document,
         results=_load_cached_results(
-            cache_document=filtered_effective_payload,
+            cache_document=filtered_cached_document,
             provider_filter=provider_filter,
             target_window=target_window,
             providers=providers,
@@ -2593,7 +2617,7 @@ def setup() -> None:
     """
     @brief Execute setup.
     @details Prompts for `idle_delay_seconds`, `api_call_delay_milliseconds`,
-    `gnome_refresh_interval_seconds`, and `billing_data` in order, then prompts for provider
+    `api_call_timeout_milliseconds`, `gnome_refresh_interval_seconds`, and `billing_data` in order, then prompts for provider
     currency symbols including `geminiai` (choices: `$`, `£`, `€`, default `$`), then persists
     all values to `~/.config/aibar/config.json`. GeminiAI OAuth source supports
     `skip`, `file`, `paste`, and `login` (re-authorization with current scopes).
@@ -2629,6 +2653,7 @@ def setup() -> None:
     click.echo(click.style("Runtime throttling", bold=True))
     click.echo("  idle-delay controls cache-only mode duration after successful refresh.")
     click.echo("  api-call delay controls minimum spacing between API calls in milliseconds.")
+    click.echo("  api-call timeout controls HTTP response timeout for provider API calls.")
     click.echo("  gnome-refresh-interval controls GNOME extension auto-refresh rate.")
     idle_delay_seconds = click.prompt(
         "  idle-delay seconds",
@@ -2639,6 +2664,11 @@ def setup() -> None:
         "  api-call delay milliseconds",
         type=int,
         default=runtime_config.api_call_delay_milliseconds,
+    )
+    api_call_timeout_milliseconds = click.prompt(
+        "  api-call timeout milliseconds",
+        type=int,
+        default=runtime_config.api_call_timeout_milliseconds,
     )
     gnome_refresh_interval_seconds = click.prompt(
         "  gnome-refresh-interval seconds",
@@ -2749,6 +2779,7 @@ def setup() -> None:
     configured_runtime = RuntimeConfig(
         idle_delay_seconds=idle_delay_seconds,
         api_call_delay_milliseconds=api_call_delay_milliseconds,
+        api_call_timeout_milliseconds=api_call_timeout_milliseconds,
         gnome_refresh_interval_seconds=gnome_refresh_interval_seconds,
         billing_data=billing_data,
         currency_symbols=currency_symbols,

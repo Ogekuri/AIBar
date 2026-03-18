@@ -130,7 +130,7 @@ def test_retrieve_pipeline_avoids_redundant_cache_reload_after_refresh(monkeypat
     monkeypatch.setattr(
         cli_module,
         "_refresh_and_persist_cache_payload",
-        lambda providers, target_window, runtime_config: {"payload": {}, "status": {}},
+        lambda providers, target_window, runtime_config, cache_document: {"payload": {}, "status": {}},
     )
 
     output = cli_module.retrieve_results_via_cache_pipeline(
@@ -153,11 +153,6 @@ def test_refresh_skips_cache_write_when_document_is_unchanged(monkeypatch) -> No
     write_calls: list[dict[str, object]] = []
     monkeypatch.setattr(
         cli_module,
-        "load_cli_cache",
-        lambda: {"payload": {}, "status": {}},
-    )
-    monkeypatch.setattr(
-        cli_module,
         "save_cli_cache",
         lambda payload: write_calls.append(payload),
     )
@@ -171,5 +166,6 @@ def test_refresh_skips_cache_write_when_document_is_unchanged(monkeypatch) -> No
         providers={},
         target_window=WindowPeriod.DAY_7,
         runtime_config=RuntimeConfig(),
+        cache_document={"payload": {}, "status": {}},
     )
     assert write_calls == []

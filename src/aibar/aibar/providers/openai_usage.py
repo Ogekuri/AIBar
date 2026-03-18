@@ -92,7 +92,9 @@ Note: Must be an organization/admin key with usage permissions."""
             )
 
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            from aibar.config import get_api_call_timeout_seconds
+
+            async with httpx.AsyncClient(timeout=get_api_call_timeout_seconds()) as client:
                 headers = {"Authorization": f"Bearer {self._api_key}"}
                 start_time, end_time = self._get_time_range(window)
 

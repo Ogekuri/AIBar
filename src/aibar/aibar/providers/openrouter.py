@@ -76,7 +76,9 @@ class OpenRouterUsageProvider(BaseProvider):
             )
 
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            from aibar.config import get_api_call_timeout_seconds
+
+            async with httpx.AsyncClient(timeout=get_api_call_timeout_seconds()) as client:
                 response = await client.get(
                     self.USAGE_URL,
                     headers={

@@ -56,7 +56,9 @@ class CopilotDeviceFlow:
         @return {dict[str, Any]} Function return value.
         @throws {Exception} Propagates explicit raised error states from internal validation or provider operations.
         """
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        from aibar.config import get_api_call_timeout_seconds
+
+        async with httpx.AsyncClient(timeout=get_api_call_timeout_seconds()) as client:
             response = await client.post(
                 self.DEVICE_CODE_URL,
                 headers={
@@ -85,7 +87,9 @@ class CopilotDeviceFlow:
         """
         import asyncio
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        from aibar.config import get_api_call_timeout_seconds
+
+        async with httpx.AsyncClient(timeout=get_api_call_timeout_seconds()) as client:
             while True:
                 await asyncio.sleep(interval)
 
@@ -248,7 +252,9 @@ Note: Token needs 'read:user' scope."""
             )
 
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            from aibar.config import get_api_call_timeout_seconds
+
+            async with httpx.AsyncClient(timeout=get_api_call_timeout_seconds()) as client:
                 response = await client.get(
                     self.USAGE_URL,
                     headers={

@@ -1,8 +1,8 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.3.25"
-date: "2026-03-17"
+version: "0.3.26"
+date: "2026-03-18"
 author: "req-change"
 scope:
   paths:
@@ -38,7 +38,7 @@ Used libraries/components evidenced by direct imports:
 - Python: `click`, `textual`, `pydantic`, `httpx` (`src/aibar/aibar/*.py`, `src/aibar/aibar/providers/*.py`)
 - GNOME JS: `GLib`, `St`, `Gio`, `Clutter`, `GObject`, `Main`, `PanelMenu`, `PopupMenu` (`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`)
 
-Performance note: explicit caching optimization uses persistent CLI cache (`~/.cache/aibar/cache.json`), idle-time gating (`~/.cache/aibar/idle-time.json`), and configurable provider-call throttling (`api_call_delay_seconds`) to minimize API request volume.
+Performance note: explicit caching optimization uses persistent CLI cache (`~/.cache/aibar/cache.json`), idle-time gating (`~/.cache/aibar/idle-time.json`), configurable provider-call throttling (`api_call_delay_milliseconds`), and configurable HTTP timeout (`api_call_timeout_milliseconds`) to minimize API request volume.
 
 ### 1.3 Repository Structure (evidence snapshot)
 ```text
@@ -95,12 +95,12 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 ### 2.2 Project Constraints
 - **CTN-001**: MUST resolve provider credentials with precedence: environment variable, then `~/.config/aibar/env`, then provider-specific local credential stores.
 - **CTN-002**: MUST represent provider fetch output with `ProviderResult` containing `provider`, `window`, `metrics`, `updated_at`, `raw`, and optional `error`; `UsageMetrics` MUST include `currency_symbol: str` (default `"$"`) annotating all monetary fields (`cost`, `remaining`, `limit`).
-- **CTN-003**: MUST perform external HTTP API calls with `httpx.AsyncClient(timeout=30.0)` for provider integrations.
+- **CTN-003**: MUST perform external HTTP API calls with `httpx.AsyncClient(timeout=<api_call_timeout_milliseconds>/1000.0)` using `RuntimeConfig.api_call_timeout_milliseconds` for provider integrations.
 - **CTN-004**: MUST persist `~/.cache/aibar/cache.json` as the canonical store for per-provider, per-window last-success payload snapshots and last-attempt status metadata.
 - **CTN-005**: MAY depend on unofficial/internal endpoints when official usage APIs are unavailable for Claude, Copilot, or Codex integrations.
 - **CTN-006**: MUST keep `docs/REFERENCES.md` synchronized with symbols defined under `src/` and `.github/workflows/`.
 - **CTN-007**: MUST declare `hatchling` as `[build-system]` backend in `pyproject.toml` with `[project]` metadata including `name`, `version`, `requires-python`, `[project.scripts]`, and `dependencies` containing `pytest`.
-- **CTN-008**: MUST persist runtime configuration in `~/.config/aibar/config.json` with keys `idle_delay_seconds`, `api_call_delay_milliseconds`, `gnome_refresh_interval_seconds`, `billing_data`, and `currency_symbols` (mapping provider name → currency symbol string; default `"$"` per provider when key is absent).
+- **CTN-008**: MUST persist runtime configuration in `~/.config/aibar/config.json` with keys `idle_delay_seconds`, `api_call_delay_milliseconds`, `api_call_timeout_milliseconds`, `gnome_refresh_interval_seconds`, `billing_data`, and `currency_symbols` (mapping provider name → currency symbol string; default `"$"` per provider when key is absent).
 - **CTN-009**: MUST persist provider-scoped idle-time state in `~/.cache/aibar/idle-time.json`, where each provider key stores epoch and human-readable `last_success_at` and `idle_until` fields.
 - **CTN-010**: MUST update `cache.json` payload fields only after successful fetch for the same provider/window and MUST preserve previous payload fields on failed fetch attempts, including HTTP `429`.
 - **CTN-011**: MUST fetch latest release metadata from `https://api.github.com/repos/Ogekuri/AIBar/releases/latest` for startup update checks.
@@ -126,7 +126,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-002**: MUST print both 5-hour and 7-day outputs for Claude and Codex when `show` runs with default window and non-JSON mode.
 - **REQ-003**: MUST emit pretty-printed JSON (`indent=2`) for `show --json` with top-level sections `payload` (per-provider/window data), `status` (last-attempt state), and `extension` (GNOME extension runtime config including `gnome_refresh_interval_seconds`).
 - **REQ-004**: MUST run provider health checks in `doctor` using the 5-hour window and report per-provider configuration and test status.
-- **REQ-005**: MUST prompt `setup` for `idle_delay_seconds` (default `300`) first, `api_call_delay_milliseconds` (default `1000`) second, `gnome_refresh_interval_seconds` (default `60`) third, and `billing_data` (default `billing_data`) fourth, then persist values in `~/.config/aibar/config.json`.
+- **REQ-005**: MUST prompt `setup` for `idle_delay_seconds` (default `300`) first, `api_call_delay_milliseconds` (default `100`) second, `api_call_timeout_milliseconds` (default `3000`) third, `gnome_refresh_interval_seconds` (default `60`) fourth, and `billing_data` (default `billing_data`) fifth, then persist values in `~/.config/aibar/config.json`.
 - **REQ-006**: MUST fail Claude login when CLI credentials are missing or expired and MUST print `claude setup-token` remediation guidance.
 - **REQ-007**: MUST execute GitHub device-flow login for Copilot and save the token in `~/.config/aibar/copilot.json`.
 - **REQ-009**: MUST execute provider retrieval for `show` in this order: force-flag handling, per-provider idle-time evaluation, per-provider conditional refresh to `~/.cache/aibar/cache.json`, then data load from `~/.cache/aibar/cache.json`.
@@ -161,10 +161,16 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-037**: CLI text `show` and GNOME provider-card error blocks MUST append retry metadata as `HTTP status: <code>, Retry after: <seconds> sec.` when both status code and retry-after value are available from provider error metadata.
 - **REQ-038**: MUST update only the refreshed provider idle-time entry after success by setting `last_success_at` to refresh completion time and `idle_until` to `last_success_at + idle_delay_seconds`, then persist epoch and human-readable values in `~/.cache/aibar/idle-time.json`.
 - **REQ-039**: MUST support force-refresh handling that deletes `~/.cache/aibar/idle-time.json`, bypasses idle-time gating for the current execution, and executes a fresh provider refresh before loading `~/.cache/aibar/cache.json`.
-- **REQ-040**: MUST enforce at least `api_call_delay_milliseconds` between consecutive provider API requests during refresh execution, with default `1000` milliseconds when configuration is missing.
+- **REQ-040**: MUST enforce at least `api_call_delay_milliseconds` between consecutive provider API requests during refresh execution, with default `100` milliseconds when configuration is missing.
 - **REQ-041**: MUST update idle-time for each provider refresh failure in `~/.cache/aibar/idle-time.json` using `idle_until = last_attempt_at + max(idle_delay_seconds, retry_after_seconds_or_0)`, where `retry_after_seconds_or_0` is parsed from API error metadata when available.
 - **REQ-042**: MUST minimize provider API requests and cache I/O by reusing in-memory cache and idle-time state within each refresh cycle and persisting `cache.json` or `idle-time.json` only when content changes.
 - **REQ-043**: MUST centralize refresh and load logic for `~/.cache/aibar/cache.json` into shared internal functions reused by CLI `show` refresh and output workflows.
+- **REQ-091**: `show` command MUST execute in this sequential order: (1) evaluate idle-time per provider to determine refresh need, (2) execute modular API calls only for providers with expired idle-time, collecting results in memory, (3) compute new idle-time values applying `idle_until = max(current_time + retry_after, current_time + idle_delay)` for errors, (4) write updated cache and idle-time under lock file, (5) read `cache.json` under lock file, (6) present results.
+- **REQ-092**: MUST maintain exactly one code path for creating or updating `~/.cache/aibar/cache.json`; no other function MUST write to `cache.json`.
+- **REQ-093**: MUST guard every read and write of `~/.cache/aibar/cache.json` with a blocking lock file `~/.cache/aibar/cache.json.lock`; lock MUST be created before write and released after write completes; reads MUST block while lock file exists.
+- **REQ-094**: MUST perform at most one disk read of `~/.cache/aibar/cache.json` per `show` command execution when no refresh is needed, and at most one disk read after the single write when refresh occurs.
+- **REQ-095**: MUST persist `api_call_timeout_milliseconds` (default `3000`) in `RuntimeConfig` and use it as the HTTP response timeout for all provider API calls via `httpx.AsyncClient(timeout=<value>/1000.0)`.
+- **REQ-096**: MUST default `api_call_delay_milliseconds` to `100` when configuration is missing.
 - **REQ-044**: MUST persist per-provider, per-window last-attempt status in `cache.json` with fields `result`, `error`, and `updated_at`, where `result` is `OK` or `FAIL`.
 - **REQ-045**: MUST overwrite a provider/window payload in `cache.json` only when the current fetch for that provider/window succeeds.
 - **REQ-046**: MUST preserve the previous provider/window payload in `cache.json` when the current fetch for that provider/window fails, including HTTP `429`.
@@ -226,10 +232,10 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-009**: MUST verify `gnome-install` resolves extension source from package location, validates source directory, copies files to target, enables the extension, and exits non-zero on missing source; MUST verify `gnome-uninstall` removes extension directory, disables the extension, and exits non-zero when extension directory does not exist.
 - **TST-010**: MUST verify `Remaining credits: <remaining> / <limit>` appears for Claude, Codex, and Copilot only when corresponding provider/window status is `OK`.
 - **TST-011**: MUST verify every provider refresh failure updates provider-scoped idle-time using `idle_until = last_attempt_at + max(idle_delay_seconds, retry_after_seconds_or_0)`, including HTTP `429` and authentication failures without `retry_after` metadata.
-- **TST-013**: MUST verify `setup` prompts idle-delay first, API-call delay milliseconds second (default `1000`), `gnome_refresh_interval_seconds` third, `billing_data` fourth (default `billing_data`), then per-provider currency symbol prompts, and persists all values into `~/.config/aibar/config.json`.
+- **TST-013**: MUST verify `setup` prompts idle-delay first, API-call delay milliseconds second (default `100`), API-call timeout milliseconds third (default `3000`), `gnome_refresh_interval_seconds` fourth, `billing_data` fifth (default `billing_data`), then per-provider currency symbol prompts, and persists all values into `~/.config/aibar/config.json`.
 - **TST-014**: MUST verify `show` evaluates idle-time per provider, serves `~/.cache/aibar/cache.json` for providers with future `idle_until`, and refreshes only providers with missing or expired idle-time state.
 - **TST-015**: MUST verify `show --force` removes `~/.cache/aibar/idle-time.json`, bypasses idle-time gating for current execution, refreshes providers, and recreates idle-time metadata before loading `~/.cache/aibar/cache.json`.
-- **TST-016**: MUST verify refresh execution enforces configured inter-call delay in milliseconds between provider API requests, using `1000` milliseconds when `api_call_delay_milliseconds` is absent.
+- **TST-016**: MUST verify refresh execution enforces configured inter-call delay in milliseconds between provider API requests, using `100` milliseconds when `api_call_delay_milliseconds` is absent.
 - **TST-017**: MUST verify CLI `show` invokes one shared cache-retrieval implementation and does not call legacy `ResultCache` read/write APIs.
 - **TST-018**: MUST verify failed provider/window refresh attempts set `result=FAIL` and `error` in `cache.json` while preserving the previous payload for the same provider/window.
 - **TST-019**: MUST verify partial refresh outcomes can record mixed `OK` and `FAIL` statuses across windows of the same provider without overwriting unaffected payload snapshots.
@@ -270,12 +276,12 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | PRJ-011 | `docs/REQUIREMENTS.md`, `docs/WORKFLOW.md`, and `docs/REFERENCES.md` + GNOME contract documentation sources; repository tree excludes `src/aibar/plans/Gnome.plan.md`. |
 | CTN-001 | `src/aibar/aibar/config.py` + `Config.get_token` + env var -> env file -> provider-specific stores (`ClaudeCLIAuth`, `CodexCredentialStore`, `CopilotCredentialStore`). |
 | CTN-002 | `src/aibar/aibar/providers/base.py` + `ProviderResult` model + fields `provider/window/metrics/updated_at/raw/error`; `UsageMetrics` + `currency_symbol` field. |
-| CTN-003 | `src/aibar/aibar/providers/*.py` + `fetch` methods + `httpx.AsyncClient(timeout=30.0)` in Claude/OpenAI/OpenRouter/Copilot/Codex providers. |
+| CTN-003 | `src/aibar/aibar/providers/*.py` + `fetch` methods + `httpx.AsyncClient(timeout=api_call_timeout_milliseconds/1000.0)` in all providers using `RuntimeConfig.api_call_timeout_milliseconds`. |
 | CTN-004 | `src/aibar/aibar/cache.py` + cache schema helpers and `src/aibar/aibar/cli.py` + `cache.json` as canonical store for payload snapshots and attempt statuses. |
 | CTN-005 | `src/aibar/aibar/config.py` + `PROVIDER_INFO` notes + entries describing unofficial/internal usage for Claude, Copilot, and Codex. |
 | CTN-006 | `docs/REFERENCES.md` + full symbol index grouped by source file, regenerated from repository code. |
 | CTN-007 | `pyproject.toml` + `[build-system] requires = ["hatchling"]` + `[project]` metadata fields `name`, `version`, `requires-python`, `dependencies` (including `pytest`), and `[project.scripts]`. |
-| CTN-008 | `src/aibar/aibar/config.py` + `RuntimeConfig` model + `idle_delay_seconds`, `api_call_delay_seconds`, `gnome_refresh_interval_seconds`, and `currency_symbols` fields persisted in `~/.config/aibar/config.json`. |
+| CTN-008 | `src/aibar/aibar/config.py` + `RuntimeConfig` model + `idle_delay_seconds`, `api_call_delay_milliseconds`, `api_call_timeout_milliseconds`, `gnome_refresh_interval_seconds`, and `currency_symbols` fields persisted in `~/.config/aibar/config.json`. |
 | CTN-009 | `src/aibar/aibar/config.py` + `load_idle_time/save_idle_time` and `src/aibar/aibar/cli.py` + provider-scoped idle-time lifecycle handling in `~/.cache/aibar/idle-time.json`. |
 | CTN-010 | `src/aibar/aibar/cache.py` + conditional payload-write helpers guarantee payload replacement only on successful provider/window fetch and payload preservation on failed attempts including HTTP `429`. |
 | DES-001 | `src/aibar/aibar/providers/base.py` + `class BaseProvider(ABC)` + abstract methods `fetch`, `is_configured`, `get_config_help`. |
@@ -288,7 +294,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-002 | `src/aibar/aibar/cli.py` + `show` + default-window Claude/Codex dual fetch output rendering. |
 | REQ-003 | `src/aibar/aibar/cli.py` + `show` JSON renderer emits `indent=2` with `payload`, `status`, and `extension` (containing `gnome_refresh_interval_seconds`) sections. |
 | REQ-004 | `src/aibar/aibar/cli.py` + `doctor` + configuration status and `_fetch_result(provider, WindowPeriod.HOUR_5)` health check. |
-| REQ-005 | `src/aibar/aibar/cli.py` + `setup` prompts `idle_delay_seconds`, `api_call_delay_seconds`, and `gnome_refresh_interval_seconds` with defaults `300`, `20`, and `60`, then persists `~/.config/aibar/config.json`. |
+| REQ-005 | `src/aibar/aibar/cli.py` + `setup` prompts `idle_delay_seconds`, `api_call_delay_milliseconds`, `api_call_timeout_milliseconds`, and `gnome_refresh_interval_seconds` with defaults `300`, `100`, `3000`, and `60`, then persists `~/.config/aibar/config.json`. |
 | REQ-049 | `src/aibar/aibar/cli.py` + `setup` + per-provider currency symbol section after timeout section; prompts each provider with choices `$`/`£`/`€` default `$`; persists `currency_symbols` map in `~/.config/aibar/config.json`. |
 | REQ-050 | `src/aibar/aibar/providers/*.py` + `_parse_response`/`_build_result` + `_resolve_currency_symbol` helper resolves currency from raw API response `currency` field; fallback to `RuntimeConfig.currency_symbols[provider_name]`. |
 | REQ-051 | `src/aibar/aibar/cli.py` + `_print_result` + cost line uses `m.currency_symbol` instead of hardcoded `$`. |
@@ -374,3 +380,9 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-087 | `.gitignore` + allowlist tracks `uv.lock` and drops `requirements.txt`; repository root no longer includes `requirements.txt`; `README.md` includes optional `uv export --format requirements-txt > requirements.txt` command. |
 | TST-039 | `tests/test_launcher_uv_only.py` + source-level assertions for `scripts/aibar.sh` uv-run invocation and absence of virtualenv/pip install logic. |
 | TST-040 | `tests/test_uv_requirements_surface.py` + assertions for `.gitignore` allowlist change, `requirements.txt` absence, and README uv requirements/export command content. |
+| REQ-091 | `src/aibar/aibar/cli.py` + `retrieve_results_via_cache_pipeline` + sequential execution: idle-time check, modular API calls, in-memory collection, locked cache write, locked cache read, presentation. |
+| REQ-092 | `src/aibar/aibar/config.py` + `save_cli_cache` is the single write path for `cache.json`. |
+| REQ-093 | `src/aibar/aibar/config.py` + `_blocking_file_lock(CACHE_FILE_PATH)` guards every `cache.json` read and write. |
+| REQ-094 | `src/aibar/aibar/cli.py` + `retrieve_results_via_cache_pipeline` + at most one `load_cli_cache` per execution path. |
+| REQ-095 | `src/aibar/aibar/config.py` + `RuntimeConfig.api_call_timeout_milliseconds` default `3000`; providers use `httpx.AsyncClient(timeout=api_call_timeout_milliseconds/1000.0)`. |
+| REQ-096 | `src/aibar/aibar/config.py` + `DEFAULT_API_CALL_DELAY_MILLISECONDS = 100`. |

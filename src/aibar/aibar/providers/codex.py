@@ -213,7 +213,9 @@ class CodexTokenRefresher:
         if not credentials.refresh_token:
             return credentials
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        from aibar.config import get_api_call_timeout_seconds
+
+        async with httpx.AsyncClient(timeout=get_api_call_timeout_seconds()) as client:
             response = await client.post(
                 self.REFRESH_URL,
                 headers={"Content-Type": "application/json"},
@@ -332,7 +334,9 @@ Note: Token is refreshed automatically when needed."""
                 pass  # Continue with existing token
 
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            from aibar.config import get_api_call_timeout_seconds
+
+            async with httpx.AsyncClient(timeout=get_api_call_timeout_seconds()) as client:
                 # Safe to use _credentials here since is_configured() passed
                 assert self._credentials is not None
 

@@ -26,7 +26,8 @@ CACHE_FILE_PATH = APP_CACHE_DIR / "cache.json"
 IDLE_TIME_PATH = APP_CACHE_DIR / "idle-time.json"
 
 DEFAULT_IDLE_DELAY_SECONDS = 300
-DEFAULT_API_CALL_DELAY_MILLISECONDS = 1000
+DEFAULT_API_CALL_DELAY_MILLISECONDS = 100
+DEFAULT_API_CALL_TIMEOUT_MILLISECONDS = 3000
 DEFAULT_GNOME_REFRESH_INTERVAL_SECONDS = 60
 DEFAULT_BILLING_DATASET = "billing_data"
 DEFAULT_CURRENCY_SYMBOL = "$"
@@ -42,10 +43,13 @@ _CURRENCY_CODE_TO_SYMBOL: dict[str, str] = {
 
 class RuntimeConfig(BaseModel):
     """
-    @brief Define runtime configuration component for refresh throttling and currency controls.
+    @brief Define runtime configuration component for refresh throttling, timeout, and currency controls.
     @details Encodes persisted CLI runtime controls used by `show` refresh logic,
     GNOME extension scheduling, and per-provider currency symbol resolution.
     Fields are validated with defaults that reduce rate-limit pressure.
+    `api_call_delay_milliseconds` defaults to `100` ms inter-call spacing.
+    `api_call_timeout_milliseconds` defaults to `3000` ms HTTP response timeout
+    applied to all provider API calls via `httpx.AsyncClient(timeout=<value>/1000.0)`.
     `currency_symbols` maps provider name strings to currency symbols (`$`, `£`, `€`);
     missing entries default to `DEFAULT_CURRENCY_SYMBOL` at resolution time.
     `billing_data` stores the Google BigQuery dataset name used for GeminiAI
@@ -54,10 +58,13 @@ class RuntimeConfig(BaseModel):
     OAuth-backed Monitoring API fetch execution.
     @satisfies CTN-008
     @satisfies REQ-049
+    @satisfies REQ-095
+    @satisfies REQ-096
     """
 
     idle_delay_seconds: int = Field(default=DEFAULT_IDLE_DELAY_SECONDS, ge=1)
     api_call_delay_milliseconds: int = Field(default=DEFAULT_API_CALL_DELAY_MILLISECONDS, ge=1)
+    api_call_timeout_milliseconds: int = Field(default=DEFAULT_API_CALL_TIMEOUT_MILLISECONDS, ge=1)
     gnome_refresh_interval_seconds: int = Field(default=DEFAULT_GNOME_REFRESH_INTERVAL_SECONDS, ge=1)
     billing_data: str = Field(default=DEFAULT_BILLING_DATASET, min_length=1)
     currency_symbols: dict[str, str] = Field(default_factory=dict)
@@ -380,6 +387,23 @@ def remove_idle_time_file() -> None:
             IDLE_TIME_PATH.unlink(missing_ok=True)
     except OSError:
         return
+
+
+def get_api_call_timeout_seconds() -> float:
+    """
+    @brief Resolve HTTP response timeout in seconds from runtime configuration.
+    @details Reads `api_call_timeout_milliseconds` from `RuntimeConfig` and converts
+    to seconds. Returns `DEFAULT_API_CALL_TIMEOUT_MILLISECONDS / 1000.0` when
+    configuration is missing or invalid.
+    @return {float} HTTP response timeout in seconds (>= 0.001).
+    @satisfies REQ-095
+    @satisfies CTN-003
+    """
+    try:
+        runtime_config = load_runtime_config()
+        return max(0.001, runtime_config.api_call_timeout_milliseconds / 1000.0)
+    except Exception:  # noqa: BLE001
+        return DEFAULT_API_CALL_TIMEOUT_MILLISECONDS / 1000.0
 
 
 def load_env_file() -> dict[str, str]:
