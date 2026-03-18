@@ -94,7 +94,7 @@
 - `Internal Call-Trace Tree`
   - `StartupPreflightGroup.main(...)`: startup preflight wrapper around Click parser/dispatcher [`src/aibar/aibar/cli.py`]
     - `_run_startup_update_preflight(...)`: startup release-check idle gate and diagnostics pipeline [`src/aibar/aibar/cli.py`]
-      - `_load_startup_idle_state(...)`: load startup idle-state JSON from `$HOME/.github_api_idle-time.aibar` [`src/aibar/aibar/cli.py`]
+      - `_load_startup_idle_state(...)`: load startup idle-state JSON from `~/.cache/aibar/check_version_idle-time.json` [`src/aibar/aibar/cli.py`]
       - `_startup_idle_epochs(...)`: normalize `last_success_at_epoch` and `idle_until_epoch` from startup idle-state payload [`src/aibar/aibar/cli.py`]
       - `_fetch_startup_latest_release(...)`: fetch and normalize latest GitHub release metadata with hardcoded timeout [`src/aibar/aibar/cli.py`]
         - `_parse_retry_after_header(...)`: normalize Retry-After values for HTTP 429 handling [`src/aibar/aibar/cli.py`]
@@ -108,9 +108,10 @@
       - `_is_linux_runtime(...)`: runtime platform gate for lifecycle subprocess execution [`src/aibar/aibar/cli.py`]
       - `_execute_lifecycle_subprocess(...)`: Linux branch subprocess execution wrapper with exit-code propagation [`src/aibar/aibar/cli.py`]
       - `_emit_non_linux_lifecycle_guidance(...)`: non-Linux branch warning with manual command text [`src/aibar/aibar/cli.py`]
-    - `_handle_uninstall_option(...)`: eager `--uninstall` callback with Linux-gated lifecycle execution and non-Linux guidance [`src/aibar/aibar/cli.py`]
+    - `_handle_uninstall_option(...)`: eager `--uninstall` callback with Linux-gated lifecycle execution, startup idle-state cache cleanup, and non-Linux guidance [`src/aibar/aibar/cli.py`]
       - `_is_linux_runtime(...)`: runtime platform gate for lifecycle subprocess execution [`src/aibar/aibar/cli.py`]
       - `_execute_lifecycle_subprocess(...)`: Linux branch subprocess execution wrapper with exit-code propagation [`src/aibar/aibar/cli.py`]
+      - `_cleanup_startup_idle_state_artifacts(...)`: Linux uninstall cleanup that removes startup idle-state file and cache directory [`src/aibar/aibar/cli.py`]
       - `_emit_non_linux_lifecycle_guidance(...)`: non-Linux branch warning with manual command text [`src/aibar/aibar/cli.py`]
     - `main(...)`: CLI command router callback [`src/aibar/aibar/cli.py`]
     - `show(...)`: usage fetch/report route with shared cache pipeline [`src/aibar/aibar/cli.py`]
@@ -241,7 +242,7 @@
   - HTTP network interactions through provider endpoints.
   - Browser-based OAuth consent flow and loopback callback for GeminiAI Google credentials.
   - Google Cloud Monitoring API HTTPS endpoints.
-  - Local filesystem reads/writes under user home for env, credentials, runtime config, CLI cache, provider idle-time state, and startup idle-state file (`$HOME/.github_api_idle-time.aibar`).
+  - Local filesystem reads/writes under user home for env, credentials, runtime config, CLI cache, provider idle-time state, startup idle-state file (`~/.cache/aibar/check_version_idle-time.json`), and Linux uninstall cache-directory removal (`~/.cache/aibar/`).
   - Local filesystem operations for GNOME extension install/uninstall (directory creation, file copy, directory removal) under `~/.local/share/gnome-shell/extensions/`.
   - `gnome-extensions` CLI for extension enable/disable.
   - Process environment and terminal stdout/stderr streams.

@@ -113,7 +113,8 @@ def test_successful_startup_check_writes_idle_state_schema(
     """
     @brief Verify successful startup check writes required idle-state fields.
     @details Executes preflight with mocked successful release metadata and
-    validates epoch and human-readable keys persisted to idle-state JSON.
+    validates cache-directory creation plus epoch and human-readable keys
+    persisted to startup idle-state JSON.
     @param monkeypatch {pytest.MonkeyPatch} Pytest monkeypatch fixture.
     @param tmp_path {Path} Temporary filesystem root for HOME isolation.
     @return {None} Function return value.
@@ -134,6 +135,9 @@ def test_successful_startup_check_writes_idle_state_schema(
     _REAL_STARTUP_PREFLIGHT()
     state_path = cli_module._startup_idle_state_path()
     assert state_path.exists()
+    assert state_path.name == "check_version_idle-time.json"
+    assert state_path.parent == tmp_path / ".cache" / "aibar"
+    assert state_path.parent.exists()
 
     payload = json.loads(state_path.read_text(encoding="utf-8"))
     assert isinstance(payload[cli_module._STARTUP_IDLE_STATE_LAST_SUCCESS_EPOCH_KEY], int)
@@ -229,14 +233,17 @@ def test_http_429_uses_max_retry_after_and_idle_delay_floor(
 )
 def test_lifecycle_flags_execute_uv_commands_and_propagate_exit_code(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
     flag: str,
     expected_command: list[str],
 ) -> None:
     """
     @brief Verify lifecycle flags execute required uv commands.
     @details Mocks subprocess execution for `--upgrade` and `--uninstall`,
-    asserting exact argv and propagated subprocess exit code.
+    asserting exact argv and propagated subprocess exit code; verifies Linux
+    `--uninstall` removes startup idle-state cache artifacts.
     @param monkeypatch {pytest.MonkeyPatch} Pytest monkeypatch fixture.
+    @param tmp_path {Path} Temporary filesystem root for HOME isolation.
     @param flag {str} Lifecycle flag under test.
     @param expected_command {list[str]} Expected subprocess argv.
     @return {None} Function return value.
@@ -255,13 +262,25 @@ def test_lifecycle_flags_execute_uv_commands_and_propagate_exit_code(
         observed_commands.append(command)
         return subprocess.CompletedProcess(command, returncode=7)
 
+    monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setattr(cli_module.subprocess, "run", _fake_run)
     monkeypatch.setattr(cli_module, "_is_linux_runtime", lambda: True)
+    startup_state_path = cli_module._startup_idle_state_path()
+    startup_state_path.parent.mkdir(parents=True, exist_ok=True)
+    startup_state_path.write_text("{}", encoding="utf-8")
+    startup_cache_sentinel_path = startup_state_path.parent / "cache.json"
+    startup_cache_sentinel_path.write_text("{}", encoding="utf-8")
     runner = CliRunner()
     result = runner.invoke(main, [flag])
 
     assert result.exit_code == 7
     assert observed_commands == [expected_command]
+    if flag == "--uninstall":
+        assert not startup_state_path.exists()
+        assert not startup_state_path.parent.exists()
+    else:
+        assert startup_state_path.exists()
+        assert startup_cache_sentinel_path.exists()
 
 
 @pytest.mark.parametrize(
@@ -289,6 +308,7 @@ def test_lifecycle_flags_execute_uv_commands_and_propagate_exit_code(
 )
 def test_lifecycle_flags_on_non_linux_emit_manual_guidance_without_subprocess(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
     flag: str,
     expected_command: list[str],
     detected_os: str,
@@ -296,8 +316,10 @@ def test_lifecycle_flags_on_non_linux_emit_manual_guidance_without_subprocess(
     """
     @brief Verify lifecycle flags on non-Linux emit manual guidance only.
     @details Forces non-Linux runtime branch, asserts command subprocess is not
-    executed, and validates guidance includes detected OS and required command.
+    executed, validates guidance includes detected OS and required command, and
+    verifies startup idle-state cache artifacts remain unchanged.
     @param monkeypatch {pytest.MonkeyPatch} Pytest monkeypatch fixture.
+    @param tmp_path {Path} Temporary filesystem root for HOME isolation.
     @param flag {str} Lifecycle flag under test.
     @param expected_command {list[str]} Expected manual command argv text.
     @param detected_os {str} Stubbed non-Linux operating-system label.
@@ -316,9 +338,15 @@ def test_lifecycle_flags_on_non_linux_emit_manual_guidance_without_subprocess(
         observed_commands.append(command)
         return subprocess.CompletedProcess(command, returncode=0)
 
+    monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setattr(cli_module.subprocess, "run", _fake_run)
     monkeypatch.setattr(cli_module, "_is_linux_runtime", lambda: False)
     monkeypatch.setattr(cli_module.platform, "system", lambda: detected_os)
+    startup_state_path = cli_module._startup_idle_state_path()
+    startup_state_path.parent.mkdir(parents=True, exist_ok=True)
+    startup_state_path.write_text("{}", encoding="utf-8")
+    startup_cache_sentinel_path = startup_state_path.parent / "cache.json"
+    startup_cache_sentinel_path.write_text("{}", encoding="utf-8")
     runner = CliRunner()
     result = runner.invoke(main, [flag])
 
@@ -327,6 +355,8 @@ def test_lifecycle_flags_on_non_linux_emit_manual_guidance_without_subprocess(
     assert f"{flag} is supported only on Linux." in result.output
     assert f"Detected OS: {detected_os}." in result.output
     assert f"Run manually: {' '.join(expected_command)}" in result.output
+    assert startup_state_path.exists()
+    assert startup_cache_sentinel_path.exists()
 
 
 def test_version_and_ver_print_installed_version_without_dispatch() -> None:

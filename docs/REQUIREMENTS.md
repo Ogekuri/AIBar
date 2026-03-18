@@ -105,8 +105,8 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **CTN-010**: MUST update `cache.json` payload fields only after successful fetch for the same provider/window and MUST preserve previous payload fields on failed fetch attempts, including HTTP `429`.
 - **CTN-011**: MUST fetch latest release metadata from `https://api.github.com/repos/Ogekuri/AIBar/releases/latest` for startup update checks.
 - **CTN-012**: MUST use hardcoded startup update-check constants `idle_delay_seconds=300` and `http_timeout_seconds=2`.
-- **CTN-013**: MUST persist startup update-check idle state in `$HOME/.github_api_idle-time.aibar` JSON with epoch and human-readable `last_success_at` and `idle_until`.
-- **CTN-014**: MUST perform at most one startup update HTTP check per 300 seconds unless `$HOME/.github_api_idle-time.aibar` is missing or expired.
+- **CTN-013**: MUST persist startup update-check idle state in `~/.cache/aibar/check_version_idle-time.json` JSON with epoch and human-readable `last_success_at` and `idle_until`.
+- **CTN-014**: MUST perform at most one startup update HTTP check per 300 seconds unless `~/.cache/aibar/check_version_idle-time.json` is missing or expired.
 - **CTN-015**: MUST use lifecycle command strings exactly as `uv tool install aibar --force --from git+https://github.com/Ogekuri/AIBar.git` and `uv tool uninstall aibar`.
 
 ## 3. Requirements
@@ -191,13 +191,13 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-068**: Bare `aibar` and `aibar --help` MUST print human-readable usage text listing all commands and global or command-specific options, including `show --force`, `show --json`, `gnome-install`, `gnome-uninstall`, `--version`/`--ver`, `--upgrade`, and `--uninstall` examples, without Doxygen tags.
 - **REQ-069**: GNOME panel icon MUST be bright white when all percentages are <= 25, bright yellow when any percentage > 25, bright orange when any percentage > 50, bright red when any percentage > 75, and blinking bright-red/dim-red when any percentage > 90.
 - **REQ-070**: MUST execute startup update-check preflight before CLI argument validation and command dispatch.
-- **REQ-071**: MUST skip startup update HTTP calls while current epoch is lower than persisted `idle_until` in `$HOME/.github_api_idle-time.aibar`.
-- **REQ-072**: MUST create or overwrite `$HOME/.github_api_idle-time.aibar` after successful startup update checks using `last_success_at=now` and `idle_until=now+300` in epoch and human-readable formats.
+- **REQ-071**: MUST skip startup update HTTP calls while current epoch is lower than persisted `idle_until` in `~/.cache/aibar/check_version_idle-time.json`.
+- **REQ-072**: MUST create missing `~/.cache/aibar/` and create or overwrite `check_version_idle-time.json` after successful startup update checks with epoch and human-readable `last_success_at=now` and `idle_until=now+300`.
 - **REQ-073**: MUST print a bright-green message containing installed version and latest available version when the latest GitHub release is newer.
 - **REQ-074**: MUST print bright-red error diagnostics when startup update checks fail, including HTTP status details such as `403`.
 - **REQ-075**: MUST process startup update HTTP `429` responses by updating idle-time with `max(300, max_retry_after_seconds_observed)`.
 - **REQ-076**: MUST execute `uv tool install aibar --force --from git+https://github.com/Ogekuri/AIBar.git` only on Linux when `--upgrade` is provided and MUST propagate subprocess exit status.
-- **REQ-077**: MUST execute `uv tool uninstall aibar` only on Linux when `--uninstall` is provided and MUST propagate subprocess exit status.
+- **REQ-077**: MUST execute `uv tool uninstall aibar` only on Linux when `--uninstall` is provided, MUST propagate subprocess exit status, and MUST delete `~/.cache/aibar/check_version_idle-time.json` and `~/.cache/aibar/`.
 - **REQ-088**: MUST NOT execute lifecycle `uv tool` subprocess commands for `--upgrade` or `--uninstall` on non-Linux operating systems.
 - **REQ-089**: MUST print explicit manual command guidance for the current non-Linux operating system when `--upgrade` or `--uninstall` is provided.
 - **REQ-078**: MUST print installed program version and exit when `--version` or `--ver` is provided.
@@ -246,9 +246,9 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-030**: MUST verify CLI `show` renders all provider panels with identical visible width in one execution, where the shared width equals the widest rendered panel content width, and reset lines contain no `⚠️` glyph suffix.
 - **TST-031**: MUST verify startup update preflight executes before invalid-argument diagnostics and before subcommand handlers run.
 - **TST-032**: MUST verify startup update idle-time gating skips HTTP calls until `idle_until` expires and resumes checks when the idle-state file is missing or expired.
-- **TST-033**: MUST verify successful startup update checks write `$HOME/.github_api_idle-time.aibar` with epoch and human-readable `last_success_at` and `idle_until`.
+- **TST-033**: MUST verify successful startup update checks create `~/.cache/aibar/` when missing and write `check_version_idle-time.json` with epoch and human-readable `last_success_at` and `idle_until`.
 - **TST-034**: MUST verify repeated startup update HTTP `429` responses compute idle-time using `max(300, max(retry-after values))`.
-- **TST-035**: MUST verify Linux `--upgrade` and `--uninstall` invoke required `uv tool` subprocess commands and propagate subprocess exit codes.
+- **TST-035**: MUST verify Linux `--upgrade` and `--uninstall` invoke required `uv tool` subprocess commands, propagate subprocess exit codes, and during `--uninstall` delete `~/.cache/aibar/check_version_idle-time.json` and `~/.cache/aibar/`.
 - **TST-041**: MUST verify non-Linux `--upgrade` and `--uninstall` skip lifecycle subprocess execution and print manual command guidance.
 - **TST-036**: MUST verify `--version` and `--ver` print installed version and bypass subcommand execution.
 - **TST-038**: MUST verify CLI text `show` renders `Updated: <datetime last update>, Next: <datetime next update>` with local-timezone `%Y-%m-%d %H:%M` formatting aligned to GNOME extension, suppresses statistics lines on `FAIL` provider/window states, and renders `HTTP status: <code>, Retry after: <seconds> sec.` when available.

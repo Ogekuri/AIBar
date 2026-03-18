@@ -90,6 +90,7 @@ _STARTUP_IDLE_STATE_LAST_SUCCESS_EPOCH_KEY = "last_success_at_epoch"
 _STARTUP_IDLE_STATE_LAST_SUCCESS_HUMAN_KEY = "last_success_at_human"
 _STARTUP_IDLE_STATE_IDLE_UNTIL_EPOCH_KEY = "idle_until_epoch"
 _STARTUP_IDLE_STATE_IDLE_UNTIL_HUMAN_KEY = "idle_until_human"
+_STARTUP_IDLE_STATE_FILENAME = "check_version_idle-time.json"
 _EXT_UUID = "aibar@aibar.panel"
 _EXT_TARGET_DIR = Path.home() / ".local" / "share" / "gnome-shell" / "extensions" / _EXT_UUID
 _UPGRADE_LIFECYCLE_COMMAND: list[str] = [
@@ -157,12 +158,11 @@ class StartupReleaseCheckResponse:
 def _startup_idle_state_path() -> Path:
     """
     @brief Resolve startup update idle-state JSON path.
-    @details Builds `$HOME/.github_api_idle-time.aibar` using the configured
-    program identifier. Path is user-scoped and outside project directories.
+    @details Builds `~/.cache/aibar/check_version_idle-time.json` in user scope.
     @return {Path} Absolute path for startup idle-state persistence.
     @satisfies CTN-013
     """
-    return Path.home() / f".github_api_idle-time.{_STARTUP_UPDATE_PROGRAM}"
+    return Path.home() / ".cache" / "aibar" / _STARTUP_IDLE_STATE_FILENAME
 
 
 def _startup_human_timestamp(epoch_seconds: int) -> str:
@@ -199,7 +199,7 @@ def _startup_parse_int(value: object, default: int = 0) -> int:
 def _load_startup_idle_state() -> dict[str, object] | None:
     """
     @brief Load startup update idle-state JSON from disk.
-    @details Reads `$HOME/.github_api_idle-time.aibar` and returns decoded JSON
+    @details Reads `~/.cache/aibar/check_version_idle-time.json` and returns decoded JSON
     object when valid. Corrupt, missing, or unreadable files normalize to None.
     @return {dict[str, object] | None} Parsed idle-state mapping or None.
     @satisfies CTN-013
@@ -243,7 +243,7 @@ def _save_startup_idle_state(last_success_epoch: int, idle_until_epoch: int) -> 
     @brief Persist startup update idle-state JSON.
     @details Writes epoch and UTC human-readable values for last successful
     startup release check and idle-disable-until timestamp to
-    `$HOME/.github_api_idle-time.aibar`.
+    `~/.cache/aibar/check_version_idle-time.json`.
     @param last_success_epoch {int} Last successful startup check epoch.
     @param idle_until_epoch {int} Startup idle gate expiry epoch.
     @return {None} Function return value.
@@ -267,6 +267,32 @@ def _save_startup_idle_state(last_success_epoch: int, idle_until_epoch: int) -> 
         json.dumps(state_payload, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+
+
+def _cleanup_startup_idle_state_artifacts() -> int:
+    """
+    @brief Remove startup update idle-state artifacts for Linux uninstall.
+    @details Deletes `~/.cache/aibar/check_version_idle-time.json` when present,
+    then removes `~/.cache/aibar/` recursively when present. Emits bright-red
+    diagnostics and returns non-zero on filesystem failures.
+    @return {int} Zero on success; one when cleanup fails.
+    @satisfies REQ-077
+    """
+    state_path = _startup_idle_state_path()
+    startup_cache_dir = state_path.parent
+    try:
+        if state_path.exists():
+            state_path.unlink()
+        if startup_cache_dir.exists():
+            shutil.rmtree(startup_cache_dir)
+    except OSError as exc:
+        _emit_startup_preflight_message(
+            message=f"Uninstall cleanup failed: {exc}.",
+            color_code=_ANSI_BRIGHT_RED,
+            err=True,
+        )
+        return 1
+    return 0
 
 
 def _emit_startup_preflight_message(message: str, color_code: str, err: bool = False) -> None:
@@ -583,9 +609,10 @@ def _handle_uninstall_option(
 ) -> None:
     """
     @brief Handle eager `--uninstall` lifecycle option callback.
-    @details Executes required lifecycle subprocess on Linux and exits with
-    propagated subprocess code; on non-Linux emits manual command guidance and
-    exits without subprocess execution.
+    @details Executes required lifecycle subprocess on Linux, cleans startup
+    idle-state artifacts under `~/.cache/aibar/`, and exits with propagated
+    subprocess code unless cleanup fails after successful subprocess execution.
+    On non-Linux emits manual command guidance and exits without subprocess execution.
     @param ctx {click.Context} Active Click context.
     @param param {click.Parameter} Option metadata (unused).
     @param value {bool} Parsed `--uninstall` flag value.
@@ -600,6 +627,9 @@ def _handle_uninstall_option(
         return
     if _is_linux_runtime():
         exit_code = _execute_lifecycle_subprocess(_UNINSTALL_LIFECYCLE_COMMAND)
+        cleanup_exit_code = _cleanup_startup_idle_state_artifacts()
+        if exit_code == 0 and cleanup_exit_code != 0:
+            exit_code = cleanup_exit_code
     else:
         exit_code = _emit_non_linux_lifecycle_guidance(
             option_name="--uninstall",
