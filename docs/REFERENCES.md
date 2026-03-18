@@ -340,7 +340,7 @@ from typing import Any
 
 ---
 
-# cli.py | Python | 3351L | 95 symbols | 30 imports | 108 comments
+# cli.py | Python | 3377L | 95 symbols | 30 imports | 108 comments
 > Path: `src/aibar/aibar/cli.py`
 - @brief Command-line interface for aibar.
 - @details Defines command parsing, provider dispatch, formatted output, setup helpers, login flows, and UI launch hooks.
@@ -1221,14 +1221,14 @@ providers other than Claude.
 - @return {Path} Absolute path to the extension source directory.
 - @satisfies REQ-025, REQ-083
 
-### fn `def gnome_install() -> None` (L3192-3276)
+### fn `def gnome_install() -> None` (L3192-3302)
 - @brief Install or update the AIBar GNOME Shell extension to the user's local extensions directory.
-- @details Resolves extension source from the installed package path, validates source directory contains `metadata.json` and is non-empty, creates target directory if absent, copies all extension files replacing existing ones, and enables the extension via `gnome-extensions enable`. Produces colored Click-styled terminal output for all status messages.
+- @details Resolves extension source from the installed package path, validates source directory contains `metadata.json` and is non-empty, then executes one of two flows: install flow (`target` absent) creates target and copies files before enabling extension; update flow (`target` present) disables extension, copies files, then enables extension. Update flow masks non-zero disable outcomes caused by missing extension and continues. Produces colored Click-styled terminal output for all status messages.
 - @return {None} Function return value.
 - @throws {SystemExit} Exits with code 1 on prerequisite validation failure.
-- @satisfies PRJ-008, REQ-025, REQ-026, REQ-027, REQ-028, REQ-029, REQ-030, REQ-032
+- @satisfies PRJ-008, REQ-025, REQ-026, REQ-027, REQ-028, REQ-029, REQ-030, REQ-032, REQ-099
 
-### fn `def gnome_uninstall() -> None` (L3286-3349)
+### fn `def gnome_uninstall() -> None` (L3312-3375)
 - @brief Remove the AIBar GNOME Shell extension from the user's local extensions directory.
 - @details Disables the extension via `gnome-extensions disable`, then removes the entire extension directory at `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/`. Exits with code 1 if the extension directory does not exist. Produces colored Click-styled terminal output for all status messages.
 - @return {None} Function return value.
@@ -1331,8 +1331,8 @@ providers other than Claude.
 |`_login_copilot`|fn|priv|3104-3131|def _login_copilot() -> None|
 |`_login_geminiai`|fn|priv|3132-3168|def _login_geminiai() -> None|
 |`_resolve_extension_source_dir`|fn|priv|3169-3181|def _resolve_extension_source_dir() -> Path|
-|`gnome_install`|fn|pub|3192-3276|def gnome_install() -> None|
-|`gnome_uninstall`|fn|pub|3286-3349|def gnome_uninstall() -> None|
+|`gnome_install`|fn|pub|3192-3302|def gnome_install() -> None|
+|`gnome_uninstall`|fn|pub|3312-3375|def gnome_uninstall() -> None|
 
 
 ---

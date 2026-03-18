@@ -3186,19 +3186,21 @@ def _resolve_extension_source_dir() -> Path:
         "Install or update the AIBar GNOME Shell extension.\n"
         "Copies extension files from the package source directory to "
         "~/.local/share/gnome-shell/extensions/aibar@aibar.panel/ "
-        "and enables the extension via gnome-extensions enable."
+        "using install/update flow semantics, then enables the extension."
     ),
 )
 def gnome_install() -> None:
     """
     @brief Install or update the AIBar GNOME Shell extension to the user's local extensions directory.
     @details Resolves extension source from the installed package path, validates source directory
-    contains `metadata.json` and is non-empty, creates target directory if absent, copies all
-    extension files replacing existing ones, and enables the extension via `gnome-extensions enable`.
+    contains `metadata.json` and is non-empty, then executes one of two flows:
+    install flow (`target` absent) creates target and copies files before enabling extension;
+    update flow (`target` present) disables extension, copies files, then enables extension.
+    Update flow masks non-zero disable outcomes caused by missing extension and continues.
     Produces colored Click-styled terminal output for all status messages.
     @return {None} Function return value.
     @throws {SystemExit} Exits with code 1 on prerequisite validation failure.
-    @satisfies PRJ-008, REQ-025, REQ-026, REQ-027, REQ-028, REQ-029, REQ-030, REQ-032
+    @satisfies PRJ-008, REQ-025, REQ-026, REQ-027, REQ-028, REQ-029, REQ-030, REQ-032, REQ-099
     """
     click.echo()
     click.echo(click.style("  AIBar GNOME Extension Installer", fg="blue", bold=True))
@@ -3222,22 +3224,46 @@ def gnome_install() -> None:
         + f"Source valid: {src_dir} ({len(source_files)} files)"
     )
 
-    click.echo(click.style("  [2/4] ", bold=True) + "Preparing target directory...")
+    click.echo(click.style("  [2/5] ", bold=True) + "Preparing target directory...")
     target_dir = _EXT_TARGET_DIR
-    if target_dir.is_dir():
-        click.echo(click.style("  [INFO] ", fg="cyan") + f"Target directory exists: {target_dir}")
+    is_update_mode = target_dir.is_dir()
+    if is_update_mode:
+        click.echo(click.style("  [INFO] ", fg="cyan") + f"Update mode: {target_dir}")
     else:
         os.makedirs(target_dir, exist_ok=True)
+        click.echo(click.style("  [INFO] ", fg="cyan") + f"Install mode: {target_dir}")
         click.echo(click.style("  [  OK] ", fg="green") + f"Created: {target_dir}")
 
-    click.echo(click.style("  [3/4] ", bold=True) + "Installing extension files...")
+    if is_update_mode:
+        click.echo(click.style("  [3/5] ", bold=True) + "Disabling extension for update...")
+        if shutil.which("gnome-extensions") is not None:
+            disable_result = subprocess.run(
+                ["gnome-extensions", "disable", _EXT_UUID],
+                capture_output=True,
+            )
+            if disable_result.returncode == 0:
+                click.echo(
+                    click.style("  [  OK] ", fg="green") + f"Extension disabled: {_EXT_UUID}"
+                )
+            else:
+                click.echo(
+                    click.style("  [INFO] ", fg="cyan")
+                    + "Disable returned non-zero; extension may be absent. Continuing update."
+                )
+        else:
+            click.echo(
+                click.style("  [WARN] ", fg="yellow")
+                + "gnome-extensions CLI not found; update proceeds without disable"
+            )
+
+    click.echo(click.style("  [4/5] ", bold=True) + "Installing extension files...")
     for src_file in source_files:
         shutil.copy2(str(src_file), str(target_dir / src_file.name))
     click.echo(
         click.style("  [  OK] ", fg="green") + f"Copied {len(source_files)} files to target"
     )
 
-    click.echo(click.style("  [4/4] ", bold=True) + "Enabling extension...")
+    click.echo(click.style("  [5/5] ", bold=True) + "Enabling extension...")
     if shutil.which("gnome-extensions") is not None:
         result = subprocess.run(
             ["gnome-extensions", "enable", _EXT_UUID],

@@ -4,7 +4,7 @@
 @details Validates extension source resolution from package location, source directory
 validation, file copy to target, extension enable/disable via subprocess, and non-zero
 exit on missing source or missing target directory.
-@satisfies TST-009, REQ-025, REQ-026, REQ-027, REQ-028, REQ-029, REQ-030, REQ-032, REQ-080, REQ-081, REQ-082
+@satisfies TST-009, REQ-025, REQ-026, REQ-027, REQ-028, REQ-029, REQ-030, REQ-032, REQ-099, REQ-080, REQ-081, REQ-082
 """
 
 import shutil
@@ -222,7 +222,7 @@ class TestGnomeInstallComposed:
 
     def test_enables_extension_via_gnome_extensions(self) -> None:
         """
-        @brief Verify gnome-install calls gnome-extensions enable after copy.
+        @brief Verify install-mode gnome-install calls gnome-extensions enable after copy.
         @satisfies REQ-032
         """
         runner = CliRunner()
@@ -250,6 +250,89 @@ class TestGnomeInstallComposed:
                 ["gnome-extensions", "enable", _EXT_UUID],
                 capture_output=True,
             )
+
+    def test_update_mode_executes_disable_copy_enable_order(self) -> None:
+        """
+        @brief Verify update-mode gnome-install performs disable -> copy -> enable order.
+        @satisfies REQ-032
+        @satisfies TST-009
+        """
+        runner = CliRunner()
+        operation_sequence: list[str] = []
+        original_copy2 = shutil.copy2
+
+        def tracking_run(args: list[str], capture_output: bool) -> mock.MagicMock:
+            operation_sequence.append(args[1])
+            return mock.MagicMock(returncode=0)
+
+        def tracking_copy2(src: str, dst: str) -> str:
+            operation_sequence.append("copy")
+            return original_copy2(src, dst)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            src_dir = Path(tmpdir) / "ext_src"
+            src_dir.mkdir()
+            (src_dir / "metadata.json").write_text('{"uuid": "test"}')
+            (src_dir / "extension.js").write_text("// ext")
+
+            target_dir = Path(tmpdir) / "target"
+            target_dir.mkdir()
+            (target_dir / "metadata.json").write_text('{"uuid": "old"}')
+
+            with (
+                mock.patch(
+                    "aibar.cli._resolve_extension_source_dir",
+                    return_value=src_dir,
+                ),
+                mock.patch("aibar.cli._EXT_TARGET_DIR", target_dir),
+                mock.patch("shutil.which", return_value="/usr/bin/gnome-extensions"),
+                mock.patch("subprocess.run", side_effect=tracking_run),
+                mock.patch("shutil.copy2", side_effect=tracking_copy2),
+            ):
+                result = runner.invoke(main, ["gnome-install"])
+
+            assert result.exit_code == 0, f"Unexpected exit: {result.output}"
+            assert operation_sequence[0] == "disable"
+            assert operation_sequence[-1] == "enable"
+            assert "copy" in operation_sequence[1:-1]
+
+    def test_update_mode_masks_missing_extension_disable_error_and_continues(self) -> None:
+        """
+        @brief Verify update-mode gnome-install masks missing-extension disable failures.
+        @details Simulates non-zero disable result, then verifies command continues to copy
+        files and execute enable path without exposing raw subprocess error text.
+        @satisfies REQ-099
+        @satisfies TST-009
+        """
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            src_dir = Path(tmpdir) / "ext_src"
+            src_dir.mkdir()
+            (src_dir / "metadata.json").write_text('{"uuid": "test"}')
+
+            target_dir = Path(tmpdir) / "target"
+            target_dir.mkdir()
+            (target_dir / "metadata.json").write_text('{"uuid": "old"}')
+
+            disable_result = mock.MagicMock(returncode=1, stderr=b"No such extension")
+            enable_result = mock.MagicMock(returncode=0)
+            with (
+                mock.patch(
+                    "aibar.cli._resolve_extension_source_dir",
+                    return_value=src_dir,
+                ),
+                mock.patch("aibar.cli._EXT_TARGET_DIR", target_dir),
+                mock.patch("shutil.which", return_value="/usr/bin/gnome-extensions"),
+                mock.patch("subprocess.run", side_effect=[disable_result, enable_result]) as mock_run,
+            ):
+                result = runner.invoke(main, ["gnome-install"])
+
+            assert result.exit_code == 0, f"Unexpected exit: {result.output}"
+            assert "Disable returned non-zero; extension may be absent. Continuing update." in result.output
+            assert "No such extension" not in result.output
+            assert mock_run.call_count == 2
+            assert mock_run.call_args_list[0].args[0] == ["gnome-extensions", "disable", _EXT_UUID]
+            assert mock_run.call_args_list[1].args[0] == ["gnome-extensions", "enable", _EXT_UUID]
 
     def test_colored_output_contains_status_markers(self) -> None:
         """

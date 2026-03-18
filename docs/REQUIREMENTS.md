@@ -87,7 +87,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **PRJ-005**: MUST maintain a machine-readable symbol inventory for repository code documentation under `docs/REFERENCES.md`.
 - **PRJ-006**: MUST provide a PEP 621-compliant `pyproject.toml` at repository root enabling `uv tool install` distribution execution and `uv run`/`uvx` live execution without external virtualenv bootstrap scripts.
 - **PRJ-007**: MUST document in `README.md` dedicated sections for `uv`-based requirements, installation/removal, `uv run`/`uvx` execution, and optional `requirements.txt` export command, plus GeminiAI prerequisites.
-- **PRJ-008**: MUST provide `aibar gnome-install` CLI command that installs or updates GNOME extension files from the installed package source directory to `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/` and enables the extension via `gnome-extensions enable`.
+- **PRJ-008**: MUST provide `aibar gnome-install` CLI command that detects install/update mode for `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/`, copies package extension files, disables extension before update copy, and enables extension after copy.
 - **PRJ-009**: MUST execute startup update checks and lifecycle flags `--upgrade`, `--uninstall`, `--version`, and `--ver` for program `aibar`.
 - **PRJ-010**: MUST package all runtime files required by `aibar` so local execution and `uv tool install` execution remain behaviorally equivalent.
 - **PRJ-011**: MUST keep GNOME extension contract documentation in `docs/REQUIREMENTS.md`, `docs/WORKFLOW.md`, and `docs/REFERENCES.md`; repository source tree MUST NOT contain `src/aibar/plans/Gnome.plan.md`.
@@ -153,7 +153,8 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-029**: MUST copy all files from the package extension source directory to target directory, replacing any existing files, in `gnome-install`.
 - **REQ-030**: MUST exit with non-zero status and descriptive error message when any prerequisite check fails in `gnome-install`.
 - **REQ-031**: `scripts/test-gnome-extension.sh` MUST launch only the nested GNOME Shell interface and MUST NOT invoke `aibar gnome-install` or any extension-update command.
-- **REQ-032**: MUST enable the extension via `gnome-extensions enable aibar@aibar.panel` after successful file copy in `gnome-install` with colored status output.
+- **REQ-032**: `gnome-install` MUST execute install and update flows with colored status output: install flow copies extension files then enables `aibar@aibar.panel`; update flow disables `aibar@aibar.panel`, copies files, then enables `aibar@aibar.panel`.
+- **REQ-099**: `gnome-install` update flow MUST mask non-zero disable outcomes caused by extension absence and continue copy/enable without exposing raw disable errors.
 - **REQ-033**: `scripts/test-gnome-extension.sh` MUST NOT accept any subcommand parameter; it MUST execute the nested-shell launch directly on invocation without arguments.
 - **REQ-034**: MUST render reset countdown as `Resets in: <d>d <h>h <m>m` for durations >= 24 hours in CLI text output.
 - **REQ-035**: MUST print `Remaining credits: <remaining> / <limit>` for Claude, Codex, and Copilot only when the rendered provider/window status is `OK` and both values exist in CLI text output.
@@ -231,7 +232,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-006**: MUST verify `req --here --references` reproduces `docs/REFERENCES.md` without missing symbol entries and preserves Doxygen field extraction for documented symbols.
 - **TST-007**: MUST verify GNOME panel status labels render in the REQ-021 order (including OpenAI cost), enforce provider style classes and color mapping, verify dynamic icon color/blink thresholds, render zero-cost labels with provider currency symbol, and omit unavailable labels when source metrics are unavailable.
 - **TST-008**: MUST verify `pyproject.toml` declares `[build-system]` with `hatchling`, `[project.scripts]` entry `aibar = "aibar.cli:main"`, `requires-python`, and `dependencies` list containing `pytest`.
-- **TST-009**: MUST verify `gnome-install` resolves extension source from package location, validates source directory, copies files to target, enables the extension, and exits non-zero on missing source; MUST verify `gnome-uninstall` removes extension directory, disables the extension, and exits non-zero when extension directory does not exist.
+- **TST-009**: MUST verify `gnome-install` resolves package source, validates source directory, branches install/update by target-directory presence, executes update disable→copy→enable ordering, masks extension-absence disable failures, and exits non-zero on missing source; MUST verify `gnome-uninstall` disables extension then removes directory and exits non-zero when directory is missing.
 - **TST-010**: MUST verify `Remaining credits: <remaining> / <limit>` appears for Claude, Codex, and Copilot only when corresponding provider/window status is `OK`.
 - **TST-011**: MUST verify every provider refresh failure updates provider-scoped idle-time using `idle_until = last_attempt_at + max(idle_delay_seconds, retry_after_seconds_or_0)`, including HTTP `429` and authentication failures without `retry_after` metadata.
 - **TST-013**: MUST verify `setup` prompts idle-delay first, API-call delay milliseconds second (default `100`), API-call timeout milliseconds third (default `3000`), `gnome_refresh_interval_seconds` fourth, `billing_data` fifth (default `billing_data`), then per-provider currency symbol prompts, and persists all values into `~/.config/aibar/config.json`.
@@ -353,7 +354,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | TST-019 | `tests/test_cli_cache_status_retention.py` + mixed-window assertions verify partial provider updates preserve unaffected windows and record per-window status granularity. |
 | TST-020 | `tests/test_cli_cache_status_retention.py` + file-system assertions verify no read/write path targets `~/.cache/aibar/claude_dual_last_success.json`. |
 | TST-016 | `tests/test_cli_provider_throttle.py` + refresh timing assertions verify configured inter-call delay and default `20`-second fallback. |
-| PRJ-008 | `src/aibar/aibar/cli.py` + `gnome_install` command + copies extension files from package source to `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/` + enables extension via `gnome-extensions enable`. |
+| PRJ-008 | `src/aibar/aibar/cli.py` + `gnome_install` command + install/update mode detection using target-directory presence, file copy from package source, update-path disable before copy, and post-copy enable. |
 | REQ-025 | `src/aibar/aibar/cli.py` + `_resolve_extension_source_dir` + `Path(__file__).resolve().parent / "gnome-extension" / _EXT_UUID` module-relative path resolution for extension source directory. |
 | REQ-083 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/` subtree inside `aibar` package + `pyproject.toml` wheel `packages = ["src/aibar/aibar"]` auto-includes gnome-extension in wheel build. |
 | REQ-026 | `src/aibar/aibar/cli.py` + `gnome_install` + `os.makedirs` for target directory creation. |
@@ -362,12 +363,13 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-029 | `src/aibar/aibar/cli.py` + `gnome_install` + `shutil.copy2` copies files from package source to target directory replacing existing files. |
 | REQ-030 | `src/aibar/aibar/cli.py` + `gnome_install` + `sys.exit(1)` on prerequisite failure with descriptive error message. |
 | REQ-031 | `scripts/test-gnome-extension.sh` + launches nested-shell UI directly and contains no `aibar gnome-install` invocation. |
-| REQ-032 | `src/aibar/aibar/cli.py` + `gnome_install` + `subprocess.run(["gnome-extensions", "enable", "aibar@aibar.panel"])` after file copy with colored status output. |
+| REQ-032 | `src/aibar/aibar/cli.py` + `gnome_install` + install/update branch execution with install copy→enable and update disable→copy→enable ordering plus colored status output. |
+| REQ-099 | `src/aibar/aibar/cli.py` + `gnome_install` update path + non-zero disable outcomes from missing extension treated as masked warnings and flow continues to copy/enable. |
 | REQ-033 | `scripts/test-gnome-extension.sh` + no subcommand parameter; executes nested-shell launch directly on invocation. |
 | REQ-080 | `src/aibar/aibar/cli.py` + `gnome_uninstall` + `subprocess.run(["gnome-extensions", "disable", "aibar@aibar.panel"])` before removal with colored status output. |
 | REQ-081 | `src/aibar/aibar/cli.py` + `gnome_uninstall` + `shutil.rmtree` removes extension directory and all contents. |
 | REQ-082 | `src/aibar/aibar/cli.py` + `gnome_uninstall` + `sys.exit(1)` when extension directory does not exist with descriptive error message. |
-| TST-009 | `tests/test_gnome_install_uninstall.py` + `gnome-install` source resolution, validation, copy, enable assertions; `gnome-uninstall` removal, disable, missing-directory exit code assertions. |
+| TST-009 | `tests/test_gnome_install_uninstall.py` + `gnome-install` install/update branch, update disable→copy→enable ordering, and masked-missing-extension disable assertions; `gnome-uninstall` disable-before-remove and missing-directory exit assertions. |
 | TST-021 | `tests/test_claude_retry_and_cli_cache.py` + `TestClaudeRetryOn429::test_retries_on_429_then_succeeds` and `TestFetchAllWindows::test_single_call_returns_both_windows` + metric-value assertions on parsed HTTP responses removed; assertions restricted to `is_error` state, window key presence in results dict, and `mock_get.call_count`. |
 | REQ-048 | `scripts/claude_token_refresh.sh` + `do_refresh()` + `> "$LOG_FILE"` truncation statement before first `log` call. |
 | TST-022 | `tests/test_claude_token_refresh_script.py` + source-level assertion that `do_refresh()` body contains `LOG_FILE` truncation before any `log` invocation. |

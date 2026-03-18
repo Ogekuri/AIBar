@@ -233,10 +233,16 @@
         - `GeminiAICredentialStore.authorize_interactively(...)`: browser authorization + token persistence using `GEMINIAI_OAUTH_SCOPES` (`bigquery.readonly`, `monitoring.read`, `cloud-platform`) [`src/aibar/aibar/providers/geminiai.py`]
     - `gnome_install(...)`: GNOME extension install/update route [`src/aibar/aibar/cli.py`]
       - `_resolve_extension_source_dir(...)`: package-relative source directory resolution [`src/aibar/aibar/cli.py`]
-        - External boundary: `shutil.copy2` for file copy.
-        - External boundary: `os.makedirs` for target directory creation.
-        - External boundary: `gnome-extensions enable` for extension activation.
+      - install/update branch resolution using target-directory presence:
+        - install path: create target when missing -> copy files -> enable extension.
+        - update path: disable extension -> copy files -> enable extension.
+        - update disable failures caused by missing extension are masked as non-fatal status and flow continues.
+      - External boundary: `os.makedirs` for target directory creation.
+      - External boundary: `shutil.copy2` for file copy.
+      - External boundary: `gnome-extensions disable` for update-path pre-copy deactivation.
+      - External boundary: `gnome-extensions enable` for post-copy activation.
     - `gnome_uninstall(...)`: GNOME extension removal route [`src/aibar/aibar/cli.py`]
+      - ordered flow: disable extension first, then remove extension directory.
       - External boundary: `gnome-extensions disable` for extension deactivation.
       - External boundary: `shutil.rmtree` for extension directory removal.
   - `__main__` module: `python -m aibar` entrypoint, delegates to `main(...)` [`src/aibar/aibar/__main__.py`]
