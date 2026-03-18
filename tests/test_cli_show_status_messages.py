@@ -215,8 +215,8 @@ def test_show_renders_cached_failure_error_only_with_retry_metadata(
     result = runner.invoke(main, ["show", "--provider", "openrouter", "--window", "7d"])
     assert result.exit_code == 0
     assert "Status: FAIL" in result.output
-    assert "Window: 30d" in result.output
-    assert "Window: 7d" not in result.output
+    assert "Window 30d:" in result.output
+    assert "Window 7d:" not in result.output
     assert "Error: Invalid or expired OAuth token" in result.output
     assert "HTTP status: 401, Retry after: 300 sec." in result.output
     assert "Cost:" not in result.output
@@ -307,8 +307,8 @@ def test_show_dual_window_cached_fail_status_renders_fail_only_blocks(
     assert result.output.count("Status: FAIL") == 1
     assert "Status: OK" not in result.output
     assert result.output.count("Error: Invalid or expired OAuth token") == 1
-    assert "5h:" in result.output
-    assert "7d:" in result.output
+    assert "Window 5h:" in result.output
+    assert "Window 7d:" in result.output
     assert "Window: 5h" not in result.output
     assert "Window: 7d" not in result.output
     assert "Usage:" not in result.output
@@ -319,7 +319,12 @@ def test_show_dual_window_cached_fail_status_renders_fail_only_blocks(
     assert "Resets in:" not in result.output
     status_idx = result.output.index("Status: FAIL")
     updated_idx = result.output.index("Updated:")
-    assert status_idx < result.output.index("5h:") < result.output.index("7d:") < updated_idx
+    assert (
+        status_idx
+        < result.output.index("Window 5h:")
+        < result.output.index("Window 7d:")
+        < updated_idx
+    )
 
 
 def test_build_result_panel_renders_zero_api_counters_for_null_metrics() -> None:

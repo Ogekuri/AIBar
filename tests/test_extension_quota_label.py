@@ -78,6 +78,23 @@ def test_quota_providers_use_30d_window_bar_with_reset_before_credits() -> None:
     assert "card.sevenDayBar.container.hide();" in source
 
 
+def test_provider_card_cost_rows_use_costs_prefix_style_parity_and_no_empty_row() -> None:
+    """
+    @brief Verify extension card cost rows use `Costs:` style parity and hide empty spacer rows.
+    @details Asserts provider-card costs render `Costs:` with non-bold values using the same
+    `aibar-stat` label class style family as `Remaining credits`, and asserts empty `BYOK` rows
+    are hidden so OpenRouter/OpenAI/GeminiAI cards do not leave a blank row after `Costs:`.
+    @satisfies REQ-017
+    @satisfies TST-004
+    """
+    source = EXTENSION_PATH.read_text(encoding="utf-8")
+    assert "let costLabel = new St.Label({style_class: 'aibar-stat'});" in source
+    assert "`Costs: ${_escapeMarkup(costText)} / ${_escapeMarkup(limitText)}`" in source
+    assert "`Costs: ${_escapeMarkup(costText)}`" in source
+    assert "_boldWhiteMarkup(costText)" not in source
+    assert "card.byokLabel.hide();" in source
+
+
 def test_popup_labels_use_aibar_brand_casing() -> None:
     """
     @brief Verify popup label strings use AIBar casing.

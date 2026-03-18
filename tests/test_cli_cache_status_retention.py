@@ -343,7 +343,7 @@ def test_geminiai_cached_fail_status_is_rendered_in_show_output(
     runner = CliRunner()
     result = runner.invoke(main, ["show", "--provider", "geminiai", "--window", "7d"])
     assert result.exit_code == 0
-    assert "Window: 30d" in result.output
+    assert "Window 30d:" in result.output
     assert "Error: GeminiAI billing export table was not found in dataset 'billing_data'." in result.output
 
 

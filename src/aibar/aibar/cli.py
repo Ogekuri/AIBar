@@ -2399,6 +2399,32 @@ def _ansi_ljust(value: str, width: int) -> str:
     return value + (" " * max(0, width - _visible_text_length(value)))
 
 
+def _ansi_rjust(value: str, width: int) -> str:
+    """
+    @brief Right-pad ANSI-colored text to one visible width.
+    @details Prefixes leading spaces using visible-length semantics so rows that
+    include ANSI escapes align right to panel content width deterministically.
+    @param value {str} Source text rendered inside one panel cell.
+    @param width {int} Target visible width for the panel cell.
+    @return {str} Right-aligned terminal text preserving ANSI sequences.
+    @satisfies REQ-067
+    """
+    return (" " * max(0, width - _visible_text_length(value))) + value
+
+
+def _is_right_aligned_panel_line(value: str) -> bool:
+    """
+    @brief Determine whether one panel body line must render right-aligned.
+    @details Marks freshness rows (`Updated: ..., Next: ...`) for right-aligned
+    rendering while all other body rows remain left-aligned.
+    @param value {str} Panel body line candidate.
+    @return {bool} True when line requires right alignment.
+    @satisfies REQ-067
+    @satisfies REQ-084
+    """
+    return value.startswith("Updated: ")
+
+
 def _format_bright_white_bold(value: str) -> str:
     """
     @brief Wrap one metric value with bright-white bold ANSI style.
@@ -2507,9 +2533,14 @@ def _emit_provider_panel(
     )
     click.echo(f"{color_code}├{horizontal_border}┤{_ANSI_RESET}")
     for body_line in wrapped_lines:
+        padded_line = (
+            _ansi_rjust(body_line, panel_content_width)
+            if _is_right_aligned_panel_line(body_line)
+            else _ansi_ljust(body_line, panel_content_width)
+        )
         click.echo(
             f"{color_code}│{_ANSI_RESET} "
-            f"{_ansi_ljust(body_line, panel_content_width)} "
+            f"{padded_line} "
             f"{color_code}│{_ANSI_RESET}"
         )
     click.echo(f"{color_code}└{horizontal_border}┘{_ANSI_RESET}")
@@ -2571,7 +2602,7 @@ def _build_result_panel(
 
     status_line = f"Status: {'FAIL' if result.is_error else 'OK'}"
     freshness_line = _build_freshness_line(result=result, freshness_state=freshness_state)
-    detail_lines: list[str] = [f"Window: {window_label}"]
+    detail_lines: list[str] = [f"Window {window_label}:"]
     if result.is_error:
         detail_lines.append(f"Error: {result.error}")
         status_retry_line = _format_http_status_retry_line(
@@ -2726,7 +2757,7 @@ def _build_dual_window_panel(
         if line
         and not line.startswith("Status: ")
         and not line.startswith("Updated: ")
-        and not line.startswith("Window: ")
+        and not line.startswith("Window ")
     ]
     details_7d = [
         line
@@ -2734,7 +2765,7 @@ def _build_dual_window_panel(
         if line
         and not line.startswith("Status: ")
         and not line.startswith("Updated: ")
-        and not line.startswith("Window: ")
+        and not line.startswith("Window ")
     ]
     metric_prefixes = ("Cost: ", "Requests: ", "Tokens: ")
     remaining_prefix = "Remaining credits: "
@@ -2775,7 +2806,7 @@ def _build_dual_window_panel(
     if shared_lines:
         body_lines.extend(shared_lines)
         body_lines.append("")
-    body_lines.extend(["5h:", *section_5h, "", "7d:", *section_7d])
+    body_lines.extend(["Window 5h:", *section_5h, "", "Window 7d:", *section_7d])
     if shared_remaining_line is not None:
         body_lines.extend(["", shared_remaining_line])
     if footer_lines:

@@ -797,7 +797,7 @@ class AIBarIndicator extends PanelMenu.Button {
             style_class: 'aibar-stats',
         });
 
-        let costLabel = new St.Label({style_class: 'aibar-cost'});
+        let costLabel = new St.Label({style_class: 'aibar-stat'});
         costLabel.clutter_text.set_use_markup(true);
         let byokLabel = new St.Label({style_class: 'aibar-stat'});
         byokLabel.clutter_text.set_use_markup(true);
@@ -921,10 +921,15 @@ class AIBarIndicator extends PanelMenu.Button {
             card.errorLabel.text = errorLines.join('\n');
             card.errorLabel.show();
             card.costLabel.text = '';
+            card.costLabel.hide();
             card.byokLabel.text = '';
+            card.byokLabel.hide();
             card.requestsLabel.text = '';
+            card.requestsLabel.hide();
             card.tokensLabel.text = '';
+            card.tokensLabel.hide();
             card.resetsLabel.text = '';
+            card.resetsLabel.hide();
             card.progressFill.style_class = 'aibar-progress-fill aibar-progress-danger';
             card.progressFill.set_width(0);
             card.progressLabel.text = '';
@@ -1104,13 +1109,15 @@ class AIBarIndicator extends PanelMenu.Button {
             if (providerName === 'openrouter' && metrics.limit !== null && metrics.limit !== undefined) {
                 const limitText = `${currencySymbol}${metrics.limit.toFixed(2)}`;
                 card.costLabel.clutter_text.set_markup(
-                    `Cost: ${_boldWhiteMarkup(costText)} / ${_boldWhiteMarkup(limitText)}`
+                    `Costs: ${_escapeMarkup(costText)} / ${_escapeMarkup(limitText)}`
                 );
             } else {
-                card.costLabel.clutter_text.set_markup(`Cost: ${_boldWhiteMarkup(costText)}`);
+                card.costLabel.clutter_text.set_markup(`Costs: ${_escapeMarkup(costText)}`);
             }
+            card.costLabel.show();
         } else {
             card.costLabel.text = '';
+            card.costLabel.hide();
         }
 
         const shouldRenderRemainingCredits = (
@@ -1127,6 +1134,7 @@ class AIBarIndicator extends PanelMenu.Button {
             card.byokLabel.clutter_text.set_markup(
                 `Remaining credits: ${_boldWhiteMarkup(remainingText)} / ${_escapeMarkup(limitText)}`
             );
+            card.byokLabel.show();
         } else if (providerName === 'openrouter' && raw.data) {
             let byokValue = null;
             if (data.window === '5h')
@@ -1139,11 +1147,14 @@ class AIBarIndicator extends PanelMenu.Button {
             if (byokValue !== null && byokValue !== undefined && byokValue > 0) {
                 const byokCurrency = metrics.currency_symbol || '$';
                 card.byokLabel.text = `BYOK: ${byokCurrency}${byokValue.toFixed(4)}`;
+                card.byokLabel.show();
             } else {
                 card.byokLabel.text = '';
+                card.byokLabel.hide();
             }
         } else {
             card.byokLabel.text = '';
+            card.byokLabel.hide();
         }
 
         const shouldRenderApiCounters = _providerSupportsApiCounters(providerName);
@@ -1173,6 +1184,8 @@ class AIBarIndicator extends PanelMenu.Button {
                 `Tokens: ${totalTokens.toLocaleString()} `
                 + `(${inputTokens.toLocaleString()} in / ${outputTokens.toLocaleString()} out)`
             );
+            card.requestsLabel.show();
+            card.tokensLabel.show();
         } else {
             if (metrics.requests !== null && metrics.requests !== undefined)
                 card.requestsLabel.text = `Requests: ${metrics.requests.toLocaleString()}`;
@@ -1187,6 +1200,14 @@ class AIBarIndicator extends PanelMenu.Button {
             } else {
                 card.tokensLabel.text = '';
             }
+            if (card.requestsLabel.text.length > 0)
+                card.requestsLabel.show();
+            else
+                card.requestsLabel.hide();
+            if (card.tokensLabel.text.length > 0)
+                card.tokensLabel.show();
+            else
+                card.tokensLabel.hide();
         }
 
         if (metrics.reset_at) {
@@ -1206,6 +1227,12 @@ class AIBarIndicator extends PanelMenu.Button {
             }
         } else {
             card.resetsLabel.text = '';
+        }
+        if (!hasWindowBars) {
+            if (card.resetsLabel.text.length > 0)
+                card.resetsLabel.show();
+            else
+                card.resetsLabel.hide();
         }
 
     }

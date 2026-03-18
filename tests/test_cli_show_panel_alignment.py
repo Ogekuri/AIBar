@@ -57,7 +57,7 @@ def _extract_panel_titles_and_bodies(output: str) -> list[tuple[str, list[str]]]
             if row.startswith("└") and row.endswith("┘"):
                 break
             if row.startswith("│") and row.endswith("│"):
-                body.append(row[1:-1].strip())
+                body.append(row[2:-2])
             index += 1
         panels.append((title, body))
         index += 1
@@ -70,16 +70,17 @@ def _assert_status_and_freshness_layout(body_lines: list[str]) -> None:
     @param body_lines {list[str]} Parsed panel body lines.
     @return {None} Function return value.
     """
-    non_empty_indexes = [idx for idx, value in enumerate(body_lines) if value]
+    non_empty_indexes = [idx for idx, value in enumerate(body_lines) if value.strip()]
     assert non_empty_indexes
     first_index = non_empty_indexes[0]
     last_index = non_empty_indexes[-1]
     assert body_lines[first_index].startswith("Status:")
-    assert body_lines[last_index].startswith("Updated:")
+    assert body_lines[last_index].lstrip().startswith("Updated:")
+    assert body_lines[last_index] == body_lines[last_index].rstrip()
     assert first_index + 1 < len(body_lines)
-    assert body_lines[first_index + 1] == ""
+    assert body_lines[first_index + 1].strip() == ""
     assert last_index > 0
-    assert body_lines[last_index - 1] == ""
+    assert body_lines[last_index - 1].strip() == ""
 
 
 def test_print_result_keeps_panel_rows_aligned_with_colored_progress_bar(capsys) -> None:
@@ -285,28 +286,32 @@ def test_show_default_window_groups_dual_windows_into_one_panel_per_provider(
     assert "CLAUDE (7d)" not in result.output
     assert "CODEX (5h)" not in result.output
     assert "CODEX (7d)" not in result.output
-    assert result.output.count("5h:") == 2
-    assert result.output.count("7d:") == 2
+    assert result.output.count("Window 5h:") == 2
+    assert result.output.count("Window 7d:") == 2
     assert result.output.count("Updated:") == 2
     for _title, body_lines in panel_data:
         _assert_status_and_freshness_layout(body_lines)
-        assert not any(line.startswith("Window:") for line in body_lines)
-        assert "5h:" in body_lines
-        assert "7d:" in body_lines
-        idx_5h = body_lines.index("5h:")
-        idx_7d = body_lines.index("7d:")
+        normalized_lines = [line.strip() for line in body_lines]
+        assert not any(line.startswith("Window:") for line in normalized_lines)
+        assert "Window 5h:" in normalized_lines
+        assert "Window 7d:" in normalized_lines
+        idx_5h = normalized_lines.index("Window 5h:")
+        idx_7d = normalized_lines.index("Window 7d:")
         assert idx_7d > idx_5h
-        assert body_lines[idx_7d - 1] == ""
+        assert normalized_lines[idx_7d - 1] == ""
 
     codex_body = panel_data[1][1]
-    idx_7d = codex_body.index("7d:")
-    idx_cost = next(idx for idx, line in enumerate(codex_body) if line.startswith("Cost:"))
+    normalized_codex_body = [line.strip() for line in codex_body]
+    idx_7d = normalized_codex_body.index("Window 7d:")
+    idx_cost = next(idx for idx, line in enumerate(normalized_codex_body) if line.startswith("Cost:"))
     idx_requests = next(
-        idx for idx, line in enumerate(codex_body) if line.startswith("Requests:")
+        idx for idx, line in enumerate(normalized_codex_body) if line.startswith("Requests:")
     )
-    idx_tokens = next(idx for idx, line in enumerate(codex_body) if line.startswith("Tokens:"))
+    idx_tokens = next(
+        idx for idx, line in enumerate(normalized_codex_body) if line.startswith("Tokens:")
+    )
     assert idx_cost > idx_7d
-    assert codex_body[idx_cost - 1] == ""
+    assert normalized_codex_body[idx_cost - 1] == ""
     assert idx_7d < idx_cost < idx_requests < idx_tokens
 
 
