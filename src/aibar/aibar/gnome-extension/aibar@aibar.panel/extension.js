@@ -724,14 +724,14 @@ class AIBarIndicator extends PanelMenu.Button {
 
         let updateAtRow = new St.BoxLayout({
             vertical: false,
-            x_expand: true,
-            x_align: Clutter.ActorAlign.START,
+            x_expand: false,
+            x_align: Clutter.ActorAlign.END,
             style_class: 'aibar-update-at-row',
         });
 
         let updateAtLabel = new St.Label({
             text: '',
-            x_align: Clutter.ActorAlign.START,
+            x_align: Clutter.ActorAlign.END,
             style_class: 'aibar-reset-label aibar-update-at-label',
         });
 

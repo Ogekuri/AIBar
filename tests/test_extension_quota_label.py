@@ -122,13 +122,13 @@ def test_refresh_now_popup_action_executes_forced_cli_refresh() -> None:
     assert "commandArgs.push('--force');" in source
 
 
-def test_provider_card_renders_update_at_label_bottom_left_from_freshness() -> None:
+def test_provider_card_renders_update_at_label_bottom_right_from_freshness() -> None:
     """
-    @brief Verify provider card contains bottom-left Updated/Next label sourced from `freshness` timestamps.
+    @brief Verify provider card contains bottom-right Updated/Next label sourced from `freshness` timestamps.
     @details Asserts extension source creates an `updateAtLabel` in the card and populates
     it from `json.freshness.<provider>.last_success_timestamp` and
     `json.freshness.<provider>.idle_until_timestamp` using runtime local-time `%Y-%m-%d %H:%M`
-    output as `Updated: <YYYY-MM-DD HH:MM>, Next: <YYYY-MM-DD HH:MM>`, with left-aligned row layout.
+    output as `Updated: <YYYY-MM-DD HH:MM>, Next: <YYYY-MM-DD HH:MM>`, with right-aligned row layout.
     @satisfies REQ-017
     @satisfies TST-004
     """
@@ -150,7 +150,7 @@ def test_provider_card_renders_update_at_label_bottom_left_from_freshness() -> N
     assert "if (freshnessState" in source
     assert source.index("if (freshnessState") < source.index("if (isError)")
     assert "style_class: 'aibar-reset-label aibar-update-at-label'" in source
-    assert "x_align: Clutter.ActorAlign.START" in source
+    assert "x_align: Clutter.ActorAlign.END" in source
     assert "updateAtRow.add_child(updateAtLabel);" in source
 
 
