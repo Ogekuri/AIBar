@@ -70,15 +70,12 @@
   - main script body: direct execution [`scripts/test-gnome-extension.sh`]
 - `Lifecycle/Trigger`
   - Starts when user invokes `scripts/test-gnome-extension.sh` (no arguments required).
-  - Invokes `aibar gnome-install` (`PROC:main`) to update and enable extension files, then launches nested shell.
+  - Launches nested shell directly without extension-update subprocesses.
 - `Internal Call-Trace Tree`
   - main script body: direct execution [`scripts/test-gnome-extension.sh`]
-    - `update_extension(...)`: invokes `aibar gnome-install` to update and enable extension files [`scripts/test-gnome-extension.sh`]
-      - External boundary: subprocess call to `aibar gnome-install` (`PROC:main`).
     - nested shell launch: `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800 dbus-run-session -- gnome-shell --nested --wayland` [`scripts/test-gnome-extension.sh`]
       - External boundary: `dbus-run-session -- gnome-shell --nested --wayland`.
 - `External Boundaries`
-  - `aibar` CLI for extension installation.
   - `dbus-run-session` and `gnome-shell` for nested shell.
 
 ### PROC:main
@@ -354,15 +351,6 @@
   - `endpoint_or_channel: argv [uv, run, --project, <repo-root>, python, -m, aibar.cli, ...]`
   - `payload_data_shape: forwarded CLI argv tokens and inherited environment`
   - `declaration_files: scripts/aibar.sh, src/aibar/aibar/cli.py`
-
-- `id: EDGE-004`
-  - `source: PROC:test-ext`
-  - `destination: PROC:main`
-  - `direction: request-response`
-  - `mechanism: subprocess invocation`
-  - `endpoint_or_channel: aibar gnome-install CLI command execution`
-  - `payload_data_shape: no structured payload; exit code signals success/failure`
-  - `declaration_files: scripts/test-gnome-extension.sh, src/aibar/aibar/cli.py`
 
 - `id: EDGE-001`
   - `source: PROC:gnome-shell`

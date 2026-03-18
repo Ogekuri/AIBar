@@ -70,21 +70,8 @@
 
 ---
 
-# test-gnome-extension.sh | Shell | 27L | 1 symbols | 0 imports | 13 comments
+# test-gnome-extension.sh | Shell | 13L | 0 symbols | 0 imports | 8 comments
 > Path: `scripts/test-gnome-extension.sh`
-
-## Definitions
-
-- fn `update_extension() {` (L17)
-- @brief Runs the extension installer CLI command to update extension files.
-- @details Invokes `aibar gnome-install` to copy extension files and enable the extension.
-Exits with non-zero status if the command fails.
-- @return Exit 0 on success; propagates CLI exit code on failure.
-- @satisfies REQ-031
-## Symbol Index
-|Symbol|Kind|Vis|Lines|Sig|
-|---|---|---|---|---|
-|`update_extension`|fn||17|update_extension()|
 
 
 ---
