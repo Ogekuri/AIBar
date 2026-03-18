@@ -8,6 +8,7 @@ surfaces cached authentication/rate-limit status failures in text output.
 @satisfies TST-038
 """
 
+import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -94,6 +95,63 @@ def test_show_renders_updated_next_datetime_from_idle_time_state(
         f"Next: {idle_until.astimezone().strftime('%Y-%m-%d %H:%M')}"
     )
     assert expected_freshness_line in result.output
+
+
+def test_show_json_exports_freshness_with_local_datetime_parity(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """
+    @brief Verify CLI `show --json` exports `freshness` aligned to text freshness values.
+    @details Uses deterministic idle-time timestamps and asserts `freshness` entries
+    include provider timestamps plus local-time `%Y-%m-%d %H:%M` strings.
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @param tmp_path {Path} Temporary path fixture.
+    @return {None} Function return value.
+    @satisfies REQ-084
+    @satisfies TST-038
+    """
+    _patch_config_paths(monkeypatch, tmp_path)
+    payload_updated_at = datetime(2026, 3, 17, 8, 0, tzinfo=timezone.utc)
+    idle_last_success = datetime(2026, 3, 18, 8, 58, tzinfo=timezone.utc)
+    idle_until = datetime(2026, 3, 18, 8, 59, tzinfo=timezone.utc)
+    result_payload = ProviderResult(
+        provider=ProviderName.OPENAI,
+        window=WindowPeriod.DAY_7,
+        metrics=UsageMetrics(cost=1.25),
+        updated_at=payload_updated_at,
+        raw={"status_code": 200},
+    )
+    provider = MagicMock()
+    provider.is_configured.return_value = True
+    monkeypatch.setattr(
+        "aibar.cli.get_providers",
+        lambda: {ProviderName.OPENAI: provider},
+    )
+    idle_time_state = config_module.build_idle_time_state(
+        last_success_at=idle_last_success,
+        idle_until=idle_until,
+    )
+    monkeypatch.setattr(
+        "aibar.cli.retrieve_results_via_cache_pipeline",
+        lambda **_: RetrievalPipelineOutput(
+            payload={},
+            results={ProviderName.OPENAI.value: result_payload},
+            idle_time_by_provider={ProviderName.OPENAI.value: idle_time_state},
+            idle_active=False,
+            cache_available=True,
+        ),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["show", "--provider", "openai", "--window", "7d", "--json"])
+    assert result.exit_code == 0
+    output_doc = json.loads(result.output)
+    freshness_entry = output_doc["freshness"][ProviderName.OPENAI.value]
+    assert freshness_entry["last_success_timestamp"] == idle_time_state.last_success_timestamp
+    assert freshness_entry["idle_until_timestamp"] == idle_time_state.idle_until_timestamp
+    assert freshness_entry["last_success_local"] == idle_last_success.astimezone().strftime("%Y-%m-%d %H:%M")
+    assert freshness_entry["idle_until_local"] == idle_until.astimezone().strftime("%Y-%m-%d %H:%M")
 
 
 def test_show_renders_cached_failure_error_only_with_retry_metadata(

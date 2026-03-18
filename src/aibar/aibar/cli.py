@@ -67,6 +67,7 @@ _RESET_PENDING_MESSAGE = "Starts when the first message is sent"
 _CACHE_PAYLOAD_SECTION_KEY = "payload"
 _CACHE_STATUS_SECTION_KEY = "status"
 _CACHE_IDLE_TIME_SECTION_KEY = "idle_time"
+_CACHE_FRESHNESS_SECTION_KEY = "freshness"
 _CACHE_EXTENSION_SECTION_KEY = "extension"
 _ATTEMPT_RESULT_OK = "OK"
 _ATTEMPT_RESULT_FAIL = "FAIL"
@@ -1157,6 +1158,31 @@ def _serialize_idle_time_state(
     }
 
 
+def _serialize_freshness_state(
+    idle_time_by_provider: dict[str, IdleTimeState],
+) -> dict[str, dict[str, object]]:
+    """
+    @brief Serialize provider-keyed freshness data for `show --json`.
+    @details Projects idle-time timestamps into GNOME-aligned `freshness` entries and
+    emits local-time `%Y-%m-%d %H:%M` strings for direct parity checks.
+    @param idle_time_by_provider {dict[str, IdleTimeState]} Provider idle-time map.
+    @return {dict[str, dict[str, object]]} JSON-safe provider freshness section.
+    @satisfies REQ-003
+    @satisfies REQ-084
+    """
+    freshness: dict[str, dict[str, object]] = {}
+    for provider_key, state in idle_time_by_provider.items():
+        updated_at_utc = _epoch_to_utc_datetime(state.last_success_timestamp)
+        next_update_utc = _epoch_to_utc_datetime(state.idle_until_timestamp)
+        freshness[provider_key] = {
+            "last_success_timestamp": state.last_success_timestamp,
+            "idle_until_timestamp": state.idle_until_timestamp,
+            "last_success_local": _format_local_datetime(updated_at_utc),
+            "idle_until_local": _format_local_datetime(next_update_utc),
+        }
+    return freshness
+
+
 def _project_cached_window(
     result: ProviderResult,
     target_window: WindowPeriod,
@@ -2103,17 +2129,26 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
         force_refresh=force_refresh,
         providers=providers,
     )
+    runtime_cfg = load_runtime_config()
     if retrieval.idle_active and not retrieval.cache_available:
         if output_json:
-            click.echo(json.dumps(_empty_cache_document(), indent=2))
+            output_doc = _empty_cache_document()
+            output_doc[_CACHE_IDLE_TIME_SECTION_KEY] = {}
+            output_doc[_CACHE_FRESHNESS_SECTION_KEY] = {}
+            output_doc[_CACHE_EXTENSION_SECTION_KEY] = {
+                "gnome_refresh_interval_seconds": runtime_cfg.gnome_refresh_interval_seconds,
+            }
+            click.echo(json.dumps(output_doc, indent=2))
         else:
             click.echo("Cache unavailable while idle-time is active.")
         return
 
-    runtime_cfg = load_runtime_config()
     if output_json:
         output_doc = dict(retrieval.payload)
         output_doc[_CACHE_IDLE_TIME_SECTION_KEY] = _serialize_idle_time_state(
+            retrieval.idle_time_by_provider
+        )
+        output_doc[_CACHE_FRESHNESS_SECTION_KEY] = _serialize_freshness_state(
             retrieval.idle_time_by_provider
         )
         output_doc[_CACHE_EXTENSION_SECTION_KEY] = {

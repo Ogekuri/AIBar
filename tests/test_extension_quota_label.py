@@ -122,13 +122,13 @@ def test_refresh_now_popup_action_executes_forced_cli_refresh() -> None:
     assert "commandArgs.push('--force');" in source
 
 
-def test_provider_card_renders_update_at_label_bottom_right() -> None:
+def test_provider_card_renders_update_at_label_bottom_left_from_freshness() -> None:
     """
-    @brief Verify provider card contains bottom-right Updated/Next label sourced from idle-time timestamps.
+    @brief Verify provider card contains bottom-left Updated/Next label sourced from `freshness` timestamps.
     @details Asserts extension source creates an `updateAtLabel` in the card and populates
-    it from `json.idle_time.<provider>.last_success_timestamp` and
-    `json.idle_time.<provider>.idle_until_timestamp` using runtime local-time `%Y-%m-%d %H:%M`
-    output as `Updated: <YYYY-MM-DD HH:MM>, Next: <YYYY-MM-DD HH:MM>`, with right-aligned row layout.
+    it from `json.freshness.<provider>.last_success_timestamp` and
+    `json.freshness.<provider>.idle_until_timestamp` using runtime local-time `%Y-%m-%d %H:%M`
+    output as `Updated: <YYYY-MM-DD HH:MM>, Next: <YYYY-MM-DD HH:MM>`, with left-aligned row layout.
     @satisfies REQ-017
     @satisfies TST-004
     """
@@ -136,9 +136,9 @@ def test_provider_card_renders_update_at_label_bottom_right() -> None:
     assert "updateAtLabel" in source
     assert "aibar-update-at-label" in source
     assert "aibar-update-at-row" in source
-    assert "updateAtSpacer" in source
-    assert "json.idle_time" in source
-    assert "this._idleTimeData" in source
+    assert "updateAtSpacer" not in source
+    assert "json.freshness" in source
+    assert "this._freshnessData" in source
     assert "last_success_timestamp" in source
     assert "idle_until_timestamp" in source
     assert "* 1000" in source
@@ -147,8 +147,10 @@ def test_provider_card_renders_update_at_label_bottom_right() -> None:
     assert "Next:" in source
     assert "getFullYear()" in source
     assert "getHours()" in source
-    assert "if (idleTimeState" in source
-    assert source.index("if (idleTimeState") < source.index("if (isError)")
+    assert "if (freshnessState" in source
+    assert source.index("if (freshnessState") < source.index("if (isError)")
+    assert "style_class: 'aibar-reset-label aibar-update-at-label'" in source
+    assert "updateAtRow.add_child(updateAtLabel);" in source
 
 
 def test_provider_cards_render_zero_api_counters_for_null_metrics() -> None:

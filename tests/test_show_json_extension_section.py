@@ -1,15 +1,16 @@
 """
 @file test_show_json_extension_section.py
 @brief Tests for the `extension` section emitted by `show --json`.
-@details Verifies that `aibar show --json` includes top-level `idle_time` and
-`extension` objects, with `extension.gnome_refresh_interval_seconds` sourced
-from the runtime config.
+@details Verifies that `aibar show --json` includes top-level `idle_time`,
+`freshness`, and `extension` objects, with
+`extension.gnome_refresh_interval_seconds` sourced from runtime config.
 @satisfies REQ-003
 @satisfies CTN-008
 @satisfies TST-004
 """
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 from click.testing import CliRunner
@@ -79,7 +80,9 @@ def test_show_json_emits_extension_section_with_default_gnome_refresh_interval(
     doc = json.loads(result.output)
     assert "extension" in doc
     assert "idle_time" in doc
+    assert "freshness" in doc
     assert doc["idle_time"] == {}
+    assert doc["freshness"] == {}
     assert "gnome_refresh_interval_seconds" in doc["extension"]
     assert doc["extension"]["gnome_refresh_interval_seconds"] == 60
 
@@ -128,7 +131,9 @@ def test_show_json_emits_extension_section_with_configured_gnome_refresh_interva
     doc = json.loads(result.output)
     assert "extension" in doc
     assert "idle_time" in doc
+    assert "freshness" in doc
     assert doc["idle_time"] == {}
+    assert doc["freshness"] == {}
     assert doc["extension"]["gnome_refresh_interval_seconds"] == 120
 
 
@@ -174,8 +179,63 @@ def test_show_json_extension_section_does_not_appear_in_cache_payload(
     doc = json.loads(result.output)
     assert "extension" in doc
     assert "idle_time" in doc
+    assert "freshness" in doc
 
     cache_file = cache_dir / "cache.json"
     if cache_file.exists():
         cached = json.loads(cache_file.read_text(encoding="utf-8"))
         assert "extension" not in cached
+        assert "freshness" not in cached
+
+
+def test_show_json_emits_provider_freshness_from_idle_time_timestamps(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """
+    @brief Verify `show --json` emits provider `freshness` from idle-time timestamps.
+    @details Injects one provider idle-time state and asserts the `freshness` section
+    exports matching epoch values and local-time `%Y-%m-%d %H:%M` strings.
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @param tmp_path {Path} Temporary path fixture.
+    @return {None} Function return value.
+    @satisfies REQ-003
+    @satisfies REQ-084
+    @satisfies TST-038
+    """
+    _patch_config_paths(monkeypatch, tmp_path)
+    empty_cache = {"payload": {}, "status": {}}
+    config_module.save_cli_cache(empty_cache)
+    config_module.save_runtime_config(RuntimeConfig())
+    last_success = datetime(2026, 3, 18, 8, 58, tzinfo=timezone.utc)
+    idle_until = datetime(2026, 3, 18, 8, 59, tzinfo=timezone.utc)
+    idle_state = config_module.build_idle_time_state(
+        last_success_at=last_success,
+        idle_until=idle_until,
+    )
+
+    monkeypatch.setattr("aibar.cli.get_providers", lambda: {})
+    monkeypatch.setattr(
+        "aibar.cli.retrieve_results_via_cache_pipeline",
+        lambda **kwargs: type(
+            "R",
+            (),
+            {
+                "idle_active": False,
+                "cache_available": True,
+                "payload": empty_cache,
+                "results": {},
+                "idle_time_by_provider": {"openai": idle_state},
+            },
+        )(),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["show", "--json"])
+
+    assert result.exit_code == 0, result.output
+    doc = json.loads(result.output)
+    assert doc["freshness"]["openai"]["last_success_timestamp"] == idle_state.last_success_timestamp
+    assert doc["freshness"]["openai"]["idle_until_timestamp"] == idle_state.idle_until_timestamp
+    assert doc["freshness"]["openai"]["last_success_local"] == last_success.astimezone().strftime("%Y-%m-%d %H:%M")
+    assert doc["freshness"]["openai"]["idle_until_local"] == idle_until.astimezone().strftime("%Y-%m-%d %H:%M")

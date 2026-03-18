@@ -247,7 +247,7 @@ class AIBarIndicator extends PanelMenu.Button {
         this._timeout = null;
         this._usageData = {};
         this._statusData = {};
-        this._idleTimeData = {};
+        this._freshnessData = {};
         this._providerRows = {};
         this._providerTabs = {};
         this._refreshIntervalSeconds = REFRESH_INTERVAL_SECONDS;
@@ -554,14 +554,14 @@ class AIBarIndicator extends PanelMenu.Button {
                     )
                         ? providerStatus[windowKey]
                         : null;
-                    const idleTimeState = (
-                        this._idleTimeData[name] &&
-                        typeof this._idleTimeData[name] === 'object' &&
-                        !Array.isArray(this._idleTimeData[name])
+                    const freshnessState = (
+                        this._freshnessData[name] &&
+                        typeof this._freshnessData[name] === 'object' &&
+                        !Array.isArray(this._freshnessData[name])
                     )
-                        ? this._idleTimeData[name]
+                        ? this._freshnessData[name]
                         : null;
-                    this._populateProviderCard(card, name, data, statusEntry, idleTimeState);
+                    this._populateProviderCard(card, name, data, statusEntry, freshnessState);
                 }
             } else {
                 card.container.hide();
@@ -577,7 +577,7 @@ class AIBarIndicator extends PanelMenu.Button {
      * @param {any} statusEntry Window-specific cached status entry from `status` section.
      * @returns {any} Function return value.
      */
-    _updateProviderCard(providerName, data, statusEntry = null, idleTimeState = null) {
+    _updateProviderCard(providerName, data, statusEntry = null, freshnessState = null) {
         let card = this._providerRows[providerName];
 
         if (!card) {
@@ -589,7 +589,7 @@ class AIBarIndicator extends PanelMenu.Button {
                 card.container.hide();
         }
 
-        this._populateProviderCard(card, providerName, data, statusEntry, idleTimeState);
+        this._populateProviderCard(card, providerName, data, statusEntry, freshnessState);
     }
 
     /**
@@ -728,13 +728,11 @@ class AIBarIndicator extends PanelMenu.Button {
             style_class: 'aibar-update-at-row',
         });
 
-        let updateAtSpacer = new St.Widget({x_expand: true});
         let updateAtLabel = new St.Label({
             text: '',
-            style_class: 'aibar-update-at-label',
+            style_class: 'aibar-reset-label aibar-update-at-label',
         });
 
-        updateAtRow.add_child(updateAtSpacer);
         updateAtRow.add_child(updateAtLabel);
         container.add_child(updateAtRow);
 
@@ -766,19 +764,19 @@ class AIBarIndicator extends PanelMenu.Button {
      * @param {any} providerName Input parameter `providerName`.
      * @param {any} data Input parameter `data`.
      * @param {any} statusEntry Window-specific cached status entry.
-     * @param {any} idleTimeState Provider-scoped idle-time state entry from `idle_time` section.
+     * @param {any} freshnessState Provider-scoped freshness entry from `freshness` section.
      * @returns {any} Function return value.
      */
-    _populateProviderCard(card, providerName, data, statusEntry = null, idleTimeState = null) {
+    _populateProviderCard(card, providerName, data, statusEntry = null, freshnessState = null) {
         const metrics = data.metrics || {};
         const raw = data.raw || {};
-        if (idleTimeState &&
-            Number.isInteger(idleTimeState.last_success_timestamp) &&
-            Number.isInteger(idleTimeState.idle_until_timestamp)
+        if (freshnessState &&
+            Number.isInteger(freshnessState.last_success_timestamp) &&
+            Number.isInteger(freshnessState.idle_until_timestamp)
         ) {
             try {
-                const updatedDate = new Date(idleTimeState.last_success_timestamp * 1000);
-                const nextDate = new Date(idleTimeState.idle_until_timestamp * 1000);
+                const updatedDate = new Date(freshnessState.last_success_timestamp * 1000);
+                const nextDate = new Date(freshnessState.idle_until_timestamp * 1000);
                 const updatedStr = _formatLocalDateTime(updatedDate);
                 const nextStr = _formatLocalDateTime(nextDate);
                 if (updatedStr === null || nextStr === null)
@@ -1156,7 +1154,7 @@ class AIBarIndicator extends PanelMenu.Button {
     /**
      * @brief Execute parse output.
      * @details Parses CLI JSON output supporting canonical cache schema sections
-     * (`payload`, `status`, `idle_time`, `extension`). Reads
+     * (`payload`, `status`, `idle_time`, `freshness`, `extension`). Reads
      * `extension.gnome_refresh_interval_seconds` to update the auto-refresh interval and
      * reschedules the timer when the value changes.
      * @param {any} output Input parameter `output`.
@@ -1187,15 +1185,22 @@ class AIBarIndicator extends PanelMenu.Button {
                 } else {
                     this._statusData = {};
                 }
-                if (
+                const hasFreshnessSection = (
+                    json.freshness &&
+                    typeof json.freshness === 'object' &&
+                    !Array.isArray(json.freshness)
+                );
+                const hasIdleTimeSection = (
                     json.idle_time &&
                     typeof json.idle_time === 'object' &&
                     !Array.isArray(json.idle_time)
-                ) {
-                    this._idleTimeData = json.idle_time;
-                } else {
-                    this._idleTimeData = {};
-                }
+                );
+                if (hasFreshnessSection)
+                    this._freshnessData = json.freshness;
+                else if (hasIdleTimeSection)
+                    this._freshnessData = json.idle_time;
+                else
+                    this._freshnessData = {};
                 if (
                     json.extension &&
                     typeof json.extension === 'object' &&
@@ -1211,7 +1216,7 @@ class AIBarIndicator extends PanelMenu.Button {
             } else {
                 this._usageData = json;
                 this._statusData = {};
-                this._idleTimeData = {};
+                this._freshnessData = {};
             }
             console.debug(`aibar: Parsed ${Object.keys(this._usageData).length} providers`);
         } catch (e) {
@@ -1449,14 +1454,14 @@ class AIBarIndicator extends PanelMenu.Button {
             )
                 ? providerStatus[windowKey]
                 : null;
-            const idleTimeState = (
-                this._idleTimeData[providerName] &&
-                typeof this._idleTimeData[providerName] === 'object' &&
-                !Array.isArray(this._idleTimeData[providerName])
+            const freshnessState = (
+                this._freshnessData[providerName] &&
+                typeof this._freshnessData[providerName] === 'object' &&
+                !Array.isArray(this._freshnessData[providerName])
             )
-                ? this._idleTimeData[providerName]
+                ? this._freshnessData[providerName]
                 : null;
-            this._updateProviderCard(providerName, data, statusEntry, idleTimeState);
+            this._updateProviderCard(providerName, data, statusEntry, freshnessState);
 
         }
 
