@@ -2944,6 +2944,9 @@ def _build_result_panel(
     @brief Build one provider panel title/body payload for CLI text rendering.
     @details Formats deterministic panel lines for one provider/window result and
     preserves provider-specific metrics/error rendering rules used by `show`.
+    `FAIL` states emit only one `Error: <reason>` line. `OK` states emit
+    `Status: OK` first, do not emit `Window <window>` headings, and end with a
+    right-aligned `Updated/Next` freshness line.
     @param name {ProviderName} Provider name enum value.
     @param result {ProviderResult} Provider result to render.
     @param label {str | None} Optional window label suffix (e.g. `"5h"`, `"7d"`).
@@ -2957,9 +2960,9 @@ def _build_result_panel(
     @satisfies REQ-051
     @satisfies REQ-060
     @satisfies REQ-067
+    @satisfies REQ-084
     """
     title = _provider_display_name(name)
-    window_label = label or result.window.value
     if label:
         title = f"{title} ({label})"
 
@@ -2967,16 +2970,10 @@ def _build_result_panel(
     freshness_line = _build_freshness_line(
         result=result, freshness_state=freshness_state
     )
-    detail_lines: list[str] = [f"Window {window_label}:"]
+    detail_lines: list[str] = []
     if result.is_error:
-        detail_lines.append(f"Error: {result.error}")
-        status_retry_line = _format_http_status_retry_line(
-            result.raw.get("status_code"),
-            result.raw.get("retry_after_seconds"),
-        )
-        if status_retry_line is not None:
-            detail_lines.append(status_retry_line)
-        return title, [status_line, "", *detail_lines, "", freshness_line]
+        error_text = result.error if isinstance(result.error, str) else "Unknown error"
+        return title, [f"Error: {error_text}"]
 
     m = result.metrics
     if m.usage_percent is not None:
@@ -3092,10 +3089,10 @@ def _build_dual_window_panel(
 ) -> tuple[str, list[str]]:
     """
     @brief Build one grouped CLI panel for dual-window providers.
-    @details Produces one provider panel with a shared metadata block and two
-    blank-line-separated sections (`5h`, `7d`) derived from window-specific panel
-    renderings while deduplicating shared lines; Claude/Codex render one shared
-    `Remaining credits` line after the `7d` section.
+    @details Produces one provider panel from `5h` and `7d` results while
+    deduplicating shared lines. `FAIL` states emit one error line only. `OK`
+    states emit `Status: OK` first, avoid `Window <window>` headings, and append
+    one trailing right-aligned freshness line.
     @param name {ProviderName} Provider enum value.
     @param result_5h {ProviderResult} Five-hour provider result.
     @param result_7d {ProviderResult} Seven-day provider result.
@@ -3107,6 +3104,17 @@ def _build_dual_window_panel(
     @satisfies REQ-084
     """
     title = _provider_display_name(name)
+    if result_5h.is_error or result_7d.is_error:
+        primary_error = (
+            result_5h.error
+            if result_5h.is_error and isinstance(result_5h.error, str)
+            else result_7d.error
+        )
+        error_text = (
+            primary_error if isinstance(primary_error, str) else "Unknown error"
+        )
+        return title, [f"Error: {error_text}"]
+
     _title_5h, lines_5h = _build_result_panel(
         name=name,
         result=result_5h,
@@ -3174,7 +3182,7 @@ def _build_dual_window_panel(
     if shared_lines:
         body_lines.extend(shared_lines)
         body_lines.append("")
-    body_lines.extend(["Window 5h:", *section_5h, "", "Window 7d:", *section_7d])
+    body_lines.extend([*section_5h, "", *section_7d])
     if shared_remaining_line is not None:
         body_lines.extend(["", shared_remaining_line])
     if footer_lines:

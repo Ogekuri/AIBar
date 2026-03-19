@@ -904,29 +904,10 @@ class AIBarIndicator extends PanelMenu.Button {
         const isError = effectiveError !== null && effectiveError !== undefined;
 
         if (isError) {
-            const statusCode = (
-                statusEntry &&
-                Number.isInteger(statusEntry.status_code)
-            )
-                ? statusEntry.status_code
-                : raw.status_code;
-            const retryAfterSeconds = (
-                statusEntry &&
-                statusEntry.retry_after_seconds !== undefined
-            )
-                ? statusEntry.retry_after_seconds
-                : raw.retry_after_seconds;
-            const statusRetryLabel = _buildHttpStatusRetryLabel(statusCode, retryAfterSeconds);
-            const windowLabel = typeof data.window === 'string' ? data.window : 'n/a';
-            const errorLines = [
-                'Status: FAIL',
-                `Window: ${windowLabel}`,
-                `Error: ${effectiveError}`,
-            ];
-            if (statusRetryLabel.length > 0)
-                errorLines.push(statusRetryLabel);
-            card.errorLabel.text = errorLines.join('\n');
+            card.errorLabel.text = `Error: ${effectiveError}`;
             card.errorLabel.show();
+            card.updateAtLabel.text = '';
+            card.updateAtLabel.hide();
             card.costLabel.text = '';
             card.costLabel.hide();
             card.byokLabel.text = '';
@@ -949,6 +930,7 @@ class AIBarIndicator extends PanelMenu.Button {
 
         card.errorLabel.text = '';
         card.errorLabel.hide();
+        card.updateAtLabel.show();
         const fiveHourUtil = raw.five_hour && raw.five_hour.utilization !== null && raw.five_hour.utilization !== undefined
             ? raw.five_hour.utilization
             : (raw.rate_limit && raw.rate_limit.primary_window && raw.rate_limit.primary_window.used_percent !== null && raw.rate_limit.primary_window.used_percent !== undefined
@@ -1063,7 +1045,7 @@ class AIBarIndicator extends PanelMenu.Button {
             const singleWindowReset = metrics.reset_at || fiveHourReset || sevenDayReset || null;
             const hasUsagePercent = usagePercent !== null && usagePercent !== undefined;
             const effectiveUsagePercent = hasUsagePercent ? usagePercent : 0;
-            card.fiveHourBar.label.text = configuredWindowLabel;
+            card.fiveHourBar.label.text = '';
             card._barData.fiveHour = {pct: effectiveUsagePercent, resetTime: singleWindowReset};
             updateWindowBar(
                 card.fiveHourBar,
@@ -1076,7 +1058,7 @@ class AIBarIndicator extends PanelMenu.Button {
             card.sevenDayBar.container.hide();
             hasWindowBars = true;
         } else {
-            card.fiveHourBar.label.text = '5h';
+            card.fiveHourBar.label.text = '';
             if (fiveHourUtil !== null) {
                 card._barData.fiveHour = {pct: fiveHourUtil, resetTime: fiveHourReset};
                 updateWindowBar(card.fiveHourBar, fiveHourUtil, fiveHourReset, false);
@@ -1088,6 +1070,7 @@ class AIBarIndicator extends PanelMenu.Button {
 
             if (sevenDayUtil !== null) {
                 card._barData.sevenDay = {pct: sevenDayUtil, resetTime: sevenDayReset};
+                card.sevenDayBar.label.text = '';
                 updateWindowBar(card.sevenDayBar, sevenDayUtil, sevenDayReset, true);
                 hasWindowBars = true;
             } else {
