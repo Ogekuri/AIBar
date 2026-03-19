@@ -63,9 +63,15 @@ class RuntimeConfig(BaseModel):
     """
 
     idle_delay_seconds: int = Field(default=DEFAULT_IDLE_DELAY_SECONDS, ge=1)
-    api_call_delay_milliseconds: int = Field(default=DEFAULT_API_CALL_DELAY_MILLISECONDS, ge=1)
-    api_call_timeout_milliseconds: int = Field(default=DEFAULT_API_CALL_TIMEOUT_MILLISECONDS, ge=1)
-    gnome_refresh_interval_seconds: int = Field(default=DEFAULT_GNOME_REFRESH_INTERVAL_SECONDS, ge=1)
+    api_call_delay_milliseconds: int = Field(
+        default=DEFAULT_API_CALL_DELAY_MILLISECONDS, ge=1
+    )
+    api_call_timeout_milliseconds: int = Field(
+        default=DEFAULT_API_CALL_TIMEOUT_MILLISECONDS, ge=1
+    )
+    gnome_refresh_interval_seconds: int = Field(
+        default=DEFAULT_GNOME_REFRESH_INTERVAL_SECONDS, ge=1
+    )
     billing_data: str = Field(default=DEFAULT_BILLING_DATASET, min_length=1)
     currency_symbols: dict[str, str] = Field(default_factory=dict)
     geminiai_project_id: str | None = Field(default=None)
@@ -84,6 +90,7 @@ class IdleTimeState(BaseModel):
     last_success_human: str
     idle_until_timestamp: int
     idle_until_human: str
+    oauth_refresh_blocked: bool = False
 
 
 def _ensure_app_config_dir() -> None:
@@ -258,7 +265,9 @@ def resolve_currency_symbol(raw: dict[str, Any] | None, provider_name: str) -> s
             return mapped
     try:
         runtime_config = load_runtime_config()
-        symbol = runtime_config.currency_symbols.get(provider_name, DEFAULT_CURRENCY_SYMBOL)
+        symbol = runtime_config.currency_symbols.get(
+            provider_name, DEFAULT_CURRENCY_SYMBOL
+        )
         if symbol in VALID_CURRENCY_SYMBOLS:
             return symbol
     except Exception:  # noqa: BLE001
@@ -290,7 +299,9 @@ def save_cli_cache(payload: dict[str, Any]) -> None:
         )
 
 
-def build_idle_time_state(last_success_at: datetime, idle_until: datetime) -> IdleTimeState:
+def build_idle_time_state(
+    last_success_at: datetime, idle_until: datetime
+) -> IdleTimeState:
     """
     @brief Build provider-local idle-time entry from UTC-compatible datetimes.
     @details Normalizes timestamps to UTC for epoch conversion, then emits
@@ -344,7 +355,9 @@ def load_idle_time() -> dict[str, IdleTimeState]:
                     if not isinstance(raw_state, dict):
                         continue
                     try:
-                        parsed_state[provider_key] = IdleTimeState.model_validate(raw_state)
+                        parsed_state[provider_key] = IdleTimeState.model_validate(
+                            raw_state
+                        )
                     except ValidationError:
                         continue
     except (OSError, ValueError, ValidationError):
@@ -352,7 +365,9 @@ def load_idle_time() -> dict[str, IdleTimeState]:
     return parsed_state
 
 
-def save_idle_time(idle_time_by_provider: dict[str, IdleTimeState]) -> dict[str, IdleTimeState]:
+def save_idle_time(
+    idle_time_by_provider: dict[str, IdleTimeState],
+) -> dict[str, IdleTimeState]:
     """
     @brief Persist provider-keyed idle-time state map.
     @details Validates each provider entry, serializes canonical epoch and

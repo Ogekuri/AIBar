@@ -1,9 +1,9 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.3.26"
-date: "2026-03-18"
-author: "req-change"
+version: "0.3.27"
+date: "2026-03-19"
+author: "req-new"
 scope:
   paths:
     - "src/**/*.py"
@@ -108,6 +108,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **CTN-013**: MUST persist startup update-check idle state in `~/.cache/aibar/check_version_idle-time.json` JSON with epoch and human-readable `last_success_at` and `idle_until`.
 - **CTN-014**: MUST perform at most one startup update HTTP check per 300 seconds unless `~/.cache/aibar/check_version_idle-time.json` is missing or expired.
 - **CTN-015**: MUST use lifecycle command strings exactly as `uv tool install aibar --force --from git+https://github.com/Ogekuri/AIBar.git` and `uv tool uninstall aibar`.
+- **CTN-016**: MUST allow `~/.cache/aibar/idle-time.json` provider entries to include optional boolean field `oauth_refresh_blocked` for Claude authentication-retry suppression state.
 
 ## 3. Requirements
 
@@ -217,6 +218,12 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-084**: CLI text `show` MUST render per-provider freshness line as `Updated: <datetime last update>, Next: <datetime next update>` sourced from provider `idle_time` `last_success_timestamp` and `idle_until_timestamp`, right-aligned to panel content width; `show --json` MUST export equivalent provider freshness in `freshness` for GNOME alignment, all formatted in local timezone `%Y-%m-%d %H:%M`.
 - **REQ-085**: CLI text `show` MUST render per-provider last-attempt authentication and refresh-rate-limit failures from cached status errors, including invalid or expired OAuth tokens and HTTP `429` refresh-limit diagnostics; when status is `FAIL`, statistics lines MUST remain suppressed.
 - **REQ-090**: GNOME provider cards MUST render error category, HTTP status, and retry-after values from cached status entries using semantics equivalent to CLI `show` for the same provider/window.
+- **REQ-100**: MUST implement one internal Claude OAuth renewal routine that truncates `~/.config/aibar/claude_token_refresh.log` before each execution and then runs `claude /usage` plus `aibar login --provider claude` with command-availability checks.
+- **REQ-101**: MUST execute each Claude OAuth renewal command with runtime `api_call_delay_milliseconds` spacing and runtime `api_call_timeout_milliseconds` timeout enforcement.
+- **REQ-102**: MUST classify Claude authentication failure when API execution yields `Invalid or expired OAuth token` and MUST preserve canonical surface text `Error: Invalid or expired OAuth token` for failed Claude outputs.
+- **REQ-103**: MUST execute exactly one Claude OAuth renewal attempt and exactly one Claude API retry when Claude fetch raises authentication error `Invalid or expired OAuth token`.
+- **REQ-104**: MUST set `~/.cache/aibar/idle-time.json` field `claude.oauth_refresh_blocked=true` when Claude retry after renewal still fails with `Invalid or expired OAuth token`, and MUST skip further renewal attempts while the flag remains active.
+- **REQ-105**: MUST clear `claude.oauth_refresh_blocked` when `show --force` is used and MUST auto-clear it when current epoch exceeds `last_success_timestamp + 86400`.
 - **REQ-086**: `scripts/aibar.sh` MUST execute CLI via `uv run python -m aibar.cli` and MUST NOT create, activate, or install dependencies into repository-local or system virtual environments.
 - **REQ-087**: Repository root MUST track `uv.lock`, MUST NOT track `requirements.txt`, and MUST keep `README.md` instructions for optional export command `uv export --format requirements-txt > requirements.txt`.
 
@@ -259,6 +266,9 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-034**: MUST verify repeated startup update HTTP `429` responses compute idle-time using `max(300, max(retry-after values))`.
 - **TST-035**: MUST verify Linux `--upgrade` and `--uninstall` invoke required `uv tool` subprocess commands, propagate subprocess exit codes, and during `--uninstall` delete `~/.cache/aibar/check_version_idle-time.json` and `~/.cache/aibar/`.
 - **TST-041**: MUST verify non-Linux `--upgrade` and `--uninstall` skip lifecycle subprocess execution and print manual command guidance.
+- **TST-043**: MUST verify Claude OAuth renewal routine truncates `~/.config/aibar/claude_token_refresh.log`, executes `claude /usage` and `aibar login --provider claude`, and records command-availability failures without aborting execution.
+- **TST-044**: MUST verify Claude authentication error `Invalid or expired OAuth token` triggers one renewal attempt and one retry, then persists `claude.oauth_refresh_blocked=true` when retry authentication fails again.
+- **TST-045**: MUST verify `claude.oauth_refresh_blocked` suppresses repeated renewal attempts, auto-clears at `last_success_timestamp + 86400`, and is removed on `show --force`.
 - **TST-036**: MUST verify `--version` and `--ver` print installed version and bypass subcommand execution.
 - **TST-038**: MUST verify CLI text `show` renders right-aligned `Updated: <datetime last update>, Next: <datetime next update>` from provider `idle_time` timestamps with local-timezone `%Y-%m-%d %H:%M` formatting aligned to GNOME extension, verifies `show --json` exports equivalent provider freshness in top-level `freshness`, suppresses statistics lines on `FAIL` states, renders `HTTP status: <code>, Retry after: <seconds> sec.` when available, renders provider API counters (`openai`, `openrouter`, `codex`, `geminiai`) as `Requests: <requests>` and `Tokens: <total> (<in> in / <out> out)` with null values normalized to `0` on `OK` states, renders window headings as `Window <window>:`, renders cost lines as `Cost: <currency><value>` with bold bright-white value, renders GeminiAI effective window as `30d` regardless of requested window, and inserts one blank line before GeminiAI `Billing table`.
 - **TST-042**: MUST verify CLI `show` and GNOME provider cards render equivalent error category, HTTP status, retry-after value, and `Updated/Next` freshness sourced from the same provider `idle_time` timestamps for failed provider/window status.

@@ -119,7 +119,9 @@ _STARTUP_IDLE_STATE_IDLE_UNTIL_EPOCH_KEY = "idle_until_epoch"
 _STARTUP_IDLE_STATE_IDLE_UNTIL_HUMAN_KEY = "idle_until_human"
 _STARTUP_IDLE_STATE_FILENAME = "check_version_idle-time.json"
 _EXT_UUID = "aibar@aibar.panel"
-_EXT_TARGET_DIR = Path.home() / ".local" / "share" / "gnome-shell" / "extensions" / _EXT_UUID
+_EXT_TARGET_DIR = (
+    Path.home() / ".local" / "share" / "gnome-shell" / "extensions" / _EXT_UUID
+)
 _UPGRADE_LIFECYCLE_COMMAND: list[str] = [
     "uv",
     "tool",
@@ -130,6 +132,11 @@ _UPGRADE_LIFECYCLE_COMMAND: list[str] = [
     "git+https://github.com/Ogekuri/AIBar.git",
 ]
 _UNINSTALL_LIFECYCLE_COMMAND: list[str] = ["uv", "tool", "uninstall", "aibar"]
+_CLAUDE_OAUTH_AUTH_ERROR_TEXT = "Invalid or expired OAuth token"
+_CLAUDE_OAUTH_BLOCK_TTL_SECONDS = 86400
+_CLAUDE_TOKEN_REFRESH_LOG_PATH = (
+    Path.home() / ".config" / "aibar" / "claude_token_refresh.log"
+)
 
 
 @dataclass(frozen=True)
@@ -324,7 +331,9 @@ def _cleanup_startup_idle_state_artifacts() -> int:
     return 0
 
 
-def _emit_startup_preflight_message(message: str, color_code: str, err: bool = False) -> None:
+def _emit_startup_preflight_message(
+    message: str, color_code: str, err: bool = False
+) -> None:
     """
     @brief Emit colorized startup preflight diagnostics.
     @details Wraps message text with ANSI bright color escape sequences so update
@@ -402,7 +411,9 @@ def _fetch_startup_latest_release() -> StartupReleaseCheckResponse:
         },
     )
     try:
-        with urllib_request.urlopen(request, timeout=_STARTUP_HTTP_TIMEOUT_SECONDS) as response:
+        with urllib_request.urlopen(
+            request, timeout=_STARTUP_HTTP_TIMEOUT_SECONDS
+        ) as response:
             decoded_payload = json.loads(response.read().decode("utf-8"))
     except urllib_error.HTTPError as exc:
         retry_after_seconds = _parse_retry_after_header(exc.headers.get("Retry-After"))
@@ -519,7 +530,9 @@ def _run_startup_update_preflight() -> None:
         return
 
     if response.status_code == 429:
-        retry_after_seconds = max(_STARTUP_IDLE_DELAY_SECONDS, response.retry_after_seconds)
+        retry_after_seconds = max(
+            _STARTUP_IDLE_DELAY_SECONDS, response.retry_after_seconds
+        )
         idle_until_epoch = max(idle_until_epoch, now_epoch + retry_after_seconds)
         try:
             _save_startup_idle_state(
@@ -879,6 +892,313 @@ def _extract_retry_after_seconds(result: ProviderResult) -> int:
     return parsed
 
 
+def _is_claude_oauth_authentication_error(message: object) -> bool:
+    """
+    @brief Detect canonical Claude OAuth authentication-expired error text.
+    @details Applies strict substring match against `Invalid or expired OAuth token`
+    using case-sensitive semantics so retry/renewal logic is only enabled for the
+    documented Claude token-expiration failure.
+    @param message {object} Candidate error message object.
+    @return {bool} True when candidate contains canonical Claude auth-expired text.
+    @satisfies REQ-102
+    """
+    return isinstance(message, str) and _CLAUDE_OAUTH_AUTH_ERROR_TEXT in message
+
+
+def _subprocess_return_code_from_exception(exc: Exception) -> int:
+    """
+    @brief Normalize subprocess exception to deterministic integer return code.
+    @details Maps TimeoutExpired to `124`, CalledProcessError to its integer
+    return code when available, and all other exception classes to `1`.
+    @param exc {Exception} Subprocess exception emitted by `subprocess.run`.
+    @return {int} Deterministic synthetic return code.
+    """
+    if isinstance(exc, subprocess.TimeoutExpired):
+        return 124
+    if isinstance(exc, subprocess.CalledProcessError):
+        try:
+            return int(exc.returncode)
+        except (TypeError, ValueError):
+            return 1
+    return 1
+
+
+def _execute_claude_refresh_command(
+    command: list[str],
+    timeout_seconds: float,
+) -> tuple[bool, int, str]:
+    """
+    @brief Execute one Claude token-refresh subprocess command.
+    @details Runs command without shell expansion, captures combined stdout/stderr,
+    and enforces timeout using runtime `api_call_timeout_milliseconds` policy.
+    Command-not-found and timeout failures are converted to deterministic error
+    tuples without raising.
+    @param command {list[str]} Subprocess argv tokens.
+    @param timeout_seconds {float} Timeout in seconds for command completion.
+    @return {tuple[bool, int, str]} Tuple `(success, return_code, output_text)`.
+    @satisfies REQ-101
+    """
+    try:
+        completed = subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout_seconds,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return (False, _subprocess_return_code_from_exception(exc), str(exc))
+
+    merged_output = "\n".join(
+        part for part in (completed.stdout, completed.stderr) if part
+    ).strip()
+    return (completed.returncode == 0, int(completed.returncode), merged_output)
+
+
+def _run_claude_oauth_token_refresh(runtime_config: RuntimeConfig) -> bool:
+    """
+    @brief Execute one Claude OAuth token-renewal routine in-process.
+    @details Truncates `~/.config/aibar/claude_token_refresh.log`, then executes
+    `claude /usage` followed by `aibar login --provider claude` when each command
+    is available in PATH. Applies configured API-call delay spacing and configured
+    API-call timeout to each subprocess call. Command failures are logged and do
+    not raise; function returns true only when both available commands complete
+    successfully.
+    @param runtime_config {RuntimeConfig} Runtime delay and timeout configuration.
+    @return {bool} True when refresh routine completes without command failures.
+    @satisfies REQ-100
+    @satisfies REQ-101
+    """
+    _CLAUDE_TOKEN_REFRESH_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _CLAUDE_TOKEN_REFRESH_LOG_PATH.write_text("", encoding="utf-8")
+    timeout_seconds = max(0.001, runtime_config.api_call_timeout_milliseconds / 1000.0)
+    throttle_state: dict[str, float | int] = {
+        "delay_milliseconds": runtime_config.api_call_delay_milliseconds,
+    }
+    command_plan: tuple[tuple[str, list[str]], ...] = (
+        ("claude", ["claude", "/usage"]),
+        ("aibar", ["aibar", "login", "--provider", "claude"]),
+    )
+    all_ok = True
+    log_lines: list[str] = ["Starting token refresh cycle"]
+
+    for binary_name, command in command_plan:
+        if shutil.which(binary_name) is None:
+            all_ok = False
+            log_lines.append(f"Warning: {binary_name} command not found")
+            continue
+
+        _apply_api_call_delay(throttle_state)
+        log_lines.append(f"Running: {' '.join(command)}")
+        success, return_code, output_text = _execute_claude_refresh_command(
+            command=command,
+            timeout_seconds=timeout_seconds,
+        )
+        if not success:
+            all_ok = False
+            log_lines.append(
+                f"Warning: command failed ({' '.join(command)}), return_code={return_code}"
+            )
+        if output_text:
+            log_lines.append(output_text)
+
+    log_lines.append("Token refresh cycle complete")
+    _CLAUDE_TOKEN_REFRESH_LOG_PATH.write_text(
+        "\n".join(log_lines) + "\n",
+        encoding="utf-8",
+    )
+    return all_ok
+
+
+def _clear_claude_refresh_block_flag(
+    idle_time_by_provider: dict[str, IdleTimeState],
+) -> bool:
+    """
+    @brief Clear Claude OAuth refresh-block flag from idle-time state.
+    @details Removes `oauth_refresh_blocked` by replacing the Claude state entry
+    with an equivalent object where `oauth_refresh_blocked=false`.
+    @param idle_time_by_provider {dict[str, IdleTimeState]} Provider idle-time map.
+    @return {bool} True when map content changed.
+    @satisfies REQ-105
+    """
+    claude_key = ProviderName.CLAUDE.value
+    claude_state = idle_time_by_provider.get(claude_key)
+    if claude_state is None or not claude_state.oauth_refresh_blocked:
+        return False
+    idle_time_by_provider[claude_key] = claude_state.model_copy(
+        update={"oauth_refresh_blocked": False}
+    )
+    return True
+
+
+def _is_claude_refresh_block_active(
+    claude_state: IdleTimeState,
+    now_epoch: int,
+) -> bool:
+    """
+    @brief Evaluate Claude OAuth refresh-block activity against hardcoded TTL.
+    @details Returns true only when `oauth_refresh_blocked` is true and current
+    epoch is not greater than `last_success_timestamp + 86400`.
+    @param claude_state {IdleTimeState} Claude provider idle-time state.
+    @param now_epoch {int} Current epoch seconds.
+    @return {bool} True when refresh-block flag remains active.
+    @satisfies REQ-105
+    """
+    if not claude_state.oauth_refresh_blocked:
+        return False
+    return now_epoch <= (
+        int(claude_state.last_success_timestamp) + _CLAUDE_OAUTH_BLOCK_TTL_SECONDS
+    )
+
+
+def _is_claude_authentication_error_result(result: ProviderResult) -> bool:
+    """
+    @brief Detect Claude result carrying canonical OAuth authentication-expired error.
+    @details Matches provider key `claude`, error-state flag, and canonical error
+    text `Invalid or expired OAuth token` for deterministic renewal triggering.
+    @param result {ProviderResult} Provider result candidate.
+    @return {bool} True when result is Claude auth-expired failure.
+    @satisfies REQ-102
+    """
+    return (
+        result.provider == ProviderName.CLAUDE
+        and result.is_error
+        and _is_claude_oauth_authentication_error(result.error)
+    )
+
+
+def _handle_claude_oauth_refresh_on_auth_error(
+    claude_provider: ClaudeOAuthProvider,
+    runtime_config: RuntimeConfig,
+    throttle_state: dict[str, float | int] | None,
+) -> tuple[ProviderResult, ProviderResult, bool]:
+    """
+    @brief Execute Claude auth-error renewal-and-retry control flow.
+    @details Runs one in-process Claude token-renewal routine and then executes
+    exactly one Claude dual-window API retry via `_fetch_claude_dual`.
+    @param runtime_config {RuntimeConfig} Runtime delay/timeout configuration.
+    @param throttle_state {dict[str, float | int] | None} Shared API-delay state.
+    @return {tuple[ProviderResult, ProviderResult, bool]} Tuple
+    `(retry_result_5h, retry_result_7d, retry_auth_failed)`.
+    @satisfies REQ-103
+    @satisfies REQ-104
+    """
+    _run_claude_oauth_token_refresh(runtime_config)
+    retry_result_5h, retry_result_7d = _fetch_claude_dual(
+        claude_provider,
+        throttle_state=throttle_state,
+    )
+    retry_auth_failed = _is_claude_authentication_error_result(
+        retry_result_5h
+    ) or _is_claude_authentication_error_result(retry_result_7d)
+    return (retry_result_5h, retry_result_7d, retry_auth_failed)
+
+
+def _update_claude_refresh_block_state(
+    idle_time_by_provider: dict[str, IdleTimeState],
+    blocked: bool,
+) -> bool:
+    """
+    @brief Persist Claude OAuth refresh-block boolean in idle-time state map.
+    @details Creates missing Claude idle-time entry when needed using current UTC
+    timestamps, then updates `oauth_refresh_blocked` only when value changes.
+    @param idle_time_by_provider {dict[str, IdleTimeState]} Provider idle-time map.
+    @param blocked {bool} Target flag value for `claude.oauth_refresh_blocked`.
+    @return {bool} True when state map changed.
+    @satisfies REQ-104
+    @satisfies REQ-105
+    """
+    claude_key = ProviderName.CLAUDE.value
+    claude_state = idle_time_by_provider.get(claude_key)
+    if claude_state is None:
+        now_utc = datetime.now(timezone.utc)
+        claude_state = build_idle_time_state(
+            last_success_at=now_utc, idle_until=now_utc
+        )
+        idle_time_by_provider[claude_key] = claude_state
+    if claude_state.oauth_refresh_blocked == blocked:
+        return False
+    idle_time_by_provider[claude_key] = claude_state.model_copy(
+        update={"oauth_refresh_blocked": blocked}
+    )
+    return True
+
+
+def _fetch_claude_dual_with_auth_recovery(
+    provider: ClaudeOAuthProvider,
+    throttle_state: dict[str, float | int] | None,
+) -> tuple[ProviderResult, ProviderResult]:
+    """
+    @brief Fetch Claude dual-window results with auth-expired recovery policy.
+    @details Executes one dual-window Claude fetch. When canonical auth-expired
+    error appears, checks `claude.oauth_refresh_blocked` in idle-time state with
+    hardcoded 86400-second TTL from `last_success_timestamp`; when unblocked,
+    performs one token-renewal routine and one dual-window retry. On repeated
+    auth failure, persists `oauth_refresh_blocked=true`; on success, clears flag.
+    @param provider {ClaudeOAuthProvider} Claude provider instance.
+    @param throttle_state {dict[str, float | int] | None} Shared API-delay state.
+    @return {tuple[ProviderResult, ProviderResult]} Final Claude `(5h, 7d)` results.
+    @satisfies REQ-102
+    @satisfies REQ-103
+    @satisfies REQ-104
+    @satisfies REQ-105
+    """
+    result_5h, result_7d = _fetch_claude_dual(
+        provider,
+        throttle_state=throttle_state,
+    )
+    if not (
+        _is_claude_authentication_error_result(result_5h)
+        or _is_claude_authentication_error_result(result_7d)
+    ):
+        return (result_5h, result_7d)
+
+    idle_time_by_provider = load_idle_time()
+    claude_state = idle_time_by_provider.get(ProviderName.CLAUDE.value)
+    now_epoch = int(time.time())
+    if claude_state is not None and claude_state.oauth_refresh_blocked:
+        if _is_claude_refresh_block_active(claude_state, now_epoch):
+            return (result_5h, result_7d)
+        if _clear_claude_refresh_block_flag(idle_time_by_provider):
+            save_idle_time(idle_time_by_provider)
+
+    runtime_config = load_runtime_config()
+    retry_5h, retry_7d, retry_auth_failed = _handle_claude_oauth_refresh_on_auth_error(
+        claude_provider=provider,
+        runtime_config=runtime_config,
+        throttle_state=throttle_state,
+    )
+
+    did_change = _update_claude_refresh_block_state(
+        idle_time_by_provider=idle_time_by_provider,
+        blocked=retry_auth_failed,
+    )
+    if did_change:
+        save_idle_time(idle_time_by_provider)
+
+    return (retry_5h, retry_7d)
+
+
+def _clear_expired_claude_refresh_block(
+    idle_time_by_provider: dict[str, IdleTimeState],
+) -> bool:
+    """
+    @brief Auto-clear expired Claude OAuth refresh-block state.
+    @details Clears `claude.oauth_refresh_blocked` when current epoch is greater
+    than `last_success_timestamp + 86400` using hardcoded TTL policy.
+    @param idle_time_by_provider {dict[str, IdleTimeState]} Provider idle-time map.
+    @return {bool} True when state map changed.
+    @satisfies REQ-105
+    """
+    claude_state = idle_time_by_provider.get(ProviderName.CLAUDE.value)
+    if claude_state is None or not claude_state.oauth_refresh_blocked:
+        return False
+    now_epoch = int(time.time())
+    if _is_claude_refresh_block_active(claude_state, now_epoch):
+        return False
+    return _clear_claude_refresh_block_flag(idle_time_by_provider)
+
+
 def _is_http_429_result(result: ProviderResult) -> bool:
     """
     @brief Check whether result payload represents HTTP 429 rate limiting.
@@ -902,7 +1222,10 @@ def _serialize_results_payload(
     @satisfies REQ-003
     @satisfies CTN-004
     """
-    return {provider_key: result.model_dump(mode="json") for provider_key, result in results.items()}
+    return {
+        provider_key: result.model_dump(mode="json")
+        for provider_key, result in results.items()
+    }
 
 
 def _empty_cache_document() -> dict[str, object]:
@@ -920,7 +1243,9 @@ def _empty_cache_document() -> dict[str, object]:
     }
 
 
-def _normalize_cache_document(cache_document: dict[str, object] | None) -> dict[str, object]:
+def _normalize_cache_document(
+    cache_document: dict[str, object] | None,
+) -> dict[str, object]:
     """
     @brief Normalize decoded cache payload to canonical sectioned schema.
     @details Accepts decoded cache document and enforces object-typed `payload` and
@@ -1070,7 +1395,9 @@ def _overlay_cached_failure_status(
     @satisfies REQ-060
     @satisfies REQ-061
     """
-    status_entry = _get_window_attempt_status(status_section, provider_key, target_window)
+    status_entry = _get_window_attempt_status(
+        status_section, provider_key, target_window
+    )
     if not isinstance(status_entry, dict):
         return projected_result
     if status_entry.get("result") != _ATTEMPT_RESULT_FAIL:
@@ -1257,7 +1584,9 @@ def _project_cached_window(
         if result.window == fixed_window:
             return result
         provider = providers.get(result.provider)
-        parser = getattr(provider, "_parse_response", None) if provider is not None else None
+        parser = (
+            getattr(provider, "_parse_response", None) if provider is not None else None
+        )
         if callable(parser) and isinstance(result.raw, dict):
             try:
                 projected = parser(result.raw, fixed_window)
@@ -1360,7 +1689,9 @@ def _update_idle_time_after_refresh(
         provider_results.append(result)
 
     for provider_key, provider_results in results_by_provider.items():
-        successful_results = [result for result in provider_results if not result.is_error]
+        successful_results = [
+            result for result in provider_results if not result.is_error
+        ]
         failed_results = [result for result in provider_results if result.is_error]
 
         last_success_at: datetime | None = None
@@ -1399,6 +1730,8 @@ def _update_idle_time_after_refresh(
             idle_until=idle_until,
         )
         previous_state = updated_idle_time_state.get(provider_key)
+        if previous_state is not None and previous_state.oauth_refresh_blocked:
+            next_state = next_state.model_copy(update={"oauth_refresh_blocked": True})
         if previous_state is not None and previous_state == next_state:
             continue
         updated_idle_time_state[provider_key] = next_state
@@ -1536,8 +1869,9 @@ def _fetch_result(
     """
     @brief Execute one provider refresh call without legacy TTL cache reuse.
     @details Executes throttled provider fetch and returns normalized success/error
-    results. Claude 5h/7d requests are routed through `_fetch_claude_dual` so one
-    API request can provide deterministic dual-window rate-limit normalization.
+    results. Claude 5h/7d requests are routed through
+    `_fetch_claude_dual_with_auth_recovery` so one API request can provide
+    deterministic dual-window normalization with OAuth auth-error recovery.
     @param provider {BaseProvider} Provider instance to fetch from.
     @param window {WindowPeriod} Time window for the fetch.
     @param throttle_state {dict[str, float | int] | None} Mutable throttling state
@@ -1547,11 +1881,11 @@ def _fetch_result(
     @satisfies REQ-043
     @satisfies REQ-040
     """
-    if (
-        isinstance(provider, ClaudeOAuthProvider)
-        and window in {WindowPeriod.HOUR_5, WindowPeriod.DAY_7}
-    ):
-        result_5h, result_7d = _fetch_claude_dual(
+    if isinstance(provider, ClaudeOAuthProvider) and window in {
+        WindowPeriod.HOUR_5,
+        WindowPeriod.DAY_7,
+    }:
+        result_5h, result_7d = _fetch_claude_dual_with_auth_recovery(
             provider,
             throttle_state=throttle_state,
         )
@@ -1828,7 +2162,7 @@ def _refresh_and_persist_cache_payload(
             WindowPeriod.HOUR_5,
             WindowPeriod.DAY_7,
         }:
-            result_5h, result_7d = _fetch_claude_dual(
+            result_5h, result_7d = _fetch_claude_dual_with_auth_recovery(
                 provider=provider,
                 throttle_state=throttle_state,
             )
@@ -1915,15 +2249,20 @@ def retrieve_results_via_cache_pipeline(
         remove_idle_time_file()
 
     idle_state_by_provider = load_idle_time()
+    if force_refresh:
+        if _clear_claude_refresh_block_flag(idle_state_by_provider):
+            save_idle_time(idle_state_by_provider)
+            idle_state_by_provider = load_idle_time()
+    elif _clear_expired_claude_refresh_block(idle_state_by_provider):
+        save_idle_time(idle_state_by_provider)
+        idle_state_by_provider = load_idle_time()
     now_utc = datetime.now(timezone.utc)
     if provider_filter is None:
         selected_providers = providers
     else:
         selected_provider = providers.get(provider_filter)
         selected_providers = (
-            {}
-            if selected_provider is None
-            else {provider_filter: selected_provider}
+            {} if selected_provider is None else {provider_filter: selected_provider}
         )
 
     idle_blocked_provider_keys: set[str] = set()
@@ -2242,8 +2581,8 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
                         name,
                         _provider_display_name(name),
                         [
-                        "Status: NOT CONFIGURED",
-                        f"Missing env: {config.ENV_VARS.get(name)}",
+                            "Status: NOT CONFIGURED",
+                            f"Missing env: {config.ENV_VARS.get(name)}",
                         ],
                     )
                 )
@@ -2278,7 +2617,11 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
                     projected_result=result_7d,
                     status_section=status_section,
                 )
-                if result.is_error and not result_5h.is_error and not result_7d.is_error:
+                if (
+                    result.is_error
+                    and not result_5h.is_error
+                    and not result_7d.is_error
+                ):
                     result_raw = dict(result.raw)
                     if result.window == WindowPeriod.HOUR_5:
                         result_5h = result_5h.model_copy(
@@ -2513,7 +2856,10 @@ def _resolve_shared_panel_content_width(
     """
     if not rendered_panels:
         return _SHOW_PANEL_MIN_WIDTH - 4
-    return max(_panel_content_width(title, body_lines) for _, title, body_lines in rendered_panels)
+    return max(
+        _panel_content_width(title, body_lines)
+        for _, title, body_lines in rendered_panels
+    )
 
 
 def _emit_provider_panel(
@@ -2540,7 +2886,9 @@ def _emit_provider_panel(
     if content_width is None:
         panel_content_width = _panel_content_width(title=title, body_lines=body_lines)
     else:
-        panel_content_width = min(max(_SHOW_PANEL_MIN_WIDTH - 4, content_width), wrap_width)
+        panel_content_width = min(
+            max(_SHOW_PANEL_MIN_WIDTH - 4, content_width), wrap_width
+        )
     horizontal_border = "─" * (panel_content_width + 2)
     click.echo(f"{color_code}┌{horizontal_border}┐{_ANSI_RESET}")
     click.echo(
@@ -2556,9 +2904,7 @@ def _emit_provider_panel(
             else _ansi_ljust(body_line, panel_content_width)
         )
         click.echo(
-            f"{color_code}│{_ANSI_RESET} "
-            f"{padded_line} "
-            f"{color_code}│{_ANSI_RESET}"
+            f"{color_code}│{_ANSI_RESET} {padded_line} {color_code}│{_ANSI_RESET}"
         )
     click.echo(f"{color_code}└{horizontal_border}┘{_ANSI_RESET}")
     click.echo()
@@ -2618,7 +2964,9 @@ def _build_result_panel(
         title = f"{title} ({label})"
 
     status_line = f"Status: {'FAIL' if result.is_error else 'OK'}"
-    freshness_line = _build_freshness_line(result=result, freshness_state=freshness_state)
+    freshness_line = _build_freshness_line(
+        result=result, freshness_state=freshness_state
+    )
     detail_lines: list[str] = [f"Window {window_label}:"]
     if result.is_error:
         detail_lines.append(f"Error: {result.error}")
@@ -2644,7 +2992,8 @@ def _build_result_panel(
         detail_lines.append(f"Resets in: {_RESET_PENDING_MESSAGE}")
 
     if (
-        name in (
+        name
+        in (
             ProviderName.CLAUDE,
             ProviderName.CODEX,
             ProviderName.COPILOT,
@@ -2705,7 +3054,9 @@ def _build_result_panel(
             latency_total = monitoring_raw.get("latency_total")
             error_total = monitoring_raw.get("error_total")
             if isinstance(latency_total, (int, float)):
-                detail_lines.append(f"Monitoring latency total: {float(latency_total):.2f}")
+                detail_lines.append(
+                    f"Monitoring latency total: {float(latency_total):.2f}"
+                )
             if isinstance(error_total, (int, float)):
                 detail_lines.append(f"Monitoring error total: {float(error_total):.2f}")
         billing_raw = result.raw.get("billing")
@@ -2801,9 +3152,7 @@ def _build_dual_window_panel(
         ]
     footer_lines: list[str] = []
     if name == ProviderName.CODEX:
-        footer_lines = [
-            line for line in details_7d if line.startswith(metric_prefixes)
-        ]
+        footer_lines = [line for line in details_7d if line.startswith(metric_prefixes)]
         details_5h = [
             line for line in details_5h if not line.startswith(metric_prefixes)
         ]
@@ -2818,7 +3167,9 @@ def _build_dual_window_panel(
     status_line = (
         "Status: FAIL" if (result_5h.is_error or result_7d.is_error) else "Status: OK"
     )
-    freshness_line = _build_freshness_line(result=result_7d, freshness_state=freshness_state)
+    freshness_line = _build_freshness_line(
+        result=result_7d, freshness_state=freshness_state
+    )
     body_lines = [status_line, ""]
     if shared_lines:
         body_lines.extend(shared_lines)
@@ -3034,9 +3385,15 @@ def setup() -> None:
 
     runtime_config = load_runtime_config()
     click.echo(click.style("Runtime throttling", bold=True))
-    click.echo("  idle-delay controls cache-only mode duration after successful refresh.")
-    click.echo("  api-call delay controls minimum spacing between API calls in milliseconds.")
-    click.echo("  api-call timeout controls HTTP response timeout for provider API calls.")
+    click.echo(
+        "  idle-delay controls cache-only mode duration after successful refresh."
+    )
+    click.echo(
+        "  api-call delay controls minimum spacing between API calls in milliseconds."
+    )
+    click.echo(
+        "  api-call timeout controls HTTP response timeout for provider API calls."
+    )
     click.echo("  gnome-refresh-interval controls GNOME extension auto-refresh rate.")
     idle_delay_seconds = click.prompt(
         "  idle-delay seconds",
@@ -3058,11 +3415,14 @@ def setup() -> None:
         type=int,
         default=runtime_config.gnome_refresh_interval_seconds,
     )
-    billing_data = click.prompt(
-        "  billing_data",
-        default=runtime_config.billing_data,
-        show_default=True,
-    ).strip() or runtime_config.billing_data
+    billing_data = (
+        click.prompt(
+            "  billing_data",
+            default=runtime_config.billing_data,
+            show_default=True,
+        ).strip()
+        or runtime_config.billing_data
+    )
     click.echo()
     click.echo(click.style("Currency symbols", bold=True))
     click.echo("  Configure the default currency symbol for cost display per provider.")
@@ -3102,14 +3462,26 @@ def setup() -> None:
         client_payload_raw: dict[str, object] | None = None
         if oauth_source == "login":
             if not credential_store.has_client_config():
-                click.echo(click.style("  -> GeminiAI OAuth client config not found.", fg="red"))
-                click.echo("  -> Configure OAuth client with source 'file' or 'paste' first.")
+                click.echo(
+                    click.style(
+                        "  -> GeminiAI OAuth client config not found.", fg="red"
+                    )
+                )
+                click.echo(
+                    "  -> Configure OAuth client with source 'file' or 'paste' first."
+                )
             else:
                 try:
-                    credential_store.authorize_interactively(scopes=GEMINIAI_OAUTH_SCOPES)
+                    credential_store.authorize_interactively(
+                        scopes=GEMINIAI_OAUTH_SCOPES
+                    )
                     click.echo("  -> OAuth token saved")
                 except (FileNotFoundError, ValueError, OSError, ProviderError) as exc:
-                    click.echo(click.style(f"  -> GeminiAI OAuth setup failed: {exc}", fg="red"))
+                    click.echo(
+                        click.style(
+                            f"  -> GeminiAI OAuth setup failed: {exc}", fg="red"
+                        )
+                    )
         elif oauth_source == "file":
             default_path = str(credential_store.client_config_path)
             oauth_path_raw = click.prompt(
@@ -3124,7 +3496,9 @@ def setup() -> None:
             except OSError as exc:
                 click.echo(click.style(f"  -> OAuth file error: {exc}", fg="red"))
             except ValueError as exc:
-                click.echo(click.style(f"  -> OAuth JSON decode error: {exc}", fg="red"))
+                click.echo(
+                    click.style(f"  -> OAuth JSON decode error: {exc}", fg="red")
+                )
         else:
             pasted_json = click.prompt(
                 "  geminiai oauth client json (single-line)",
@@ -3135,7 +3509,9 @@ def setup() -> None:
                 try:
                     client_payload_raw = json.loads(pasted_json)
                 except ValueError as exc:
-                    click.echo(click.style(f"  -> OAuth JSON decode error: {exc}", fg="red"))
+                    click.echo(
+                        click.style(f"  -> OAuth JSON decode error: {exc}", fg="red")
+                    )
 
         if client_payload_raw is not None:
             try:
@@ -3145,11 +3521,17 @@ def setup() -> None:
                 if detected_project_id is not None:
                     geminiai_project_id = detected_project_id
                 click.echo("  -> OAuth client saved")
-                if click.confirm("  Open browser and authorize GeminiAI now?", default=True):
-                    credential_store.authorize_interactively(scopes=GEMINIAI_OAUTH_SCOPES)
+                if click.confirm(
+                    "  Open browser and authorize GeminiAI now?", default=True
+                ):
+                    credential_store.authorize_interactively(
+                        scopes=GEMINIAI_OAUTH_SCOPES
+                    )
                     click.echo("  -> OAuth token saved")
             except (FileNotFoundError, ValueError, OSError, ProviderError) as exc:
-                click.echo(click.style(f"  -> GeminiAI OAuth setup failed: {exc}", fg="red"))
+                click.echo(
+                    click.style(f"  -> GeminiAI OAuth setup failed: {exc}", fg="red")
+                )
 
         project_default = geminiai_project_id or ""
         project_input = click.prompt(
@@ -3383,7 +3765,9 @@ def _login_geminiai() -> None:
         sys.exit(1)
 
     try:
-        credentials = credential_store.authorize_interactively(scopes=GEMINIAI_OAUTH_SCOPES)
+        credentials = credential_store.authorize_interactively(
+            scopes=GEMINIAI_OAUTH_SCOPES
+        )
     except (FileNotFoundError, ValueError, OSError, ProviderError) as exc:
         click.echo(click.style(f"\n Login failed: {exc}", fg="red"))
         sys.exit(1)
@@ -3440,15 +3824,23 @@ def gnome_install() -> None:
     src_dir = _resolve_extension_source_dir()
     click.echo(click.style("  [1/4] ", bold=True) + "Validating extension source...")
     if not src_dir.is_dir():
-        click.echo(click.style("  [FAIL] ", fg="red") + f"Source directory not found: {src_dir}")
+        click.echo(
+            click.style("  [FAIL] ", fg="red")
+            + f"Source directory not found: {src_dir}"
+        )
         sys.exit(1)
     metadata_path = src_dir / "metadata.json"
     if not metadata_path.is_file():
-        click.echo(click.style("  [FAIL] ", fg="red") + f"metadata.json not found in: {src_dir}")
+        click.echo(
+            click.style("  [FAIL] ", fg="red")
+            + f"metadata.json not found in: {src_dir}"
+        )
         sys.exit(1)
     source_files = [f for f in src_dir.iterdir() if f.is_file()]
     if not source_files:
-        click.echo(click.style("  [FAIL] ", fg="red") + f"Source directory is empty: {src_dir}")
+        click.echo(
+            click.style("  [FAIL] ", fg="red") + f"Source directory is empty: {src_dir}"
+        )
         sys.exit(1)
     click.echo(
         click.style("  [  OK] ", fg="green")
@@ -3466,7 +3858,9 @@ def gnome_install() -> None:
         click.echo(click.style("  [  OK] ", fg="green") + f"Created: {target_dir}")
 
     if is_update_mode:
-        click.echo(click.style("  [3/5] ", bold=True) + "Disabling extension for update...")
+        click.echo(
+            click.style("  [3/5] ", bold=True) + "Disabling extension for update..."
+        )
         if shutil.which("gnome-extensions") is not None:
             disable_result = subprocess.run(
                 ["gnome-extensions", "disable", _EXT_UUID],
@@ -3474,7 +3868,8 @@ def gnome_install() -> None:
             )
             if disable_result.returncode == 0:
                 click.echo(
-                    click.style("  [  OK] ", fg="green") + f"Extension disabled: {_EXT_UUID}"
+                    click.style("  [  OK] ", fg="green")
+                    + f"Extension disabled: {_EXT_UUID}"
                 )
             else:
                 click.echo(
@@ -3491,7 +3886,8 @@ def gnome_install() -> None:
     for src_file in source_files:
         shutil.copy2(str(src_file), str(target_dir / src_file.name))
     click.echo(
-        click.style("  [  OK] ", fg="green") + f"Copied {len(source_files)} files to target"
+        click.style("  [  OK] ", fg="green")
+        + f"Copied {len(source_files)} files to target"
     )
 
     click.echo(click.style("  [5/5] ", bold=True) + "Enabling extension...")
@@ -3522,11 +3918,15 @@ def gnome_install() -> None:
     click.echo(click.style("  [INFO] ", fg="cyan") + f"Installed to   : {target_dir}")
     click.echo()
     click.echo(
-        click.style("  [WARN] ", fg="yellow") + "Restart GNOME Shell to load the extension:"
+        click.style("  [WARN] ", fg="yellow")
+        + "Restart GNOME Shell to load the extension:"
     )
-    click.echo(click.style("  [INFO] ", fg="cyan") + "  Wayland : Log out and log back in")
     click.echo(
-        click.style("  [INFO] ", fg="cyan") + "  X11     : Press Alt+F2, type r, press Enter"
+        click.style("  [INFO] ", fg="cyan") + "  Wayland : Log out and log back in"
+    )
+    click.echo(
+        click.style("  [INFO] ", fg="cyan")
+        + "  X11     : Press Alt+F2, type r, press Enter"
     )
     click.echo()
 
@@ -3557,7 +3957,9 @@ def gnome_uninstall() -> None:
 
     target_dir = _EXT_TARGET_DIR
 
-    click.echo(click.style("  [1/3] ", bold=True) + "Checking extension installation...")
+    click.echo(
+        click.style("  [1/3] ", bold=True) + "Checking extension installation..."
+    )
     if not target_dir.is_dir():
         click.echo(
             click.style("  [FAIL] ", fg="red")
@@ -3574,7 +3976,8 @@ def gnome_uninstall() -> None:
         )
         if result.returncode == 0:
             click.echo(
-                click.style("  [  OK] ", fg="green") + f"Extension disabled: {_EXT_UUID}"
+                click.style("  [  OK] ", fg="green")
+                + f"Extension disabled: {_EXT_UUID}"
             )
         else:
             click.echo(
@@ -3597,9 +4000,12 @@ def gnome_uninstall() -> None:
     click.echo(
         click.style("  [WARN] ", fg="yellow") + "Restart GNOME Shell to apply changes:"
     )
-    click.echo(click.style("  [INFO] ", fg="cyan") + "  Wayland : Log out and log back in")
     click.echo(
-        click.style("  [INFO] ", fg="cyan") + "  X11     : Press Alt+F2, type r, press Enter"
+        click.style("  [INFO] ", fg="cyan") + "  Wayland : Log out and log back in"
+    )
+    click.echo(
+        click.style("  [INFO] ", fg="cyan")
+        + "  X11     : Press Alt+F2, type r, press Enter"
     )
     click.echo()
 
