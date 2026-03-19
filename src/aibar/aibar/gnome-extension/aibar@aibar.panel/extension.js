@@ -59,6 +59,23 @@ function _getProviderDisplayName(providerName) {
 }
 
 /**
+ * @brief Reset popup menu item pseudo-class state to base visual style.
+ * @details Removes `focus` and `active` pseudo classes from the menu item actor so
+ * focus-loss transitions always return to the original color surface.
+ * Time complexity O(1). Space complexity O(1).
+ * @param {any} menuItem Popup menu item actor candidate.
+ * @returns {boolean} True when pseudo-class removal API is available and executed.
+ * @satisfies DES-006
+ */
+function _resetMenuItemFocusVisualState(menuItem) {
+    if (!menuItem || typeof menuItem.remove_style_pseudo_class !== 'function')
+        return false;
+    menuItem.remove_style_pseudo_class('focus');
+    menuItem.remove_style_pseudo_class('active');
+    return true;
+}
+
+/**
  * @brief Check whether provider cards must render API counter labels.
  * @details API-counter providers render `requests` and `tokens` labels on OK states
  * with null/undefined counters normalized to zero.
@@ -543,6 +560,10 @@ class AIBarIndicator extends PanelMenu.Button {
         let refreshItem = new PopupMenu.PopupMenuItem('Refresh Now');
         refreshItem.connect('activate', () => {
             this._refreshData(true);
+            _resetMenuItemFocusVisualState(refreshItem);
+        });
+        refreshItem.connect('key-focus-out', () => {
+            _resetMenuItemFocusVisualState(refreshItem);
         });
         this.menu.addMenuItem(refreshItem);
 
