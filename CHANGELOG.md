@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.13.0](https://github.com/Ogekuri/AIBar/compare/v0.12.0..v0.13.0) - 2026-03-19
+### ⛰️  Features
+- add in-process token refresh recovery and retry block state [useReq] *(claude-oauth)*
+  - add requirements for Claude OAuth once-mode refresh parity, auth retry, and idle-time block flag lifecycle\n- port once-mode shell flow to Python routine with timeout/delay controls and log truncation\n- add Claude auth-expired recovery path with single renewal+retry and block-flag persistence\n- extend idle-time schema with oauth_refresh_blocked and force/TTL unblock behavior\n- add unit tests covering refresh routine, retry policy, and block flag lifecycle
+
+### 🐛  Bug Fixes
+- reset Refresh Now visual state on focus loss [useReq] *(gnome-extension)*
+  - REQ-EVIDENCE-ID: useReq-AIBar-work-20260319120024\n- add helper to clear Refresh Now focus/active pseudo classes\n- invoke cleanup on activation and key-focus-out events\n- update workflow and references docs for new internal helper\n- add focused regression test for Refresh Now focus-loss color reset
+
+### 🚜  Changes
+- set default API timeout to 5 seconds [useReq] *(config)*
+  - Update REQ-005, REQ-095, and TST-013 defaults from 3000ms to 5000ms in docs/REQUIREMENTS.md.
+  - Set RuntimeConfig default timeout to 5000ms in src/aibar/aibar/config.py and align Doxygen details.
+  - Update setup runtime-config tests to assert timeout prompt ordering and persisted timeout value.
+  - Regenerate docs/REFERENCES.md and update docs/WORKFLOW.md runtime setup timeout description.
+- align FAIL block formatting across CLI and GNOME [useReq] *(show-output)*
+  - Update REQ-017/REQ-036/REQ-084 and related TST requirements for FAIL rendering format.
+  - Render CLI FAIL panels as Status/Reason/Updated-Next and remove window heading rows.
+  - Render GNOME FAIL cards as Status/Reason while preserving Updated/Next row visibility.
+  - Refresh workflow and references docs and update targeted tests for new output contract.
+- render all GeminiAI billing services without truncation [useReq] *(cli)*
+  - Update REQ-106 and TST-046 to require full billing-service evidence output.
+  - Remove truncation logic from _format_billing_service_descriptions in CLI rendering.
+  - Adjust GeminiAI status-message test to assert all four service names are printed.
+  - Refresh WORKFLOW and REFERENCES documentation to match updated behavior and symbols.
+- add human-readable GeminiAI billing services output [useReq] *(cli)*
+  - Update requirements with REQ-106 and TST-046 for GeminiAI billing services formatting.
+  - Implement CLI GeminiAI billing service summary with ordered names and truncation.
+  - Add unit tests for human-readable and truncated billing service list rendering.
+  - Regenerate REFERENCES and update WORKFLOW call-trace for new formatter helper.
+- remove FAIL/status window labels from CLI/GNOME [useReq] *(cli-show)*
+  - Update REQ-017/036/037/067/084 and related TST entries for FAIL rendering.
+  - Implement CLI FAIL output as error-only and remove all window heading labels.
+  - Implement GNOME card FAIL output as error-only and hide freshness/window rows.
+  - Regenerate WORKFLOW and REFERENCES to reflect updated runtime/symbol evidence.
+
 ## [0.12.0](https://github.com/Ogekuri/AIBar/compare/v0.11.0..v0.12.0) - 2026-03-18
 ### 🐛  Bug Fixes
 - restore Updated/Next with legacy CLI JSON [useReq] *(gnome-extension)*
@@ -802,6 +838,7 @@
 - \[0.10.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.10.0
 - \[0.11.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.11.0
 - \[0.12.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.12.0
+- \[0.13.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.13.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -815,3 +852,4 @@
 [0.10.0]: https://github.com/Ogekuri/AIBar/compare/v0.9.0..v0.10.0
 [0.11.0]: https://github.com/Ogekuri/AIBar/compare/v0.10.0..v0.11.0
 [0.12.0]: https://github.com/Ogekuri/AIBar/compare/v0.11.0..v0.12.0
+[0.13.0]: https://github.com/Ogekuri/AIBar/compare/v0.12.0..v0.13.0
