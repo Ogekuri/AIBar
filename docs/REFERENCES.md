@@ -340,7 +340,7 @@ from typing import Any
 
 ---
 
-# cli.py | Python | 4065L | 114 symbols | 30 imports | 128 comments
+# cli.py | Python | 4056L | 114 symbols | 30 imports | 128 comments
 > Path: `src/aibar/aibar/cli.py`
 - @brief Command-line interface for aibar.
 - @details Defines command parsing, provider dispatch, formatted output, setup helpers, login flows, and UI launch hooks.
@@ -1272,19 +1272,23 @@ Border and title color use provider-specific ANSI palette.
 - @return {str | None} Diagnostic line or None when both values are missing.
 - @satisfies REQ-037
 
-### fn `def _format_billing_service_descriptions(` `priv` (L3090-3092)
+### fn `def _format_billing_service_descriptions(services: list[object]) -> str | None` `priv` (L3090-3117)
 - @brief Build one provider panel title/body payload for CLI text rendering.
+- @brief Build human-readable GeminiAI billing service summary.
 - @details Formats deterministic panel lines for one provider/window result and
 preserves provider-specific metrics/error rendering rules used by `show`.
 `FAIL` states emit only one `Error: <reason>` line. `OK` states emit
 `Status: OK` first, do not emit `Window <window>` headings, and end with a
 right-aligned `Updated/Next` freshness line.
+- @details Extracts ordered `service_description` values from billing service entries and returns all valid names in source order as one comma-separated summary string.
 - @param name {ProviderName} Provider name enum value.
 - @param result {ProviderResult} Provider result to render.
 - @param label {str | None} Optional window label suffix (e.g. `"5h"`, `"7d"`).
 - @param freshness_state {IdleTimeState | None} Optional provider idle-time state
 carrying `last_success_timestamp` and `idle_until_timestamp` freshness values.
+- @param services {list[object]} Billing service entries from GeminiAI raw billing payload.
 - @return {tuple[str, list[str]]} Panel title and body lines.
+- @return {str | None} Comma-separated service names summary without surrounding parentheses, or `None` when no valid names exist.
 - @satisfies REQ-084
 - @satisfies REQ-034
 - @satisfies REQ-035
@@ -1293,20 +1297,11 @@ carrying `last_success_timestamp` and `idle_until_timestamp` freshness values.
 - @satisfies REQ-060
 - @satisfies REQ-067
 - @satisfies REQ-084
-
-### fn `def _build_dual_window_panel(` `priv` (L3127-3131)
-- @brief Build human-readable GeminiAI billing service summary.
-- @details Extracts ordered `service_description` values from billing service
-entries, keeps at most `max_visible` names, and appends `...` when hidden
-services remain.
-- @param services {list[object]} Billing service entries from GeminiAI raw
-billing payload.
-- @param max_visible {int} Maximum service names to include.
-- @return {str | None} Comma-separated service names summary without
-surrounding parentheses, or `None` when no valid names exist.
 - @satisfies REQ-106
 
-### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L3237-3255)
+### fn `def _build_dual_window_panel(` `priv` (L3118-3122)
+
+### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L3228-3246)
 - @brief Build one grouped CLI panel for dual-window providers.
 - @brief Render CLI text output for one provider result.
 - @details Produces one provider panel from `5h` and `7d` results while
@@ -1332,15 +1327,15 @@ one trailing right-aligned freshness line.
 - @satisfies REQ-051
 - @satisfies REQ-067
 
-### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L3256-3271)
+### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L3247-3262)
 - @brief Execute format reset duration.
 - @details Applies format reset duration logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param seconds {float} Input parameter `seconds`.
 - @return {str} Function return value.
 
-### fn `def _should_print_claude_reset_pending_hint(` `priv` (L3272-3274)
+### fn `def _should_print_claude_reset_pending_hint(` `priv` (L3263-3265)
 
-### fn `def _is_displayed_zero_percent(percent: float | None) -> bool` `priv` (L3294-3310)
+### fn `def _is_displayed_zero_percent(percent: float | None) -> bool` `priv` (L3285-3301)
 - @brief Determine whether CLI output must render the reset-pending fallback hint.
 - @brief Check whether a percentage renders as `0.0%` in one-decimal UI output.
 - @details The hint is only valid for Claude windows when no reset timestamp is
@@ -1356,7 +1351,7 @@ providers other than Claude.
 - @satisfies REQ-002
 - @satisfies REQ-002
 
-### fn `def _progress_bar(percent: float, provider_name: ProviderName, width: int = 20) -> str` `priv` (L3311-3326)
+### fn `def _progress_bar(percent: float, provider_name: ProviderName, width: int = 20) -> str` `priv` (L3302-3317)
 - @brief Execute progress bar.
 - @details Applies progress bar logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param percent {float} Input parameter `percent`.
@@ -1364,17 +1359,17 @@ providers other than Claude.
 - @param width {int} Input parameter `width`.
 - @return {str} Function return value.
 
-### fn `def doctor() -> None` (L3331-3383)
+### fn `def doctor() -> None` (L3322-3374)
 - @brief Execute doctor.
 - @details Applies doctor logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def env() -> None` (L3388-3396)
+### fn `def env() -> None` (L3379-3387)
 - @brief Execute env.
 - @details Applies env logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def setup() -> None` (L3401-3600)
+### fn `def setup() -> None` (L3392-3591)
 - @brief Execute setup.
 - @details Prompts for `idle_delay_seconds`, `api_call_delay_milliseconds`, `api_call_timeout_milliseconds`, `gnome_refresh_interval_seconds`, and `billing_data` in order, then prompts for provider currency symbols including `geminiai` (choices: `$`, `£`, `€`, default `$`), then persists all values to `~/.config/aibar/config.json`. GeminiAI OAuth source supports `skip`, `file`, `paste`, and `login` (re-authorization with current scopes). Also prompts for provider API keys and writes them to `~/.config/aibar/env`.
 - @return {None} Function return value.
@@ -1384,43 +1379,43 @@ providers other than Claude.
 - @satisfies REQ-056
 - @satisfies REQ-059
 
-### fn `def login(provider: str) -> None` (L3700-3718)
+### fn `def login(provider: str) -> None` (L3691-3709)
 - @brief Execute login.
 - @details Applies login logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param provider {str} Input parameter `provider`.
 - @return {None} Function return value.
 
-### fn `def _login_claude() -> None` `priv` (L3719-3767)
+### fn `def _login_claude() -> None` `priv` (L3710-3758)
 - @brief Execute login claude.
 - @details Applies login claude logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_copilot() -> None` `priv` (L3768-3795)
+### fn `def _login_copilot() -> None` `priv` (L3759-3786)
 - @brief Execute login copilot.
 - @details Applies login copilot logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_geminiai() -> None` `priv` (L3796-3834)
+### fn `def _login_geminiai() -> None` `priv` (L3787-3825)
 - @brief Execute GeminiAI OAuth login flow.
 - @details Reuses persisted OAuth client configuration to launch browser-based authorization and persist refresh-capable Google credentials.
 - @return {None} Function return value.
 - @satisfies REQ-055
 - @satisfies REQ-056
 
-### fn `def _resolve_extension_source_dir() -> Path` `priv` (L3835-3847)
+### fn `def _resolve_extension_source_dir() -> Path` `priv` (L3826-3838)
 - @brief Resolve GNOME extension source directory from within the `aibar` package.
 - @details Uses `Path(__file__).resolve().parent` to locate the `aibar` package directory, then appends `gnome-extension/<UUID>/`. Works in development (editable install), wheel-installed, and `uv tool install` layouts because the extension directory resides inside the `aibar` Python package subtree.
 - @return {Path} Absolute path to the extension source directory.
 - @satisfies REQ-025, REQ-083
 
-### fn `def gnome_install() -> None` (L3858-3984)
+### fn `def gnome_install() -> None` (L3849-3975)
 - @brief Install or update the AIBar GNOME Shell extension to the user's local extensions directory.
 - @details Resolves extension source from the installed package path, validates source directory contains `metadata.json` and is non-empty, then executes one of two flows: install flow (`target` absent) creates target and copies files before enabling extension; update flow (`target` present) disables extension, copies files, then enables extension. Update flow masks non-zero disable outcomes caused by missing extension and continues. Produces colored Click-styled terminal output for all status messages.
 - @return {None} Function return value.
 - @throws {SystemExit} Exits with code 1 on prerequisite validation failure.
 - @satisfies PRJ-008, REQ-025, REQ-026, REQ-027, REQ-028, REQ-029, REQ-030, REQ-032, REQ-099
 
-### fn `def gnome_uninstall() -> None` (L3994-4063)
+### fn `def gnome_uninstall() -> None` (L3985-4054)
 - @brief Remove the AIBar GNOME Shell extension from the user's local extensions directory.
 - @details Disables the extension via `gnome-extensions disable`, then removes the entire extension directory at `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/`. Exits with code 1 if the extension directory does not exist. Produces colored Click-styled terminal output for all status messages.
 - @return {None} Function return value.
@@ -1527,23 +1522,23 @@ providers other than Claude.
 |`_emit_provider_panel`|fn|priv|2865-2869|def _emit_provider_panel(|
 |`_format_http_status_retry_line`|fn|priv|2913-2915|def _format_http_status_retry_line(|
 |`_build_result_panel`|fn|priv|2937-2941|def _build_result_panel(|
-|`_format_billing_service_descriptions`|fn|priv|3090-3092|def _format_billing_service_descriptions(|
-|`_build_dual_window_panel`|fn|priv|3127-3131|def _build_dual_window_panel(|
-|`_print_result`|fn|priv|3237-3255|def _print_result(name: ProviderName, result, label: str ...|
-|`_format_reset_duration`|fn|priv|3256-3271|def _format_reset_duration(seconds: float) -> str|
-|`_should_print_claude_reset_pending_hint`|fn|priv|3272-3274|def _should_print_claude_reset_pending_hint(|
-|`_is_displayed_zero_percent`|fn|priv|3294-3310|def _is_displayed_zero_percent(percent: float | None) -> ...|
-|`_progress_bar`|fn|priv|3311-3326|def _progress_bar(percent: float, provider_name: Provider...|
-|`doctor`|fn|pub|3331-3383|def doctor() -> None|
-|`env`|fn|pub|3388-3396|def env() -> None|
-|`setup`|fn|pub|3401-3600|def setup() -> None|
-|`login`|fn|pub|3700-3718|def login(provider: str) -> None|
-|`_login_claude`|fn|priv|3719-3767|def _login_claude() -> None|
-|`_login_copilot`|fn|priv|3768-3795|def _login_copilot() -> None|
-|`_login_geminiai`|fn|priv|3796-3834|def _login_geminiai() -> None|
-|`_resolve_extension_source_dir`|fn|priv|3835-3847|def _resolve_extension_source_dir() -> Path|
-|`gnome_install`|fn|pub|3858-3984|def gnome_install() -> None|
-|`gnome_uninstall`|fn|pub|3994-4063|def gnome_uninstall() -> None|
+|`_format_billing_service_descriptions`|fn|priv|3090-3117|def _format_billing_service_descriptions(services: list[o...|
+|`_build_dual_window_panel`|fn|priv|3118-3122|def _build_dual_window_panel(|
+|`_print_result`|fn|priv|3228-3246|def _print_result(name: ProviderName, result, label: str ...|
+|`_format_reset_duration`|fn|priv|3247-3262|def _format_reset_duration(seconds: float) -> str|
+|`_should_print_claude_reset_pending_hint`|fn|priv|3263-3265|def _should_print_claude_reset_pending_hint(|
+|`_is_displayed_zero_percent`|fn|priv|3285-3301|def _is_displayed_zero_percent(percent: float | None) -> ...|
+|`_progress_bar`|fn|priv|3302-3317|def _progress_bar(percent: float, provider_name: Provider...|
+|`doctor`|fn|pub|3322-3374|def doctor() -> None|
+|`env`|fn|pub|3379-3387|def env() -> None|
+|`setup`|fn|pub|3392-3591|def setup() -> None|
+|`login`|fn|pub|3691-3709|def login(provider: str) -> None|
+|`_login_claude`|fn|priv|3710-3758|def _login_claude() -> None|
+|`_login_copilot`|fn|priv|3759-3786|def _login_copilot() -> None|
+|`_login_geminiai`|fn|priv|3787-3825|def _login_geminiai() -> None|
+|`_resolve_extension_source_dir`|fn|priv|3826-3838|def _resolve_extension_source_dir() -> Path|
+|`gnome_install`|fn|pub|3849-3975|def gnome_install() -> None|
+|`gnome_uninstall`|fn|pub|3985-4054|def gnome_uninstall() -> None|
 
 
 ---

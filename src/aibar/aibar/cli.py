@@ -3087,24 +3087,18 @@ def _build_result_panel(
     return title, [status_line, "", *detail_lines, "", freshness_line]
 
 
-def _format_billing_service_descriptions(
-    services: list[object],
-    max_visible: int = 3,
-) -> str | None:
+def _format_billing_service_descriptions(services: list[object]) -> str | None:
     """
     @brief Build human-readable GeminiAI billing service summary.
     @details Extracts ordered `service_description` values from billing service
-    entries, keeps at most `max_visible` names, and appends `...` when hidden
-    services remain.
+    entries and returns all valid names in source order as one comma-separated
+    summary string.
     @param services {list[object]} Billing service entries from GeminiAI raw
         billing payload.
-    @param max_visible {int} Maximum service names to include.
     @return {str | None} Comma-separated service names summary without
         surrounding parentheses, or `None` when no valid names exist.
     @satisfies REQ-106
     """
-    if max_visible <= 0:
-        return None
     service_names: list[str] = []
     for service_entry in services:
         if not isinstance(service_entry, dict):
@@ -3118,10 +3112,7 @@ def _format_billing_service_descriptions(
         service_names.append(service_name)
     if not service_names:
         return None
-    visible_names = service_names[:max_visible]
-    if len(service_names) > max_visible:
-        visible_names.append("...")
-    return ", ".join(visible_names)
+    return ", ".join(service_names)
 
 
 def _build_dual_window_panel(

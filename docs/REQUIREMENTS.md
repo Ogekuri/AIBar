@@ -189,7 +189,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-058**: GeminiAI provider failures for HTTP `429`, Google quota exhaustion, or missing billing-export table MUST mark attempt status `FAIL`, preserve prior payload snapshots, and apply existing idle-time retry policy for rate-limited refreshes.
 - **REQ-059**: `setup` MUST include `geminiai` in `currency_symbols` prompts, and GeminiAI rendering MUST resolve `RuntimeConfig.currency_symbols.geminiai` with fallback `"$"` when missing.
 - **REQ-060**: CLI text `show` and JSON `show --json` MUST expose GeminiAI monitoring usage fields, latest-available billing-period cost values, and cached `result/error` status for billing table discovery or query failures.
-- **REQ-106**: CLI text GeminiAI `Billing services: <count>` MUST append parenthesized service names from billing data in display order, comma-separated, limited to three entries with trailing `...` when additional services exist.
+- **REQ-106**: CLI text GeminiAI `Billing services: <count>` MUST append parenthesized service names from billing data in display order, comma-separated, including all available services without truncation markers.
 - **REQ-097**: GeminiAI effective window MUST always be `30d` in CLI text and JSON output, and GeminiAI fetch logic MUST ignore requested window arguments.
 - **REQ-098**: GeminiAI monitoring queries MUST use interval `[UTC month start, current UTC time]` so `30d` behavior represents current-month usage scope.
 - **REQ-061**: GNOME extension MUST render GeminiAI provider tab/card using bright-purple style classes, include GeminiAI payload and status in panel aggregation logic, and order `geminiai` as the last provider tab/card.
@@ -270,7 +270,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-043**: MUST verify Claude OAuth renewal routine truncates `~/.config/aibar/claude_token_refresh.log`, executes `claude /usage` and `aibar login --provider claude`, and records command-availability failures without aborting execution.
 - **TST-044**: MUST verify Claude authentication error `Invalid or expired OAuth token` triggers one renewal attempt and one retry, then persists `claude.oauth_refresh_blocked=true` when retry authentication fails again.
 - **TST-045**: MUST verify `claude.oauth_refresh_blocked` suppresses repeated renewal attempts, auto-clears at `last_success_timestamp + 86400`, and is removed on `show --force`.
-- **TST-046**: MUST verify GeminiAI CLI text renders `Billing services: <count> (<service1>, <service2>, ...)` using billing `service_description` values, preserving order, capping visible names at three, and appending `...` when truncated.
+- **TST-046**: MUST verify GeminiAI CLI text renders `Billing services: <count> (<service1>, <service2>, ...)` using billing `service_description` values, preserving order, and printing all discovered services without truncation markers.
 - **TST-036**: MUST verify `--version` and `--ver` print installed version and bypass subcommand execution.
 - **TST-038**: MUST verify CLI text `show` prints `Error: <reason>` only on `FAIL`, never renders `Window <window>` headings, renders right-aligned `Updated/Next` only on `OK`, and keeps `show --json` freshness, API-counter, cost, and GeminiAI effective-window behaviors.
 - **TST-042**: MUST verify CLI `show` and GNOME provider cards render equivalent `Error: <reason>` output for failed provider/window status without status/window/retry/freshness lines.

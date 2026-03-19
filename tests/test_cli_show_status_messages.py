@@ -404,11 +404,11 @@ def test_build_result_panel_renders_geminiai_billing_services_human_readable() -
     assert "Billing services: 2 (Google AI Studio, TAX)" in lines
 
 
-def test_build_result_panel_truncates_geminiai_billing_services_preview() -> None:
+def test_build_result_panel_renders_all_geminiai_billing_services() -> None:
     """
-    @brief Verify GeminiAI billing services preview truncation behavior.
+    @brief Verify GeminiAI billing services rendering includes all services.
     @details Builds GeminiAI panel lines with four billing services and asserts
-    output preserves order, limits visible names to three, and appends `...`.
+    output preserves order and prints all service names without truncation.
     @return {None} Function return value.
     @satisfies REQ-106
     @satisfies TST-046
@@ -429,4 +429,4 @@ def test_build_result_panel_truncates_geminiai_billing_services_preview() -> Non
         },
     )
     _title, lines = _build_result_panel(ProviderName.GEMINIAI, result_payload)
-    assert "Billing services: 4 (Google AI Studio, TAX, Vertex AI, ...)" in lines
+    assert "Billing services: 4 (Google AI Studio, TAX, Vertex AI, BigQuery)" in lines
