@@ -3068,7 +3068,13 @@ def _build_result_panel(
             if isinstance(table_path, str) and table_path:
                 detail_lines.append(f"Billing path: {table_path}")
             if isinstance(services, list):
-                detail_lines.append(f"Billing services: {len(services)}")
+                services_summary = _format_billing_service_descriptions(services)
+                if services_summary is None:
+                    detail_lines.append(f"Billing services: {len(services)}")
+                else:
+                    detail_lines.append(
+                        f"Billing services: {len(services)} ({services_summary})"
+                    )
 
     if not result.is_error:
         status_retry_line = _format_http_status_retry_line(
@@ -3079,6 +3085,43 @@ def _build_result_panel(
             detail_lines.append(status_retry_line)
 
     return title, [status_line, "", *detail_lines, "", freshness_line]
+
+
+def _format_billing_service_descriptions(
+    services: list[object],
+    max_visible: int = 3,
+) -> str | None:
+    """
+    @brief Build human-readable GeminiAI billing service summary.
+    @details Extracts ordered `service_description` values from billing service
+    entries, keeps at most `max_visible` names, and appends `...` when hidden
+    services remain.
+    @param services {list[object]} Billing service entries from GeminiAI raw
+        billing payload.
+    @param max_visible {int} Maximum service names to include.
+    @return {str | None} Comma-separated service names summary without
+        surrounding parentheses, or `None` when no valid names exist.
+    @satisfies REQ-106
+    """
+    if max_visible <= 0:
+        return None
+    service_names: list[str] = []
+    for service_entry in services:
+        if not isinstance(service_entry, dict):
+            continue
+        service_name_raw = service_entry.get("service_description")
+        if not isinstance(service_name_raw, str):
+            continue
+        service_name = service_name_raw.strip()
+        if not service_name:
+            continue
+        service_names.append(service_name)
+    if not service_names:
+        return None
+    visible_names = service_names[:max_visible]
+    if len(service_names) > max_visible:
+        visible_names.append("...")
+    return ", ".join(visible_names)
 
 
 def _build_dual_window_panel(

@@ -17,7 +17,12 @@ from click.testing import CliRunner
 
 from aibar import config as config_module
 from aibar.cli import RetrievalPipelineOutput, _build_result_panel, main
-from aibar.providers.base import ProviderName, ProviderResult, UsageMetrics, WindowPeriod
+from aibar.providers.base import (
+    ProviderName,
+    ProviderResult,
+    UsageMetrics,
+    WindowPeriod,
+)
 from aibar.providers.claude_oauth import ClaudeOAuthProvider
 
 
@@ -33,7 +38,9 @@ def _patch_config_paths(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(config_module, "APP_CONFIG_DIR", config_dir)
     monkeypatch.setattr(config_module, "APP_CACHE_DIR", cache_dir)
     monkeypatch.setattr(config_module, "ENV_FILE_PATH", config_dir / "env")
-    monkeypatch.setattr(config_module, "RUNTIME_CONFIG_PATH", config_dir / "config.json")
+    monkeypatch.setattr(
+        config_module, "RUNTIME_CONFIG_PATH", config_dir / "config.json"
+    )
     monkeypatch.setattr(config_module, "CACHE_FILE_PATH", cache_dir / "cache.json")
     monkeypatch.setattr(config_module, "IDLE_TIME_PATH", cache_dir / "idle-time.json")
 
@@ -144,14 +151,25 @@ def test_show_json_exports_freshness_with_local_datetime_parity(
     )
 
     runner = CliRunner()
-    result = runner.invoke(main, ["show", "--provider", "openai", "--window", "7d", "--json"])
+    result = runner.invoke(
+        main, ["show", "--provider", "openai", "--window", "7d", "--json"]
+    )
     assert result.exit_code == 0
     output_doc = json.loads(result.output)
     freshness_entry = output_doc["freshness"][ProviderName.OPENAI.value]
-    assert freshness_entry["last_success_timestamp"] == idle_time_state.last_success_timestamp
-    assert freshness_entry["idle_until_timestamp"] == idle_time_state.idle_until_timestamp
-    assert freshness_entry["last_success_local"] == idle_last_success.astimezone().strftime("%Y-%m-%d %H:%M")
-    assert freshness_entry["idle_until_local"] == idle_until.astimezone().strftime("%Y-%m-%d %H:%M")
+    assert (
+        freshness_entry["last_success_timestamp"]
+        == idle_time_state.last_success_timestamp
+    )
+    assert (
+        freshness_entry["idle_until_timestamp"] == idle_time_state.idle_until_timestamp
+    )
+    assert freshness_entry[
+        "last_success_local"
+    ] == idle_last_success.astimezone().strftime("%Y-%m-%d %H:%M")
+    assert freshness_entry["idle_until_local"] == idle_until.astimezone().strftime(
+        "%Y-%m-%d %H:%M"
+    )
 
 
 def test_show_renders_cached_failure_error_only_with_retry_metadata(
@@ -171,7 +189,9 @@ def test_show_renders_cached_failure_error_only_with_retry_metadata(
     """
     _patch_config_paths(monkeypatch, tmp_path)
     config_module.save_runtime_config(
-        config_module.RuntimeConfig(idle_delay_seconds=300, api_call_delay_milliseconds=20)
+        config_module.RuntimeConfig(
+            idle_delay_seconds=300, api_call_delay_milliseconds=20
+        )
     )
     cached_success = ProviderResult(
         provider=ProviderName.OPENROUTER,
@@ -356,3 +376,57 @@ def test_build_result_panel_renders_zero_api_counters_for_null_metrics() -> None
         _title, lines = _build_result_panel(provider_name, result_payload)
         assert "Requests: 0" in lines
         assert "Tokens: 0 (0 in / 0 out)" in lines
+
+
+def test_build_result_panel_renders_geminiai_billing_services_human_readable() -> None:
+    """
+    @brief Verify GeminiAI panel renders human-readable billing service names.
+    @details Builds GeminiAI panel lines with ordered billing `service_description`
+    entries and verifies output includes count plus parenthesized service list.
+    @return {None} Function return value.
+    @satisfies REQ-106
+    @satisfies TST-046
+    """
+    result_payload = ProviderResult(
+        provider=ProviderName.GEMINIAI,
+        window=WindowPeriod.DAY_30,
+        metrics=UsageMetrics(cost=12.5, currency_symbol="$"),
+        raw={
+            "billing": {
+                "services": [
+                    {"service_description": "Google AI Studio"},
+                    {"service_description": "TAX"},
+                ]
+            }
+        },
+    )
+    _title, lines = _build_result_panel(ProviderName.GEMINIAI, result_payload)
+    assert "Billing services: 2 (Google AI Studio, TAX)" in lines
+
+
+def test_build_result_panel_truncates_geminiai_billing_services_preview() -> None:
+    """
+    @brief Verify GeminiAI billing services preview truncation behavior.
+    @details Builds GeminiAI panel lines with four billing services and asserts
+    output preserves order, limits visible names to three, and appends `...`.
+    @return {None} Function return value.
+    @satisfies REQ-106
+    @satisfies TST-046
+    """
+    result_payload = ProviderResult(
+        provider=ProviderName.GEMINIAI,
+        window=WindowPeriod.DAY_30,
+        metrics=UsageMetrics(cost=1.0, currency_symbol="$"),
+        raw={
+            "billing": {
+                "services": [
+                    {"service_description": "Google AI Studio"},
+                    {"service_description": "TAX"},
+                    {"service_description": "Vertex AI"},
+                    {"service_description": "BigQuery"},
+                ]
+            }
+        },
+    )
+    _title, lines = _build_result_panel(ProviderName.GEMINIAI, result_payload)
+    assert "Billing services: 4 (Google AI Studio, TAX, Vertex AI, ...)" in lines
