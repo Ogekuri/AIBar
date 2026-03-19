@@ -1590,14 +1590,14 @@ from aibar.providers import (
 - var `IDLE_TIME_PATH = APP_CACHE_DIR / "idle-time.json"` (L26)
 - var `DEFAULT_IDLE_DELAY_SECONDS = 300` (L28)
 - var `DEFAULT_API_CALL_DELAY_MILLISECONDS = 100` (L29)
-- var `DEFAULT_API_CALL_TIMEOUT_MILLISECONDS = 3000` (L30)
+- var `DEFAULT_API_CALL_TIMEOUT_MILLISECONDS = 5000` (L30)
 - var `DEFAULT_GNOME_REFRESH_INTERVAL_SECONDS = 60` (L31)
 - var `DEFAULT_BILLING_DATASET = "billing_data"` (L32)
 - var `DEFAULT_CURRENCY_SYMBOL = "$"` (L33)
 - var `LOCK_POLL_INTERVAL_SECONDS = 0.25` (L35)
 ### class `class RuntimeConfig(BaseModel)` : BaseModel (L44-79)
 - @brief Define runtime configuration component for refresh throttling, timeout, and currency controls.
-- @details Encodes persisted CLI runtime controls used by `show` refresh logic, GNOME extension scheduling, and per-provider currency symbol resolution. Fields are validated with defaults that reduce rate-limit pressure. `api_call_delay_milliseconds` defaults to `100` ms inter-call spacing. `api_call_timeout_milliseconds` defaults to `3000` ms HTTP response timeout applied to all provider API calls via `httpx.AsyncClient(timeout=<value>/1000.0)`. `currency_symbols` maps provider name strings to currency symbols (`$`, `£`, `€`); missing entries default to `DEFAULT_CURRENCY_SYMBOL` at resolution time. `billing_data` stores the Google BigQuery dataset name used for GeminiAI billing export table discovery. Optional GeminiAI field persists Google Cloud project identifier used by OAuth-backed Monitoring API fetch execution.
+- @details Encodes persisted CLI runtime controls used by `show` refresh logic, GNOME extension scheduling, and per-provider currency symbol resolution. Fields are validated with defaults that reduce rate-limit pressure. `api_call_delay_milliseconds` defaults to `100` ms inter-call spacing. `api_call_timeout_milliseconds` defaults to `5000` ms HTTP response timeout applied to all provider API calls via `httpx.AsyncClient(timeout=<value>/1000.0)`. `currency_symbols` maps provider name strings to currency symbols (`$`, `£`, `€`); missing entries default to `DEFAULT_CURRENCY_SYMBOL` at resolution time. `billing_data` stores the Google BigQuery dataset name used for GeminiAI billing export table discovery. Optional GeminiAI field persists Google Cloud project identifier used by OAuth-backed Monitoring API fetch execution.
 - @satisfies CTN-008
 - @satisfies REQ-049
 - @satisfies REQ-095

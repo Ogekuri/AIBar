@@ -27,7 +27,7 @@ IDLE_TIME_PATH = APP_CACHE_DIR / "idle-time.json"
 
 DEFAULT_IDLE_DELAY_SECONDS = 300
 DEFAULT_API_CALL_DELAY_MILLISECONDS = 100
-DEFAULT_API_CALL_TIMEOUT_MILLISECONDS = 3000
+DEFAULT_API_CALL_TIMEOUT_MILLISECONDS = 5000
 DEFAULT_GNOME_REFRESH_INTERVAL_SECONDS = 60
 DEFAULT_BILLING_DATASET = "billing_data"
 DEFAULT_CURRENCY_SYMBOL = "$"
@@ -48,7 +48,7 @@ class RuntimeConfig(BaseModel):
     GNOME extension scheduling, and per-provider currency symbol resolution.
     Fields are validated with defaults that reduce rate-limit pressure.
     `api_call_delay_milliseconds` defaults to `100` ms inter-call spacing.
-    `api_call_timeout_milliseconds` defaults to `3000` ms HTTP response timeout
+    `api_call_timeout_milliseconds` defaults to `5000` ms HTTP response timeout
     applied to all provider API calls via `httpx.AsyncClient(timeout=<value>/1000.0)`.
     `currency_symbols` maps provider name strings to currency symbols (`$`, `£`, `€`);
     missing entries default to `DEFAULT_CURRENCY_SYMBOL` at resolution time.

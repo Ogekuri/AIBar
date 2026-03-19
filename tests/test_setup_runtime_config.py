@@ -2,7 +2,8 @@
 @file
 @brief Setup runtime-config prompt and persistence tests.
 @details Verifies setup prompt order for idle-delay, API-call delay milliseconds,
-gnome-refresh-interval, billing dataset, and per-provider currency symbol fields;
+API-call timeout milliseconds, gnome-refresh-interval, billing dataset, and
+per-provider currency symbol fields;
 persists selected values to `~/.config/aibar/config.json`.
 @satisfies REQ-005
 @satisfies REQ-049
@@ -30,7 +31,9 @@ def _patch_config_paths(monkeypatch, tmp_path: Path) -> Path:
     monkeypatch.setattr(config_module, "APP_CONFIG_DIR", config_dir)
     monkeypatch.setattr(config_module, "APP_CACHE_DIR", cache_dir)
     monkeypatch.setattr(config_module, "ENV_FILE_PATH", config_dir / "env")
-    monkeypatch.setattr(config_module, "RUNTIME_CONFIG_PATH", config_dir / "config.json")
+    monkeypatch.setattr(
+        config_module, "RUNTIME_CONFIG_PATH", config_dir / "config.json"
+    )
     monkeypatch.setattr(config_module, "CACHE_FILE_PATH", cache_dir / "cache.json")
     monkeypatch.setattr(config_module, "IDLE_TIME_PATH", cache_dir / "idle-time.json")
     return config_dir
@@ -52,13 +55,16 @@ def test_default_cache_and_idle_time_paths_use_home_cache_directory() -> None:
     assert config_module.IDLE_TIME_PATH == expected_cache_dir / "idle-time.json"
 
 
-def test_setup_prompts_runtime_config_before_credentials(monkeypatch, tmp_path: Path) -> None:
+def test_setup_prompts_runtime_config_before_credentials(
+    monkeypatch, tmp_path: Path
+) -> None:
     """
     @brief Verify setup prompt order and runtime-config persistence.
     @details Ensures setup asks `idle-delay` first, `api-call delay` second,
-    `gnome-refresh-interval` third, `billing_data` fourth, then per-provider currency symbols (one prompt
-    per provider: claude, openai, openrouter, copilot, codex, geminiai),
-    then GeminiAI OAuth source prompt, then writes all selected values to runtime config JSON.
+    `api-call timeout` third, `gnome-refresh-interval` fourth, `billing_data`
+    fifth, then per-provider currency symbols (one prompt per provider:
+    claude, openai, openrouter, copilot, codex, geminiai), then GeminiAI
+    OAuth source prompt, then writes all selected values to runtime config JSON.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
     @param tmp_path {Path} Temporary path fixture.
     @return {None} Function return value.
@@ -68,9 +74,25 @@ def test_setup_prompts_runtime_config_before_credentials(monkeypatch, tmp_path: 
     """
     config_dir = _patch_config_paths(monkeypatch, tmp_path)
     prompts: list[str] = []
-    # 4 runtime values + 6 currency symbols + OAuth source + empty credentials
+    # 5 runtime values + 6 currency symbols + OAuth source + empty credentials
     responses = iter(
-        [450, 2500, 90, "billing_data", "$", "$", "$", "$", "$", "$", "skip", "", "", ""]
+        [
+            450,
+            2500,
+            5200,
+            90,
+            "billing_data",
+            "$",
+            "$",
+            "$",
+            "$",
+            "$",
+            "$",
+            "skip",
+            "",
+            "",
+            "",
+        ]
     )
 
     def _fake_prompt(
@@ -99,19 +121,23 @@ def test_setup_prompts_runtime_config_before_credentials(monkeypatch, tmp_path: 
     assert result.exit_code == 0
     assert prompts[0] == "  idle-delay seconds"
     assert prompts[1] == "  api-call delay milliseconds"
-    assert prompts[2] == "  gnome-refresh-interval seconds"
-    assert prompts[3] == "  billing_data"
-    assert prompts[4] == "  claude currency symbol"
-    assert prompts[5] == "  openai currency symbol"
-    assert prompts[6] == "  openrouter currency symbol"
-    assert prompts[7] == "  copilot currency symbol"
-    assert prompts[8] == "  codex currency symbol"
-    assert prompts[9] == "  geminiai currency symbol"
-    assert prompts[10] == "  geminiai oauth source"
+    assert prompts[2] == "  api-call timeout milliseconds"
+    assert prompts[3] == "  gnome-refresh-interval seconds"
+    assert prompts[4] == "  billing_data"
+    assert prompts[5] == "  claude currency symbol"
+    assert prompts[6] == "  openai currency symbol"
+    assert prompts[7] == "  openrouter currency symbol"
+    assert prompts[8] == "  copilot currency symbol"
+    assert prompts[9] == "  codex currency symbol"
+    assert prompts[10] == "  geminiai currency symbol"
+    assert prompts[11] == "  geminiai oauth source"
 
-    runtime_config = json.loads((config_dir / "config.json").read_text(encoding="utf-8"))
+    runtime_config = json.loads(
+        (config_dir / "config.json").read_text(encoding="utf-8")
+    )
     assert runtime_config["idle_delay_seconds"] == 450
     assert runtime_config["api_call_delay_milliseconds"] == 2500
+    assert runtime_config["api_call_timeout_milliseconds"] == 5200
     assert runtime_config["gnome_refresh_interval_seconds"] == 90
     assert runtime_config["billing_data"] == "billing_data"
     assert runtime_config["currency_symbols"] == {
@@ -167,6 +193,7 @@ def test_setup_accepts_geminiai_oauth_json_paste_and_persists_runtime_fields(
         [
             300,
             1000,
+            5000,
             60,
             "billing_data",
             "$",
@@ -211,7 +238,10 @@ def test_setup_accepts_geminiai_oauth_json_paste_and_persists_runtime_fields(
 
     assert client_path.exists()
     client_doc = json.loads(client_path.read_text(encoding="utf-8"))
-    assert client_doc["installed"]["client_id"] == "example-client.apps.googleusercontent.com"
+    assert (
+        client_doc["installed"]["client_id"]
+        == "example-client.apps.googleusercontent.com"
+    )
     assert client_doc["installed"]["project_id"] == "gen-lang-client-0834428245"
     assert not token_path.exists()
 
@@ -285,6 +315,7 @@ def test_setup_geminiai_oauth_login_source_reauthorizes_with_current_scopes(
         [
             300,
             1000,
+            5000,
             60,
             "billing_data",
             "$",
