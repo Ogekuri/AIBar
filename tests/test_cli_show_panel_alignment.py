@@ -14,7 +14,12 @@ from click.testing import CliRunner
 
 from aibar.cli import RetrievalPipelineOutput, main
 from aibar.cli import _print_result
-from aibar.providers.base import ProviderName, ProviderResult, UsageMetrics, WindowPeriod
+from aibar.providers.base import (
+    ProviderName,
+    ProviderResult,
+    UsageMetrics,
+    WindowPeriod,
+)
 
 
 _ANSI_ESCAPE_SEQUENCE_PATTERN = re.compile(r"\x1b\[[0-9;]*m")
@@ -83,10 +88,28 @@ def _assert_status_and_freshness_layout(body_lines: list[str]) -> None:
     assert body_lines[last_index - 1].strip() == ""
 
 
-def test_print_result_keeps_panel_rows_aligned_with_colored_progress_bar(capsys) -> None:
+def _assert_fail_reason_layout(body_lines: list[str]) -> None:
+    """
+    @brief Verify failed panel body order for `Status/Reason/Updated` rows.
+    @details Confirms failed-state block ordering `Status: FAIL`, blank line,
+    `Reason: ...`, blank line, and trailing right-aligned `Updated:` freshness row.
+    @param body_lines {list[str]} Parsed panel body lines.
+    @return {None} Function return value.
+    """
+    normalized_lines = [line.strip() for line in body_lines]
+    assert normalized_lines[0] == "Status: FAIL"
+    assert normalized_lines[1] == ""
+    assert normalized_lines[2].startswith("Reason: ")
+    assert normalized_lines[3] == ""
+    assert normalized_lines[4].startswith("Updated: ")
+
+
+def test_print_result_keeps_panel_rows_aligned_with_colored_progress_bar(
+    capsys,
+) -> None:
     """
     @brief Verify ANSI-colored progress bar rows preserve panel border alignment.
-    @details Renders the Claude 5h partial-window error path and asserts every
+    @details Renders the Claude 5h partial-window failed path and asserts every
     non-empty panel row has identical visible width after ANSI stripping and no
     reset line contains the `⚠️` suffix glyph.
     @param capsys {pytest.CaptureFixture} Pytest stdout/stderr capture fixture.
@@ -112,11 +135,16 @@ def test_print_result_keeps_panel_rows_aligned_with_colored_progress_bar(capsys)
 
     assert panel_rows
     assert all("⚠️" not in line for line in panel_rows)
+    assert any("Status: FAIL" in line for line in panel_rows)
+    assert any("Reason: Rate limited. Try again later." in line for line in panel_rows)
+    assert any("Updated:" in line for line in panel_rows)
     row_length = len(panel_rows[0])
     assert all(len(line) == row_length for line in panel_rows)
 
 
-def test_show_uses_one_shared_panel_width_for_all_rendered_providers(monkeypatch) -> None:
+def test_show_uses_one_shared_panel_width_for_all_rendered_providers(
+    monkeypatch,
+) -> None:
     """
     @brief Verify one `show` execution renders all provider panels at one shared width.
     @details Mocks two providers with different body lengths and asserts visible border
@@ -168,7 +196,9 @@ def test_show_uses_one_shared_panel_width_for_all_rendered_providers(monkeypatch
         for line in result.output.splitlines()
         if line.strip()
     ]
-    top_borders = [line for line in visible_lines if line.startswith("┌") and line.endswith("┐")]
+    top_borders = [
+        line for line in visible_lines if line.startswith("┌") and line.endswith("┐")
+    ]
     assert len(top_borders) == 2
     assert len({len(line) for line in top_borders}) == 1
 
@@ -178,9 +208,8 @@ def test_show_default_window_groups_dual_windows_into_one_panel_per_provider(
 ) -> None:
     """
     @brief Verify default-window `show` groups Claude/Codex dual windows in single provider panels.
-    @details Mocks Claude and Codex parser paths so each provider emits one grouped panel
-    containing blank-line-separated `5h` and `7d` sections with shared `Updated/Next`
-    metadata rendered once per provider panel.
+    @details Mocks Claude and Codex parser paths so each provider emits one grouped
+    panel with shared `Updated/Next` metadata rendered once per provider panel.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
     @return {None} Function return value.
     @satisfies REQ-002
@@ -211,14 +240,12 @@ def test_show_default_window_groups_dual_windows_into_one_panel_per_provider(
                 WindowPeriod.DAY_7: 1.2345,
             }
             metrics = UsageMetrics(
-                usage_percent=usage_by_window[window],
-                remaining=65.0,
+                remaining=100.0 - usage_by_window[window],
                 limit=100.0,
             )
             if provider_name == ProviderName.CODEX:
                 metrics = UsageMetrics(
-                    usage_percent=usage_by_window[window],
-                    remaining=65.0,
+                    remaining=100.0 - usage_by_window[window],
                     limit=100.0,
                     cost=codex_cost[window],
                     requests=codex_requests[window],
@@ -286,33 +313,83 @@ def test_show_default_window_groups_dual_windows_into_one_panel_per_provider(
     assert "CLAUDE (7d)" not in result.output
     assert "CODEX (5h)" not in result.output
     assert "CODEX (7d)" not in result.output
-    assert result.output.count("Window 5h:") == 2
-    assert result.output.count("Window 7d:") == 2
+    assert result.output.count("Window 5h:") == 0
+    assert result.output.count("Window 7d:") == 0
     assert result.output.count("Updated:") == 2
     for _title, body_lines in panel_data:
         _assert_status_and_freshness_layout(body_lines)
         normalized_lines = [line.strip() for line in body_lines]
         assert not any(line.startswith("Window:") for line in normalized_lines)
-        assert "Window 5h:" in normalized_lines
-        assert "Window 7d:" in normalized_lines
-        idx_5h = normalized_lines.index("Window 5h:")
-        idx_7d = normalized_lines.index("Window 7d:")
-        assert idx_7d > idx_5h
-        assert normalized_lines[idx_7d - 1] == ""
+        assert "Window 5h:" not in normalized_lines
+        assert "Window 7d:" not in normalized_lines
 
     codex_body = panel_data[1][1]
     normalized_codex_body = [line.strip() for line in codex_body]
-    idx_7d = normalized_codex_body.index("Window 7d:")
-    idx_cost = next(idx for idx, line in enumerate(normalized_codex_body) if line.startswith("Cost:"))
+    idx_cost = next(
+        idx
+        for idx, line in enumerate(normalized_codex_body)
+        if line.startswith("Cost:")
+    )
     idx_requests = next(
-        idx for idx, line in enumerate(normalized_codex_body) if line.startswith("Requests:")
+        idx
+        for idx, line in enumerate(normalized_codex_body)
+        if line.startswith("Requests:")
     )
     idx_tokens = next(
-        idx for idx, line in enumerate(normalized_codex_body) if line.startswith("Tokens:")
+        idx
+        for idx, line in enumerate(normalized_codex_body)
+        if line.startswith("Tokens:")
     )
-    assert idx_cost > idx_7d
     assert normalized_codex_body[idx_cost - 1] == ""
-    assert idx_7d < idx_cost < idx_requests < idx_tokens
+    assert idx_cost < idx_requests < idx_tokens
+
+
+def test_show_fail_panel_uses_status_reason_updated_layout(monkeypatch) -> None:
+    """
+    @brief Verify failed CLI panel layout uses `Status`, `Reason`, and `Updated` rows.
+    @details Forces one failed provider result and asserts panel body renders
+    `Status: FAIL`, blank line, `Reason: ...`, blank line, and `Updated/Next`
+    without window heading rows.
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @return {None} Function return value.
+    @satisfies REQ-036
+    @satisfies TST-030
+    """
+    provider_stub = MagicMock()
+    provider_stub.is_configured.return_value = True
+    monkeypatch.setattr(
+        "aibar.cli.get_providers",
+        lambda: {ProviderName.OPENROUTER: provider_stub},
+    )
+    monkeypatch.setattr(
+        "aibar.cli.retrieve_results_via_cache_pipeline",
+        lambda **_: RetrievalPipelineOutput(
+            payload={},
+            results={
+                ProviderName.OPENROUTER.value: ProviderResult(
+                    provider=ProviderName.OPENROUTER,
+                    window=WindowPeriod.DAY_30,
+                    metrics=UsageMetrics(),
+                    error="Invalid or expired OAuth token",
+                    updated_at=datetime(2026, 3, 18, 9, 0, tzinfo=timezone.utc),
+                    raw={"status_code": 401, "retry_after_seconds": 300},
+                )
+            },
+            idle_time_by_provider={},
+            idle_active=False,
+            cache_available=True,
+        ),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["show", "--provider", "openrouter", "--window", "7d"])
+    assert result.exit_code == 0
+
+    panel_data = _extract_panel_titles_and_bodies(result.output)
+    assert len(panel_data) == 1
+    _assert_fail_reason_layout(panel_data[0][1])
+    normalized_lines = [line.strip() for line in panel_data[0][1]]
+    assert all(not line.startswith("Window") for line in normalized_lines)
 
 
 def test_show_orders_provider_panels_status_first_and_updated_last(monkeypatch) -> None:
@@ -345,10 +422,9 @@ def test_show_orders_provider_panels_status_first_and_updated_last(monkeypatch) 
             provider=provider_name,
             window=WindowPeriod.DAY_7,
             metrics=UsageMetrics(
-                usage_percent=12.5,
-                cost=0.1234,
                 remaining=87.5,
                 limit=100.0,
+                cost=0.1234,
                 requests=8,
                 input_tokens=80,
                 output_tokens=20,

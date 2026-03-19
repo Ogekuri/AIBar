@@ -172,14 +172,14 @@ def test_show_json_exports_freshness_with_local_datetime_parity(
     )
 
 
-def test_show_renders_cached_failure_error_only_with_retry_metadata(
+def test_show_renders_cached_failure_reason_block_with_freshness(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
     """
-    @brief Verify CLI `show` renders failed status blocks without statistics lines.
+    @brief Verify CLI `show` renders failed status blocks with reason and freshness lines.
     @details Writes OpenRouter cache payload with `status[openrouter][7d]=FAIL` and
-    asserts output prints cached error plus combined HTTP status/retry metadata while
+    asserts output prints `Status: FAIL` plus `Reason: ...` and `Updated/Next` while
     suppressing stale payload metrics.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
     @param tmp_path {Path} Temporary path fixture.
@@ -235,24 +235,27 @@ def test_show_renders_cached_failure_error_only_with_retry_metadata(
     result = runner.invoke(main, ["show", "--provider", "openrouter", "--window", "7d"])
     assert result.exit_code == 0
     assert "Status: FAIL" in result.output
-    assert "Window 30d:" in result.output
+    assert "Window 30d:" not in result.output
     assert "Window 7d:" not in result.output
-    assert "Error: Invalid or expired OAuth token" in result.output
-    assert "HTTP status: 401, Retry after: 300 sec." in result.output
+    assert "Reason: Invalid or expired OAuth token" in result.output
+    assert "Error: Invalid or expired OAuth token" not in result.output
+    assert "HTTP status: 401, Retry after: 300 sec." not in result.output
+    assert "Updated:" in result.output
+    assert "Next:" in result.output
     assert "Cost:" not in result.output
     assert "Usage:" not in result.output
     assert "Remaining credits:" not in result.output
 
 
-def test_show_dual_window_cached_fail_status_renders_fail_only_blocks(
+def test_show_dual_window_cached_fail_status_renders_reason_with_freshness(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
     """
-    @brief Verify Claude grouped dual-window panel renders deduplicated `FAIL` diagnostics.
+    @brief Verify Claude grouped dual-window panel renders deduplicated failed block.
     @details Seeds successful Claude dual-window payload with cached `status[claude][5h|7d]=FAIL`,
-    activates idle-time cache read path, and asserts one grouped panel contains `5h`/`7d`
-    sections while shared failure diagnostics (`Status`, `Updated/Next`, `Error`) render once.
+    activates idle-time cache read path, and asserts one grouped panel renders one shared
+    failed block (`Status`, `Reason`, `Updated/Next`) without `Window` headings.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
     @param tmp_path {Path} Temporary path fixture.
     @return {None} Function return value.
@@ -326,9 +329,10 @@ def test_show_dual_window_cached_fail_status_renders_fail_only_blocks(
     assert result.exit_code == 0
     assert result.output.count("Status: FAIL") == 1
     assert "Status: OK" not in result.output
-    assert result.output.count("Error: Invalid or expired OAuth token") == 1
-    assert "Window 5h:" in result.output
-    assert "Window 7d:" in result.output
+    assert result.output.count("Reason: Invalid or expired OAuth token") == 1
+    assert "Error: Invalid or expired OAuth token" not in result.output
+    assert "Window 5h:" not in result.output
+    assert "Window 7d:" not in result.output
     assert "Window: 5h" not in result.output
     assert "Window: 7d" not in result.output
     assert "Usage:" not in result.output
@@ -338,13 +342,9 @@ def test_show_dual_window_cached_fail_status_renders_fail_only_blocks(
     assert "Tokens:" not in result.output
     assert "Resets in:" not in result.output
     status_idx = result.output.index("Status: FAIL")
+    reason_idx = result.output.index("Reason: Invalid or expired OAuth token")
     updated_idx = result.output.index("Updated:")
-    assert (
-        status_idx
-        < result.output.index("Window 5h:")
-        < result.output.index("Window 7d:")
-        < updated_idx
-    )
+    assert status_idx < reason_idx < updated_idx
 
 
 def test_build_result_panel_renders_zero_api_counters_for_null_metrics() -> None:

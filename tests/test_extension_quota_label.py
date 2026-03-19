@@ -8,9 +8,33 @@ from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-EXTENSION_PATH = PROJECT_ROOT / "src" / "aibar" / "aibar" / "gnome-extension" / "aibar@aibar.panel" / "extension.js"
-METADATA_PATH = PROJECT_ROOT / "src" / "aibar" / "aibar" / "gnome-extension" / "aibar@aibar.panel" / "metadata.json"
-STYLESHEET_PATH = PROJECT_ROOT / "src" / "aibar" / "aibar" / "gnome-extension" / "aibar@aibar.panel" / "stylesheet.css"
+EXTENSION_PATH = (
+    PROJECT_ROOT
+    / "src"
+    / "aibar"
+    / "aibar"
+    / "gnome-extension"
+    / "aibar@aibar.panel"
+    / "extension.js"
+)
+METADATA_PATH = (
+    PROJECT_ROOT
+    / "src"
+    / "aibar"
+    / "aibar"
+    / "gnome-extension"
+    / "aibar@aibar.panel"
+    / "metadata.json"
+)
+STYLESHEET_PATH = (
+    PROJECT_ROOT
+    / "src"
+    / "aibar"
+    / "aibar"
+    / "gnome-extension"
+    / "aibar@aibar.panel"
+    / "stylesheet.css"
+)
 
 
 def test_quota_only_label_uses_remaining_credits_prefix_and_bold_remaining() -> None:
@@ -36,31 +60,34 @@ def test_reset_labels_use_reset_in_prefix_with_colon() -> None:
 
 def test_rate_limit_failures_render_error_banner_with_http_retry_metadata() -> None:
     """
-    @brief Verify extension error rendering includes status and retry-after diagnostics.
+    @brief Verify extension failed-state rendering uses status/reason block format.
     @satisfies REQ-017
-    @satisfies REQ-037
-    @satisfies REQ-090
+    @satisfies TST-004
     """
     source = EXTENSION_PATH.read_text(encoding="utf-8")
-    assert "function _buildHttpStatusRetryLabel(statusCodeRaw, retryAfterRaw)" in source
-    assert "return `HTTP status: ${statusCode}, Retry after: ${retryAfter} sec.`;" in source
-    assert "const isError = effectiveError !== null && effectiveError !== undefined;" in source
-    assert "const statusRetryLabel = _buildHttpStatusRetryLabel(statusCode, retryAfterSeconds);" in source
-    assert "'Status: FAIL'" in source
-    assert "`Window: ${windowLabel}`" in source
-    assert "`Error: ${effectiveError}`" in source
-    assert "card.errorLabel.text = errorLines.join('\\n');" in source
-    assert "const isRateLimitQuotaError = (" not in source
+    assert (
+        "const isError = effectiveError !== null && effectiveError !== undefined;"
+        in source
+    )
+    assert "`Status: FAIL\\n\\nReason: ${effectiveError}`" in source
+    assert "`Window: ${windowLabel}`" not in source
+    assert "`Error: ${effectiveError}`" not in source
+    assert "card.errorLabel.text = errorLines.join('\\n');" not in source
 
 
-def test_limit_reached_suffix_is_appended_to_reset_labels_at_displayed_full_usage() -> None:
+def test_limit_reached_suffix_is_appended_to_reset_labels_at_displayed_full_usage() -> (
+    None
+):
     """
     @brief Verify reset labels append `⚠️ Limit reached!` for displayed full usage.
     @satisfies REQ-017
     """
     source = EXTENSION_PATH.read_text(encoding="utf-8")
     assert "function _isDisplayedFullPercent(pct)" in source
-    assert "const shouldShowLimitReached = allowLimitReached && _isDisplayedFullPercent(pct);" in source
+    assert (
+        "const shouldShowLimitReached = allowLimitReached && _isDisplayedFullPercent(pct);"
+        in source
+    )
     assert "bar.resetLabel.text = `${baseText} ⚠️ Limit reached!`;" in source
 
 
@@ -69,7 +96,10 @@ def test_quota_providers_use_30d_window_bar_with_reset_before_credits() -> None:
     @brief Verify quota providers use single 30d window bar and reset label placement.
     """
     source = EXTENSION_PATH.read_text(encoding="utf-8")
-    assert "const WINDOW_BAR_30D_PROVIDERS = new Set(['copilot', 'openrouter', 'openai', 'geminiai']);" in source
+    assert (
+        "const WINDOW_BAR_30D_PROVIDERS = new Set(['copilot', 'openrouter', 'openai', 'geminiai']);"
+        in source
+    )
     assert "const DEFAULT_WINDOW_LABELS = Object.freeze({" in source
     assert "openrouter: '30d'" in source
     assert "openai: '30d'" in source
@@ -79,14 +109,19 @@ def test_quota_providers_use_30d_window_bar_with_reset_before_credits() -> None:
     assert "const configuredWindowLabel = (" in source
     assert "this._windowLabels[providerName]" in source
     assert "card.fiveHourBar.label.text = configuredWindowLabel;" in source
-    assert "const singleWindowReset = metrics.reset_at || fiveHourReset || sevenDayReset || null;" in source
+    assert (
+        "const singleWindowReset = metrics.reset_at || fiveHourReset || sevenDayReset || null;"
+        in source
+    )
     assert "const effectiveUsagePercent = hasUsagePercent ? usagePercent : 0;" in source
     assert "updateWindowBar(" in source
     assert "card._barData.sevenDay = null;" in source
     assert "card.sevenDayBar.container.hide();" in source
 
 
-def test_provider_card_cost_rows_use_costs_prefix_style_parity_and_no_empty_row() -> None:
+def test_provider_card_cost_rows_use_costs_prefix_style_parity_and_no_empty_row() -> (
+    None
+):
     """
     @brief Verify extension card cost rows use `Costs:` style parity and hide empty spacer rows.
     @details Asserts provider-card costs render `Costs:` with bold bright-white numeric values
@@ -97,7 +132,10 @@ def test_provider_card_cost_rows_use_costs_prefix_style_parity_and_no_empty_row(
     """
     source = EXTENSION_PATH.read_text(encoding="utf-8")
     assert "let costLabel = new St.Label({style_class: 'aibar-stat'});" in source
-    assert "`Costs: ${_boldWhiteMarkup(costText)} / ${_boldWhiteMarkup(limitText)}`" in source
+    assert (
+        "`Costs: ${_boldWhiteMarkup(costText)} / ${_boldWhiteMarkup(limitText)}`"
+        in source
+    )
     assert "`Costs: ${_boldWhiteMarkup(costText)}`" in source
     assert "_boldWhiteMarkup(costText)" in source
     assert "card.byokLabel.hide();" in source
@@ -182,7 +220,9 @@ def test_provider_card_renders_update_at_label_bottom_right_from_freshness() -> 
     assert "updateAtRow.add_child(updateAtLabel);" in source
 
 
-def test_extension_builds_freshness_fallback_from_status_updated_at_when_freshness_missing() -> None:
+def test_extension_builds_freshness_fallback_from_status_updated_at_when_freshness_missing() -> (
+    None
+):
     """
     @brief Verify extension derives `Updated/Next` fallback timestamps from status metadata.
     @details Asserts source defines a fallback helper that reads `statusEntry.updated_at`,
@@ -193,10 +233,14 @@ def test_extension_builds_freshness_fallback_from_status_updated_at_when_freshne
     @satisfies TST-004
     """
     source = EXTENSION_PATH.read_text(encoding="utf-8")
-    assert "function _buildFallbackFreshnessState(statusEntry, idleDelaySeconds)" in source
+    assert (
+        "function _buildFallbackFreshnessState(statusEntry, idleDelaySeconds)" in source
+    )
     assert "Date.parse(statusEntry.updated_at)" in source
     assert "const updatedTimestamp = Math.floor(parsedMilliseconds / 1000);" in source
-    assert "const idleUntilTimestamp = updatedTimestamp + safeIntervalSeconds;" in source
+    assert (
+        "const idleUntilTimestamp = updatedTimestamp + safeIntervalSeconds;" in source
+    )
     assert "const IDLE_DELAY_SECONDS = 300;" in source
     assert "last_success_timestamp: updatedTimestamp," in source
     assert "idle_until_timestamp: idleUntilTimestamp," in source
@@ -217,10 +261,15 @@ def test_popup_scroll_view_uses_gnome_compatible_child_attachment() -> None:
     source = EXTENSION_PATH.read_text(encoding="utf-8")
     assert "this._providersScrollView = new St.ScrollView({" in source
     assert "style_class: 'aibar-providers-scroll'" in source
-    assert "this._providersScrollView.set_policy(St.PolicyType.NEVER, St.PolicyType.AUTOMATIC);" in source
+    assert (
+        "this._providersScrollView.set_policy(St.PolicyType.NEVER, St.PolicyType.AUTOMATIC);"
+        in source
+    )
     assert "if (typeof this._providersScrollView.set_child === 'function')" in source
     assert "this._providersScrollView.set_child(this._providersContainer);" in source
-    assert "else if (typeof this._providersScrollView.add_actor === 'function')" in source
+    assert (
+        "else if (typeof this._providersScrollView.add_actor === 'function')" in source
+    )
     assert "this._providersScrollView.add_actor(this._providersContainer);" in source
     assert "providersItem.add_child(this._providersScrollView);" in source
 
@@ -235,21 +284,35 @@ def test_provider_cards_render_zero_api_counters_for_null_metrics() -> None:
     @satisfies TST-004
     """
     source = EXTENSION_PATH.read_text(encoding="utf-8")
-    assert "const API_COUNTER_PROVIDERS = new Set(['openai', 'openrouter', 'codex', 'geminiai']);" in source
+    assert (
+        "const API_COUNTER_PROVIDERS = new Set(['openai', 'openrouter', 'codex', 'geminiai']);"
+        in source
+    )
     assert "function _providerSupportsApiCounters(providerName)" in source
-    assert "const shouldRenderApiCounters = _providerSupportsApiCounters(providerName);" in source
+    assert (
+        "const shouldRenderApiCounters = _providerSupportsApiCounters(providerName);"
+        in source
+    )
     assert "const requestCount = (" in source
     assert "? metrics.requests" in source
     assert ": 0;" in source
     assert "const inputTokens = (" in source
     assert "const outputTokens = (" in source
     assert "const totalTokens = inputTokens + outputTokens;" in source
-    assert "card.requestsLabel.text = `${requestCount.toLocaleString()} requests`;" in source
+    assert (
+        "card.requestsLabel.text = `${requestCount.toLocaleString()} requests`;"
+        in source
+    )
     assert "card.tokensLabel.text = (" in source
-    assert "(${inputTokens.toLocaleString()} in / ${outputTokens.toLocaleString()} out)" in source
+    assert (
+        "(${inputTokens.toLocaleString()} in / ${outputTokens.toLocaleString()} out)"
+        in source
+    )
 
 
-def test_panel_percentage_labels_use_fixed_order_provider_styles_and_primary_bold() -> None:
+def test_panel_percentage_labels_use_fixed_order_provider_styles_and_primary_bold() -> (
+    None
+):
     """
     @brief Verify panel percentage label order, provider styles, and primary bold classes.
     """
@@ -258,16 +321,36 @@ def test_panel_percentage_labels_use_fixed_order_provider_styles_and_primary_bol
     assert "this._panelBox.add_child(this._panelPercentages);" in source
     assert "this._panelBox.add_child(this._panelLabel);" in source
 
-    claude_idx = source.index("this._panelPercentages.add_child(this._panelClaudePctLabel);")
-    claude_7d_idx = source.index("this._panelPercentages.add_child(this._panelClaude7dPctLabel);")
-    claude_cost_idx = source.index("this._panelPercentages.add_child(this._panelClaudeCostLabel);")
-    openrouter_cost_idx = source.index("this._panelPercentages.add_child(this._panelOpenRouterCostLabel);")
-    copilot_idx = source.index("this._panelPercentages.add_child(this._panelCopilotPctLabel);")
-    codex_5h_idx = source.index("this._panelPercentages.add_child(this._panelCodexPctLabel);")
-    codex_7d_idx = source.index("this._panelPercentages.add_child(this._panelCodex7dPctLabel);")
-    codex_cost_idx = source.index("this._panelPercentages.add_child(this._panelCodexCostLabel);")
-    openai_cost_idx = source.index("this._panelPercentages.add_child(this._panelOpenAICostLabel);")
-    geminiai_cost_idx = source.index("this._panelPercentages.add_child(this._panelGeminiaiCostLabel);")
+    claude_idx = source.index(
+        "this._panelPercentages.add_child(this._panelClaudePctLabel);"
+    )
+    claude_7d_idx = source.index(
+        "this._panelPercentages.add_child(this._panelClaude7dPctLabel);"
+    )
+    claude_cost_idx = source.index(
+        "this._panelPercentages.add_child(this._panelClaudeCostLabel);"
+    )
+    openrouter_cost_idx = source.index(
+        "this._panelPercentages.add_child(this._panelOpenRouterCostLabel);"
+    )
+    copilot_idx = source.index(
+        "this._panelPercentages.add_child(this._panelCopilotPctLabel);"
+    )
+    codex_5h_idx = source.index(
+        "this._panelPercentages.add_child(this._panelCodexPctLabel);"
+    )
+    codex_7d_idx = source.index(
+        "this._panelPercentages.add_child(this._panelCodex7dPctLabel);"
+    )
+    codex_cost_idx = source.index(
+        "this._panelPercentages.add_child(this._panelCodexCostLabel);"
+    )
+    openai_cost_idx = source.index(
+        "this._panelPercentages.add_child(this._panelOpenAICostLabel);"
+    )
+    geminiai_cost_idx = source.index(
+        "this._panelPercentages.add_child(this._panelGeminiaiCostLabel);"
+    )
     assert (
         claude_idx
         < claude_7d_idx
@@ -281,16 +364,46 @@ def test_panel_percentage_labels_use_fixed_order_provider_styles_and_primary_bol
         < geminiai_cost_idx
     )
 
-    assert "style_class: 'aibar-panel-pct aibar-panel-pct-primary aibar-tab-label-claude'" in source
-    assert "style_class: 'aibar-panel-pct aibar-panel-pct-secondary aibar-tab-label-claude'" in source
-    assert "style_class: 'aibar-panel-pct aibar-panel-cost aibar-tab-label-claude'" in source
-    assert "style_class: 'aibar-panel-pct aibar-panel-cost aibar-tab-label-openrouter'" in source
-    assert "style_class: 'aibar-panel-pct aibar-panel-pct-primary aibar-tab-label-copilot'" in source
-    assert "style_class: 'aibar-panel-pct aibar-panel-pct-primary aibar-tab-label-codex'" in source
-    assert "style_class: 'aibar-panel-pct aibar-panel-pct-secondary aibar-tab-label-codex'" in source
-    assert "style_class: 'aibar-panel-pct aibar-panel-cost aibar-tab-label-codex'" in source
-    assert "style_class: 'aibar-panel-pct aibar-panel-cost aibar-tab-label-openai'" in source
-    assert "style_class: 'aibar-panel-pct aibar-panel-cost aibar-tab-label-geminiai'" in source
+    assert (
+        "style_class: 'aibar-panel-pct aibar-panel-pct-primary aibar-tab-label-claude'"
+        in source
+    )
+    assert (
+        "style_class: 'aibar-panel-pct aibar-panel-pct-secondary aibar-tab-label-claude'"
+        in source
+    )
+    assert (
+        "style_class: 'aibar-panel-pct aibar-panel-cost aibar-tab-label-claude'"
+        in source
+    )
+    assert (
+        "style_class: 'aibar-panel-pct aibar-panel-cost aibar-tab-label-openrouter'"
+        in source
+    )
+    assert (
+        "style_class: 'aibar-panel-pct aibar-panel-pct-primary aibar-tab-label-copilot'"
+        in source
+    )
+    assert (
+        "style_class: 'aibar-panel-pct aibar-panel-pct-primary aibar-tab-label-codex'"
+        in source
+    )
+    assert (
+        "style_class: 'aibar-panel-pct aibar-panel-pct-secondary aibar-tab-label-codex'"
+        in source
+    )
+    assert (
+        "style_class: 'aibar-panel-pct aibar-panel-cost aibar-tab-label-codex'"
+        in source
+    )
+    assert (
+        "style_class: 'aibar-panel-pct aibar-panel-cost aibar-tab-label-openai'"
+        in source
+    )
+    assert (
+        "style_class: 'aibar-panel-pct aibar-panel-cost aibar-tab-label-geminiai'"
+        in source
+    )
 
 
 def test_popup_open_triggers_bar_width_reapply() -> None:
@@ -305,7 +418,9 @@ def test_popup_open_triggers_bar_width_reapply() -> None:
     assert "_applyBarWidths" in source
     open_idx = source.index("open-state-changed")
     apply_def_idx = source.index("_applyBarWidths()")
-    assert open_idx < apply_def_idx, "_applyBarWidths must be defined after open-state-changed connection"
+    assert open_idx < apply_def_idx, (
+        "_applyBarWidths must be defined after open-state-changed connection"
+    )
     assert "card._barData.fiveHour" in source
     assert "card._barData.sevenDay" in source
     assert "card._barData.progress" in source
@@ -358,7 +473,10 @@ def test_extension_reads_gnome_refresh_interval_from_json_extension_section() ->
     assert "_startAutoRefresh()" in source
     assert "this._refreshIntervalSeconds = newInterval;" in source
     assert "idle_delay_seconds" in source
-    assert "this._idleDelaySeconds = Math.floor(extensionData.idle_delay_seconds);" in source
+    assert (
+        "this._idleDelaySeconds = Math.floor(extensionData.idle_delay_seconds);"
+        in source
+    )
     assert "extensionData.window_labels" in source
     assert "this._windowLabels = {...DEFAULT_WINDOW_LABELS};" in source
 
@@ -395,7 +513,10 @@ def test_geminiai_extension_tab_order_label_and_bright_pink_styles() -> None:
     extension_source = EXTENSION_PATH.read_text(encoding="utf-8")
     stylesheet_source = STYLESHEET_PATH.read_text(encoding="utf-8")
 
-    assert "this._providerOrder = ['claude', 'openrouter', 'copilot', 'codex', 'openai', 'geminiai'];" in extension_source
+    assert (
+        "this._providerOrder = ['claude', 'openrouter', 'copilot', 'codex', 'openai', 'geminiai'];"
+        in extension_source
+    )
     assert "const PROVIDER_DISPLAY_NAMES = {" in extension_source
     assert "geminiai: 'GEMINIAI'" in extension_source
     assert "_getProviderDisplayName(providerName)" in extension_source
@@ -430,12 +551,30 @@ def test_provider_color_palette_is_applied_to_tabs_cards_and_progress_fills() ->
     @satisfies REQ-067
     """
     stylesheet_source = STYLESHEET_PATH.read_text(encoding="utf-8")
-    assert ".aibar-tab-label-claude {" in stylesheet_source and "#FF3B30" in stylesheet_source
-    assert ".aibar-tab-label-openrouter {" in stylesheet_source and "#FF8C00" in stylesheet_source
-    assert ".aibar-tab-label-copilot {" in stylesheet_source and "#FFD60A" in stylesheet_source
-    assert ".aibar-tab-label-codex {" in stylesheet_source and "#32D74B" in stylesheet_source
-    assert ".aibar-tab-label-openai {" in stylesheet_source and "#0A84FF" in stylesheet_source
-    assert ".aibar-tab-label-geminiai {" in stylesheet_source and "#BF5AF2" in stylesheet_source
+    assert (
+        ".aibar-tab-label-claude {" in stylesheet_source
+        and "#FF3B30" in stylesheet_source
+    )
+    assert (
+        ".aibar-tab-label-openrouter {" in stylesheet_source
+        and "#FF8C00" in stylesheet_source
+    )
+    assert (
+        ".aibar-tab-label-copilot {" in stylesheet_source
+        and "#FFD60A" in stylesheet_source
+    )
+    assert (
+        ".aibar-tab-label-codex {" in stylesheet_source
+        and "#32D74B" in stylesheet_source
+    )
+    assert (
+        ".aibar-tab-label-openai {" in stylesheet_source
+        and "#0A84FF" in stylesheet_source
+    )
+    assert (
+        ".aibar-tab-label-geminiai {" in stylesheet_source
+        and "#BF5AF2" in stylesheet_source
+    )
     assert ".aibar-progress-provider-claude {" in stylesheet_source
     assert ".aibar-progress-provider-openrouter {" in stylesheet_source
     assert ".aibar-progress-provider-copilot {" in stylesheet_source

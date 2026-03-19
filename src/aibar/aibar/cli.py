@@ -2934,6 +2934,30 @@ def _format_http_status_retry_line(
     return None
 
 
+def _build_fail_panel_lines(
+    result: ProviderResult,
+    reason: str,
+    freshness_state: IdleTimeState | None,
+) -> list[str]:
+    """
+    @brief Build deterministic CLI body lines for one failed provider panel.
+    @details Emits the required failed-state block layout: `Status: FAIL`, blank
+    separator, `Reason: <reason>`, blank separator, and one right-aligned
+    freshness line (`Updated: ..., Next: ...`) using provider freshness state.
+    @param result {ProviderResult} Provider result used for freshness fallback.
+    @param reason {str} Normalized failure reason text.
+    @param freshness_state {IdleTimeState | None} Optional provider freshness state.
+    @return {list[str]} Ordered panel body lines for failed-state rendering.
+    @satisfies REQ-036
+    @satisfies REQ-084
+    """
+    freshness_line = _build_freshness_line(
+        result=result,
+        freshness_state=freshness_state,
+    )
+    return ["Status: FAIL", "", f"Reason: {reason}", "", freshness_line]
+
+
 def _build_result_panel(
     name: ProviderName,
     result: ProviderResult,
@@ -2944,9 +2968,9 @@ def _build_result_panel(
     @brief Build one provider panel title/body payload for CLI text rendering.
     @details Formats deterministic panel lines for one provider/window result and
     preserves provider-specific metrics/error rendering rules used by `show`.
-    `FAIL` states emit only one `Error: <reason>` line. `OK` states emit
-    `Status: OK` first, do not emit `Window <window>` headings, and end with a
-    right-aligned `Updated/Next` freshness line.
+    `FAIL` states emit `Status: FAIL`, `Reason: <reason>`, and `Updated/Next`
+    separated by blank lines. `OK` states emit `Status: OK` first, do not emit
+    `Window <window>` headings, and end with one right-aligned freshness line.
     @param name {ProviderName} Provider name enum value.
     @param result {ProviderResult} Provider result to render.
     @param label {str | None} Optional window label suffix (e.g. `"5h"`, `"7d"`).
@@ -2966,14 +2990,18 @@ def _build_result_panel(
     if label:
         title = f"{title} ({label})"
 
-    status_line = f"Status: {'FAIL' if result.is_error else 'OK'}"
+    detail_lines: list[str] = []
+    if result.is_error:
+        reason_text = result.error if isinstance(result.error, str) else "Unknown error"
+        return title, _build_fail_panel_lines(
+            result=result,
+            reason=reason_text,
+            freshness_state=freshness_state,
+        )
+
     freshness_line = _build_freshness_line(
         result=result, freshness_state=freshness_state
     )
-    detail_lines: list[str] = []
-    if result.is_error:
-        error_text = result.error if isinstance(result.error, str) else "Unknown error"
-        return title, [f"Error: {error_text}"]
 
     m = result.metrics
     if m.usage_percent is not None:
@@ -3084,7 +3112,7 @@ def _build_result_panel(
         if status_retry_line is not None:
             detail_lines.append(status_retry_line)
 
-    return title, [status_line, "", *detail_lines, "", freshness_line]
+    return title, ["Status: OK", "", *detail_lines, "", freshness_line]
 
 
 def _format_billing_service_descriptions(services: list[object]) -> str | None:
@@ -3124,9 +3152,10 @@ def _build_dual_window_panel(
     """
     @brief Build one grouped CLI panel for dual-window providers.
     @details Produces one provider panel from `5h` and `7d` results while
-    deduplicating shared lines. `FAIL` states emit one error line only. `OK`
-    states emit `Status: OK` first, avoid `Window <window>` headings, and append
-    one trailing right-aligned freshness line.
+    deduplicating shared lines. `FAIL` states emit `Status: FAIL`,
+    `Reason: <reason>`, and `Updated/Next` separated by blank lines. `OK` states
+    emit `Status: OK` first, avoid `Window <window>` headings, and append one
+    trailing right-aligned freshness line.
     @param name {ProviderName} Provider enum value.
     @param result_5h {ProviderResult} Five-hour provider result.
     @param result_7d {ProviderResult} Seven-day provider result.
@@ -3144,10 +3173,14 @@ def _build_dual_window_panel(
             if result_5h.is_error and isinstance(result_5h.error, str)
             else result_7d.error
         )
-        error_text = (
+        reason_text = (
             primary_error if isinstance(primary_error, str) else "Unknown error"
         )
-        return title, [f"Error: {error_text}"]
+        return title, _build_fail_panel_lines(
+            result=result_7d,
+            reason=reason_text,
+            freshness_state=freshness_state,
+        )
 
     _title_5h, lines_5h = _build_result_panel(
         name=name,

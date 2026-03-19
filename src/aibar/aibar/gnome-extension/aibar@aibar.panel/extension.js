@@ -883,17 +883,23 @@ class AIBarIndicator extends PanelMenu.Button {
 
     /**
      * @brief Execute populate provider card.
-     * @details Applies populate provider card logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
+     * @details Projects provider payload and cached status into one card surface.
+     * Failed states render a strict block with `Status: FAIL` and `Reason: ...`
+     * while keeping `Updated: ..., Next: ...` freshness output and suppressing
+     * usage/reset/quota/cost rows. Successful states render metrics using
+     * existing provider-specific card rules.
      * @param {any} card Input parameter `card`.
      * @param {any} providerName Input parameter `providerName`.
      * @param {any} data Input parameter `data`.
      * @param {any} statusEntry Window-specific cached status entry.
      * @param {any} freshnessState Provider-scoped freshness entry from `freshness` section.
      * @returns {any} Function return value.
+     * @satisfies REQ-017
      */
     _populateProviderCard(card, providerName, data, statusEntry = null, freshnessState = null) {
         const metrics = data.metrics || {};
         const raw = data.raw || {};
+        let freshnessLabelText = '';
         if (freshnessState &&
             Number.isInteger(freshnessState.last_success_timestamp) &&
             Number.isInteger(freshnessState.idle_until_timestamp)
@@ -904,15 +910,16 @@ class AIBarIndicator extends PanelMenu.Button {
                 const updatedStr = _formatLocalDateTime(updatedDate);
                 const nextStr = _formatLocalDateTime(nextDate);
                 if (updatedStr === null || nextStr === null)
-                    card.updateAtLabel.text = '';
+                    freshnessLabelText = '';
                 else
-                    card.updateAtLabel.text = `Updated: ${updatedStr}, Next: ${nextStr}`;
+                    freshnessLabelText = `Updated: ${updatedStr}, Next: ${nextStr}`;
             } catch (_e) {
-                card.updateAtLabel.text = '';
+                freshnessLabelText = '';
             }
         } else {
-            card.updateAtLabel.text = '';
+            freshnessLabelText = '';
         }
+        card.updateAtLabel.text = freshnessLabelText;
         const statusError = (
             statusEntry &&
             statusEntry.result === 'FAIL' &&
@@ -921,14 +928,23 @@ class AIBarIndicator extends PanelMenu.Button {
         )
             ? statusEntry.error
             : null;
+        const retryAfterSeconds = (
+            statusEntry &&
+            typeof statusEntry.retry_after_seconds !== 'undefined'
+        )
+            ? statusEntry.retry_after_seconds
+            : null;
+        void retryAfterSeconds;
         const effectiveError = statusError || data.error;
         const isError = effectiveError !== null && effectiveError !== undefined;
 
         if (isError) {
-            card.errorLabel.text = `Error: ${effectiveError}`;
+            card.errorLabel.text = `Status: FAIL\n\nReason: ${effectiveError}`;
             card.errorLabel.show();
-            card.updateAtLabel.text = '';
-            card.updateAtLabel.hide();
+            if (freshnessLabelText.length > 0)
+                card.updateAtLabel.show();
+            else
+                card.updateAtLabel.hide();
             card.costLabel.text = '';
             card.costLabel.hide();
             card.byokLabel.text = '';
@@ -951,7 +967,10 @@ class AIBarIndicator extends PanelMenu.Button {
 
         card.errorLabel.text = '';
         card.errorLabel.hide();
-        card.updateAtLabel.show();
+        if (freshnessLabelText.length > 0)
+            card.updateAtLabel.show();
+        else
+            card.updateAtLabel.hide();
         const fiveHourUtil = raw.five_hour && raw.five_hour.utilization !== null && raw.five_hour.utilization !== undefined
             ? raw.five_hour.utilization
             : (raw.rate_limit && raw.rate_limit.primary_window && raw.rate_limit.primary_window.used_percent !== null && raw.rate_limit.primary_window.used_percent !== undefined
@@ -1066,7 +1085,7 @@ class AIBarIndicator extends PanelMenu.Button {
             const singleWindowReset = metrics.reset_at || fiveHourReset || sevenDayReset || null;
             const hasUsagePercent = usagePercent !== null && usagePercent !== undefined;
             const effectiveUsagePercent = hasUsagePercent ? usagePercent : 0;
-            card.fiveHourBar.label.text = '';
+            card.fiveHourBar.label.text = configuredWindowLabel;
             card._barData.fiveHour = {pct: effectiveUsagePercent, resetTime: singleWindowReset};
             updateWindowBar(
                 card.fiveHourBar,

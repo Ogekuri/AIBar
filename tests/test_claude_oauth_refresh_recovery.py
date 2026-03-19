@@ -180,7 +180,8 @@ def test_claude_oauth_recovery_retry_persists_block_on_second_auth_failure(
     runner = CliRunner()
     result = runner.invoke(main, ["show", "--provider", "claude", "--window", "7d"])
     assert result.exit_code == 0
-    assert "Error: Invalid or expired OAuth token" in result.output
+    assert "Reason: Invalid or expired OAuth token" in result.output
+    assert "Error: Invalid or expired OAuth token" not in result.output
     assert len(refresh_calls) == 1
     assert len(dual_calls) == 2
 
@@ -232,7 +233,8 @@ def test_claude_oauth_recovery_skips_refresh_when_block_flag_active(
     runner = CliRunner()
     result = runner.invoke(main, ["show", "--provider", "claude", "--window", "7d"])
     assert result.exit_code == 0
-    assert "Error: Invalid or expired OAuth token" in result.output
+    assert "Reason: Invalid or expired OAuth token" in result.output
+    assert "Error: Invalid or expired OAuth token" not in result.output
     assert len(refresh_calls) == 0
 
 

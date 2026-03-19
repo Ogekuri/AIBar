@@ -22,7 +22,12 @@ from click.testing import CliRunner
 
 from aibar import config as config_module
 from aibar.cli import main
-from aibar.providers.base import ProviderName, ProviderResult, UsageMetrics, WindowPeriod
+from aibar.providers.base import (
+    ProviderName,
+    ProviderResult,
+    UsageMetrics,
+    WindowPeriod,
+)
 from aibar.providers.claude_oauth import ClaudeOAuthProvider
 
 
@@ -38,7 +43,9 @@ def _patch_config_paths(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(config_module, "APP_CONFIG_DIR", config_dir)
     monkeypatch.setattr(config_module, "APP_CACHE_DIR", cache_dir)
     monkeypatch.setattr(config_module, "ENV_FILE_PATH", config_dir / "env")
-    monkeypatch.setattr(config_module, "RUNTIME_CONFIG_PATH", config_dir / "config.json")
+    monkeypatch.setattr(
+        config_module, "RUNTIME_CONFIG_PATH", config_dir / "config.json"
+    )
     monkeypatch.setattr(config_module, "CACHE_FILE_PATH", cache_dir / "cache.json")
     monkeypatch.setattr(config_module, "IDLE_TIME_PATH", cache_dir / "idle-time.json")
 
@@ -124,7 +131,9 @@ def _make_geminiai_success(source: str) -> ProviderResult:
     return ProviderResult(
         provider=ProviderName.GEMINIAI,
         window=WindowPeriod.DAY_30,
-        metrics=UsageMetrics(cost=3.0, requests=90, input_tokens=600, currency_symbol="€"),
+        metrics=UsageMetrics(
+            cost=3.0, requests=90, input_tokens=600, currency_symbol="€"
+        ),
         raw={"status_code": 200, "source": source, "project_id": "demo-project"},
     )
 
@@ -159,7 +168,9 @@ def test_failed_refresh_preserves_previous_payload_and_records_fail_status(
     """
     _patch_config_paths(monkeypatch, tmp_path)
     config_module.save_runtime_config(
-        config_module.RuntimeConfig(idle_delay_seconds=300, api_call_delay_milliseconds=20)
+        config_module.RuntimeConfig(
+            idle_delay_seconds=300, api_call_delay_milliseconds=20
+        )
     )
     cached_success = _make_openrouter_success(source="cached-success")
     config_module.save_cli_cache(
@@ -188,7 +199,10 @@ def test_failed_refresh_preserves_previous_payload_and_records_fail_status(
     output = json.loads(result.output)
     assert output["payload"]["openrouter"]["raw"]["source"] == "cached-success"
     assert output["status"]["openrouter"]["30d"]["result"] == "FAIL"
-    assert output["status"]["openrouter"]["30d"]["error"] == "Rate limited. Try again later."
+    assert (
+        output["status"]["openrouter"]["30d"]["error"]
+        == "Rate limited. Try again later."
+    )
     assert isinstance(output["status"]["openrouter"]["30d"]["updated_at"], str)
 
 
@@ -207,7 +221,9 @@ def test_partial_claude_refresh_records_mixed_window_statuses(
     """
     _patch_config_paths(monkeypatch, tmp_path)
     config_module.save_runtime_config(
-        config_module.RuntimeConfig(idle_delay_seconds=300, api_call_delay_milliseconds=20)
+        config_module.RuntimeConfig(
+            idle_delay_seconds=300, api_call_delay_milliseconds=20
+        )
     )
     initial_claude = _make_claude_success(WindowPeriod.DAY_7, utilization_7d=30.0)
     config_module.save_cli_cache(
@@ -255,12 +271,18 @@ def test_refresh_flow_does_not_create_legacy_claude_snapshot_file(
     """
     _patch_config_paths(monkeypatch, tmp_path)
     config_module.save_runtime_config(
-        config_module.RuntimeConfig(idle_delay_seconds=300, api_call_delay_milliseconds=20)
+        config_module.RuntimeConfig(
+            idle_delay_seconds=300, api_call_delay_milliseconds=20
+        )
     )
     provider = ClaudeOAuthProvider(token="sk-ant-test-token")
     successful = {
-        WindowPeriod.HOUR_5: _make_claude_success(WindowPeriod.HOUR_5, utilization_7d=44.0),
-        WindowPeriod.DAY_7: _make_claude_success(WindowPeriod.DAY_7, utilization_7d=44.0),
+        WindowPeriod.HOUR_5: _make_claude_success(
+            WindowPeriod.HOUR_5, utilization_7d=44.0
+        ),
+        WindowPeriod.DAY_7: _make_claude_success(
+            WindowPeriod.DAY_7, utilization_7d=44.0
+        ),
     }
     monkeypatch.setattr(
         "aibar.cli.get_providers",
@@ -287,11 +309,10 @@ def test_geminiai_cached_fail_status_is_rendered_in_show_output(
     tmp_path: Path,
 ) -> None:
     """
-    @brief Verify GeminiAI cached FAIL status propagates to CLI text output.
+    @brief Verify GeminiAI cached FAIL status propagates with status-reason block.
     @details Writes cache payload with successful GeminiAI metrics plus status FAIL
-    for 30d window, activates idle-time gating, and asserts `aibar show` prints the
-    cached status error message and renders effective GeminiAI window `30d` even with
-    explicit `--window 7d`.
+    for 30d window, activates idle-time gating, and asserts `aibar show` prints
+    status/reason lines without `Window` heading rows even with explicit `--window 7d`.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
     @param tmp_path {Path} Temporary path fixture.
     @return {None} Function return value.
@@ -299,14 +320,21 @@ def test_geminiai_cached_fail_status_is_rendered_in_show_output(
     """
     _patch_config_paths(monkeypatch, tmp_path)
     config_module.save_runtime_config(
-        config_module.RuntimeConfig(idle_delay_seconds=300, api_call_delay_milliseconds=20)
+        config_module.RuntimeConfig(
+            idle_delay_seconds=300, api_call_delay_milliseconds=20
+        )
     )
 
     cached_success = ProviderResult(
         provider=ProviderName.GEMINIAI,
         window=WindowPeriod.DAY_30,
-        metrics=UsageMetrics(cost=2.75, requests=120, input_tokens=1024, currency_symbol="€"),
-        raw={"project_id": "demo-project", "billing": {"table_id": "gcp_billing_export_v1_001"}},
+        metrics=UsageMetrics(
+            cost=2.75, requests=120, input_tokens=1024, currency_symbol="€"
+        ),
+        raw={
+            "project_id": "demo-project",
+            "billing": {"table_id": "gcp_billing_export_v1_001"},
+        },
     )
     config_module.save_cli_cache(
         {
@@ -343,8 +371,16 @@ def test_geminiai_cached_fail_status_is_rendered_in_show_output(
     runner = CliRunner()
     result = runner.invoke(main, ["show", "--provider", "geminiai", "--window", "7d"])
     assert result.exit_code == 0
-    assert "Window 30d:" in result.output
-    assert "Error: GeminiAI billing export table was not found in dataset 'billing_data'." in result.output
+    assert "Window 30d:" not in result.output
+    assert "Status: FAIL" in result.output
+    assert (
+        "Reason: GeminiAI billing export table was not found in dataset 'billing_data'."
+        in result.output
+    )
+    assert (
+        "Error: GeminiAI billing export table was not found in dataset 'billing_data'."
+        not in result.output
+    )
 
 
 def test_geminiai_rate_limit_preserves_payload_and_updates_only_its_idle_state(
@@ -365,7 +401,9 @@ def test_geminiai_rate_limit_preserves_payload_and_updates_only_its_idle_state(
     """
     _patch_config_paths(monkeypatch, tmp_path)
     config_module.save_runtime_config(
-        config_module.RuntimeConfig(idle_delay_seconds=300, api_call_delay_milliseconds=20)
+        config_module.RuntimeConfig(
+            idle_delay_seconds=300, api_call_delay_milliseconds=20
+        )
     )
     cached_geminiai = _make_geminiai_success(source="cached-geminiai")
     config_module.save_cli_cache(
@@ -407,10 +445,12 @@ def test_geminiai_rate_limit_preserves_payload_and_updates_only_its_idle_state(
     geminiai_state = idle_state[ProviderName.GEMINIAI.value]
     openrouter_state = idle_state[ProviderName.OPENROUTER.value]
     geminiai_delta = (
-        geminiai_state["idle_until_timestamp"] - geminiai_state["last_success_timestamp"]
+        geminiai_state["idle_until_timestamp"]
+        - geminiai_state["last_success_timestamp"]
     )
     openrouter_delta = (
-        openrouter_state["idle_until_timestamp"] - openrouter_state["last_success_timestamp"]
+        openrouter_state["idle_until_timestamp"]
+        - openrouter_state["last_success_timestamp"]
     )
     assert 899 <= geminiai_delta <= 901
     assert 299 <= openrouter_delta <= 301

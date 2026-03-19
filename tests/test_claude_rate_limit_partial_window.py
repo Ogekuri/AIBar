@@ -11,7 +11,12 @@ windows and CLI output suppresses metric/statistic lines on failed states.
 from unittest.mock import AsyncMock, patch
 
 from aibar.cli import _fetch_claude_dual, _print_result
-from aibar.providers.base import ProviderName, ProviderResult, UsageMetrics, WindowPeriod
+from aibar.providers.base import (
+    ProviderName,
+    ProviderResult,
+    UsageMetrics,
+    WindowPeriod,
+)
 from aibar.providers.claude_oauth import ClaudeOAuthProvider
 
 
@@ -32,9 +37,9 @@ def _make_429_result(window: WindowPeriod) -> ProviderResult:
 
 def test_claude_429_renders_error_only_output_for_both_windows(capsys) -> None:
     """
-    @brief Verify Claude dual-window CLI output suppresses all statistics on HTTP 429.
-    @details Asserts both windows remain in failed state and only render error plus
-    combined HTTP status/retry diagnostics.
+    @brief Verify Claude dual-window CLI output uses failed status-reason block format.
+    @details Asserts both windows remain in failed state and render `Status: FAIL`
+    plus `Reason: ...` with freshness rows while suppressing statistics lines.
     @param capsys {_pytest.capture.CaptureFixture[str]} Output capture fixture.
     @return {None} Function return value.
     @satisfies REQ-036
@@ -61,8 +66,11 @@ def test_claude_429_renders_error_only_output_for_both_windows(capsys) -> None:
     _print_result(ProviderName.CLAUDE, result_7d, label="7d")
     output = capsys.readouterr().out
 
-    assert output.count("Error: Rate limited. Try again later.") == 2
-    assert output.count("HTTP status: 429, Retry after: 300 sec.") == 2
+    assert output.count("Status: FAIL") == 2
+    assert output.count("Reason: Rate limited. Try again later.") == 2
+    assert output.count("Updated:") == 2
+    assert "Error: Rate limited. Try again later." not in output
+    assert "HTTP status: 429, Retry after: 300 sec." not in output
     assert "Usage:" not in output
     assert "Resets in:" not in output
     assert "Remaining credits:" not in output
