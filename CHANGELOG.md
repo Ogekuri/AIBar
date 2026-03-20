@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.14.0](https://github.com/Ogekuri/AIBar/compare/v0.13.0..v0.14.0) - 2026-03-20
+### 🚜  Changes
+- add persistent runtime log/debug flags [useReq] *(cli)*
+  - Update SRS with REQ-107..REQ-114 and TST-047..TST-049 for logging controls.
+  - Add eager flags --enable-log/--disable-log/--enable-debug/--disable-debug with config persistence.
+  - Extend setup with final logging section and persist log_enabled/debug_enabled.
+  - Implement append runtime logging, idle/call/error/cache logging, and debug API result logging.
+  - Refresh WORKFLOW/REFERENCES and add targeted regression tests for help/setup/log behavior.
+
+### 📚  Documentation
+- Update README.md document.
+
 ## [0.13.0](https://github.com/Ogekuri/AIBar/compare/v0.12.0..v0.13.0) - 2026-03-19
 ### ⛰️  Features
 - add in-process token refresh recovery and retry block state [useReq] *(claude-oauth)*
@@ -839,6 +851,7 @@
 - \[0.11.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.11.0
 - \[0.12.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.12.0
 - \[0.13.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.13.0
+- \[0.14.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.14.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -853,3 +866,4 @@
 [0.11.0]: https://github.com/Ogekuri/AIBar/compare/v0.10.0..v0.11.0
 [0.12.0]: https://github.com/Ogekuri/AIBar/compare/v0.11.0..v0.12.0
 [0.13.0]: https://github.com/Ogekuri/AIBar/compare/v0.12.0..v0.13.0
+[0.14.0]: https://github.com/Ogekuri/AIBar/compare/v0.13.0..v0.14.0
