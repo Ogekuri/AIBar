@@ -86,10 +86,11 @@
 - `Lifecycle/Trigger`
   - Starts when `aibar` is invoked by a user shell, by launcher delegation from `PROC:aibar-launcher`, or by subprocess spawn from `PROC:gnome-shell`.
   - Executes startup update preflight before CLI argument validation and command dispatch.
-  - Executes one command route (`show`, `doctor`, `env`, `setup`, `login`, `gnome-install`, `gnome-uninstall`) or exits early via lifecycle flags (`--version`, `--ver`, `--upgrade`, `--uninstall`) with Linux-only subprocess execution and non-Linux manual guidance.
+  - Executes one command route (`show`, `doctor`, `env`, `setup`, `login`, `gnome-install`, `gnome-uninstall`) or exits early via lifecycle flags (`--version`, `--ver`, `--upgrade`, `--uninstall`, `--enable-log`, `--disable-log`, `--enable-debug`, `--disable-debug`) with Linux-only subprocess execution and non-Linux manual guidance.
   - Exits after command completion.
 - `Internal Call-Trace Tree`
-  - `StartupPreflightGroup.main(...)`: startup preflight wrapper around Click parser/dispatcher [`src/aibar/aibar/cli.py`]
+  - `StartupPreflightGroup.main(...)`: startup preflight wrapper around Click parser/dispatcher with execution start/end logging [`src/aibar/aibar/cli.py`]
+    - `append_runtime_log_line(...)`: append execution-start and execution-end rows in runtime log [`src/aibar/aibar/config.py`]
     - `_run_startup_update_preflight(...)`: startup release-check idle gate and diagnostics pipeline [`src/aibar/aibar/cli.py`]
       - `_load_startup_idle_state(...)`: load startup idle-state JSON from `~/.cache/aibar/check_version_idle-time.json` [`src/aibar/aibar/cli.py`]
       - `_startup_idle_epochs(...)`: normalize `last_success_at_epoch` and `idle_until_epoch` from startup idle-state payload [`src/aibar/aibar/cli.py`]
@@ -100,6 +101,7 @@
         - `_parse_version_triplet(...)`: parse `major.minor.patch` tuple from version text [`src/aibar/aibar/cli.py`]
       - `_save_startup_idle_state(...)`: persist startup idle-state JSON with epoch and human-readable fields [`src/aibar/aibar/cli.py`]
       - `_emit_startup_preflight_message(...)`: emit bright-green/bright-red startup diagnostics [`src/aibar/aibar/cli.py`]
+      - `append_runtime_log_line(...)`: append startup idle-check and fetch diagnostics rows [`src/aibar/aibar/config.py`]
     - `_handle_version_option(...)`: eager `--version`/`--ver` callback that prints installed version and exits [`src/aibar/aibar/cli.py`]
     - `_handle_upgrade_option(...)`: eager `--upgrade` callback with Linux-gated lifecycle execution and non-Linux guidance [`src/aibar/aibar/cli.py`]
       - `_is_linux_runtime(...)`: runtime platform gate for lifecycle subprocess execution [`src/aibar/aibar/cli.py`]
@@ -110,6 +112,19 @@
       - `_execute_lifecycle_subprocess(...)`: Linux branch subprocess execution wrapper with exit-code propagation [`src/aibar/aibar/cli.py`]
       - `_cleanup_startup_idle_state_artifacts(...)`: Linux uninstall cleanup that removes startup idle-state file and cache directory [`src/aibar/aibar/cli.py`]
       - `_emit_non_linux_lifecycle_guidance(...)`: non-Linux branch warning with manual command text [`src/aibar/aibar/cli.py`]
+    - `_handle_enable_log_option(...)`: eager `--enable-log` callback that enables persisted runtime execution logging and exits [`src/aibar/aibar/cli.py`]
+      - `_update_runtime_logging_flags(...)`: runtime config toggle update for `log_enabled` and/or `debug_enabled` values [`src/aibar/aibar/cli.py`]
+      - `save_runtime_config(...)`: persist updated runtime config toggles [`src/aibar/aibar/config.py`]
+    - `_handle_disable_log_option(...)`: eager `--disable-log` callback that disables persisted runtime execution logging and exits [`src/aibar/aibar/cli.py`]
+      - `_update_runtime_logging_flags(...)`: runtime config toggle update for `log_enabled` and/or `debug_enabled` values [`src/aibar/aibar/cli.py`]
+      - `save_runtime_config(...)`: persist updated runtime config toggles [`src/aibar/aibar/config.py`]
+    - `_handle_enable_debug_option(...)`: eager `--enable-debug` callback that enables persisted API debug logging and exits [`src/aibar/aibar/cli.py`]
+      - `_update_runtime_logging_flags(...)`: runtime config toggle update for `log_enabled` and/or `debug_enabled` values [`src/aibar/aibar/cli.py`]
+      - `save_runtime_config(...)`: persist updated runtime config toggles [`src/aibar/aibar/config.py`]
+    - `_handle_disable_debug_option(...)`: eager `--disable-debug` callback that disables persisted API debug logging and exits [`src/aibar/aibar/cli.py`]
+      - `_update_runtime_logging_flags(...)`: runtime config toggle update for `log_enabled` and/or `debug_enabled` values [`src/aibar/aibar/cli.py`]
+      - `save_runtime_config(...)`: persist updated runtime config toggles [`src/aibar/aibar/config.py`]
+    - `append_runtime_log_separator(...)`: append trailing blank line separator per execution block [`src/aibar/aibar/config.py`]
     - `main(...)`: CLI command router callback [`src/aibar/aibar/cli.py`]
     - `show(...)`: usage fetch/report route with shared cache pipeline; JSON branch emits canonical `payload`/`status` plus `idle_time`/`freshness`/`extension` sections, while text output sorts provider panels as `claude/openrouter/copilot/codex/openai/geminiai`, omits window-heading rows, renders `FAIL` blocks as `Status: FAIL` + `Reason: <reason>`, and right-aligns trailing `Updated/Next` on both `OK` and `FAIL` panels [`src/aibar/aibar/cli.py`]
       - `parse_window(...)`: CLI window selector normalization [`src/aibar/aibar/cli.py`]
@@ -122,7 +137,8 @@
         - `CopilotProvider.__init__(...)`: resolve Copilot token source [`src/aibar/aibar/providers/copilot.py`]
         - `CodexProvider.__init__(...)`: resolve Codex credential source [`src/aibar/aibar/providers/codex.py`]
         - `GeminiAIProvider.__init__(...)`: resolve GeminiAI OAuth token/client/project sources [`src/aibar/aibar/providers/geminiai.py`]
-      - `retrieve_results_via_cache_pipeline(...)`: shared `show` process flow: (1) idle-time check including Claude OAuth refresh-block lifecycle (force-clear and expiry-clear), (2) if refresh needed: load cache → modular API calls → in-memory merge → locked cache write → idle-time update, (3) if no refresh: single locked cache read, (4) decode results for presentation; at most one `load_cli_cache` per execution [`src/aibar/aibar/cli.py`]
+      - `retrieve_results_via_cache_pipeline(...)`: shared `show` process flow with idle-time logging and refresh/cache-branch logging: (1) idle-time check including Claude OAuth refresh-block lifecycle, (2) refresh expired providers, (3) load cached payload when refresh not required, (4) decode results for presentation [`src/aibar/aibar/cli.py`]
+        - `append_runtime_log_line(...)`: append idle-time verification, branch decisions, and pipeline outcome rows [`src/aibar/aibar/config.py`]
         - `remove_idle_time_file(...)`: clear persisted idle-time state on forced refresh with blocking lock-file coordination [`src/aibar/aibar/config.py`]
         - `_clear_claude_refresh_block_flag(...)`: clear Claude OAuth refresh-block flag in provider idle-time map [`src/aibar/aibar/cli.py`]
         - `_clear_expired_claude_refresh_block(...)`: auto-clear Claude OAuth refresh-block after hardcoded TTL expiry [`src/aibar/aibar/cli.py`]
@@ -131,13 +147,15 @@
           - `_blocking_file_lock(...)`: poll lock-file release at 250ms and own lock lifecycle for `idle-time.json` read [`src/aibar/aibar/config.py`]
         - `load_runtime_config(...)`: runtime throttling and timeout settings loader [`src/aibar/aibar/config.py`]
         - `load_cli_cache(...)`: load persisted provider dataset from `~/.cache/aibar/cache.json` with blocking lock-file coordination (single read per execution) [`src/aibar/aibar/config.py`]
+          - `append_runtime_log_line(...)`: append cache-load event rows for `cache.json` read path [`src/aibar/aibar/config.py`]
           - `_blocking_file_lock(...)`: poll lock-file release at 250ms and own lock lifecycle for `cache.json` read [`src/aibar/aibar/config.py`]
           - `_lock_file_path(...)`: resolve lock-file name `<cache-file>.lock` under `~/.cache/aibar/` [`src/aibar/aibar/config.py`]
         - `_normalize_cache_document(...)`: normalize decoded cache payload to canonical sectioned schema [`src/aibar/aibar/cli.py`]
-        - `_refresh_and_persist_cache_payload(...)`: execute modular API calls for expired providers, merge results in memory, then persist cache.json and idle-time.json under lock in a single write point [`src/aibar/aibar/cli.py`]
-          - `_fetch_result(...)`: throttled provider fetch wrapper using configurable `api_call_timeout_milliseconds` for HTTP timeout [`src/aibar/aibar/cli.py`]
+        - `_refresh_and_persist_cache_payload(...)`: execute modular API calls for expired providers, merge results in memory, persist cache/idle updates, and append refresh-branch runtime log rows [`src/aibar/aibar/cli.py`]
+          - `append_runtime_log_line(...)`: append refresh branch start/skip/write/end rows [`src/aibar/aibar/config.py`]
+          - `_fetch_result(...)`: throttled provider fetch wrapper with API-call start/end/error runtime logging and debug-result logging [`src/aibar/aibar/cli.py`]
             - `_fetch_claude_dual_with_auth_recovery(...)`: Claude dual-window fetch with auth-expired recovery policy, one renewal attempt, and retry-block lifecycle persistence [`src/aibar/aibar/cli.py`]
-              - `_fetch_claude_dual(...)`: Claude single-call dual-window fetch returning direct provider success/error outcomes for both windows [`src/aibar/aibar/cli.py`]
+              - `_fetch_claude_dual(...)`: Claude single-call dual-window fetch with runtime API logging and debug-result logging for both windows [`src/aibar/aibar/cli.py`]
               - `_is_claude_authentication_error_result(...)`: classify Claude auth-expired failures using canonical token-expired error text [`src/aibar/aibar/cli.py`]
               - `_is_claude_refresh_block_active(...)`: evaluate refresh-block TTL against last-success timestamp [`src/aibar/aibar/cli.py`]
               - `_handle_claude_oauth_refresh_on_auth_error(...)`: execute in-process token renewal and one dual-window retry [`src/aibar/aibar/cli.py`]
@@ -175,6 +193,7 @@
             - `_record_attempt_status(...)`: persist per-provider/window attempt result (`OK`/`FAIL`) in cache `status` section [`src/aibar/aibar/cli.py`]
             - `_serialize_results_payload(...)`: serialize refreshed provider results [`src/aibar/aibar/cli.py`]
           - `save_cli_cache(...)`: persist sanitized cache document (`payload` + `status`) to `cache.json` only when merged payload content changed (single write point) [`src/aibar/aibar/config.py`]
+            - `append_runtime_log_line(...)`: append cache-save event rows for `cache.json` write path [`src/aibar/aibar/config.py`]
             - `_blocking_file_lock(...)`: poll lock-file release at 250ms and own lock lifecycle for `cache.json` write [`src/aibar/aibar/config.py`]
           - `_update_idle_time_after_refresh(...)`: persist provider-scoped idle-time metadata from refresh outcomes, applying `idle_until = max(current_time + retry_after, current_time + idle_delay)` for failures [`src/aibar/aibar/cli.py`]
             - `_extract_retry_after_seconds(...)`: normalized retry-after parser with integer-second coercion [`src/aibar/aibar/cli.py`]
@@ -222,13 +241,13 @@
     - `env(...)`: environment-help route [`src/aibar/aibar/cli.py`]
       - `Config.get_env_var_help(...)`: provider help block synthesis [`src/aibar/aibar/config.py`]
         - `Config.is_provider_configured(...)`: provider probe via provider class [`src/aibar/aibar/config.py`]
-    - `setup(...)`: interactive setup route for runtime throttling (idle delay, API call delay milliseconds, API call timeout milliseconds, gnome refresh interval, `billing_data` dataset), per-provider currency symbol defaults including `geminiai`, provider credentials, and GeminiAI OAuth/project configuration where source choice supports `skip`/`file`/`paste`/`login` re-authorization with canonical scopes [`src/aibar/aibar/cli.py`]
+    - `setup(...)`: interactive setup route for runtime throttling (idle delay, API call delay milliseconds, API call timeout milliseconds, gnome refresh interval, `billing_data` dataset), per-provider currency symbol defaults including `geminiai`, provider credentials, GeminiAI OAuth/project configuration, and final logging-section prompts for `log_enabled` and `debug_enabled` [`src/aibar/aibar/cli.py`]
       - `load_runtime_config(...)`: load persisted runtime throttling and currency defaults [`src/aibar/aibar/config.py`]
-      - `RuntimeConfig(...)`: validate user-provided idle delay, API call delay milliseconds, API call timeout milliseconds, gnome_refresh_interval_seconds, billing_data, and currency_symbols values [`src/aibar/aibar/config.py`]
+      - `RuntimeConfig(...)`: validate user-provided idle delay, API call delay milliseconds, API call timeout milliseconds, gnome_refresh_interval_seconds, billing_data, currency_symbols, and logging flags (`log_enabled`, `debug_enabled`) [`src/aibar/aibar/config.py`]
       - `GeminiAICredentialStore.save_client_config(...)`: persist validated GeminiAI OAuth desktop-client JSON [`src/aibar/aibar/providers/geminiai.py`]
       - `GeminiAICredentialStore.extract_project_id(...)`: derive project id from validated OAuth payload [`src/aibar/aibar/providers/geminiai.py`]
       - `GeminiAICredentialStore.authorize_interactively(...)`: browser OAuth flow + token persistence for setup `login` source and optional `file`/`paste` post-save authorization using `GEMINIAI_OAUTH_SCOPES` (`bigquery.readonly`, `monitoring.read`, `cloud-platform`) [`src/aibar/aibar/providers/geminiai.py`]
-      - `save_runtime_config(...)`: persist runtime throttling and currency settings to `~/.config/aibar/config.json` [`src/aibar/aibar/config.py`]
+      - `save_runtime_config(...)`: persist runtime throttling, currency settings, and logging flags to `~/.config/aibar/config.json` [`src/aibar/aibar/config.py`]
       - `write_env_file(...)`: env-file credential update/persist [`src/aibar/aibar/config.py`]
     - `login(...)`: provider login router [`src/aibar/aibar/cli.py`]
       - `_login_claude(...)`: Claude credential health check route [`src/aibar/aibar/cli.py`]
@@ -266,6 +285,7 @@
   - Click command parsing and dispatch.
   - GitHub Releases latest endpoint (`https://api.github.com/repos/Ogekuri/AIBar/releases/latest`) for startup update checks.
   - Linux-only `uv` subprocess execution for lifecycle flags (`--upgrade`, `--uninstall`) plus non-Linux stderr guidance output.
+  - Runtime execution log file appends under `~/.cache/aibar/aibar.log` controlled by persisted `log_enabled` and `debug_enabled` flags in `~/.config/aibar/config.json`.
   - HTTP network interactions through provider endpoints.
   - Browser-based OAuth consent flow and loopback callback for GeminiAI Google credentials.
   - Google Cloud Monitoring API HTTPS endpoints.

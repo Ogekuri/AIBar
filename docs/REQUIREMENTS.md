@@ -1,8 +1,8 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.3.27"
-date: "2026-03-19"
+version: "0.3.28"
+date: "2026-03-20"
 author: "req-new"
 scope:
   paths:
@@ -88,7 +88,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **PRJ-006**: MUST provide a PEP 621-compliant `pyproject.toml` at repository root enabling `uv tool install` distribution execution and `uv run`/`uvx` live execution without external virtualenv bootstrap scripts.
 - **PRJ-007**: MUST document in `README.md` dedicated sections for `uv`-based requirements, installation/removal, `uv run`/`uvx` execution, and optional `requirements.txt` export command, plus GeminiAI prerequisites.
 - **PRJ-008**: MUST provide `aibar gnome-install` CLI command that detects install/update mode for `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/`, copies package extension files, disables extension before update copy, and enables extension after copy.
-- **PRJ-009**: MUST execute startup update checks and lifecycle flags `--upgrade`, `--uninstall`, `--version`, and `--ver` for program `aibar`.
+- **PRJ-009**: MUST execute startup update checks and lifecycle flags `--upgrade`, `--uninstall`, `--version`, `--ver`, `--enable-log`, `--disable-log`, `--enable-debug`, and `--disable-debug` for program `aibar`.
 - **PRJ-010**: MUST package all runtime files required by `aibar` so local execution and `uv tool install` execution remain behaviorally equivalent.
 - **PRJ-011**: MUST keep GNOME extension contract documentation in `docs/REQUIREMENTS.md`, `docs/WORKFLOW.md`, and `docs/REFERENCES.md`; repository source tree MUST NOT contain `src/aibar/plans/Gnome.plan.md`.
 
@@ -100,7 +100,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **CTN-005**: MAY depend on unofficial/internal endpoints when official usage APIs are unavailable for Claude, Copilot, or Codex integrations.
 - **CTN-006**: MUST keep `docs/REFERENCES.md` synchronized with symbols defined under `src/` and `.github/workflows/`.
 - **CTN-007**: MUST declare `hatchling` as `[build-system]` backend in `pyproject.toml` with `[project]` metadata including `name`, `version`, `requires-python`, `[project.scripts]`, and `dependencies` containing `pytest`.
-- **CTN-008**: MUST persist runtime configuration in `~/.config/aibar/config.json` with keys `idle_delay_seconds`, `api_call_delay_milliseconds`, `api_call_timeout_milliseconds`, `gnome_refresh_interval_seconds`, `billing_data`, and `currency_symbols` (mapping provider name → currency symbol string; default `"$"` per provider when key is absent).
+- **CTN-008**: MUST persist runtime configuration in `~/.config/aibar/config.json` with keys `idle_delay_seconds`, `api_call_delay_milliseconds`, `api_call_timeout_milliseconds`, `gnome_refresh_interval_seconds`, `billing_data`, `currency_symbols`, `log_enabled`, and `debug_enabled`.
 - **CTN-009**: MUST persist provider-scoped idle-time state in `~/.cache/aibar/idle-time.json` with `last_success_timestamp` and `idle_until_timestamp` (epoch seconds) and `last_success_human` and `idle_until_human` (local-timezone ISO-8601).
 - **CTN-010**: MUST update `cache.json` payload fields only after successful fetch for the same provider/window and MUST preserve previous payload fields on failed fetch attempts, including HTTP `429`.
 - **CTN-011**: MUST fetch latest release metadata from `https://api.github.com/repos/Ogekuri/AIBar/releases/latest` for startup update checks.
@@ -179,6 +179,14 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-047**: MUST store and load all last-success fallback payloads from `~/.cache/aibar/cache.json` and MUST NOT require `~/.cache/aibar/claude_dual_last_success.json`.
 - **REQ-048**: `scripts/claude_token_refresh.sh` `do_refresh()` MUST truncate `LOG_FILE` to zero bytes before writing any log entries, so each `once` invocation and each daemon refresh cycle produces a standalone log containing only entries from that cycle.
 - **REQ-049**: `setup` MUST prompt for per-provider default currency symbol (choices: `$`, `£`, `€`; default `$`) for providers `claude`, `openai`, `openrouter`, `copilot`, `codex`, `geminiai` in a dedicated section after timeout configuration, then persist selections in `~/.config/aibar/config.json` `currency_symbols`.
+- **REQ-107**: MUST expose global flags `--enable-log`, `--disable-log`, `--enable-debug`, and `--disable-debug` that update `~/.config/aibar/config.json` and persist until reconfigured.
+- **REQ-108**: `setup` MUST present a final logging section after all existing setup sections and MUST configure `log_enabled` and `debug_enabled` in `~/.config/aibar/config.json`.
+- **REQ-109**: `--enable-log` and `--disable-log` MUST set `log_enabled` to `true` and `false` respectively without modifying `debug_enabled`.
+- **REQ-110**: `--enable-debug` and `--disable-debug` MUST set `debug_enabled` to `true` and `false` respectively without modifying `log_enabled`.
+- **REQ-111**: When `log_enabled` is `true`, CLI executions MUST append entries to `~/.cache/aibar/aibar.log`, and each non-empty entry line MUST start with timestamp `%Y-%m-%d %H:%M:%S`.
+- **REQ-112**: Logging MUST record execution start, idle-time verification, idle-time-driven function branches, error-handling branches, and every load/save operation targeting `~/.cache/aibar/cache.json`.
+- **REQ-113**: Logging MUST record execution outcome and execution end time, then append one trailing empty line to separate the current execution block from the next execution block.
+- **REQ-114**: API-call debug logging MUST append API metadata and debug response summaries only when both `log_enabled` and `debug_enabled` are `true`.
 - **REQ-050**: Provider `fetch` MUST attempt to extract `currency_symbol` from the raw API JSON response (field `currency`); when absent, MUST resolve `currency_symbol` from `RuntimeConfig.currency_symbols[provider_name]` with fallback `"$"`.
 - **REQ-051**: CLI `show` text output MUST render cost as `Cost: <currency_symbol><value>` where `<currency_symbol><value>` uses `metrics.currency_symbol`, is bold bright white, and MUST NOT use hardcoded `$`.
 - **REQ-053**: GNOME extension MUST NOT render aggregated total panel cost; panel and provider-card cost labels MUST use per-provider `metrics.currency_symbol` and display provider-local monetary values.
@@ -199,7 +207,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-065**: GeminiAI billing fetch MUST query `<billing_dataset>.gcp_billing_export_v1_<table_id>` using explicit column projection and aggregate the latest available invoice month (`MAX(invoice.month)`); when invoice month is unavailable, implementation MUST fallback to `usage_start_time >= TIMESTAMP_TRUNC(CURRENT_TIMESTAMP(), MONTH)`.
 - **REQ-066**: MUST guard every read/write of `~/.cache/aibar/cache.json` and `~/.cache/aibar/idle-time.json` with blocking lock files in `~/.cache/aibar/`, polling lock release every 250 milliseconds before continuing.
 - **REQ-067**: CLI `show` text mode MUST render ANSI provider-colored bordered panels ordered `claude`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, MUST render `Status` first on `OK`, and MUST NOT render any `Window <window>` heading text.
-- **REQ-068**: Bare `aibar` and `aibar --help` MUST print human-readable usage text listing all commands and global or command-specific options, including `show --force`, `show --json`, `gnome-install`, `gnome-uninstall`, `--version`/`--ver`, `--upgrade`, and `--uninstall` examples, without Doxygen tags.
+- **REQ-068**: Bare `aibar` and `aibar --help` MUST print human-readable usage text listing all commands and global or command-specific options, including `show --force`, `show --json`, `gnome-install`, `gnome-uninstall`, `--version`/`--ver`, `--upgrade`, `--uninstall`, `--enable-log`/`--disable-log`, and `--enable-debug`/`--disable-debug` examples, without Doxygen tags.
 - **REQ-069**: GNOME panel icon MUST be bright white when all percentages are <= 25, bright yellow when any percentage > 25, bright orange when any percentage > 50, bright red when any percentage > 75, and blinking bright-red/dim-red when any percentage > 90.
 - **REQ-070**: MUST execute startup update-check preflight before CLI argument validation and command dispatch.
 - **REQ-071**: MUST skip startup update HTTP calls while current epoch is lower than persisted `idle_until` in `~/.cache/aibar/check_version_idle-time.json`.
@@ -243,7 +251,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-009**: MUST verify `gnome-install` resolves package source, validates source directory, branches install/update by target-directory presence, executes update disable→copy→enable ordering, masks extension-absence disable failures, and exits non-zero on missing source; MUST verify `gnome-uninstall` disables extension then removes directory and exits non-zero when directory is missing.
 - **TST-010**: MUST verify `Remaining credits: <remaining> / <limit>` appears for Claude, Codex, and Copilot only when corresponding status is `OK`, appears after one blank line following `Resets in`, and renders `<remaining>` as bold bright white.
 - **TST-011**: MUST verify every provider refresh failure updates provider-scoped idle-time using `idle_until = last_attempt_at + max(idle_delay_seconds, retry_after_seconds_or_0)`, including HTTP `429` and authentication failures without `retry_after` metadata.
-- **TST-013**: MUST verify `setup` prompts idle-delay first, API-call delay milliseconds second (default `100`), API-call timeout milliseconds third (default `5000`), `gnome_refresh_interval_seconds` fourth, `billing_data` fifth (default `billing_data`), then per-provider currency symbol prompts, and persists all values into `~/.config/aibar/config.json`.
+- **TST-013**: MUST verify `setup` prompts idle-delay first, API-call delay milliseconds second (default `100`), API-call timeout milliseconds third (default `5000`), `gnome_refresh_interval_seconds` fourth, `billing_data` fifth (default `billing_data`), then currency prompts, then final logging prompts, and persists all values into `~/.config/aibar/config.json`.
 - **TST-014**: MUST verify `show` evaluates idle-time per provider, serves `~/.cache/aibar/cache.json` for providers with future `idle_until`, and refreshes only providers with missing or expired idle-time state.
 - **TST-015**: MUST verify `show --force` removes `~/.cache/aibar/idle-time.json`, bypasses idle-time gating for current execution, refreshes providers, and recreates idle-time metadata before loading `~/.cache/aibar/cache.json`.
 - **TST-016**: MUST verify refresh execution enforces configured inter-call delay in milliseconds between provider API requests, using `100` milliseconds when `api_call_delay_milliseconds` is absent.
@@ -271,6 +279,9 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-044**: MUST verify Claude authentication error `Invalid or expired OAuth token` triggers one renewal attempt and one retry, then persists `claude.oauth_refresh_blocked=true` when retry authentication fails again.
 - **TST-045**: MUST verify `claude.oauth_refresh_blocked` suppresses repeated renewal attempts, auto-clears at `last_success_timestamp + 86400`, and is removed on `show --force`.
 - **TST-046**: MUST verify GeminiAI CLI text renders `Billing services: <count> (<service1>, <service2>, ...)` using billing `service_description` values, preserving order, and printing all discovered services without truncation markers.
+- **TST-047**: MUST verify `--enable-log`, `--disable-log`, `--enable-debug`, and `--disable-debug` persist `log_enabled` and `debug_enabled` in `~/.config/aibar/config.json` without cross-flag side effects.
+- **TST-048**: MUST verify `log_enabled=true` appends timestamped entries in `~/.cache/aibar/aibar.log` for execution start, idle-time checks, idle-driven branches, error handling, cache.json load/save operations, and execution end plus one trailing empty line.
+- **TST-049**: MUST verify API-call debug logging writes API metadata and debug response summaries only when `log_enabled=true` and `debug_enabled=true`, and does not write debug API rows otherwise.
 - **TST-036**: MUST verify `--version` and `--ver` print installed version and bypass subcommand execution.
 - **TST-038**: MUST verify CLI text `show` renders `FAIL` blocks as `Status: FAIL`, blank line, `Reason: <reason>`, blank line, and right-aligned `Updated/Next`, never renders `Window 5h:/7d:/30d:` headings, and preserves `show --json` freshness, API-counter, cost, and GeminiAI effective-window behaviors.
 - **TST-042**: MUST verify CLI `show` and GNOME provider cards render equivalent failed-provider blocks formatted as `Status: FAIL`, blank line, `Reason: <reason>`, blank line, and `Updated/Next`, without `Window 5h:/7d:/30d:` headings.

@@ -31,6 +31,8 @@ from . import __version__
 from aibar.config import (
     IdleTimeState,
     RuntimeConfig,
+    append_runtime_log_line,
+    append_runtime_log_separator,
     build_idle_time_state,
     config,
     load_cli_cache,
@@ -39,6 +41,7 @@ from aibar.config import (
     remove_idle_time_file,
     save_cli_cache,
     save_idle_time,
+    save_runtime_config,
 )
 from aibar.providers import (
     ClaudeOAuthProvider,
@@ -499,14 +502,28 @@ def _run_startup_update_preflight() -> None:
     @satisfies REQ-073
     @satisfies REQ-074
     @satisfies REQ-075
+    @satisfies REQ-112
     """
     now_epoch = int(time.time())
     state = _load_startup_idle_state()
     last_success_epoch, idle_until_epoch = _startup_idle_epochs(state)
+    append_runtime_log_line(
+        "idle.startup.check "
+        f"now_epoch={now_epoch} idle_until_epoch={idle_until_epoch} "
+        f"last_success_epoch={last_success_epoch}"
+    )
     if now_epoch < idle_until_epoch:
+        append_runtime_log_line("idle.startup.skip reason=idle_active")
         return
 
+    append_runtime_log_line("startup.update.fetch.start")
     response = _fetch_startup_latest_release()
+    append_runtime_log_line(
+        "startup.update.fetch.end "
+        f"status_code={response.status_code} "
+        f"has_error={response.error_message is not None} "
+        f"retry_after_seconds={response.retry_after_seconds}"
+    )
     if response.error_message is None and response.latest_version is not None:
         if _is_newer_release(__version__, response.latest_version):
             _emit_startup_preflight_message(
@@ -700,6 +717,123 @@ def _handle_version_option(
     ctx.exit(0)
 
 
+def _update_runtime_logging_flags(
+    *,
+    log_enabled: bool | None = None,
+    debug_enabled: bool | None = None,
+) -> None:
+    """
+    @brief Persist runtime logging-flag updates into runtime config.
+    @details Loads current `RuntimeConfig`, applies provided logging-flag
+    overrides, writes updated config to disk, and emits one configuration log
+    entry when execution logging is enabled after update.
+    @param log_enabled {bool | None} Optional replacement for `log_enabled`.
+    @param debug_enabled {bool | None} Optional replacement for `debug_enabled`.
+    @return {None} Function return value.
+    @satisfies REQ-107
+    @satisfies REQ-109
+    @satisfies REQ-110
+    """
+    update_payload: dict[str, object] = {}
+    if log_enabled is not None:
+        update_payload["log_enabled"] = bool(log_enabled)
+    if debug_enabled is not None:
+        update_payload["debug_enabled"] = bool(debug_enabled)
+    if not update_payload:
+        return
+    updated_runtime_config = load_runtime_config().model_copy(update=update_payload)
+    save_runtime_config(updated_runtime_config)
+    append_runtime_log_line(
+        "config.logging.update "
+        f"log_enabled={updated_runtime_config.log_enabled} "
+        f"debug_enabled={updated_runtime_config.debug_enabled}"
+    )
+
+
+def _handle_enable_log_option(
+    ctx: click.Context, param: click.Parameter, value: bool
+) -> None:
+    """
+    @brief Enable runtime execution logging via eager CLI option.
+    @details Sets `RuntimeConfig.log_enabled` to true without mutating
+    `RuntimeConfig.debug_enabled`, then exits before command dispatch.
+    @param ctx {click.Context} Active Click context.
+    @param param {click.Parameter} Option metadata (unused).
+    @param value {bool} Parsed `--enable-log` flag value.
+    @return {None} Function return value.
+    @satisfies REQ-107
+    @satisfies REQ-109
+    """
+    del param
+    if not value or ctx.resilient_parsing:
+        return
+    _update_runtime_logging_flags(log_enabled=True)
+    ctx.exit(0)
+
+
+def _handle_disable_log_option(
+    ctx: click.Context, param: click.Parameter, value: bool
+) -> None:
+    """
+    @brief Disable runtime execution logging via eager CLI option.
+    @details Sets `RuntimeConfig.log_enabled` to false without mutating
+    `RuntimeConfig.debug_enabled`, then exits before command dispatch.
+    @param ctx {click.Context} Active Click context.
+    @param param {click.Parameter} Option metadata (unused).
+    @param value {bool} Parsed `--disable-log` flag value.
+    @return {None} Function return value.
+    @satisfies REQ-107
+    @satisfies REQ-109
+    """
+    del param
+    if not value or ctx.resilient_parsing:
+        return
+    _update_runtime_logging_flags(log_enabled=False)
+    ctx.exit(0)
+
+
+def _handle_enable_debug_option(
+    ctx: click.Context, param: click.Parameter, value: bool
+) -> None:
+    """
+    @brief Enable runtime API debug logging via eager CLI option.
+    @details Sets `RuntimeConfig.debug_enabled` to true without mutating
+    `RuntimeConfig.log_enabled`, then exits before command dispatch.
+    @param ctx {click.Context} Active Click context.
+    @param param {click.Parameter} Option metadata (unused).
+    @param value {bool} Parsed `--enable-debug` flag value.
+    @return {None} Function return value.
+    @satisfies REQ-107
+    @satisfies REQ-110
+    """
+    del param
+    if not value or ctx.resilient_parsing:
+        return
+    _update_runtime_logging_flags(debug_enabled=True)
+    ctx.exit(0)
+
+
+def _handle_disable_debug_option(
+    ctx: click.Context, param: click.Parameter, value: bool
+) -> None:
+    """
+    @brief Disable runtime API debug logging via eager CLI option.
+    @details Sets `RuntimeConfig.debug_enabled` to false without mutating
+    `RuntimeConfig.log_enabled`, then exits before command dispatch.
+    @param ctx {click.Context} Active Click context.
+    @param param {click.Parameter} Option metadata (unused).
+    @param value {bool} Parsed `--disable-debug` flag value.
+    @return {None} Function return value.
+    @satisfies REQ-107
+    @satisfies REQ-110
+    """
+    del param
+    if not value or ctx.resilient_parsing:
+        return
+    _update_runtime_logging_flags(debug_enabled=False)
+    ctx.exit(0)
+
+
 class StartupPreflightGroup(click.Group):
     """
     @brief Click group subclass that enforces startup preflight ordering and preserves epilog formatting.
@@ -741,8 +875,9 @@ class StartupPreflightGroup(click.Group):
     ) -> NoReturn:
         """
         @brief Execute startup preflight before Click main dispatch.
-        @details Runs update-check preflight and then delegates to Click's
-        standard command parser and dispatcher.
+        @details Appends execution-start log entry, runs update-check preflight,
+        delegates to Click parser/dispatcher, and appends execution-end outcome
+        plus one trailing separator line when runtime logging is enabled.
         @param args {Sequence[str] | None} Optional argv sequence.
         @param prog_name {str | None} Program display name override.
         @param complete_var {str | None} Shell-completion environment variable.
@@ -751,17 +886,37 @@ class StartupPreflightGroup(click.Group):
         @param extra {object} Additional keyword arguments forwarded to Click.
         @return {NoReturn} Click main dispatcher return contract.
         @satisfies REQ-070
+        @satisfies REQ-111
+        @satisfies REQ-113
         """
-        _run_startup_update_preflight()
-        super().main(
-            args=args,
-            prog_name=prog_name,
-            complete_var=complete_var,
-            standalone_mode=standalone_mode,
-            windows_expand_args=windows_expand_args,
-            **extra,
-        )
-        raise RuntimeError("Click main returned unexpectedly.")
+        execution_outcome = "unknown"
+        append_runtime_log_line("execution.start stage=program_entry")
+        try:
+            _run_startup_update_preflight()
+            super().main(
+                args=args,
+                prog_name=prog_name,
+                complete_var=complete_var,
+                standalone_mode=standalone_mode,
+                windows_expand_args=windows_expand_args,
+                **extra,
+            )
+            execution_outcome = "unexpected_return"
+            raise RuntimeError("Click main returned unexpectedly.")
+        except click.exceptions.Exit as exc:
+            execution_outcome = f"click_exit_code={int(exc.exit_code)}"
+            raise
+        except SystemExit as exc:
+            execution_outcome = f"system_exit_code={exc.code}"
+            raise
+        except BaseException as exc:  # noqa: BLE001
+            execution_outcome = (
+                f"exception_type={type(exc).__name__} exception_message={exc}"
+            )
+            raise
+        finally:
+            append_runtime_log_line(f"execution.end outcome={execution_outcome}")
+            append_runtime_log_separator()
 
 
 def _normalize_utc(value: datetime) -> datetime:
@@ -1861,6 +2016,32 @@ def parse_provider(provider: str) -> ProviderName | None:
         raise click.BadParameter(f"Invalid provider. Choose from: {valid}")
 
 
+def _provider_result_debug_summary(result: ProviderResult) -> str:
+    """
+    @brief Serialize provider result payload for debug log rows.
+    @details Builds JSON summary including provider id, window id, error state,
+    error text, and raw payload object using deterministic key ordering.
+    Serialization failures fallback to minimal scalar diagnostics.
+    @param result {ProviderResult} Provider result instance to summarize.
+    @return {str} JSON debug summary string.
+    @satisfies REQ-114
+    """
+    payload: dict[str, object] = {
+        "provider": result.provider.value,
+        "window": result.window.value,
+        "is_error": result.is_error,
+        "error": result.error,
+        "raw": result.raw,
+    }
+    try:
+        return json.dumps(payload, sort_keys=True, default=str)
+    except (TypeError, ValueError):
+        return (
+            f'{{"provider":"{result.provider.value}","window":"{result.window.value}",'
+            f'"is_error":{str(result.is_error).lower()}}}'
+        )
+
+
 def _fetch_result(
     provider: BaseProvider,
     window: WindowPeriod,
@@ -1880,7 +2061,12 @@ def _fetch_result(
     @satisfies CTN-004
     @satisfies REQ-043
     @satisfies REQ-040
+    @satisfies REQ-112
+    @satisfies REQ-114
     """
+    append_runtime_log_line(
+        f"provider.fetch.start provider={provider.name.value} window={window.value}"
+    )
     if isinstance(provider, ClaudeOAuthProvider) and window in {
         WindowPeriod.HOUR_5,
         WindowPeriod.DAY_7,
@@ -1890,18 +2076,57 @@ def _fetch_result(
             throttle_state=throttle_state,
         )
         if window == WindowPeriod.HOUR_5:
+            append_runtime_log_line(
+                "provider.fetch.end "
+                f"provider={provider.name.value} window={window.value} status="
+                f"{_ATTEMPT_RESULT_FAIL if result_5h.is_error else _ATTEMPT_RESULT_OK}"
+            )
+            append_runtime_log_line(
+                "provider.fetch.debug "
+                f"{_provider_result_debug_summary(result_5h)}",
+                debug_only=True,
+            )
             return result_5h
+        append_runtime_log_line(
+            "provider.fetch.end "
+            f"provider={provider.name.value} window={window.value} status="
+            f"{_ATTEMPT_RESULT_FAIL if result_7d.is_error else _ATTEMPT_RESULT_OK}"
+        )
+        append_runtime_log_line(
+            "provider.fetch.debug "
+            f"{_provider_result_debug_summary(result_7d)}",
+            debug_only=True,
+        )
         return result_7d
 
     try:
         _apply_api_call_delay(throttle_state)
         result = asyncio.run(provider.fetch(window))
     except ProviderError as exc:
+        append_runtime_log_line(
+            "provider.fetch.error "
+            f"provider={provider.name.value} window={window.value} error={exc}"
+        )
         result = provider._make_error_result(window=window, error=str(exc))
     except Exception as exc:
+        append_runtime_log_line(
+            "provider.fetch.error "
+            f"provider={provider.name.value} window={window.value} "
+            f"error=Unexpected error: {exc}"
+        )
         result = provider._make_error_result(
             window=window, error=f"Unexpected error: {exc}"
         )
+    append_runtime_log_line(
+        "provider.fetch.end "
+        f"provider={provider.name.value} window={window.value} status="
+        f"{_ATTEMPT_RESULT_FAIL if result.is_error else _ATTEMPT_RESULT_OK}"
+    )
+    append_runtime_log_line(
+        "provider.fetch.debug "
+        f"{_provider_result_debug_summary(result)}",
+        debug_only=True,
+    )
     return result
 
 
@@ -1919,16 +2144,26 @@ def _fetch_claude_dual(
         used to enforce inter-call spacing for live API requests.
     @return {tuple[ProviderResult, ProviderResult]} (5h_result, 7d_result).
     @satisfies REQ-002, REQ-036, REQ-037, CTN-004, REQ-040, REQ-043
+    @satisfies REQ-112
+    @satisfies REQ-114
     """
+    append_runtime_log_line("provider.fetch.start provider=claude window=5h,7d")
     _apply_api_call_delay(throttle_state)
     windows = [WindowPeriod.HOUR_5, WindowPeriod.DAY_7]
     try:
         fetched = asyncio.run(provider.fetch_all_windows(windows))
     except ProviderError as exc:
+        append_runtime_log_line(
+            f"provider.fetch.error provider=claude window=5h,7d error={exc}"
+        )
         fetched = {
             w: provider._make_error_result(window=w, error=str(exc)) for w in windows
         }
     except Exception as exc:
+        append_runtime_log_line(
+            "provider.fetch.error "
+            f"provider=claude window=5h,7d error=Unexpected error: {exc}"
+        )
         fetched = {
             w: provider._make_error_result(window=w, error=f"Unexpected error: {exc}")
             for w in windows
@@ -1941,6 +2176,24 @@ def _fetch_claude_dual(
         window=WindowPeriod.DAY_7, error="Missing 7d result"
     )
 
+    append_runtime_log_line(
+        "provider.fetch.end provider=claude window=5h "
+        f"status={_ATTEMPT_RESULT_FAIL if result_5h.is_error else _ATTEMPT_RESULT_OK}"
+    )
+    append_runtime_log_line(
+        "provider.fetch.end provider=claude window=7d "
+        f"status={_ATTEMPT_RESULT_FAIL if result_7d.is_error else _ATTEMPT_RESULT_OK}"
+    )
+    append_runtime_log_line(
+        "provider.fetch.debug "
+        f"{_provider_result_debug_summary(result_5h)}",
+        debug_only=True,
+    )
+    append_runtime_log_line(
+        "provider.fetch.debug "
+        f"{_provider_result_debug_summary(result_7d)}",
+        debug_only=True,
+    )
     return result_5h, result_7d
 
 
@@ -2145,6 +2398,10 @@ def _refresh_and_persist_cache_payload(
     @satisfies REQ-092
     @satisfies REQ-094
     """
+    append_runtime_log_line(
+        "refresh.pipeline.start "
+        f"target_window={target_window.value} provider_count={len(providers)}"
+    )
     cache_before_refresh = json.dumps(cache_document, sort_keys=True)
     payload_section = _cache_payload_section(cache_document)
     status_section = _cache_status_section(cache_document)
@@ -2156,6 +2413,9 @@ def _refresh_and_persist_cache_payload(
     }
     for provider_name, provider in providers.items():
         if not provider.is_configured():
+            append_runtime_log_line(
+                f"refresh.pipeline.skip provider={provider_name.value} reason=not_configured"
+            )
             continue
 
         if isinstance(provider, ClaudeOAuthProvider) and target_window in {
@@ -2202,9 +2462,15 @@ def _refresh_and_persist_cache_payload(
 
     cache_after_refresh = json.dumps(cache_document, sort_keys=True)
     if cache_after_refresh != cache_before_refresh:
+        append_runtime_log_line("refresh.pipeline.cache_write changed=true")
         save_cli_cache(cache_document)
+    else:
+        append_runtime_log_line("refresh.pipeline.cache_write changed=false")
 
     _update_idle_time_after_refresh(fetched_results, runtime_config)
+    append_runtime_log_line(
+        f"refresh.pipeline.end fetched_results_count={len(fetched_results)}"
+    )
     return cache_document
 
 
@@ -2245,8 +2511,14 @@ def retrieve_results_via_cache_pipeline(
     @satisfies REQ-093
     @satisfies REQ-094
     """
+    append_runtime_log_line(
+        "idle.pipeline.start "
+        f"provider_filter={provider_filter.value if provider_filter is not None else 'all'} "
+        f"target_window={target_window.value} force_refresh={force_refresh}"
+    )
     if force_refresh:
         remove_idle_time_file()
+        append_runtime_log_line("idle.pipeline.force_refresh removed_idle_time_file=true")
 
     idle_state_by_provider = load_idle_time()
     if force_refresh:
@@ -2275,6 +2547,18 @@ def retrieve_results_via_cache_pipeline(
                 and provider_state.idle_until_timestamp > current_timestamp
             ):
                 idle_blocked_provider_keys.add(provider_name.value)
+                append_runtime_log_line(
+                    "idle.pipeline.check "
+                    f"provider={provider_name.value} blocked=true "
+                    f"idle_until_timestamp={provider_state.idle_until_timestamp} "
+                    f"current_timestamp={current_timestamp}"
+                )
+            else:
+                append_runtime_log_line(
+                    "idle.pipeline.check "
+                    f"provider={provider_name.value} blocked=false "
+                    f"current_timestamp={current_timestamp}"
+                )
     idle_active = bool(idle_blocked_provider_keys)
 
     if force_refresh:
@@ -2287,6 +2571,10 @@ def retrieve_results_via_cache_pipeline(
         }
 
     if refresh_scope:
+        append_runtime_log_line(
+            "idle.pipeline.refresh_scope "
+            f"providers={','.join(sorted(p.value for p in refresh_scope))}"
+        )
         runtime_config = load_runtime_config()
         cached_payload_raw = load_cli_cache()
         cached_document = _normalize_cache_document(cached_payload_raw)
@@ -2300,6 +2588,7 @@ def retrieve_results_via_cache_pipeline(
             _cache_status_section(effective_payload)
         )
         if not cache_available:
+            append_runtime_log_line("idle.pipeline.end cache_available=false")
             return RetrievalPipelineOutput(
                 payload=_empty_cache_document(),
                 results={},
@@ -2314,6 +2603,7 @@ def retrieve_results_via_cache_pipeline(
         filtered_effective_payload = _filter_cached_payload(
             effective_payload, provider_filter
         )
+        append_runtime_log_line("idle.pipeline.end cache_available=true source=refresh")
         return RetrievalPipelineOutput(
             payload=filtered_effective_payload,
             results=_load_cached_results(
@@ -2332,6 +2622,7 @@ def retrieve_results_via_cache_pipeline(
 
     cached_payload_raw = load_cli_cache()
     if cached_payload_raw is None:
+        append_runtime_log_line("idle.pipeline.end cache_available=false")
         return RetrievalPipelineOutput(
             payload=_empty_cache_document(),
             results={},
@@ -2344,6 +2635,7 @@ def retrieve_results_via_cache_pipeline(
         )
     cached_document = _normalize_cache_document(cached_payload_raw)
     filtered_cached_document = _filter_cached_payload(cached_document, provider_filter)
+    append_runtime_log_line("idle.pipeline.end cache_available=true source=cache_only")
     return RetrievalPipelineOutput(
         payload=filtered_cached_document,
         results=_load_cached_results(
@@ -2414,7 +2706,11 @@ def _build_cached_dual_window_results(
         "  aibar gnome-uninstall        Remove GNOME extension\n"
         "  aibar --version              Show installed version\n"
         "  aibar --upgrade              Upgrade via uv\n"
-        "  aibar --uninstall            Uninstall via uv"
+        "  aibar --uninstall            Uninstall via uv\n"
+        "  aibar --enable-log           Enable runtime execution log\n"
+        "  aibar --disable-log          Disable runtime execution log\n"
+        "  aibar --enable-debug         Enable runtime API debug log\n"
+        "  aibar --disable-debug        Disable runtime API debug log"
     ),
 )
 @click.option(
@@ -2442,6 +2738,38 @@ def _build_cached_dual_window_results(
     expose_value=False,
     callback=_handle_uninstall_option,
     help="Uninstall aibar using uv and exit.",
+)
+@click.option(
+    "--enable-log",
+    is_flag=True,
+    is_eager=True,
+    expose_value=False,
+    callback=_handle_enable_log_option,
+    help="Enable runtime execution log and exit.",
+)
+@click.option(
+    "--disable-log",
+    is_flag=True,
+    is_eager=True,
+    expose_value=False,
+    callback=_handle_disable_log_option,
+    help="Disable runtime execution log and exit.",
+)
+@click.option(
+    "--enable-debug",
+    is_flag=True,
+    is_eager=True,
+    expose_value=False,
+    callback=_handle_enable_debug_option,
+    help="Enable runtime API debug log and exit.",
+)
+@click.option(
+    "--disable-debug",
+    is_flag=True,
+    is_eager=True,
+    expose_value=False,
+    callback=_handle_disable_debug_option,
+    help="Disable runtime API debug log and exit.",
 )
 @click.pass_context
 def main(ctx: click.Context) -> None:
@@ -3428,12 +3756,14 @@ def setup() -> None:
     @details Prompts for `idle_delay_seconds`, `api_call_delay_milliseconds`,
     `api_call_timeout_milliseconds`, `gnome_refresh_interval_seconds`, and `billing_data` in order, then prompts for provider
     currency symbols including `geminiai` (choices: `$`, `£`, `€`, default `$`), then persists
-    all values to `~/.config/aibar/config.json`. GeminiAI OAuth source supports
+    all values to `~/.config/aibar/config.json`. Final setup section configures
+    logging flags (`log_enabled`, `debug_enabled`). GeminiAI OAuth source supports
     `skip`, `file`, `paste`, and `login` (re-authorization with current scopes).
     Also prompts for provider API keys and writes them to `~/.config/aibar/env`.
     @return {None} Function return value.
     @satisfies REQ-005
     @satisfies REQ-049
+    @satisfies REQ-108
     @satisfies REQ-055
     @satisfies REQ-056
     @satisfies REQ-059
@@ -3616,19 +3946,6 @@ def setup() -> None:
         ).strip()
         geminiai_project_id = project_input or None
 
-    configured_runtime = RuntimeConfig(
-        idle_delay_seconds=idle_delay_seconds,
-        api_call_delay_milliseconds=api_call_delay_milliseconds,
-        api_call_timeout_milliseconds=api_call_timeout_milliseconds,
-        gnome_refresh_interval_seconds=gnome_refresh_interval_seconds,
-        billing_data=billing_data,
-        currency_symbols=currency_symbols,
-        geminiai_project_id=geminiai_project_id,
-    )
-    save_runtime_config(configured_runtime)
-    click.echo("  -> Saved")
-    click.echo()
-
     updates: dict[str, str] = {}
 
     # OpenRouter API key
@@ -3703,6 +4020,35 @@ def setup() -> None:
     else:
         click.echo("-" * 40)
         click.echo("No keys provided. Nothing saved.")
+
+    click.echo()
+    click.echo(click.style("Logging", bold=True))
+    click.echo("  Configure runtime execution logging and API debug logging.")
+    log_mode = click.prompt(
+        "  execution log mode",
+        type=click.Choice(["enable", "disable"]),
+        default="enable" if runtime_config.log_enabled else "disable",
+        show_choices=True,
+    )
+    debug_mode = click.prompt(
+        "  debug api log mode",
+        type=click.Choice(["enable", "disable"]),
+        default="enable" if runtime_config.debug_enabled else "disable",
+        show_choices=True,
+    )
+    configured_runtime = RuntimeConfig(
+        idle_delay_seconds=idle_delay_seconds,
+        api_call_delay_milliseconds=api_call_delay_milliseconds,
+        api_call_timeout_milliseconds=api_call_timeout_milliseconds,
+        gnome_refresh_interval_seconds=gnome_refresh_interval_seconds,
+        billing_data=billing_data,
+        currency_symbols=currency_symbols,
+        log_enabled=(log_mode == "enable"),
+        debug_enabled=(debug_mode == "enable"),
+        geminiai_project_id=geminiai_project_id,
+    )
+    save_runtime_config(configured_runtime)
+    click.echo("  -> Runtime settings saved")
 
     click.echo()
     click.echo("Next steps:")

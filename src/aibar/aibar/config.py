@@ -31,6 +31,9 @@ DEFAULT_API_CALL_TIMEOUT_MILLISECONDS = 5000
 DEFAULT_GNOME_REFRESH_INTERVAL_SECONDS = 60
 DEFAULT_BILLING_DATASET = "billing_data"
 DEFAULT_CURRENCY_SYMBOL = "$"
+DEFAULT_LOG_ENABLED = False
+DEFAULT_DEBUG_ENABLED = False
+LOG_TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S"
 VALID_CURRENCY_SYMBOLS: tuple[str, ...] = ("$", "£", "€")
 LOCK_POLL_INTERVAL_SECONDS = 0.25
 
@@ -54,9 +57,14 @@ class RuntimeConfig(BaseModel):
     missing entries default to `DEFAULT_CURRENCY_SYMBOL` at resolution time.
     `billing_data` stores the Google BigQuery dataset name used for GeminiAI
     billing export table discovery.
+    `log_enabled` controls append logging to `~/.cache/aibar/aibar.log`.
+    `debug_enabled` controls API debug-result logging and requires `log_enabled`.
     Optional GeminiAI field persists Google Cloud project identifier used by
     OAuth-backed Monitoring API fetch execution.
     @satisfies CTN-008
+    @satisfies REQ-107
+    @satisfies REQ-109
+    @satisfies REQ-110
     @satisfies REQ-049
     @satisfies REQ-095
     @satisfies REQ-096
@@ -74,6 +82,8 @@ class RuntimeConfig(BaseModel):
     )
     billing_data: str = Field(default=DEFAULT_BILLING_DATASET, min_length=1)
     currency_symbols: dict[str, str] = Field(default_factory=dict)
+    log_enabled: bool = Field(default=DEFAULT_LOG_ENABLED)
+    debug_enabled: bool = Field(default=DEFAULT_DEBUG_ENABLED)
     geminiai_project_id: str | None = Field(default=None)
 
 
@@ -111,6 +121,79 @@ def _ensure_app_cache_dir() -> None:
     @return {None} Function return value.
     """
     APP_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _runtime_log_path() -> Path:
+    """
+    @brief Resolve runtime execution log file path.
+    @details Produces deterministic path `~/.cache/aibar/aibar.log` under
+    user cache directory for append-only execution logging.
+    @return {Path} Absolute runtime log file path.
+    @satisfies REQ-111
+    """
+    return APP_CACHE_DIR / "aibar.log"
+
+
+def _runtime_log_flags() -> tuple[bool, bool]:
+    """
+    @brief Resolve persisted runtime log and debug flags.
+    @details Loads runtime configuration and extracts `log_enabled` and
+    `debug_enabled`; invalid or unreadable config yields `(False, False)`.
+    @return {tuple[bool, bool]} Tuple `(log_enabled, debug_enabled)`.
+    @satisfies REQ-107
+    @satisfies REQ-109
+    @satisfies REQ-110
+    """
+    try:
+        runtime_config = load_runtime_config()
+        return bool(runtime_config.log_enabled), bool(runtime_config.debug_enabled)
+    except Exception:  # noqa: BLE001
+        return (False, False)
+
+
+def append_runtime_log_line(message: str, debug_only: bool = False) -> None:
+    """
+    @brief Append one timestamped runtime log line.
+    @details Writes `<timestamp> <message>` rows in append mode to
+    `~/.cache/aibar/aibar.log` when `log_enabled` is true. Debug-only rows are
+    emitted only when both `log_enabled` and `debug_enabled` are true.
+    @param message {str} Runtime log message payload without trailing newline.
+    @param debug_only {bool} True to gate emission on debug flag.
+    @return {None} Function return value.
+    @satisfies REQ-111
+    @satisfies REQ-114
+    """
+    log_enabled, debug_enabled = _runtime_log_flags()
+    if not log_enabled:
+        return
+    if debug_only and not debug_enabled:
+        return
+    timestamp = datetime.now().strftime(LOG_TIMESTAMP_FORMAT)
+    try:
+        _ensure_app_cache_dir()
+        with _runtime_log_path().open("a", encoding="utf-8") as log_file:
+            log_file.write(f"{timestamp} {message}\n")
+    except OSError:
+        return
+
+
+def append_runtime_log_separator() -> None:
+    """
+    @brief Append one trailing empty line to runtime log.
+    @details Emits one blank separator row in append mode when `log_enabled`
+    is true to delimit consecutive execution blocks.
+    @return {None} Function return value.
+    @satisfies REQ-113
+    """
+    log_enabled, _ = _runtime_log_flags()
+    if not log_enabled:
+        return
+    try:
+        _ensure_app_cache_dir()
+        with _runtime_log_path().open("a", encoding="utf-8") as log_file:
+            log_file.write("\n")
+    except OSError:
+        return
 
 
 def _lock_file_path(target_path: Path) -> Path:
@@ -232,14 +315,21 @@ def load_cli_cache() -> dict[str, Any] | None:
     @satisfies CTN-004
     @satisfies REQ-047
     @satisfies REQ-066
+    @satisfies REQ-112
     """
+    append_runtime_log_line("cache.load.start path=~/.cache/aibar/cache.json")
     try:
         with _blocking_file_lock(CACHE_FILE_PATH):
             decoded = json.loads(CACHE_FILE_PATH.read_text(encoding="utf-8"))
             if isinstance(decoded, dict):
+                append_runtime_log_line(
+                    "cache.load.success path=~/.cache/aibar/cache.json"
+                )
                 return decoded
     except (OSError, ValueError):
+        append_runtime_log_line("cache.load.error path=~/.cache/aibar/cache.json")
         return None
+    append_runtime_log_line("cache.load.empty path=~/.cache/aibar/cache.json")
     return None
 
 
@@ -290,13 +380,16 @@ def save_cli_cache(payload: dict[str, Any]) -> None:
     @satisfies REQ-046
     @satisfies REQ-047
     @satisfies REQ-066
+    @satisfies REQ-112
     """
+    append_runtime_log_line("cache.save.start path=~/.cache/aibar/cache.json")
     sanitized_payload = _sanitize_cache_payload(payload)
     with _blocking_file_lock(CACHE_FILE_PATH):
         CACHE_FILE_PATH.write_text(
             json.dumps(sanitized_payload, indent=2),
             encoding="utf-8",
         )
+    append_runtime_log_line("cache.save.success path=~/.cache/aibar/cache.json")
 
 
 def build_idle_time_state(

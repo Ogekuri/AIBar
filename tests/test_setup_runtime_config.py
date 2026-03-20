@@ -3,7 +3,7 @@
 @brief Setup runtime-config prompt and persistence tests.
 @details Verifies setup prompt order for idle-delay, API-call delay milliseconds,
 API-call timeout milliseconds, gnome-refresh-interval, billing dataset, and
-per-provider currency symbol fields;
+per-provider currency symbol fields, then final logging mode fields;
 persists selected values to `~/.config/aibar/config.json`.
 @satisfies REQ-005
 @satisfies REQ-049
@@ -64,7 +64,8 @@ def test_setup_prompts_runtime_config_before_credentials(
     `api-call timeout` third, `gnome-refresh-interval` fourth, `billing_data`
     fifth, then per-provider currency symbols (one prompt per provider:
     claude, openai, openrouter, copilot, codex, geminiai), then GeminiAI
-    OAuth source prompt, then writes all selected values to runtime config JSON.
+    OAuth source prompt, provider credential prompts, final logging prompts,
+    then writes all selected values to runtime config JSON.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
     @param tmp_path {Path} Temporary path fixture.
     @return {None} Function return value.
@@ -74,7 +75,7 @@ def test_setup_prompts_runtime_config_before_credentials(
     """
     config_dir = _patch_config_paths(monkeypatch, tmp_path)
     prompts: list[str] = []
-    # 5 runtime values + 6 currency symbols + OAuth source + empty credentials
+    # 5 runtime values + 6 currency symbols + OAuth source + empty credentials + 2 logging modes
     responses = iter(
         [
             450,
@@ -92,6 +93,8 @@ def test_setup_prompts_runtime_config_before_credentials(
             "",
             "",
             "",
+            "enable",
+            "disable",
         ]
     )
 
@@ -131,6 +134,11 @@ def test_setup_prompts_runtime_config_before_credentials(
     assert prompts[9] == "  codex currency symbol"
     assert prompts[10] == "  geminiai currency symbol"
     assert prompts[11] == "  geminiai oauth source"
+    assert prompts[12] == "  OPENROUTER_API_KEY"
+    assert prompts[13] == "  OPENAI_ADMIN_KEY"
+    assert prompts[14] == "  GITHUB_TOKEN"
+    assert prompts[15] == "  execution log mode"
+    assert prompts[16] == "  debug api log mode"
 
     runtime_config = json.loads(
         (config_dir / "config.json").read_text(encoding="utf-8")
@@ -149,6 +157,8 @@ def test_setup_prompts_runtime_config_before_credentials(
         "geminiai": "$",
     }
     assert runtime_config["geminiai_project_id"] is None
+    assert runtime_config["log_enabled"] is True
+    assert runtime_config["debug_enabled"] is False
     assert "geminiai_billing_account" not in runtime_config
 
 
@@ -208,6 +218,8 @@ def test_setup_accepts_geminiai_oauth_json_paste_and_persists_runtime_fields(
             "",
             "",
             "",
+            "enable",
+            "enable",
         ]
     )
 
@@ -248,6 +260,8 @@ def test_setup_accepts_geminiai_oauth_json_paste_and_persists_runtime_fields(
     runtime_doc = json.loads((config_dir / "config.json").read_text(encoding="utf-8"))
     assert runtime_doc["geminiai_project_id"] == "gen-lang-client-0834428245"
     assert runtime_doc["billing_data"] == "billing_data"
+    assert runtime_doc["log_enabled"] is True
+    assert runtime_doc["debug_enabled"] is True
     assert "geminiai_billing_account" not in runtime_doc
 
 
@@ -329,6 +343,8 @@ def test_setup_geminiai_oauth_login_source_reauthorizes_with_current_scopes(
             "",
             "",
             "",
+            "disable",
+            "enable",
         ]
     )
 
@@ -356,3 +372,6 @@ def test_setup_geminiai_oauth_login_source_reauthorizes_with_current_scopes(
     result = runner.invoke(main, ["setup"])
     assert result.exit_code == 0, result.output
     assert recorded_scopes == [geminiai_module.GEMINIAI_OAUTH_SCOPES]
+    runtime_doc = json.loads((config_dir / "config.json").read_text(encoding="utf-8"))
+    assert runtime_doc["log_enabled"] is False
+    assert runtime_doc["debug_enabled"] is True

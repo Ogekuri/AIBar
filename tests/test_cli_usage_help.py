@@ -28,6 +28,10 @@ def test_main_invocation_without_subcommand_prints_human_usage() -> None:
     assert "--version" in result.output
     assert "--upgrade" in result.output
     assert "--uninstall" in result.output
+    assert "--enable-log" in result.output
+    assert "--disable-log" in result.output
+    assert "--enable-debug" in result.output
+    assert "--disable-debug" in result.output
     assert "@brief" not in result.output
     assert "@details" not in result.output
 
@@ -50,6 +54,10 @@ def test_top_level_help_lists_commands_without_doxygen_fragments() -> None:
     assert "--version" in result.output
     assert "--upgrade" in result.output
     assert "--uninstall" in result.output
+    assert "--enable-log" in result.output
+    assert "--disable-log" in result.output
+    assert "--enable-debug" in result.output
+    assert "--disable-debug" in result.output
     assert "@return" not in result.output
 
 
