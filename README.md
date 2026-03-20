@@ -47,17 +47,17 @@ AIBar aggregates usage metrics for Claude, OpenAI, OpenRouter, GitHub Copilot, C
 
 ```bash
 # 1) From the repository root, run the launcher
-./scripts/aibar.sh --help
+aibar --help
 
 # 2) Configure credentials interactively
-./scripts/aibar.sh setup
+aibar setup
 
 # 3) Verify provider configuration and connectivity
-./scripts/aibar.sh doctor
+aibar doctor
 
 # 4) Show usage
-./scripts/aibar.sh show
-./scripts/aibar.sh show --json
+aibar show
+aibar show --json
 ```
 
 ## Requirements (uv)
@@ -80,8 +80,8 @@ After installation the `aibar` command is available system-wide:
 
 ```bash
 aibar --help
+aibar setup
 aibar show
-aibar doctor
 ```
 
 ### Live Execution (no install)
@@ -111,24 +111,24 @@ uv tool uninstall aibar
 
 ```bash
 # Show all configured providers (default window: 7d)
-./scripts/aibar.sh show
+aibar show
 
 # Show one provider and select window
-./scripts/aibar.sh show --provider claude --window 5h
+aibar show --provider claude --window 5h
 
 # JSON output
-./scripts/aibar.sh show --json
+aibar show --json
 
 # Print required environment variables
-./scripts/aibar.sh env
+aibar env
 
 # Interactive setup wizard
-./scripts/aibar.sh setup
+aibar setup
 
 # Provider login helpers
-./scripts/aibar.sh login --provider claude
-./scripts/aibar.sh login --provider copilot
-./scripts/aibar.sh login --provider geminiai
+aibar login --provider claude
+aibar login --provider copilot
+aibar login --provider geminiai
 
 ```
 
