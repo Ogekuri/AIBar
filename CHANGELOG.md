@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.15.0](https://github.com/Ogekuri/AIBar/compare/v0.14.0..v0.15.0) - 2026-03-23
+### 🚜  Changes
+- render Err for failed provider cost labels [useReq] *(gnome-extension)*
+  - Update REQ-021 to require Err rendering for failed provider cost labels and percentages.
+  - Extend extension panel status mapping to set Err on failed cost labels for claude, openrouter, codex, openai, and geminiai while preserving healthy providers.
+  - Adjust extension label regression test to cover percentage and cost Err mappings.
+  - Refresh WORKFLOW and REFERENCES runtime/symbol evidence.
+- render provider fail labels as Err [useReq] *(gnome-extension)*
+  - Update REQ-021 for provider/window FAIL Err rendering on panel percentage labels.
+  - Implement status-driven Err mapping in extension _updateUI for percentage labels.
+  - Add regression test for provider/window fail Err logic.
+  - Refresh WORKFLOW and REFERENCES for updated runtime/symbol evidence.
+
 ## [0.14.0](https://github.com/Ogekuri/AIBar/compare/v0.13.0..v0.14.0) - 2026-03-20
 ### 🚜  Changes
 - add persistent runtime log/debug flags [useReq] *(cli)*
@@ -852,6 +865,7 @@
 - \[0.12.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.12.0
 - \[0.13.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.13.0
 - \[0.14.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.14.0
+- \[0.15.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.15.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -867,3 +881,4 @@
 [0.12.0]: https://github.com/Ogekuri/AIBar/compare/v0.11.0..v0.12.0
 [0.13.0]: https://github.com/Ogekuri/AIBar/compare/v0.12.0..v0.13.0
 [0.14.0]: https://github.com/Ogekuri/AIBar/compare/v0.13.0..v0.14.0
+[0.15.0]: https://github.com/Ogekuri/AIBar/compare/v0.14.0..v0.15.0
