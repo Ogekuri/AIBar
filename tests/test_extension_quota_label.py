@@ -445,6 +445,30 @@ def test_panel_percentage_labels_hide_when_metrics_are_unavailable() -> None:
     assert "this._panelGeminiaiCostLabel.hide();" in source
 
 
+def test_panel_percentage_labels_render_err_only_for_failed_provider_windows() -> None:
+    """
+    @brief Verify panel percentage labels map provider/window FAIL status to `Err`.
+    @details Asserts extension source derives provider-window status entries and renders
+    `Err` only for percentage labels mapped to failed provider/window status keys.
+    @satisfies REQ-021
+    """
+    source = EXTENSION_PATH.read_text(encoding="utf-8")
+    assert "const resolveStatusEntry = (providerName, windowKey) => {" in source
+    assert "const isStatusFailure = (providerName, windowKey) => {" in source
+    assert "const panelStatusFailures = {" in source
+    assert "claude5h: isStatusFailure('claude', '5h')" in source
+    assert "claude7d: isStatusFailure('claude', '7d')" in source
+    assert "copilot: isStatusFailure('copilot', '30d')" in source
+    assert "codex5h: isStatusFailure('codex', '5h')" in source
+    assert "codex7d: isStatusFailure('codex', '7d')" in source
+    assert "if (panelStatusFailures[labelKey] === true) {" in source
+    assert "label.set_text('Err');" in source
+    assert "label.show();" in source
+    assert source.index("if (panelStatusFailures[labelKey] === true) {") < source.index(
+        "if (typeof value === 'number' && Number.isFinite(value)) {"
+    )
+
+
 def test_panel_cost_text_keeps_zero_values_visible_with_currency_symbol() -> None:
     """
     @brief Verify panel cost formatter returns currency-prefixed text for numeric zero.

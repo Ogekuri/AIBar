@@ -1530,6 +1530,7 @@ class AIBarIndicator extends PanelMenu.Button {
      * to card renderers. Panel status row renders fixed-order percentages and per-provider costs.
      * @returns {any} Function return value.
      * @satisfies REQ-021
+     * @satisfies REQ-115
      * @satisfies REQ-053
      * @satisfies REQ-069
      */
@@ -1552,6 +1553,21 @@ class AIBarIndicator extends PanelMenu.Button {
                 return null;
             const numeric = Number(value);
             return Number.isFinite(numeric) ? numeric : null;
+        };
+        const resolveStatusEntry = (providerName, windowKey) => {
+            const providerStatus = this._statusData[providerName];
+            if (!providerStatus || typeof providerStatus !== 'object' || Array.isArray(providerStatus))
+                return null;
+            if (!windowKey || typeof windowKey !== 'string')
+                return null;
+            const windowStatus = providerStatus[windowKey];
+            if (!windowStatus || typeof windowStatus !== 'object' || Array.isArray(windowStatus))
+                return null;
+            return windowStatus;
+        };
+        const isStatusFailure = (providerName, windowKey) => {
+            const statusEntry = resolveStatusEntry(providerName, windowKey);
+            return statusEntry !== null && statusEntry.result === 'FAIL';
         };
 
         const getPanelUsageValues = (providerName, data) => {
@@ -1629,11 +1645,23 @@ class AIBarIndicator extends PanelMenu.Button {
             openaiCost: this._panelCostText(this._usageData.openai),
             geminiaiCost: this._panelCostText(this._usageData.geminiai),
         };
+        const panelStatusFailures = {
+            claude5h: isStatusFailure('claude', '5h'),
+            claude7d: isStatusFailure('claude', '7d'),
+            copilot: isStatusFailure('copilot', '30d'),
+            codex5h: isStatusFailure('codex', '5h'),
+            codex7d: isStatusFailure('codex', '7d'),
+        };
 
         for (let [labelKey, value] of Object.entries(panelValues)) {
             const label = usageLabels[labelKey];
             if (!label)
                 continue;
+            if (panelStatusFailures[labelKey] === true) {
+                label.set_text('Err');
+                label.show();
+                continue;
+            }
             if (typeof value === 'number' && Number.isFinite(value)) {
                 label.set_text(`${value.toFixed(1)}%`);
                 label.show();
