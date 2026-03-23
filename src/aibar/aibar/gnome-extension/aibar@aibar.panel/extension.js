@@ -1530,7 +1530,6 @@ class AIBarIndicator extends PanelMenu.Button {
      * to card renderers. Panel status row renders fixed-order percentages and per-provider costs.
      * @returns {any} Function return value.
      * @satisfies REQ-021
-     * @satisfies REQ-115
      * @satisfies REQ-053
      * @satisfies REQ-069
      */
@@ -1648,9 +1647,14 @@ class AIBarIndicator extends PanelMenu.Button {
         const panelStatusFailures = {
             claude5h: isStatusFailure('claude', '5h'),
             claude7d: isStatusFailure('claude', '7d'),
+            claudeCost: isStatusFailure('claude', '5h') || isStatusFailure('claude', '7d'),
+            openrouterCost: isStatusFailure('openrouter', '30d'),
             copilot: isStatusFailure('copilot', '30d'),
+            codexCost: isStatusFailure('codex', '5h') || isStatusFailure('codex', '7d'),
             codex5h: isStatusFailure('codex', '5h'),
             codex7d: isStatusFailure('codex', '7d'),
+            openaiCost: isStatusFailure('openai', '30d'),
+            geminiaiCost: isStatusFailure('geminiai', '30d'),
         };
 
         for (let [labelKey, value] of Object.entries(panelValues)) {

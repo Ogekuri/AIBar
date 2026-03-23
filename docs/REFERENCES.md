@@ -1948,7 +1948,7 @@ Invalid map entries are skipped.
 
 ---
 
-# extension.js | JavaScript | 1843L | 36 symbols | 9 imports | 40 comments
+# extension.js | JavaScript | 1847L | 36 symbols | 9 imports | 40 comments
 > Path: `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`
 - @brief GNOME Shell panel extension for aibar metrics.
 - @details Collects usage JSON from the aibar CLI and renders provider-specific quota/cost cards in the GNOME panel popup.
@@ -2112,24 +2112,23 @@ existing provider-specific card rules.
 
 ### fn `const showResetPendingHint = () =>` (L1009-1011)
 
-### fn `const toPercent = (value) =>` (L1551-1556)
+### fn `const toPercent = (value) =>` (L1550-1555)
 - @brief Execute update u i.
 - @details Applies update u i logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 Resolves provider-window failure metadata from cache `status` section and forwards it
 to card renderers. Panel status row renders fixed-order percentages and per-provider costs.
 - @return s {any} Function return value.
 - @satisfies REQ-021
-- @satisfies REQ-115
 - @satisfies REQ-053
 - @satisfies REQ-069
 
-### fn `const resolveStatusEntry = (providerName, windowKey) =>` (L1557-1567)
+### fn `const resolveStatusEntry = (providerName, windowKey) =>` (L1556-1566)
 
-### fn `const isStatusFailure = (providerName, windowKey) =>` (L1568-1571)
+### fn `const isStatusFailure = (providerName, windowKey) =>` (L1567-1570)
 
-### fn `const getPanelUsageValues = (providerName, data) =>` (L1573-1630)
+### fn `const getPanelUsageValues = (providerName, data) =>` (L1572-1629)
 
-### class `export default class AIBarExtension extends Extension` : Extension (L1817-1843)
+### class `export default class AIBarExtension extends Extension` : Extension (L1821-1847)
 - @brief GNOME extension lifecycle adapter for AIBarIndicator registration.
 - @brief Execute enable.
 - @details Extends Extension (GNOME Shell 45+ API) to integrate with the extension lifecycle.
@@ -2172,11 +2171,11 @@ Uses this.uuid (provided by the Extension base class) as the status-area key.
 |`updateWindowBar`|fn||986-1054|const updateWindowBar = (bar, pct, resetTime, useDays, al...|
 |`setResetLabel`|fn||992-998|const setResetLabel = (baseText) =>|
 |`showResetPendingHint`|fn||1009-1011|const showResetPendingHint = () =>|
-|`toPercent`|fn||1551-1556|const toPercent = (value) =>|
-|`resolveStatusEntry`|fn||1557-1567|const resolveStatusEntry = (providerName, windowKey) =>|
-|`isStatusFailure`|fn||1568-1571|const isStatusFailure = (providerName, windowKey) =>|
-|`getPanelUsageValues`|fn||1573-1630|const getPanelUsageValues = (providerName, data) =>|
-|`AIBarExtension`|class||1817-1843|export default class AIBarExtension extends Extension|
+|`toPercent`|fn||1550-1555|const toPercent = (value) =>|
+|`resolveStatusEntry`|fn||1556-1566|const resolveStatusEntry = (providerName, windowKey) =>|
+|`isStatusFailure`|fn||1567-1570|const isStatusFailure = (providerName, windowKey) =>|
+|`getPanelUsageValues`|fn||1572-1629|const getPanelUsageValues = (providerName, data) =>|
+|`AIBarExtension`|class||1821-1847|export default class AIBarExtension extends Extension|
 
 
 ---
