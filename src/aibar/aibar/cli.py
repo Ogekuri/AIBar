@@ -28,6 +28,7 @@ from click.core import ParameterSource
 from pydantic import ValidationError
 
 from . import __version__
+from aibar.claude_cli_auth import extract_claude_cli_token
 from aibar.config import (
     IdleTimeState,
     RuntimeConfig,
@@ -1229,8 +1230,9 @@ def _handle_claude_oauth_refresh_on_auth_error(
 ) -> tuple[ProviderResult, ProviderResult, bool]:
     """
     @brief Execute Claude auth-error renewal-and-retry control flow.
-    @details Runs one in-process Claude token-renewal routine and then executes
-    exactly one Claude dual-window API retry via `_fetch_claude_dual`.
+    @details Runs one in-process Claude token-renewal routine, reloads provider
+    token from current environment/CLI credentials, and then executes exactly one
+    Claude dual-window API retry via `_fetch_claude_dual`.
     @param runtime_config {RuntimeConfig} Runtime delay/timeout configuration.
     @param throttle_state {dict[str, float | int] | None} Shared API-delay state.
     @return {tuple[ProviderResult, ProviderResult, bool]} Tuple
@@ -1239,6 +1241,13 @@ def _handle_claude_oauth_refresh_on_auth_error(
     @satisfies REQ-104
     """
     _run_claude_oauth_token_refresh(runtime_config)
+    # Rebind provider token after renewal so retry uses refreshed credentials.
+    refreshed_token = (
+        os.environ.get(ClaudeOAuthProvider.TOKEN_ENV_VAR)
+        or extract_claude_cli_token()
+    )
+    if refreshed_token:
+        claude_provider._token = refreshed_token
     retry_result_5h, retry_result_7d = _fetch_claude_dual(
         claude_provider,
         throttle_state=throttle_state,

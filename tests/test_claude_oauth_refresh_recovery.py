@@ -394,6 +394,68 @@ def test_run_claude_oauth_token_refresh_truncates_log_and_checks_commands(
     assert "Token refresh cycle complete" in content
 
 
+def test_claude_oauth_recovery_retry_uses_refreshed_token_source(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """
+    @brief Verify auth-recovery retry consumes refreshed token source after renewal.
+    @details Simulates first Claude dual fetch failing with canonical OAuth-expired
+    error, then renewal updating token source from environment. Asserts retry path
+    succeeds only when provider token is reloaded before the second dual fetch.
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @param tmp_path {Path} Temporary path fixture.
+    @return {None} Function return value.
+    @satisfies REQ-103
+    @satisfies TST-044
+    """
+    _patch_config_paths(monkeypatch, tmp_path)
+    _save_runtime_config()
+    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "sk-ant-old-token")
+
+    from aibar.cli import _fetch_claude_dual_with_auth_recovery
+    from aibar.providers.claude_oauth import ClaudeOAuthProvider
+
+    provider = ClaudeOAuthProvider(token="sk-ant-old-token")
+    monkeypatch.setattr("aibar.cli.load_idle_time", lambda: {})
+    monkeypatch.setattr("aibar.cli.save_idle_time", lambda _state: None)
+
+    dual_tokens: list[str | None] = []
+
+    def _fake_refresh(runtime_config):
+        del runtime_config
+        monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "sk-ant-new-token")
+        return True
+
+    def _fake_dual(provider_obj, throttle_state=None):
+        del throttle_state
+        dual_tokens.append(getattr(provider_obj, "_token", None))
+        if len(dual_tokens) == 1:
+            return (
+                _make_claude_error_result(window="5h"),
+                _make_claude_error_result(window="7d"),
+            )
+        if getattr(provider_obj, "_token", None) == "sk-ant-new-token":
+            return (
+                _make_claude_success_result(window="5h"),
+                _make_claude_success_result(window="7d"),
+            )
+        return (
+            _make_claude_error_result(window="5h"),
+            _make_claude_error_result(window="7d"),
+        )
+
+    monkeypatch.setattr("aibar.cli._run_claude_oauth_token_refresh", _fake_refresh)
+    monkeypatch.setattr("aibar.cli._fetch_claude_dual", _fake_dual)
+
+    result_5h, result_7d = _fetch_claude_dual_with_auth_recovery(provider, None)
+    assert len(dual_tokens) == 2
+    assert dual_tokens[0] == "sk-ant-old-token"
+    assert dual_tokens[1] == "sk-ant-new-token"
+    assert result_5h.is_error is False
+    assert result_7d.is_error is False
+
+
 def _make_claude_error_result(window: str):
     """
     @brief Build deterministic Claude auth-error ProviderResult.

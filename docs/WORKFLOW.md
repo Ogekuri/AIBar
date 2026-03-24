@@ -158,7 +158,7 @@
               - `_fetch_claude_dual(...)`: Claude single-call dual-window fetch with runtime API logging and debug-result logging for both windows [`src/aibar/aibar/cli.py`]
               - `_is_claude_authentication_error_result(...)`: classify Claude auth-expired failures using canonical token-expired error text [`src/aibar/aibar/cli.py`]
               - `_is_claude_refresh_block_active(...)`: evaluate refresh-block TTL against last-success timestamp [`src/aibar/aibar/cli.py`]
-              - `_handle_claude_oauth_refresh_on_auth_error(...)`: execute in-process token renewal and one dual-window retry [`src/aibar/aibar/cli.py`]
+              - `_handle_claude_oauth_refresh_on_auth_error(...)`: execute in-process token renewal, reload Claude token from environment/CLI credential source, and execute one dual-window retry [`src/aibar/aibar/cli.py`]
                 - `_run_claude_oauth_token_refresh(...)`: token-renewal routine mirroring script once-flow (`claude /usage`, `aibar login --provider claude`) with delay/timeout controls and log truncation [`src/aibar/aibar/cli.py`]
                   - `_execute_claude_refresh_command(...)`: run one renewal subprocess command with timeout and merged output capture [`src/aibar/aibar/cli.py`]
                   - `_subprocess_return_code_from_exception(...)`: normalize subprocess exception classes to deterministic return codes [`src/aibar/aibar/cli.py`]
