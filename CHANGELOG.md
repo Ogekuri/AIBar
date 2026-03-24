@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.16.0](https://github.com/Ogekuri/AIBar/compare/v0.15.0..v0.16.0) - 2026-03-24
+### 🐛  Bug Fixes
+- reload Claude token before auth retry [useReq] *(cli)*
+  - add failing reproducer for stale token reuse in Python OAuth recovery
+  - reload provider token from env/CLI source after renewal before retry
+  - keep one-refresh one-retry and block-flag semantics unchanged
+  - update workflow and references docs for retry-token reload flow
+- recover once mode on expired oauth [useReq] *(claude-token-refresh)*
+  - detect canonical OAuth-expired usage failure in once mode
+  - run claude setup-token once and retry claude /usage once
+  - keep loop mode behavior unchanged
+  - add deterministic regression test for once-mode recovery
+  - update workflow and references docs for new call flow
+
+### ◀️  Revert
+- Roll back branch to d50cfc8f (d50cfc8f41cb9e647c3af07aa9dc36a659792e45).
+
 ## [0.15.0](https://github.com/Ogekuri/AIBar/compare/v0.14.0..v0.15.0) - 2026-03-23
 ### 🚜  Changes
 - render Err for failed provider cost labels [useReq] *(gnome-extension)*
@@ -866,6 +883,7 @@
 - \[0.13.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.13.0
 - \[0.14.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.14.0
 - \[0.15.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.15.0
+- \[0.16.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.16.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -882,3 +900,4 @@
 [0.13.0]: https://github.com/Ogekuri/AIBar/compare/v0.12.0..v0.13.0
 [0.14.0]: https://github.com/Ogekuri/AIBar/compare/v0.13.0..v0.14.0
 [0.15.0]: https://github.com/Ogekuri/AIBar/compare/v0.14.0..v0.15.0
+[0.16.0]: https://github.com/Ogekuri/AIBar/compare/v0.15.0..v0.16.0
