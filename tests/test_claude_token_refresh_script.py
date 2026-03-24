@@ -6,9 +6,7 @@ ensuring each 'once' invocation and each daemon refresh cycle produces a standal
 @satisfies TST-022, REQ-048
 """
 
-import os
 import re
-import subprocess
 from pathlib import Path
 
 
@@ -78,90 +76,3 @@ def test_script_log_file_variable_is_defined() -> None:
     """
     source = SCRIPT_PATH.read_text(encoding="utf-8")
     assert 'LOG_FILE="$CONFIG_DIR/claude_token_refresh.log"' in source
-
-
-def test_once_runs_setup_token_when_usage_reports_expired_oauth(
-    tmp_path: Path,
-) -> None:
-    """
-    @brief Verify once mode executes `claude setup-token` after auth-expired usage failure.
-    @details Creates deterministic fake `claude` and `aibar` binaries on PATH. The first
-    `claude /usage` call returns canonical auth-expired text; `claude setup-token` creates
-    a marker file and the retry path becomes successful. Asserts marker creation and log
-    evidence for setup-token execution.
-    @param tmp_path {Path} Temporary path fixture.
-    @return {None} Function return value.
-    @satisfies REQ-100
-    @satisfies TST-043
-    """
-    fake_bin = tmp_path / "bin"
-    fake_bin.mkdir(parents=True, exist_ok=True)
-    marker_path = tmp_path / "claude_token_refreshed.marker"
-
-    claude_stub = fake_bin / "claude"
-    claude_stub.write_text(
-        "\n".join(
-            [
-                "#!/usr/bin/env bash",
-                "set -euo pipefail",
-                'MARKER_PATH="${MARKER_PATH:?}"',
-                'if [[ "${1:-}" == "/usage" ]]; then',
-                '  if [[ -f "$MARKER_PATH" ]]; then',
-                '    echo "usage-ok"',
-                "    exit 0",
-                "  fi",
-                '  echo "Invalid or expired OAuth token"',
-                "  exit 1",
-                "fi",
-                'if [[ "${1:-}" == "setup-token" ]]; then',
-                '  : >"$MARKER_PATH"',
-                '  echo "setup-ok"',
-                "  exit 0",
-                "fi",
-                'echo "unexpected-claude-args: $*"',
-                "exit 2",
-            ]
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    claude_stub.chmod(0o755)
-
-    aibar_stub = fake_bin / "aibar"
-    aibar_stub.write_text(
-        "\n".join(
-            [
-                "#!/usr/bin/env bash",
-                "set -euo pipefail",
-                'if [[ "${1:-}" == "login" && "${2:-}" == "--provider" && "${3:-}" == "claude" ]]; then',
-                "  exit 0",
-                "fi",
-                'echo "unexpected-aibar-args: $*"',
-                "exit 2",
-            ]
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    aibar_stub.chmod(0o755)
-
-    env = {
-        "HOME": str(tmp_path),
-        "PATH": f"{fake_bin}:{os.environ['PATH']}",
-        "XDG_CONFIG_HOME": str(tmp_path / ".config"),
-        "MARKER_PATH": str(marker_path),
-    }
-    result = subprocess.run(
-        ["bash", str(SCRIPT_PATH), "once"],
-        check=False,
-        capture_output=True,
-        text=True,
-        env=env,
-    )
-    assert result.returncode == 0
-    assert marker_path.exists(), "Expected once mode to run `claude setup-token`."
-
-    log_path = tmp_path / ".config" / "aibar" / "claude_token_refresh.log"
-    assert log_path.exists()
-    content = log_path.read_text(encoding="utf-8")
-    assert "Running: claude setup-token" in content

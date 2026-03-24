@@ -346,13 +346,12 @@
   - main script dispatch: subcommand routing via `case` statement [`scripts/claude_token_refresh.sh`]
 - `Lifecycle/Trigger`
   - Invoked by user or external scheduler with one of `start|stop|status|once|loop` subcommands.
-  - `once`: calls `do_refresh()` once and exits; on canonical OAuth-expired usage failure, executes one inline `claude setup-token` recovery and retries `claude /usage` once before `aibar login --provider claude`. `start`: daemonizes via `nohup` + re-invokes with `loop`; `loop`: calls `run_loop()` indefinitely.
+  - `once`: calls `do_refresh()` once and exits; `start`: daemonizes via `nohup` + re-invokes with `loop`; `loop`: calls `run_loop()` indefinitely.
 - `Internal Call-Trace Tree`
   - main script dispatch [`scripts/claude_token_refresh.sh`]
-    - `do_refresh(...)`: truncate LOG_FILE, execute `claude /usage`, and in `once` mode only run one inline `claude setup-token` + one usage retry when canonical OAuth-expired text is detected; then execute `aibar login --provider claude` [`scripts/claude_token_refresh.sh`]
+    - `do_refresh(...)`: truncate LOG_FILE, then execute single token refresh cycle [`scripts/claude_token_refresh.sh`]
       - External boundary: `> "$LOG_FILE"` truncation.
       - External boundary: `claude /usage` (optional, PATH-gated).
-      - External boundary: `claude setup-token` (once-only, auth-error-gated, PATH-gated).
       - External boundary: `aibar login --provider claude` (optional, PATH-gated).
     - `run_loop(...)`: infinite loop calling `do_refresh()` with configurable sleep interval [`scripts/claude_token_refresh.sh`]
       - `do_refresh(...)`: single cycle execution (see above) [`scripts/claude_token_refresh.sh`]

@@ -34,7 +34,7 @@
 
 ---
 
-# claude_token_refresh.sh | Shell | 210L | 13 symbols | 0 imports | 38 comments
+# claude_token_refresh.sh | Shell | 174L | 12 symbols | 0 imports | 35 comments
 > Path: `scripts/claude_token_refresh.sh`
 
 ## Definitions
@@ -43,15 +43,14 @@
 - var `PID_FILE="$CONFIG_DIR/claude_token_refresh.pid"` (L21)
 - var `LOG_FILE="$CONFIG_DIR/claude_token_refresh.log"` (L22)
 - var `INTERVAL="${AIBAR_CLAUDE_REFRESH_INTERVAL_SECONDS:-1800}"` (L23)
-- var `REFRESH_COMMAND="${1:-}"` (L25)
-- fn `log() {` (L31)
-- fn `do_refresh() {` (L47)
-- fn `run_loop() {` (L101)
-- fn `is_running() {` (L111)
-- fn `start_daemon() {` (L123)
-- fn `stop_daemon() {` (L137)
-- fn `show_status() {` (L158)
-- fn `show_usage() {` (L172)
+- fn `log() {` (L29)
+- fn `do_refresh() {` (L43)
+- fn `run_loop() {` (L65)
+- fn `is_running() {` (L75)
+- fn `start_daemon() {` (L87)
+- fn `stop_daemon() {` (L101)
+- fn `show_status() {` (L122)
+- fn `show_usage() {` (L136)
 ## Symbol Index
 |Symbol|Kind|Vis|Lines|Sig|
 |---|---|---|---|---|
@@ -59,15 +58,14 @@
 |`PID_FILE`|var||21||
 |`LOG_FILE`|var||22||
 |`INTERVAL`|var||23||
-|`REFRESH_COMMAND`|var||25||
-|`log`|fn||31|log()|
-|`do_refresh`|fn||47|do_refresh()|
-|`run_loop`|fn||101|run_loop()|
-|`is_running`|fn||111|is_running()|
-|`start_daemon`|fn||123|start_daemon()|
-|`stop_daemon`|fn||137|stop_daemon()|
-|`show_status`|fn||158|show_status()|
-|`show_usage`|fn||172|show_usage()|
+|`log`|fn||29|log()|
+|`do_refresh`|fn||43|do_refresh()|
+|`run_loop`|fn||65|run_loop()|
+|`is_running`|fn||75|is_running()|
+|`start_daemon`|fn||87|start_daemon()|
+|`stop_daemon`|fn||101|stop_daemon()|
+|`show_status`|fn||122|show_status()|
+|`show_usage`|fn||136|show_usage()|
 
 
 ---
