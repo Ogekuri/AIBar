@@ -187,6 +187,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-112**: Logging MUST record execution start, idle-time verification, idle-time-driven function branches, error-handling branches, and every load/save operation targeting `~/.cache/aibar/cache.json`.
 - **REQ-113**: Logging MUST record execution outcome and execution end time, then append one trailing empty line to separate the current execution block from the next execution block.
 - **REQ-114**: API-call debug logging MUST append API metadata and debug response summaries only when both `log_enabled` and `debug_enabled` are `true`.
+- **REQ-115**: When `log_enabled` is `true`, runtime logging MUST append non-debug rows for provider `FAIL` attempts categorized as `oauth` or HTTP `429` `rate_limit`, and MUST include `retry_after_seconds` when available.
 - **REQ-050**: Provider `fetch` MUST attempt to extract `currency_symbol` from the raw API JSON response (field `currency`); when absent, MUST resolve `currency_symbol` from `RuntimeConfig.currency_symbols[provider_name]` with fallback `"$"`.
 - **REQ-051**: CLI `show` text output MUST render cost as `Cost: <currency_symbol><value>` where `<currency_symbol><value>` uses `metrics.currency_symbol`, is bold bright white, and MUST NOT use hardcoded `$`.
 - **REQ-053**: GNOME extension MUST NOT render aggregated total panel cost; panel and provider-card cost labels MUST use per-provider `metrics.currency_symbol` and display provider-local monetary values.
@@ -282,6 +283,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-047**: MUST verify `--enable-log`, `--disable-log`, `--enable-debug`, and `--disable-debug` persist `log_enabled` and `debug_enabled` in `~/.config/aibar/config.json` without cross-flag side effects.
 - **TST-048**: MUST verify `log_enabled=true` appends timestamped entries in `~/.cache/aibar/aibar.log` for execution start, idle-time checks, idle-driven branches, error handling, cache.json load/save operations, and execution end plus one trailing empty line.
 - **TST-049**: MUST verify API-call debug logging writes API metadata and debug response summaries only when `log_enabled=true` and `debug_enabled=true`, and does not write debug API rows otherwise.
+- **TST-050**: MUST verify runtime logging records provider `FAIL` categories `oauth` and `rate_limit` when `log_enabled=true`, and logs `retry_after_seconds` for each category when that value exists.
 - **TST-036**: MUST verify `--version` and `--ver` print installed version and bypass subcommand execution.
 - **TST-038**: MUST verify CLI text `show` renders `FAIL` blocks as `Status: FAIL`, blank line, `Reason: <reason>`, blank line, and right-aligned `Updated/Next`, never renders `Window 5h:/7d:/30d:` headings, and preserves `show --json` freshness, API-counter, cost, and GeminiAI effective-window behaviors.
 - **TST-042**: MUST verify CLI `show` and GNOME provider cards render equivalent failed-provider blocks formatted as `Status: FAIL`, blank line, `Reason: <reason>`, blank line, and `Updated/Next`, without `Window 5h:/7d:/30d:` headings.

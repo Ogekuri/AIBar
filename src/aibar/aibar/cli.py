@@ -138,6 +138,8 @@ _UPGRADE_LIFECYCLE_COMMAND: list[str] = [
 _UNINSTALL_LIFECYCLE_COMMAND: list[str] = ["uv", "tool", "uninstall", "aibar"]
 _CLAUDE_OAUTH_AUTH_ERROR_TEXT = "Invalid or expired OAuth token"
 _CLAUDE_OAUTH_BLOCK_TTL_SECONDS = 86400
+_LOG_FAILURE_CATEGORY_OAUTH = "oauth"
+_LOG_FAILURE_CATEGORY_RATE_LIMIT = "rate_limit"
 _CLAUDE_TOKEN_REFRESH_LOG_PATH = (
     Path.home() / ".config" / "aibar" / "claude_token_refresh.log"
 )
@@ -1057,6 +1059,56 @@ def _extract_retry_after_seconds(result: ProviderResult) -> int:
     if parsed is None:
         return 0
     return parsed
+
+
+def _classify_provider_failure_log_category(result: ProviderResult) -> str | None:
+    """
+    @brief Classify provider failure category for runtime logging.
+    @details Maps failed provider results to runtime-log categories used by
+    logging requirement checks. Returns `rate_limit` when `raw.status_code` is
+    `429`; returns `oauth` when error text contains OAuth-authentication markers.
+    @param result {ProviderResult} Provider result candidate.
+    @return {str | None} Failure category token or None when not log-targeted.
+    @satisfies REQ-115
+    """
+    if not result.is_error:
+        return None
+    if _is_http_429_result(result):
+        return _LOG_FAILURE_CATEGORY_RATE_LIMIT
+    if _is_claude_oauth_authentication_error(result.error):
+        return _LOG_FAILURE_CATEGORY_OAUTH
+    if isinstance(result.error, str) and "oauth" in result.error.lower():
+        return _LOG_FAILURE_CATEGORY_OAUTH
+    return None
+
+
+def _append_provider_failure_runtime_log(result: ProviderResult) -> None:
+    """
+    @brief Append runtime-log row for OAuth and rate-limit provider failures.
+    @details Emits non-debug runtime-log entries for provider failure categories
+    `oauth` and `rate_limit` when logging is enabled. Includes
+    `retry_after_seconds` when available in `result.raw.retry_after_seconds`.
+    @param result {ProviderResult} Provider result to log.
+    @return {None} Function return value.
+    @satisfies REQ-115
+    """
+    category = _classify_provider_failure_log_category(result)
+    if category is None:
+        return
+    error_message = result.error if isinstance(result.error, str) else "Unknown error"
+    log_line = (
+        "provider.fetch.failure "
+        f"provider={result.provider.value} "
+        f"window={result.window.value} "
+        f"category={category} "
+        f"error={json.dumps(error_message, ensure_ascii=True)}"
+    )
+    retry_after_seconds = _coerce_retry_after_seconds(
+        result.raw.get("retry_after_seconds")
+    )
+    if retry_after_seconds is not None:
+        log_line = f"{log_line} retry_after_seconds={retry_after_seconds}"
+    append_runtime_log_line(log_line)
 
 
 def _is_claude_oauth_authentication_error(message: object) -> bool:
@@ -2082,6 +2134,7 @@ def _fetch_result(
     @satisfies REQ-040
     @satisfies REQ-112
     @satisfies REQ-114
+    @satisfies REQ-115
     """
     append_runtime_log_line(
         f"provider.fetch.start provider={provider.name.value} window={window.value}"
@@ -2100,6 +2153,7 @@ def _fetch_result(
                 f"provider={provider.name.value} window={window.value} status="
                 f"{_ATTEMPT_RESULT_FAIL if result_5h.is_error else _ATTEMPT_RESULT_OK}"
             )
+            _append_provider_failure_runtime_log(result_5h)
             append_runtime_log_line(
                 f"provider.fetch.debug {_provider_result_debug_summary(result_5h)}",
                 debug_only=True,
@@ -2110,6 +2164,7 @@ def _fetch_result(
             f"provider={provider.name.value} window={window.value} status="
             f"{_ATTEMPT_RESULT_FAIL if result_7d.is_error else _ATTEMPT_RESULT_OK}"
         )
+        _append_provider_failure_runtime_log(result_7d)
         append_runtime_log_line(
             f"provider.fetch.debug {_provider_result_debug_summary(result_7d)}",
             debug_only=True,
@@ -2139,6 +2194,7 @@ def _fetch_result(
         f"provider={provider.name.value} window={window.value} status="
         f"{_ATTEMPT_RESULT_FAIL if result.is_error else _ATTEMPT_RESULT_OK}"
     )
+    _append_provider_failure_runtime_log(result)
     append_runtime_log_line(
         f"provider.fetch.debug {_provider_result_debug_summary(result)}",
         debug_only=True,

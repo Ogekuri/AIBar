@@ -6,6 +6,7 @@ block formatting, runtime pipeline logging coverage, and debug API log gating.
 @satisfies TST-047
 @satisfies TST-048
 @satisfies TST-049
+@satisfies TST-050
 """
 
 import re
@@ -38,7 +39,9 @@ def _patch_paths(monkeypatch, tmp_path: Path) -> tuple[Path, Path]:
     monkeypatch.setattr(config_module, "APP_CONFIG_DIR", config_dir)
     monkeypatch.setattr(config_module, "APP_CACHE_DIR", cache_dir)
     monkeypatch.setattr(config_module, "ENV_FILE_PATH", config_dir / "env")
-    monkeypatch.setattr(config_module, "RUNTIME_CONFIG_PATH", config_dir / "config.json")
+    monkeypatch.setattr(
+        config_module, "RUNTIME_CONFIG_PATH", config_dir / "config.json"
+    )
     monkeypatch.setattr(config_module, "CACHE_FILE_PATH", cache_dir / "cache.json")
     monkeypatch.setattr(config_module, "IDLE_TIME_PATH", cache_dir / "idle-time.json")
     return (config_dir, cache_dir)
@@ -127,6 +130,82 @@ class _ErrorProvider(BaseProvider):
         return "configured"
 
 
+class _OAuthErrorProvider(BaseProvider):
+    """
+    @brief Deterministic provider stub returning OAuth-classified failures.
+    @details Produces one failed result carrying OAuth error text without
+    retry-after metadata so runtime log classification can assert `oauth` branch.
+    """
+
+    name = ProviderName.OPENAI
+
+    async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult:
+        """
+        @brief Return deterministic OAuth failure provider result.
+        @param window {WindowPeriod} Requested usage window.
+        @return {ProviderResult} Failed result with OAuth error text.
+        """
+        return ProviderResult(
+            provider=self.name,
+            window=window,
+            metrics=UsageMetrics(),
+            raw={"status_code": 401},
+            error="OAuth token invalid",
+        )
+
+    def is_configured(self) -> bool:
+        """
+        @brief Report deterministic configured state for OAuth stub provider.
+        @return {bool} Always true.
+        """
+        return True
+
+    def get_config_help(self) -> str:
+        """
+        @brief Return deterministic configuration help text.
+        @return {str} Static helper text.
+        """
+        return "configured"
+
+
+class _RateLimitProvider(BaseProvider):
+    """
+    @brief Deterministic provider stub returning HTTP 429 failures.
+    @details Produces one failed result carrying `status_code=429` and
+    `retry_after_seconds` metadata for runtime log `rate_limit` assertions.
+    """
+
+    name = ProviderName.OPENROUTER
+
+    async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult:
+        """
+        @brief Return deterministic rate-limit failure provider result.
+        @param window {WindowPeriod} Requested usage window.
+        @return {ProviderResult} Failed result with retry-after metadata.
+        """
+        return ProviderResult(
+            provider=self.name,
+            window=window,
+            metrics=UsageMetrics(),
+            raw={"status_code": 429, "retry_after_seconds": 45},
+            error="API error: HTTP 429",
+        )
+
+    def is_configured(self) -> bool:
+        """
+        @brief Report deterministic configured state for rate-limit stub provider.
+        @return {bool} Always true.
+        """
+        return True
+
+    def get_config_help(self) -> str:
+        """
+        @brief Return deterministic configuration help text.
+        @return {str} Static helper text.
+        """
+        return "configured"
+
+
 def test_logging_flag_options_persist_without_cross_side_effects(
     monkeypatch,
     tmp_path: Path,
@@ -143,7 +222,9 @@ def test_logging_flag_options_persist_without_cross_side_effects(
     """
     _patch_paths(monkeypatch, tmp_path)
     monkeypatch.setattr(cli_module, "_run_startup_update_preflight", lambda: None)
-    config_module.save_runtime_config(RuntimeConfig(log_enabled=False, debug_enabled=False))
+    config_module.save_runtime_config(
+        RuntimeConfig(log_enabled=False, debug_enabled=False)
+    )
     runner = CliRunner()
 
     assert runner.invoke(cli_module.main, ["--enable-log"]).exit_code == 0
@@ -182,7 +263,9 @@ def test_execution_start_end_and_separator_logged_with_timestamp(
     """
     _, cache_dir = _patch_paths(monkeypatch, tmp_path)
     monkeypatch.setattr(cli_module, "_run_startup_update_preflight", lambda: None)
-    config_module.save_runtime_config(RuntimeConfig(log_enabled=True, debug_enabled=False))
+    config_module.save_runtime_config(
+        RuntimeConfig(log_enabled=True, debug_enabled=False)
+    )
     runner = CliRunner()
     result = runner.invoke(cli_module.main, ["--help"])
     assert result.exit_code == 0
@@ -213,7 +296,9 @@ def test_pipeline_logging_covers_idle_fetch_error_and_cache_io(
     @satisfies TST-048
     """
     _, cache_dir = _patch_paths(monkeypatch, tmp_path)
-    config_module.save_runtime_config(RuntimeConfig(log_enabled=True, debug_enabled=False))
+    config_module.save_runtime_config(
+        RuntimeConfig(log_enabled=True, debug_enabled=False)
+    )
 
     providers: dict[ProviderName, BaseProvider] = {
         ProviderName.CODEX: _SuccessProvider(),
@@ -231,7 +316,10 @@ def test_pipeline_logging_covers_idle_fetch_error_and_cache_io(
     assert "idle.pipeline.start" in log_text
     assert "idle.pipeline.check provider=codex blocked=false" in log_text
     assert "provider.fetch.start provider=codex window=7d" in log_text
-    assert "provider.fetch.error provider=openrouter window=30d error=provider boom" in log_text
+    assert (
+        "provider.fetch.error provider=openrouter window=30d error=provider boom"
+        in log_text
+    )
     assert "cache.load.start path=~/.cache/aibar/cache.json" in log_text
     assert "cache.save.start path=~/.cache/aibar/cache.json" in log_text
     assert "idle.pipeline.end cache_available=true source=refresh" in log_text
@@ -252,9 +340,13 @@ def test_debug_api_log_rows_require_both_log_and_debug_flags(
     @satisfies TST-049
     """
     _, cache_dir = _patch_paths(monkeypatch, tmp_path)
-    providers: dict[ProviderName, BaseProvider] = {ProviderName.CODEX: _SuccessProvider()}
+    providers: dict[ProviderName, BaseProvider] = {
+        ProviderName.CODEX: _SuccessProvider()
+    }
 
-    config_module.save_runtime_config(RuntimeConfig(log_enabled=True, debug_enabled=False))
+    config_module.save_runtime_config(
+        RuntimeConfig(log_enabled=True, debug_enabled=False)
+    )
     cli_module.retrieve_results_via_cache_pipeline(
         provider_filter=None,
         target_window=WindowPeriod.DAY_7,
@@ -264,7 +356,9 @@ def test_debug_api_log_rows_require_both_log_and_debug_flags(
     log_without_debug = _read_log(cache_dir)
     assert "provider.fetch.debug" not in log_without_debug
 
-    config_module.save_runtime_config(RuntimeConfig(log_enabled=True, debug_enabled=True))
+    config_module.save_runtime_config(
+        RuntimeConfig(log_enabled=True, debug_enabled=True)
+    )
     cli_module.retrieve_results_via_cache_pipeline(
         provider_filter=None,
         target_window=WindowPeriod.DAY_7,
@@ -273,3 +367,43 @@ def test_debug_api_log_rows_require_both_log_and_debug_flags(
     )
     log_with_debug = _read_log(cache_dir)
     assert "provider.fetch.debug" in log_with_debug
+
+
+def test_failure_logging_captures_oauth_and_rate_limit_with_retry_after(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """
+    @brief Verify runtime log records oauth/rate_limit failure categories.
+    @details Executes refresh with deterministic OAuth and HTTP-429 providers,
+    then asserts runtime log rows contain category tokens and includes
+    `retry_after_seconds` for rate-limit entries when available.
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @param tmp_path {Path} Temporary path fixture.
+    @return {None} Function return value.
+    @satisfies TST-050
+    """
+    _, cache_dir = _patch_paths(monkeypatch, tmp_path)
+    config_module.save_runtime_config(
+        RuntimeConfig(log_enabled=True, debug_enabled=False)
+    )
+    providers: dict[ProviderName, BaseProvider] = {
+        ProviderName.OPENAI: _OAuthErrorProvider(),
+        ProviderName.OPENROUTER: _RateLimitProvider(),
+    }
+
+    cli_module.retrieve_results_via_cache_pipeline(
+        provider_filter=None,
+        target_window=WindowPeriod.DAY_7,
+        force_refresh=True,
+        providers=providers,
+    )
+
+    log_text = _read_log(cache_dir)
+    assert (
+        "provider.fetch.failure provider=openai window=30d category=oauth" in log_text
+    )
+    assert (
+        "provider.fetch.failure provider=openrouter window=30d category=rate_limit"
+    ) in log_text
+    assert "retry_after_seconds=45" in log_text
