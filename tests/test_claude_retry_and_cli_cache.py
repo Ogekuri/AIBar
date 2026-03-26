@@ -104,7 +104,9 @@ class TestClaudeRetryOn429:
         provider = ClaudeOAuthProvider(token="sk-ant-test-token")
         mock_responses = [_make_429_response("0"), _make_200_response()]
 
-        with patch("aibar.providers.claude_oauth.asyncio.sleep", new_callable=AsyncMock):
+        with patch(
+            "aibar.providers.claude_oauth.asyncio.sleep", new_callable=AsyncMock
+        ):
             with patch("aibar.providers.claude_oauth.random.uniform", return_value=0.0):
                 with patch.object(
                     httpx.AsyncClient,
@@ -124,7 +126,9 @@ class TestClaudeRetryOn429:
         provider = ClaudeOAuthProvider(token="sk-ant-test-token")
         all_429 = [_make_429_response("0")] * 4
 
-        with patch("aibar.providers.claude_oauth.asyncio.sleep", new_callable=AsyncMock):
+        with patch(
+            "aibar.providers.claude_oauth.asyncio.sleep", new_callable=AsyncMock
+        ):
             with patch("aibar.providers.claude_oauth.random.uniform", return_value=0.0):
                 with patch.object(
                     httpx.AsyncClient,
@@ -150,7 +154,9 @@ class TestClaudeRetryOn429:
         retry_after_header = _format_http_date_retry_after(7200)
         all_429 = [_make_429_response(retry_after_header)] * 4
 
-        with patch("aibar.providers.claude_oauth.asyncio.sleep", new_callable=AsyncMock):
+        with patch(
+            "aibar.providers.claude_oauth.asyncio.sleep", new_callable=AsyncMock
+        ):
             with patch("aibar.providers.claude_oauth.random.uniform", return_value=0.0):
                 with patch.object(
                     httpx.AsyncClient,
@@ -163,6 +169,35 @@ class TestClaudeRetryOn429:
         assert result.is_error
         assert result.raw["status_code"] == 429
         assert result.raw["retry_after_seconds"] >= 3600
+
+    def test_epoch_retry_after_header_is_normalized_to_relative_delay(self) -> None:
+        """
+        @brief Verify epoch Retry-After headers are normalized to relative seconds.
+        @details Simulates Claude HTTP 429 responses carrying Unix-epoch seconds in
+        `retry-after` and asserts provider output preserves a bounded relative delay
+        suitable for idle-time scheduling instead of a raw epoch timestamp.
+        @satisfies REQ-041
+        @satisfies TST-011
+        """
+        provider = ClaudeOAuthProvider(token="sk-ant-test-token")
+        retry_after_epoch = int(datetime.now(timezone.utc).timestamp()) + 900
+        all_429 = [_make_429_response(str(retry_after_epoch))] * 4
+
+        with patch(
+            "aibar.providers.claude_oauth.asyncio.sleep", new_callable=AsyncMock
+        ):
+            with patch("aibar.providers.claude_oauth.random.uniform", return_value=0.0):
+                with patch.object(
+                    httpx.AsyncClient,
+                    "get",
+                    new_callable=AsyncMock,
+                    side_effect=all_429,
+                ):
+                    result = asyncio.run(provider.fetch(WindowPeriod.DAY_7))
+
+        assert result.is_error
+        assert result.raw["status_code"] == 429
+        assert 899 <= result.raw["retry_after_seconds"] <= 901
 
 
 class TestFetchAllWindows:

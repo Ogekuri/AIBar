@@ -2344,7 +2344,7 @@ from pydantic import BaseModel, Field
 
 ---
 
-# claude_oauth.py | Python | 365L | 16 symbols | 13 imports | 19 comments
+# claude_oauth.py | Python | 386L | 16 symbols | 13 imports | 19 comments
 > Path: `src/aibar/aibar/providers/claude_oauth.py`
 - @brief Claude OAuth usage provider.
 - @details Fetches Claude subscription utilization through OAuth credentials and normalizes provider quota state into the shared result contract.
@@ -2368,13 +2368,13 @@ from datetime import timezone
 
 ## Definitions
 
-### fn `def _parse_retry_after_header(retry_after_raw: str | None) -> float` `priv` (L27-52)
+### fn `def _parse_retry_after_header(retry_after_raw: str | None) -> float` `priv` (L27-65)
 - @brief Parse HTTP Retry-After header to delay seconds.
-- @details Supports integer-second values and HTTP-date formats. Date values are converted to seconds relative to current UTC time and clamped to zero.
+- @details Supports numeric and HTTP-date formats. Numeric values are treated as relative seconds by default, but large numeric values are normalized as epoch timestamps (seconds or milliseconds) and converted to relative delay seconds against current UTC time. Date values are converted to seconds relative to current UTC time and clamped to zero.
 - @param retry_after_raw {str | None} Retry-After header value.
 - @return {float} Non-negative delay seconds as float.
 
-### fn `def _resolve_provider_currency(raw: dict, provider_name: str) -> str` `priv` (L53-66)
+### fn `def _resolve_provider_currency(raw: dict, provider_name: str) -> str` `priv` (L66-80)
 - @brief Resolve currency symbol for a provider from raw API response or config.
 - @details Delegates to `resolve_currency_symbol` from `aibar.config`. Imported lazily inside the function to avoid circular import at module load time.
 - @param raw {dict} Raw API response dict.
@@ -2382,37 +2382,37 @@ from datetime import timezone
 - @return {str} Resolved currency symbol.
 - @satisfies REQ-050
 
-### class `class ClaudeOAuthProvider(BaseProvider)` : BaseProvider (L67-103)
+### class `class ClaudeOAuthProvider(BaseProvider)` : BaseProvider (L81-117)
 - @brief Define claude o auth provider component.
 - @details Encapsulates claude o auth provider state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
-- var `USAGE_URL = "https://api.anthropic.com/api/oauth/usage"` (L74)
+- var `USAGE_URL = "https://api.anthropic.com/api/oauth/usage"` (L88)
   - @brief Define claude o auth provider component.
   - @details Encapsulates claude o auth provider state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
-- var `TOKEN_ENV_VAR = "CLAUDE_CODE_OAUTH_TOKEN"` (L75)
-- fn `def __init__(self, token: str | None = None) -> None` `priv` (L77-87)
+- var `TOKEN_ENV_VAR = "CLAUDE_CODE_OAUTH_TOKEN"` (L89)
+- fn `def __init__(self, token: str | None = None) -> None` `priv` (L91-101)
   - @brief Execute init.
   - @details Applies init logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param token {str | None} Input parameter `token`.
   - @return {None} Function return value.
-- fn `def is_configured(self) -> bool` (L88-95)
+- fn `def is_configured(self) -> bool` (L102-109)
   - @brief Execute is configured.
   - @details Applies is configured logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {bool} Function return value.
-- fn `def get_config_help(self) -> str` (L96-103)
+- fn `def get_config_help(self) -> str` (L110-117)
   - @brief Execute get config help.
   - @details Applies get config help logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {str} Function return value.
 
-- var `MAX_RETRIES = 3` (L110)
-- var `RETRY_BACKOFF_BASE = 2.0` (L111)
-- var `RETRY_JITTER_MAX = 1.0` (L112)
-### fn `async def _request_usage(self, client: httpx.AsyncClient) -> httpx.Response` `priv` (L114-150)
+- var `MAX_RETRIES = 3` (L124)
+- var `RETRY_BACKOFF_BASE = 2.0` (L125)
+- var `RETRY_JITTER_MAX = 1.0` (L126)
+### fn `async def _request_usage(self, client: httpx.AsyncClient) -> httpx.Response` `priv` (L128-167)
 - @brief Execute HTTP GET to usage endpoint with retry on HTTP 429.
 - @details Retries up to MAX_RETRIES times on 429 responses, respecting the retry-after header with exponential backoff fallback and random jitter to prevent thundering-herd synchronization. Backoff sequence with RETRY_BACKOFF_BASE=2.0: ~2-3s, ~4-5s, ~8-9s (total ~14-17s).
 - @param client {httpx.AsyncClient} Reusable HTTP client session.
 - @return {httpx.Response} Final HTTP response after retries exhausted or success.
 
-### fn `async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult` (L151-192)
+### fn `async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult` (L168-211)
 - @brief Execute fetch for a single window period.
 - @details Makes one HTTP request to the usage endpoint (with retry on 429) and parses the response for the requested window.
 - @param window {WindowPeriod} Window period to parse from the API response.
@@ -2420,11 +2420,11 @@ from datetime import timezone
 - @throws {AuthenticationError} When the OAuth token is invalid or expired.
 - @throws {ProviderError} On unexpected non-HTTP errors.
 
-### fn `async def fetch_all_windows(` (L193-194)
+### fn `async def fetch_all_windows(` (L212-213)
 
-### fn `def _handle_response(` `priv` (L249-250)
+### fn `def _handle_response(` `priv` (L270-271)
 
-### fn `def _parse_response(self, data: dict, window: WindowPeriod) -> ProviderResult` `priv` (L299-365)
+### fn `def _parse_response(self, data: dict, window: WindowPeriod) -> ProviderResult` `priv` (L320-386)
 - @brief Map HTTP error status codes to ProviderResult error payloads.
 - @brief Normalize a raw Claude API payload dict into a ProviderResult for the given window.
 - @details Returns None on HTTP 200 (success), otherwise returns an error
@@ -2442,22 +2442,22 @@ ProviderResult for the given window. Raises AuthenticationError on 401.
 ## Symbol Index
 |Symbol|Kind|Vis|Lines|Sig|
 |---|---|---|---|---|
-|`_parse_retry_after_header`|fn|priv|27-52|def _parse_retry_after_header(retry_after_raw: str | None...|
-|`_resolve_provider_currency`|fn|priv|53-66|def _resolve_provider_currency(raw: dict, provider_name: ...|
-|`ClaudeOAuthProvider`|class|pub|67-103|class ClaudeOAuthProvider(BaseProvider)|
-|`ClaudeOAuthProvider.USAGE_URL`|var|pub|74||
-|`ClaudeOAuthProvider.TOKEN_ENV_VAR`|var|pub|75||
-|`ClaudeOAuthProvider.__init__`|fn|priv|77-87|def __init__(self, token: str | None = None) -> None|
-|`ClaudeOAuthProvider.is_configured`|fn|pub|88-95|def is_configured(self) -> bool|
-|`ClaudeOAuthProvider.get_config_help`|fn|pub|96-103|def get_config_help(self) -> str|
-|`MAX_RETRIES`|var|pub|110||
-|`RETRY_BACKOFF_BASE`|var|pub|111||
-|`RETRY_JITTER_MAX`|var|pub|112||
-|`_request_usage`|fn|priv|114-150|async def _request_usage(self, client: httpx.AsyncClient)...|
-|`fetch`|fn|pub|151-192|async def fetch(self, window: WindowPeriod = WindowPeriod...|
-|`fetch_all_windows`|fn|pub|193-194|async def fetch_all_windows(|
-|`_handle_response`|fn|priv|249-250|def _handle_response(|
-|`_parse_response`|fn|priv|299-365|def _parse_response(self, data: dict, window: WindowPerio...|
+|`_parse_retry_after_header`|fn|priv|27-65|def _parse_retry_after_header(retry_after_raw: str | None...|
+|`_resolve_provider_currency`|fn|priv|66-80|def _resolve_provider_currency(raw: dict, provider_name: ...|
+|`ClaudeOAuthProvider`|class|pub|81-117|class ClaudeOAuthProvider(BaseProvider)|
+|`ClaudeOAuthProvider.USAGE_URL`|var|pub|88||
+|`ClaudeOAuthProvider.TOKEN_ENV_VAR`|var|pub|89||
+|`ClaudeOAuthProvider.__init__`|fn|priv|91-101|def __init__(self, token: str | None = None) -> None|
+|`ClaudeOAuthProvider.is_configured`|fn|pub|102-109|def is_configured(self) -> bool|
+|`ClaudeOAuthProvider.get_config_help`|fn|pub|110-117|def get_config_help(self) -> str|
+|`MAX_RETRIES`|var|pub|124||
+|`RETRY_BACKOFF_BASE`|var|pub|125||
+|`RETRY_JITTER_MAX`|var|pub|126||
+|`_request_usage`|fn|priv|128-167|async def _request_usage(self, client: httpx.AsyncClient)...|
+|`fetch`|fn|pub|168-211|async def fetch(self, window: WindowPeriod = WindowPeriod...|
+|`fetch_all_windows`|fn|pub|212-213|async def fetch_all_windows(|
+|`_handle_response`|fn|priv|270-271|def _handle_response(|
+|`_parse_response`|fn|priv|320-386|def _parse_response(self, data: dict, window: WindowPerio...|
 
 
 ---

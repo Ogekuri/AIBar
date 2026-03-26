@@ -27,15 +27,28 @@ from aibar.providers.base import (
 def _parse_retry_after_header(retry_after_raw: str | None) -> float:
     """
     @brief Parse HTTP Retry-After header to delay seconds.
-    @details Supports integer-second values and HTTP-date formats. Date values
-    are converted to seconds relative to current UTC time and clamped to zero.
+    @details Supports numeric and HTTP-date formats. Numeric values are treated
+    as relative seconds by default, but large numeric values are normalized as
+    epoch timestamps (seconds or milliseconds) and converted to relative delay
+    seconds against current UTC time. Date values are converted to seconds
+    relative to current UTC time and clamped to zero.
     @param retry_after_raw {str | None} Retry-After header value.
     @return {float} Non-negative delay seconds as float.
     """
     if retry_after_raw is None:
         return 0.0
     try:
-        return max(0.0, float(retry_after_raw))
+        retry_after_numeric = float(retry_after_raw)
+        if retry_after_numeric <= 0.0:
+            return 0.0
+
+        now_utc = datetime.now(tz=timezone.utc)
+        now_epoch = now_utc.timestamp()
+        if retry_after_numeric >= 1_000_000_000_000:
+            retry_after_numeric = retry_after_numeric / 1000.0
+        if retry_after_numeric >= 1_000_000_000:
+            retry_after_numeric = retry_after_numeric - now_epoch
+        return max(0.0, retry_after_numeric)
     except (TypeError, ValueError):
         pass
     try:
@@ -61,6 +74,7 @@ def _resolve_provider_currency(raw: dict, provider_name: str) -> str:
     @satisfies REQ-050
     """
     from aibar.config import resolve_currency_symbol
+
     return resolve_currency_symbol(raw, provider_name)
 
 
@@ -139,11 +153,14 @@ Note: Token must start with 'sk-ant-' prefix."""
                 float(load_runtime_config().api_call_delay_milliseconds) / 1000.0
             )
             jitter = random.uniform(0, self.RETRY_JITTER_MAX)
-            delay = max(
-                retry_after,
-                self.RETRY_BACKOFF_BASE * (2**attempt),
-                min_api_delay_seconds,
-            ) + jitter
+            delay = (
+                max(
+                    retry_after,
+                    self.RETRY_BACKOFF_BASE * (2**attempt),
+                    min_api_delay_seconds,
+                )
+                + jitter
+            )
             await asyncio.sleep(delay)
             response = await client.get(self.USAGE_URL, headers=headers)
         return response
@@ -167,7 +184,9 @@ Note: Token must start with 'sk-ant-' prefix."""
         try:
             from aibar.config import get_api_call_timeout_seconds
 
-            async with httpx.AsyncClient(timeout=get_api_call_timeout_seconds()) as client:
+            async with httpx.AsyncClient(
+                timeout=get_api_call_timeout_seconds()
+            ) as client:
                 response = await self._request_usage(client)
                 result = self._handle_response(response, window)
                 if result is not None:
@@ -214,7 +233,9 @@ Note: Token must start with 'sk-ant-' prefix."""
         try:
             from aibar.config import get_api_call_timeout_seconds
 
-            async with httpx.AsyncClient(timeout=get_api_call_timeout_seconds()) as client:
+            async with httpx.AsyncClient(
+                timeout=get_api_call_timeout_seconds()
+            ) as client:
                 response = await self._request_usage(client)
 
                 error_result = self._handle_response(response, windows[0])
