@@ -11,6 +11,8 @@ and HTTP call count; specific numeric metric values MUST NOT be asserted per TST
 """
 
 import asyncio
+import email.utils
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, patch
 
 import httpx
@@ -36,6 +38,18 @@ def _make_429_response(retry_after: str = "0") -> httpx.Response:
         json={"error": {"message": "Rate limited.", "type": "rate_limit_error"}},
         request=httpx.Request("GET", "https://api.anthropic.com/api/oauth/usage"),
     )
+
+
+def _format_http_date_retry_after(delay_seconds: int) -> str:
+    """
+    @brief Build HTTP-date Retry-After header value relative to current UTC.
+    @details Produces RFC 7231 IMF-fixdate string for deterministic provider
+    header parsing tests where retry-after is not numeric.
+    @param delay_seconds {int} Positive delay from current UTC.
+    @return {str} Retry-After HTTP-date string.
+    """
+    retry_after_at = datetime.now(timezone.utc) + timedelta(seconds=delay_seconds)
+    return email.utils.format_datetime(retry_after_at, usegmt=True)
 
 
 def _make_200_response() -> httpx.Response:
@@ -123,6 +137,32 @@ class TestClaudeRetryOn429:
         assert result.is_error
         assert result.error is not None
         assert "Rate limited" in result.error
+
+    def test_http_date_retry_after_is_preserved_for_idle_time(self) -> None:
+        """
+        @brief Verify final Claude 429 result preserves HTTP-date retry-after delay.
+        @details Uses HTTP-date header format (non-numeric) and asserts provider
+        stores positive `raw.retry_after_seconds` for CLI idle-time expansion.
+        @satisfies REQ-041
+        @satisfies TST-011
+        """
+        provider = ClaudeOAuthProvider(token="sk-ant-test-token")
+        retry_after_header = _format_http_date_retry_after(7200)
+        all_429 = [_make_429_response(retry_after_header)] * 4
+
+        with patch("aibar.providers.claude_oauth.asyncio.sleep", new_callable=AsyncMock):
+            with patch("aibar.providers.claude_oauth.random.uniform", return_value=0.0):
+                with patch.object(
+                    httpx.AsyncClient,
+                    "get",
+                    new_callable=AsyncMock,
+                    side_effect=all_429,
+                ):
+                    result = asyncio.run(provider.fetch(WindowPeriod.DAY_7))
+
+        assert result.is_error
+        assert result.raw["status_code"] == 429
+        assert result.raw["retry_after_seconds"] >= 3600
 
 
 class TestFetchAllWindows:

@@ -5,9 +5,10 @@
 """
 
 import asyncio
+import email.utils
 import os
 import random
-from datetime import datetime
+from datetime import datetime, timezone
 
 import httpx
 
@@ -21,6 +22,32 @@ from aibar.providers.base import (
     UsageMetrics,
     WindowPeriod,
 )
+
+
+def _parse_retry_after_header(retry_after_raw: str | None) -> float:
+    """
+    @brief Parse HTTP Retry-After header to delay seconds.
+    @details Supports integer-second values and HTTP-date formats. Date values
+    are converted to seconds relative to current UTC time and clamped to zero.
+    @param retry_after_raw {str | None} Retry-After header value.
+    @return {float} Non-negative delay seconds as float.
+    """
+    if retry_after_raw is None:
+        return 0.0
+    try:
+        return max(0.0, float(retry_after_raw))
+    except (TypeError, ValueError):
+        pass
+    try:
+        retry_after_datetime = email.utils.parsedate_to_datetime(retry_after_raw)
+    except (TypeError, ValueError):
+        return 0.0
+    if retry_after_datetime.tzinfo is None:
+        retry_after_datetime = retry_after_datetime.replace(tzinfo=timezone.utc)
+    retry_after_utc = retry_after_datetime.astimezone(timezone.utc)
+    now_utc = datetime.now(tz=timezone.utc)
+    delta_seconds = (retry_after_utc - now_utc).total_seconds()
+    return max(0.0, delta_seconds)
 
 
 def _resolve_provider_currency(raw: dict, provider_name: str) -> str:
@@ -105,10 +132,7 @@ Note: Token must start with 'sk-ant-' prefix."""
             if response.status_code != 429:
                 return response
             retry_after_raw = response.headers.get("retry-after", "0")
-            try:
-                retry_after = max(0.0, float(retry_after_raw))
-            except (TypeError, ValueError):
-                retry_after = 0.0
+            retry_after = _parse_retry_after_header(retry_after_raw)
             from aibar.config import load_runtime_config
 
             min_api_delay_seconds = (
@@ -253,10 +277,7 @@ Note: Token must start with 'sk-ant-' prefix."""
 
         if response.status_code == 429:
             retry_after_raw = response.headers.get("retry-after", "0")
-            try:
-                retry_after_seconds = max(0.0, float(retry_after_raw))
-            except (TypeError, ValueError):
-                retry_after_seconds = 0.0
+            retry_after_seconds = _parse_retry_after_header(retry_after_raw)
             return self._make_error_result(
                 window=window,
                 error="Rate limited. Try again later.",
