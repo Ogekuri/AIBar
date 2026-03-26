@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.18.0](https://github.com/Ogekuri/AIBar/compare/v0.17.0..v0.18.0) - 2026-03-26
+### 🐛  Bug Fixes
+- normalize retry-after epoch delay parsing [useReq] *(cli)*
+
 ## [0.17.0](https://github.com/Ogekuri/AIBar/compare/v0.16.0..v0.17.0) - 2026-03-26
 ### 🐛  Bug Fixes
 - parse HTTP-date Retry-After for 429 [useReq] *(claude_oauth)*
@@ -914,6 +918,7 @@
 - \[0.15.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.15.0
 - \[0.16.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.16.0
 - \[0.17.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.17.0
+- \[0.18.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.18.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -932,3 +937,4 @@
 [0.15.0]: https://github.com/Ogekuri/AIBar/compare/v0.14.0..v0.15.0
 [0.16.0]: https://github.com/Ogekuri/AIBar/compare/v0.15.0..v0.16.0
 [0.17.0]: https://github.com/Ogekuri/AIBar/compare/v0.16.0..v0.17.0
+[0.18.0]: https://github.com/Ogekuri/AIBar/compare/v0.17.0..v0.18.0
