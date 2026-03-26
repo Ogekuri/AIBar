@@ -252,9 +252,6 @@ Note: Token must start with 'sk-ant-' prefix."""
             )
 
         if response.status_code == 429:
-            error_body = response.text
-            if "Invalid or expired OAuth token" in error_body:
-                raise AuthenticationError("Invalid or expired OAuth token")
             retry_after_raw = response.headers.get("retry-after", "0")
             try:
                 retry_after_seconds = max(0.0, float(retry_after_raw))
