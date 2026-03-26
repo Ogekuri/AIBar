@@ -445,13 +445,43 @@ def test_panel_percentage_labels_hide_when_metrics_are_unavailable() -> None:
     assert "this._panelGeminiaiCostLabel.hide();" in source
 
 
-def test_panel_labels_render_err_only_for_failed_percentage_windows() -> None:
+def test_panel_labels_render_single_bold_provider_colored_err_for_oauth_or_rate_limit() -> (
+    None
+):
     """
-    @brief Verify panel `Err` projection applies only to failed percentage labels.
-    @details Asserts extension source derives provider-window status entries and maps
-    `Err` to failed percentage labels while keeping provider cost labels out of
-    the `Err` projection map.
+    @brief Verify panel collapse projects one provider-colored bold `Err` for OAuth/rate-limit.
+    @details Asserts extension source derives provider failure categories from
+    status metadata, chooses one provider in deterministic order, hides normal labels,
+    and renders exactly one `Err` with provider color class and bold style class.
     @satisfies REQ-021
+    """
+    source = EXTENSION_PATH.read_text(encoding="utf-8")
+    assert "const CLAUDE_OAUTH_ERROR_MESSAGE = 'Invalid or expired OAuth token';" in source
+    assert "function _classifyPanelFailureCategory(statusEntry)" in source
+    assert "if (errorText.includes(CLAUDE_OAUTH_ERROR_MESSAGE))" in source
+    assert "if (errorText.includes(RATE_LIMIT_ERROR_MESSAGE) || statusCode === 429)" in source
+    assert "function _panelProviderFailureState(statusData, providerName, windows)" in source
+    assert "const providerFailureStates = {" in source
+    assert "const providerErrClassNames = {" in source
+    assert "const providerErrPriority = ['claude', 'openrouter', 'copilot', 'codex', 'openai', 'geminiai'];" in source
+    assert "let singleErrProvider = null;" in source
+    assert "if (state.category === 'oauth' || state.category === 'rate_limit')" in source
+    assert "if (singleErrProvider !== null) {" in source
+    assert "label.remove_style_class_name('aibar-panel-err-single');" in source
+    assert "const errLabel = usageLabels[`${singleErrProvider}Cost`] || usageLabels[singleErrProvider];" in source
+    assert "errLabel.set_text('Err');" in source
+    assert "errLabel.add_style_class_name('aibar-panel-err-single');" in source
+    assert "errLabel.add_style_class_name(providerColorClass);" in source
+    assert ".aibar-panel-err-single {" in STYLESHEET_PATH.read_text(encoding="utf-8")
+    assert "font-weight: bold;" in STYLESHEET_PATH.read_text(encoding="utf-8")
+
+
+def test_panel_error_mapping_still_tracks_failed_provider_windows_and_costs() -> None:
+    """
+    @brief Verify panel status failure map still tracks provider/window FAIL states.
+    @details Asserts extension preserves status-window mapping for percentage and cost
+    labels so non-collapsed states retain deterministic failure metadata coverage.
+    @satisfies TST-007
     """
     source = EXTENSION_PATH.read_text(encoding="utf-8")
     assert "const resolveStatusEntry = (providerName, windowKey) => {" in source
@@ -459,20 +489,14 @@ def test_panel_labels_render_err_only_for_failed_percentage_windows() -> None:
     assert "const panelStatusFailures = {" in source
     assert "claude5h: isStatusFailure('claude', '5h')" in source
     assert "claude7d: isStatusFailure('claude', '7d')" in source
-    assert "claudeCost: false" in source
-    assert "openrouterCost: false" in source
+    assert "claudeCost: isStatusFailure('claude', '5h') || isStatusFailure('claude', '7d')" in source
+    assert "openrouterCost: isStatusFailure('openrouter', '30d')" in source
     assert "copilot: isStatusFailure('copilot', '30d')" in source
     assert "codex5h: isStatusFailure('codex', '5h')" in source
     assert "codex7d: isStatusFailure('codex', '7d')" in source
-    assert "codexCost: false" in source
-    assert "openaiCost: false" in source
-    assert "geminiaiCost: false" in source
-    assert "if (panelStatusFailures[labelKey] === true) {" in source
-    assert "label.set_text('Err');" in source
-    assert "label.show();" in source
-    assert source.index("if (panelStatusFailures[labelKey] === true) {") < source.index(
-        "if (typeof value === 'number' && Number.isFinite(value)) {"
-    )
+    assert "codexCost: isStatusFailure('codex', '5h') || isStatusFailure('codex', '7d')" in source
+    assert "openaiCost: isStatusFailure('openai', '30d')" in source
+    assert "geminiaiCost: isStatusFailure('geminiai', '30d')" in source
 
 
 def test_panel_cost_text_keeps_zero_values_visible_with_currency_symbol() -> None:

@@ -20,6 +20,7 @@ const IDLE_DELAY_SECONDS = 300;
 const ENV_FILE_PATH = GLib.get_home_dir() + '/.config/aibar/env';
 const RESET_PENDING_MESSAGE = 'Starts when the first message is sent';
 const RATE_LIMIT_ERROR_MESSAGE = 'Rate limited. Try again later.';
+const CLAUDE_OAUTH_ERROR_MESSAGE = 'Invalid or expired OAuth token';
 const PROVIDER_PROGRESS_CLASSES = {
     claude: 'aibar-progress-provider-claude',
     openrouter: 'aibar-progress-provider-openrouter',
@@ -121,6 +122,63 @@ function _coerceRetryAfterSeconds(value) {
     if (parsed <= 0)
         return null;
     return parsed;
+}
+
+/**
+ * @brief Classify panel-failure category from cache status metadata.
+ * @details Returns one of `oauth`, `rate_limit`, or `other` by inspecting
+ * normalized status error text and optional HTTP status code.
+ * @param {any} statusEntry Window-specific cache status entry.
+ * @returns {'oauth' | 'rate_limit' | 'other'} Failure category.
+ */
+function _classifyPanelFailureCategory(statusEntry) {
+    if (!statusEntry || typeof statusEntry !== 'object' || Array.isArray(statusEntry))
+        return 'other';
+    const statusCode = Number.isInteger(statusEntry.status_code)
+        ? statusEntry.status_code
+        : null;
+    const errorText = typeof statusEntry.error === 'string'
+        ? statusEntry.error
+        : '';
+    if (errorText.includes(CLAUDE_OAUTH_ERROR_MESSAGE))
+        return 'oauth';
+    if (errorText.includes(RATE_LIMIT_ERROR_MESSAGE) || statusCode === 429)
+        return 'rate_limit';
+    return 'other';
+}
+
+/**
+ * @brief Build provider-scoped panel failure state for one provider.
+ * @details Resolves per-window FAIL entries from status data and computes
+ * `hasFailure` plus failure category for panel collapse logic.
+ * @param {Object<string, any>} statusData Provider-keyed status section.
+ * @param {string} providerName Provider key.
+ * @param {string[]} windows Ordered window keys to inspect.
+ * @returns {{hasFailure: boolean, category: 'oauth' | 'rate_limit' | 'other'}} Provider failure state.
+ */
+function _panelProviderFailureState(statusData, providerName, windows) {
+    if (!statusData || typeof statusData !== 'object' || Array.isArray(statusData))
+        return {hasFailure: false, category: 'other'};
+    const providerStatus = statusData[providerName];
+    if (!providerStatus || typeof providerStatus !== 'object' || Array.isArray(providerStatus))
+        return {hasFailure: false, category: 'other'};
+    let sawFailure = false;
+    let category = 'other';
+    for (const windowKey of windows) {
+        if (typeof windowKey !== 'string' || windowKey.length === 0)
+            continue;
+        const entry = providerStatus[windowKey];
+        if (!entry || typeof entry !== 'object' || Array.isArray(entry))
+            continue;
+        if (entry.result !== 'FAIL')
+            continue;
+        sawFailure = true;
+        const nextCategory = _classifyPanelFailureCategory(entry);
+        if (nextCategory === 'oauth' || nextCategory === 'rate_limit')
+            return {hasFailure: true, category: nextCategory};
+        category = 'other';
+    }
+    return {hasFailure: sawFailure, category};
 }
 
 /**
@@ -1647,25 +1705,47 @@ class AIBarIndicator extends PanelMenu.Button {
         const panelStatusFailures = {
             claude5h: isStatusFailure('claude', '5h'),
             claude7d: isStatusFailure('claude', '7d'),
-            claudeCost: false,
-            openrouterCost: false,
+            claudeCost: isStatusFailure('claude', '5h') || isStatusFailure('claude', '7d'),
+            openrouterCost: isStatusFailure('openrouter', '30d'),
             copilot: isStatusFailure('copilot', '30d'),
-            codexCost: false,
+            codexCost: isStatusFailure('codex', '5h') || isStatusFailure('codex', '7d'),
             codex5h: isStatusFailure('codex', '5h'),
             codex7d: isStatusFailure('codex', '7d'),
-            openaiCost: false,
-            geminiaiCost: false,
+            openaiCost: isStatusFailure('openai', '30d'),
+            geminiaiCost: isStatusFailure('geminiai', '30d'),
         };
+        const providerFailureStates = {
+            claude: _panelProviderFailureState(this._statusData, 'claude', ['5h', '7d']),
+            openrouter: _panelProviderFailureState(this._statusData, 'openrouter', ['30d']),
+            copilot: _panelProviderFailureState(this._statusData, 'copilot', ['30d']),
+            codex: _panelProviderFailureState(this._statusData, 'codex', ['5h', '7d']),
+            openai: _panelProviderFailureState(this._statusData, 'openai', ['30d']),
+            geminiai: _panelProviderFailureState(this._statusData, 'geminiai', ['30d']),
+        };
+        const providerErrClassNames = {
+            claude: 'aibar-tab-label-claude',
+            openrouter: 'aibar-tab-label-openrouter',
+            copilot: 'aibar-tab-label-copilot',
+            codex: 'aibar-tab-label-codex',
+            openai: 'aibar-tab-label-openai',
+            geminiai: 'aibar-tab-label-geminiai',
+        };
+        const providerErrPriority = ['claude', 'openrouter', 'copilot', 'codex', 'openai', 'geminiai'];
+        let singleErrProvider = null;
+        for (const providerName of providerErrPriority) {
+            const state = providerFailureStates[providerName];
+            if (!state || state.hasFailure !== true)
+                continue;
+            if (state.category === 'oauth' || state.category === 'rate_limit') {
+                singleErrProvider = providerName;
+                break;
+            }
+        }
 
         for (let [labelKey, value] of Object.entries(panelValues)) {
             const label = usageLabels[labelKey];
             if (!label)
                 continue;
-            if (panelStatusFailures[labelKey] === true) {
-                label.set_text('Err');
-                label.show();
-                continue;
-            }
             if (typeof value === 'number' && Number.isFinite(value)) {
                 label.set_text(`${value.toFixed(1)}%`);
                 label.show();
@@ -1675,6 +1755,32 @@ class AIBarIndicator extends PanelMenu.Button {
             } else {
                 label.set_text('');
                 label.hide();
+            }
+        }
+
+        if (singleErrProvider !== null) {
+            for (const label of Object.values(usageLabels)) {
+                if (!label)
+                    continue;
+                label.set_text('');
+                label.hide();
+                label.remove_style_class_name('aibar-panel-err-single');
+            }
+            const errLabel = usageLabels[`${singleErrProvider}Cost`] || usageLabels[singleErrProvider];
+            if (errLabel) {
+                errLabel.set_text('Err');
+                errLabel.add_style_class_name('aibar-panel-err-single');
+                const providerColorClass = providerErrClassNames[singleErrProvider];
+                if (providerColorClass)
+                    errLabel.add_style_class_name(providerColorClass);
+                errLabel.show();
+            }
+        } else {
+            for (let [labelKey] of Object.entries(panelValues)) {
+                const label = usageLabels[labelKey];
+                if (!label)
+                    continue;
+                label.remove_style_class_name('aibar-panel-err-single');
             }
         }
 
