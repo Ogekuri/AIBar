@@ -199,7 +199,7 @@
             - `append_runtime_log_line(...)`: append cache-save event rows for `cache.json` write path [`src/aibar/aibar/config.py`]
             - `_blocking_file_lock(...)`: poll lock-file release at 250ms and own lock lifecycle for `cache.json` write [`src/aibar/aibar/config.py`]
           - `_update_idle_time_after_refresh(...)`: persist provider-scoped idle-time metadata from refresh outcomes, applying `idle_until = max(current_time + retry_after, current_time + idle_delay)` for failures [`src/aibar/aibar/cli.py`]
-            - `_extract_retry_after_seconds(...)`: normalized retry-after parser with integer-second coercion [`src/aibar/aibar/cli.py`]
+            - `_extract_retry_after_seconds(...)`: normalized retry-after parser that coerces relative-delay values and absolute epoch timestamps into non-negative delay seconds [`src/aibar/aibar/cli.py`]
             - `build_idle_time_state(...)`: normalize provider-local idle timestamps into canonical epoch fields plus local-timezone ISO human fields (`last_success_human`, `idle_until_human`) [`src/aibar/aibar/config.py`]
           - `save_idle_time(...)`: persist provider-keyed idle-time map with blocking lock-file coordination [`src/aibar/aibar/config.py`]
             - `_blocking_file_lock(...)`: poll lock-file release at 250ms and own lock lifecycle for `idle-time.json` write [`src/aibar/aibar/config.py`]

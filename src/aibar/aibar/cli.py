@@ -1016,7 +1016,9 @@ def _coerce_retry_after_seconds(value: object) -> int | None:
     """
     @brief Normalize retry-after metadata to positive integer seconds.
     @details Accepts integer/float/string payload values and converts them to
-    integer seconds; non-numeric, invalid, and non-positive values return None.
+    normalized relative-delay seconds. When numeric values represent absolute
+    epoch timestamps (seconds or milliseconds), converts them to `max(0, epoch-now)`.
+    Non-numeric, invalid, and non-positive values return None.
     @param value {object} Retry-after candidate value.
     @return {int | None} Positive retry-after seconds or None when unavailable.
     @satisfies REQ-037
@@ -1028,6 +1030,15 @@ def _coerce_retry_after_seconds(value: object) -> int | None:
         parsed = int(float(value))
     except (TypeError, ValueError):
         return None
+    if parsed <= 0:
+        return None
+
+    now_epoch = int(time.time())
+    if parsed >= 1_000_000_000_000:
+        parsed = parsed // 1000
+    if parsed >= 1_000_000_000:
+        parsed = parsed - now_epoch
+
     if parsed <= 0:
         return None
     return parsed
@@ -1243,8 +1254,7 @@ def _handle_claude_oauth_refresh_on_auth_error(
     _run_claude_oauth_token_refresh(runtime_config)
     # Rebind provider token after renewal so retry uses refreshed credentials.
     refreshed_token = (
-        os.environ.get(ClaudeOAuthProvider.TOKEN_ENV_VAR)
-        or extract_claude_cli_token()
+        os.environ.get(ClaudeOAuthProvider.TOKEN_ENV_VAR) or extract_claude_cli_token()
     )
     if refreshed_token:
         claude_provider._token = refreshed_token
@@ -2091,8 +2101,7 @@ def _fetch_result(
                 f"{_ATTEMPT_RESULT_FAIL if result_5h.is_error else _ATTEMPT_RESULT_OK}"
             )
             append_runtime_log_line(
-                "provider.fetch.debug "
-                f"{_provider_result_debug_summary(result_5h)}",
+                f"provider.fetch.debug {_provider_result_debug_summary(result_5h)}",
                 debug_only=True,
             )
             return result_5h
@@ -2102,8 +2111,7 @@ def _fetch_result(
             f"{_ATTEMPT_RESULT_FAIL if result_7d.is_error else _ATTEMPT_RESULT_OK}"
         )
         append_runtime_log_line(
-            "provider.fetch.debug "
-            f"{_provider_result_debug_summary(result_7d)}",
+            f"provider.fetch.debug {_provider_result_debug_summary(result_7d)}",
             debug_only=True,
         )
         return result_7d
@@ -2132,8 +2140,7 @@ def _fetch_result(
         f"{_ATTEMPT_RESULT_FAIL if result.is_error else _ATTEMPT_RESULT_OK}"
     )
     append_runtime_log_line(
-        "provider.fetch.debug "
-        f"{_provider_result_debug_summary(result)}",
+        f"provider.fetch.debug {_provider_result_debug_summary(result)}",
         debug_only=True,
     )
     return result
@@ -2194,13 +2201,11 @@ def _fetch_claude_dual(
         f"status={_ATTEMPT_RESULT_FAIL if result_7d.is_error else _ATTEMPT_RESULT_OK}"
     )
     append_runtime_log_line(
-        "provider.fetch.debug "
-        f"{_provider_result_debug_summary(result_5h)}",
+        f"provider.fetch.debug {_provider_result_debug_summary(result_5h)}",
         debug_only=True,
     )
     append_runtime_log_line(
-        "provider.fetch.debug "
-        f"{_provider_result_debug_summary(result_7d)}",
+        f"provider.fetch.debug {_provider_result_debug_summary(result_7d)}",
         debug_only=True,
     )
     return result_5h, result_7d
@@ -2527,7 +2532,9 @@ def retrieve_results_via_cache_pipeline(
     )
     if force_refresh:
         remove_idle_time_file()
-        append_runtime_log_line("idle.pipeline.force_refresh removed_idle_time_file=true")
+        append_runtime_log_line(
+            "idle.pipeline.force_refresh removed_idle_time_file=true"
+        )
 
     idle_state_by_provider = load_idle_time()
     if force_refresh:
