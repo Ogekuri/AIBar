@@ -1647,14 +1647,14 @@ class AIBarIndicator extends PanelMenu.Button {
         const panelStatusFailures = {
             claude5h: isStatusFailure('claude', '5h'),
             claude7d: isStatusFailure('claude', '7d'),
-            claudeCost: isStatusFailure('claude', '5h') || isStatusFailure('claude', '7d'),
-            openrouterCost: isStatusFailure('openrouter', '30d'),
+            claudeCost: false,
+            openrouterCost: false,
             copilot: isStatusFailure('copilot', '30d'),
-            codexCost: isStatusFailure('codex', '5h') || isStatusFailure('codex', '7d'),
+            codexCost: false,
             codex5h: isStatusFailure('codex', '5h'),
             codex7d: isStatusFailure('codex', '7d'),
-            openaiCost: isStatusFailure('openai', '30d'),
-            geminiaiCost: isStatusFailure('geminiai', '30d'),
+            openaiCost: false,
+            geminiaiCost: false,
         };
 
         for (let [labelKey, value] of Object.entries(panelValues)) {

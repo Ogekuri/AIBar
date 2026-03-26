@@ -445,11 +445,12 @@ def test_panel_percentage_labels_hide_when_metrics_are_unavailable() -> None:
     assert "this._panelGeminiaiCostLabel.hide();" in source
 
 
-def test_panel_labels_render_err_only_for_failed_provider_windows_and_costs() -> None:
+def test_panel_labels_render_err_only_for_failed_percentage_windows() -> None:
     """
-    @brief Verify panel percentage and cost labels map provider/window FAIL status to `Err`.
-    @details Asserts extension source derives provider-window status entries and renders
-    `Err` only for labels mapped to failed provider/window status keys.
+    @brief Verify panel `Err` projection applies only to failed percentage labels.
+    @details Asserts extension source derives provider-window status entries and maps
+    `Err` to failed percentage labels while keeping provider cost labels out of
+    the `Err` projection map.
     @satisfies REQ-021
     """
     source = EXTENSION_PATH.read_text(encoding="utf-8")
@@ -458,14 +459,14 @@ def test_panel_labels_render_err_only_for_failed_provider_windows_and_costs() ->
     assert "const panelStatusFailures = {" in source
     assert "claude5h: isStatusFailure('claude', '5h')" in source
     assert "claude7d: isStatusFailure('claude', '7d')" in source
-    assert "claudeCost: isStatusFailure('claude', '5h') || isStatusFailure('claude', '7d')" in source
-    assert "openrouterCost: isStatusFailure('openrouter', '30d')" in source
+    assert "claudeCost: false" in source
+    assert "openrouterCost: false" in source
     assert "copilot: isStatusFailure('copilot', '30d')" in source
     assert "codex5h: isStatusFailure('codex', '5h')" in source
     assert "codex7d: isStatusFailure('codex', '7d')" in source
-    assert "codexCost: isStatusFailure('codex', '5h') || isStatusFailure('codex', '7d')" in source
-    assert "openaiCost: isStatusFailure('openai', '30d')" in source
-    assert "geminiaiCost: isStatusFailure('geminiai', '30d')" in source
+    assert "codexCost: false" in source
+    assert "openaiCost: false" in source
+    assert "geminiaiCost: false" in source
     assert "if (panelStatusFailures[labelKey] === true) {" in source
     assert "label.set_text('Err');" in source
     assert "label.show();" in source
