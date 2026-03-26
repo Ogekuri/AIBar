@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.17.0](https://github.com/Ogekuri/AIBar/compare/v0.16.0..v0.17.0) - 2026-03-26
+### 🐛  Bug Fixes
+- parse HTTP-date Retry-After for 429 [useReq] *(claude_oauth)*
+  - Normalize Claude Retry-After parsing for numeric and HTTP-date headers.
+  - Add a failing-then-passing reproducer for HTTP-date 429 handling.
+  - Preserve retry_after_seconds for idle-time expansion paths.
+  - Update workflow/runtime documentation and symbol references.
+- prioritize auth-expired payload on HTTP 429 [useReq] *(claude-oauth)*
+  - Classify HTTP 429 Claude responses containing canonical token-expired text as AuthenticationError.
+  - Preserve standard 429 handling for non-auth payloads.
+  - Add reproducer test for 429 auth payload classification.
+  - Update WORKFLOW.md and regenerate REFERENCES.md.
+
+### 🚜  Changes
+- collapse oauth/rate-limit to single Err [useReq] *(gnome-panel)*
+  - Update REQ-021/TST-007 to require one provider-colored bold Err token.
+  - Implement panel failure-category collapse logic for OAuth and rate-limit states.
+  - Hide normal percentage/cost labels while single Err is active.
+  - Add bold err style class and refresh extension panel regression assertions.
+  - Update WORKFLOW model and regenerate REFERENCES.
+- restrict Err to usage percentages [useReq] *(gnome-panel)*
+  - Update REQ-021/TST-007 to map panel Err only to failed percentage labels.
+  - Fix extension panelStatusFailures so cost labels never render Err.
+  - Adjust GNOME extension quota-label regression test to enforce new behavior.
+  - Update WORKFLOW runtime model and regenerate REFERENCES index.
+
+### ◀️  Revert
+- Roll back branch to b4a48147 (b4a48147008a22d49226a630f878fb3e16b1f459).
+
 ## [0.16.0](https://github.com/Ogekuri/AIBar/compare/v0.15.0..v0.16.0) - 2026-03-24
 ### 🐛  Bug Fixes
 - reload Claude token before auth retry [useReq] *(cli)*
@@ -884,6 +913,7 @@
 - \[0.14.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.14.0
 - \[0.15.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.15.0
 - \[0.16.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.16.0
+- \[0.17.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.17.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -901,3 +931,4 @@
 [0.14.0]: https://github.com/Ogekuri/AIBar/compare/v0.13.0..v0.14.0
 [0.15.0]: https://github.com/Ogekuri/AIBar/compare/v0.14.0..v0.15.0
 [0.16.0]: https://github.com/Ogekuri/AIBar/compare/v0.15.0..v0.16.0
+[0.17.0]: https://github.com/Ogekuri/AIBar/compare/v0.16.0..v0.17.0
