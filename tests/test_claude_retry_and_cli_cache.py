@@ -14,8 +14,10 @@ import asyncio
 from unittest.mock import AsyncMock, patch
 
 import httpx
+import pytest
 
 from aibar.providers.base import (
+    AuthenticationError,
     ProviderName,
     ProviderResult,
     UsageMetrics,
@@ -123,6 +125,26 @@ class TestClaudeRetryOn429:
         assert result.is_error
         assert result.error is not None
         assert "Rate limited" in result.error
+
+    def test_429_auth_payload_raises_authentication_error(self) -> None:
+        """
+        @brief Verify Claude 429 payload with auth-expired message raises AuthenticationError.
+        @details Builds a deterministic HTTP 429 response containing canonical OAuth token
+        expiration text and asserts auth classification takes precedence over rate-limit
+        classification to enable caller-side renewal/retry flow.
+        @return {None} Function return value.
+        @satisfies REQ-102
+        """
+        provider = ClaudeOAuthProvider(token="sk-ant-test-token")
+        response = httpx.Response(
+            status_code=429,
+            headers={"retry-after": "0"},
+            json={"error": {"message": "Invalid or expired OAuth token"}},
+            request=httpx.Request("GET", "https://api.anthropic.com/api/oauth/usage"),
+        )
+
+        with pytest.raises(AuthenticationError, match="Invalid or expired OAuth token"):
+            provider._handle_response(response, WindowPeriod.DAY_7)
 
 
 class TestFetchAllWindows:

@@ -164,7 +164,7 @@
                   - `_subprocess_return_code_from_exception(...)`: normalize subprocess exception classes to deterministic return codes [`src/aibar/aibar/cli.py`]
                 - `_update_claude_refresh_block_state(...)`: persist Claude refresh-block boolean in idle-time state map [`src/aibar/aibar/cli.py`]
               - `_apply_api_call_delay(...)`: inter-call throttling gate [`src/aibar/aibar/cli.py`]
-              - `ClaudeOAuthProvider.fetch_all_windows(...)`: dual-window provider call with `get_api_call_timeout_seconds` for HTTP timeout and `resolve_currency_symbol` for `currency_symbol` on each result [`src/aibar/aibar/providers/claude_oauth.py`]
+              - `ClaudeOAuthProvider.fetch_all_windows(...)`: dual-window provider call with `get_api_call_timeout_seconds` for HTTP timeout and `resolve_currency_symbol` for `currency_symbol` on each result; authentication classification in `ClaudeOAuthProvider._handle_response(...)` prioritizes canonical token-expired payload detection on HTTP 429 before rate-limit mapping [`src/aibar/aibar/providers/claude_oauth.py`]
                 - `get_api_call_timeout_seconds(...)`: resolve HTTP timeout from `RuntimeConfig.api_call_timeout_milliseconds` [`src/aibar/aibar/config.py`]
                 - `resolve_currency_symbol(...)`: resolve ISO code or symbol from API raw → configured default → `"$"` [`src/aibar/aibar/config.py`]
             - `_apply_api_call_delay(...)`: inter-call throttling gate [`src/aibar/aibar/cli.py`]

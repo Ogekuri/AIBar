@@ -2324,7 +2324,7 @@ from pydantic import BaseModel, Field
 
 ---
 
-# claude_oauth.py | Python | 344L | 15 symbols | 12 imports | 18 comments
+# claude_oauth.py | Python | 347L | 15 symbols | 12 imports | 18 comments
 > Path: `src/aibar/aibar/providers/claude_oauth.py`
 - @brief Claude OAuth usage provider.
 - @details Fetches Claude subscription utilization through OAuth credentials and normalizes provider quota state into the shared result contract.
@@ -2397,7 +2397,7 @@ from datetime import timezone
 
 ### fn `def _handle_response(` `priv` (L225-226)
 
-### fn `def _parse_response(self, data: dict, window: WindowPeriod) -> ProviderResult` `priv` (L278-344)
+### fn `def _parse_response(self, data: dict, window: WindowPeriod) -> ProviderResult` `priv` (L281-347)
 - @brief Map HTTP error status codes to ProviderResult error payloads.
 - @brief Normalize a raw Claude API payload dict into a ProviderResult for the given window.
 - @details Returns None on HTTP 200 (success), otherwise returns an error
@@ -2429,7 +2429,7 @@ ProviderResult for the given window. Raises AuthenticationError on 401.
 |`fetch`|fn|pub|127-168|async def fetch(self, window: WindowPeriod = WindowPeriod...|
 |`fetch_all_windows`|fn|pub|169-170|async def fetch_all_windows(|
 |`_handle_response`|fn|priv|225-226|def _handle_response(|
-|`_parse_response`|fn|priv|278-344|def _parse_response(self, data: dict, window: WindowPerio...|
+|`_parse_response`|fn|priv|281-347|def _parse_response(self, data: dict, window: WindowPerio...|
 
 
 ---
