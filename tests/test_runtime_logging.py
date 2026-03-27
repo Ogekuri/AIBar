@@ -550,3 +550,61 @@ def test_claude_dual_window_failures_log_retry_after_and_unavailable_evidence(
     )
     assert "retry_after_unavailable=true" in log_text
     assert "retry_after_source=probe_exhausted" in log_text
+
+
+def test_show_lock_timeout_logs_and_exits_with_explicit_error(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """
+    @brief Verify `show` logs lock timeout and exits non-zero with explicit diagnostic.
+    @details Enables runtime logging, forces lock-file acquisition timeout for
+    `cache.json`, executes `show --json`, and asserts stderr includes timeout
+    diagnostic while runtime log contains `lock.acquire.timeout` row.
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @param tmp_path {Path} Temporary path fixture.
+    @return {None} Function return value.
+    @satisfies REQ-066
+    @satisfies REQ-112
+    @satisfies TST-051
+    """
+    _, cache_dir = _patch_paths(monkeypatch, tmp_path)
+    config_module.save_runtime_config(
+        RuntimeConfig(log_enabled=True, debug_enabled=False)
+    )
+    monkeypatch.setattr(cli_module, "_run_startup_update_preflight", lambda: None)
+    real_os_open = config_module.os.open
+
+    def _always_locked_os_open(path, flags, mode=0o777):
+        """
+        @brief Raise FileExistsError for lock-file acquisition open operations.
+        @details Simulates persistent lock contention while preserving default
+        os.open behavior for non-lock paths and non-exclusive create operations.
+        @param path {Any} Path argument received by `os.open`.
+        @param flags {int} Open flags bitmask.
+        @param mode {int} POSIX mode value for file creation.
+        @return {int} File descriptor for delegated non-lock operations.
+        @throws {FileExistsError} Always for lock-file `O_CREAT|O_EXCL|O_WRONLY`.
+        """
+        path_str = str(path)
+        lock_acquire_flags = (
+            config_module.os.O_CREAT | config_module.os.O_EXCL | config_module.os.O_WRONLY
+        )
+        if path_str.endswith(".lock") and flags == lock_acquire_flags:
+            raise FileExistsError(path_str)
+        return real_os_open(path, flags, mode)
+
+    monkeypatch.setattr(config_module.os, "open", _always_locked_os_open)
+    monkeypatch.setattr(config_module.time, "sleep", lambda _: None)
+    monotonic_values = iter([0.0, 5.1])
+    monkeypatch.setattr(config_module.time, "monotonic", lambda: next(monotonic_values))
+
+    runner = CliRunner()
+    result = runner.invoke(cli_module.main, ["show", "--json"])
+
+    assert result.exit_code == 1
+    assert "Lock acquisition timeout after 5 seconds" in result.output
+    assert "~/.cache/aibar/" in result.output
+    assert ".lock" in result.output
+    log_text = _read_log(cache_dir)
+    assert "lock.acquire.timeout target=~/.cache/aibar/" in log_text

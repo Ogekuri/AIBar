@@ -107,6 +107,39 @@ def test_load_idle_time_waits_for_lock_release_with_250ms_poll(
     assert state["openrouter"].idle_until_timestamp == 2
 
 
+def test_save_cli_cache_raises_timeout_after_5s_when_lock_stays_blocked(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """
+    @brief Verify cache write raises lock-timeout error after 5s blocked wait.
+    @details Keeps `cache.json.lock` present and simulates monotonic clock
+    progression to exceed timeout without releasing lock, then asserts
+    `LockAcquisitionTimeoutError` includes deterministic timeout diagnostics.
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @param tmp_path {Path} Temporary path fixture.
+    @return {None} Function return value.
+    @satisfies REQ-066
+    @satisfies TST-051
+    """
+    _patch_config_paths(monkeypatch, tmp_path)
+    lock_path = config_module.APP_CACHE_DIR / "cache.json.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path.write_text("locked", encoding="utf-8")
+
+    monotonic_values = iter([0.0, 5.1])
+    monkeypatch.setattr(config_module.time, "monotonic", lambda: next(monotonic_values))
+    monkeypatch.setattr(config_module.time, "sleep", lambda _: None)
+
+    try:
+        config_module.save_cli_cache({"payload": {}, "status": {}})
+        raise AssertionError("Expected lock timeout error.")
+    except config_module.LockAcquisitionTimeoutError as exc:
+        message = str(exc)
+        assert "Lock acquisition timeout after 5 seconds" in message
+        assert "~/.cache/aibar/cache.json" in message
+
+
 def test_retrieve_pipeline_avoids_redundant_cache_reload_after_refresh(monkeypatch) -> None:
     """
     @brief Verify retrieval pipeline loads cache only once per non-idle refresh run.

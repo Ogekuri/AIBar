@@ -37,6 +37,7 @@ DEFAULT_DEBUG_ENABLED = False
 LOG_TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S"
 VALID_CURRENCY_SYMBOLS: tuple[str, ...] = ("$", "£", "€")
 LOCK_POLL_INTERVAL_SECONDS = 0.25
+LOCK_ACQUIRE_TIMEOUT_SECONDS = 5.0
 
 _CURRENCY_CODE_TO_SYMBOL: dict[str, str] = {
     "USD": "$",
@@ -107,6 +108,17 @@ class IdleTimeState(BaseModel):
     idle_until_timestamp: int
     idle_until_human: str
     oauth_refresh_blocked: bool = False
+
+
+class LockAcquisitionTimeoutError(RuntimeError):
+    """
+    @brief Define lock-acquisition timeout error for cache-file synchronization.
+    @details Raised when lock-file acquisition for `cache.json` or `idle-time.json`
+    remains blocked beyond the configured timeout window.
+    @satisfies REQ-066
+    """
+
+    pass
 
 
 def _ensure_app_config_dir() -> None:
@@ -220,13 +232,18 @@ def _blocking_file_lock(target_path: Path):
     @brief Acquire and release blocking lock-file for cache artifact I/O.
     @details Uses atomic `O_CREAT|O_EXCL` lock-file creation. When lock-file
     already exists, polls every `250ms` until lock release, then acquires lock.
-    Always removes owned lock-file during exit.
+    Raises timeout error after `5s` blocked wait and appends timeout diagnostics
+    to runtime log when logging is enabled. Always removes owned lock-file
+    during exit.
     @param target_path {Path} Cache artifact path protected by this lock.
     @return {Iterator[None]} Context manager yielding while lock is held.
+    @throws {LockAcquisitionTimeoutError} When lock remains blocked beyond timeout.
     @satisfies REQ-066
+    @satisfies REQ-112
     """
     _ensure_app_cache_dir()
     lock_path = _lock_file_path(target_path)
+    wait_started_at = time.monotonic()
     while True:
         try:
             lock_fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
@@ -234,6 +251,21 @@ def _blocking_file_lock(target_path: Path):
                 lock_file.write(f"{os.getpid()}\n")
             break
         except FileExistsError:
+            elapsed_seconds = time.monotonic() - wait_started_at
+            if elapsed_seconds >= LOCK_ACQUIRE_TIMEOUT_SECONDS:
+                target_display = f"~/.cache/aibar/{target_path.name}"
+                lock_display = f"~/.cache/aibar/{lock_path.name}"
+                append_runtime_log_line(
+                    "lock.acquire.timeout "
+                    f"target={target_display} lock={lock_display} "
+                    f"waited_seconds={elapsed_seconds:.3f} "
+                    f"timeout_seconds={LOCK_ACQUIRE_TIMEOUT_SECONDS:.3f}"
+                )
+                raise LockAcquisitionTimeoutError(
+                    "Lock acquisition timeout after "
+                    f"{LOCK_ACQUIRE_TIMEOUT_SECONDS:.0f} seconds for {target_display} "
+                    f"(lock file: {lock_display})."
+                )
             time.sleep(LOCK_POLL_INTERVAL_SECONDS)
     try:
         yield

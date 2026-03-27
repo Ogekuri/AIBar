@@ -31,6 +31,7 @@ from . import __version__
 from aibar.claude_cli_auth import extract_claude_cli_token
 from aibar.config import (
     IdleTimeState,
+    LockAcquisitionTimeoutError,
     RuntimeConfig,
     append_runtime_log_line,
     append_runtime_log_separator,
@@ -3031,12 +3032,16 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
             )
             sys.exit(1)
 
-    retrieval = retrieve_results_via_cache_pipeline(
-        provider_filter=provider_filter,
-        target_window=window_period,
-        force_refresh=force_refresh,
-        providers=providers,
-    )
+    try:
+        retrieval = retrieve_results_via_cache_pipeline(
+            provider_filter=provider_filter,
+            target_window=window_period,
+            force_refresh=force_refresh,
+            providers=providers,
+        )
+    except LockAcquisitionTimeoutError as exc:
+        click.echo(str(exc), err=True)
+        sys.exit(1)
     runtime_cfg = load_runtime_config()
     if retrieval.idle_active and not retrieval.cache_available:
         if output_json:
