@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.24.0](https://github.com/Ogekuri/AIBar/compare/v0.23.0..v0.24.0) - 2026-03-27
+### 🚜  Changes
+- log raw API error JSON in debug rows [useReq] *(cli-logging)*
+  - Update REQ-114/REQ-115 and TST-049 for debug raw error payload logging.
+  - Add CLI debug logging helper to emit provider.fetch.debug.error_json
+  - only for failed calls with JSON raw.body, preserving payload text unchanged.
+  - Add runtime logging regression test for debug-off/on gating and exact payload.
+  - Update WORKFLOW and regenerate REFERENCES for traceability.
+
 ## [0.23.0](https://github.com/Ogekuri/AIBar/compare/v0.22.0..v0.23.0) - 2026-03-27
 ### 🐛  Bug Fixes
 - include refresh error reason [useReq] *(geminiai)*
@@ -975,6 +984,7 @@
 - \[0.21.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.21.0
 - \[0.22.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.22.0
 - \[0.23.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.23.0
+- \[0.24.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.24.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -999,3 +1009,4 @@
 [0.21.0]: https://github.com/Ogekuri/AIBar/compare/v0.20.0..v0.21.0
 [0.22.0]: https://github.com/Ogekuri/AIBar/compare/v0.21.0..v0.22.0
 [0.23.0]: https://github.com/Ogekuri/AIBar/compare/v0.22.0..v0.23.0
+[0.24.0]: https://github.com/Ogekuri/AIBar/compare/v0.23.0..v0.24.0
