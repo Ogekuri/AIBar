@@ -159,7 +159,7 @@
               - `_retry_after_probe_payload(...)`: compact evidence serializer for retry-after extraction failures in runtime logs [`src/aibar/aibar/cli.py`]
               - `_classify_provider_failure_log_category(...)`: classify provider failures for runtime log categories using OAuth error markers and HTTP 429 status [`src/aibar/aibar/cli.py`]
             - `_fetch_claude_dual_with_auth_recovery(...)`: Claude dual-window fetch with auth-expired recovery policy, one renewal attempt, and retry-block lifecycle persistence [`src/aibar/aibar/cli.py`]
-              - `_fetch_claude_dual(...)`: Claude single-call dual-window fetch with runtime API logging and debug-result logging for both windows [`src/aibar/aibar/cli.py`]
+              - `_fetch_claude_dual(...)`: Claude single-call dual-window fetch with runtime API logging and debug-result logging for both windows; synthesized ProviderError/Unexpected-error dual results include `retry_after_unavailable=true` metadata so idle-time fallback delay policy is applied on Claude OAuth/rate-limit failure paths without retry-after payloads [`src/aibar/aibar/cli.py`]
               - `_is_claude_authentication_error_result(...)`: classify Claude auth-expired failures using canonical token-expired error text [`src/aibar/aibar/cli.py`]
               - `_is_claude_refresh_block_active(...)`: evaluate refresh-block TTL against last-success timestamp [`src/aibar/aibar/cli.py`]
               - `_handle_claude_oauth_refresh_on_auth_error(...)`: execute in-process token renewal, reload Claude token from environment/CLI credential source, and execute one dual-window retry [`src/aibar/aibar/cli.py`]

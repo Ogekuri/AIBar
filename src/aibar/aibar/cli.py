@@ -2302,7 +2302,14 @@ def _fetch_claude_dual(
             f"provider.fetch.error provider=claude window=5h,7d error={exc}"
         )
         fetched = {
-            w: provider._make_error_result(window=w, error=str(exc)) for w in windows
+            w: provider._make_error_result(
+                window=w,
+                error=str(exc),
+                raw={
+                    "retry_after_unavailable": True,
+                },
+            )
+            for w in windows
         }
     except Exception as exc:
         append_runtime_log_line(
@@ -2310,7 +2317,13 @@ def _fetch_claude_dual(
             f"provider=claude window=5h,7d error=Unexpected error: {exc}"
         )
         fetched = {
-            w: provider._make_error_result(window=w, error=f"Unexpected error: {exc}")
+            w: provider._make_error_result(
+                window=w,
+                error=f"Unexpected error: {exc}",
+                raw={
+                    "retry_after_unavailable": True,
+                },
+            )
             for w in windows
         }
 
