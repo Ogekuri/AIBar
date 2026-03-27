@@ -59,3 +59,18 @@ def test_references_symbol_rows_have_line_ranges() -> None:
             invalid_rows.append(row)
 
     assert not invalid_rows, f"Invalid symbol line ranges in docs/REFERENCES.md: {invalid_rows}"
+
+
+def test_requirements_define_satisfies_as_optional_for_audit_pass_fail() -> None:
+    """
+    @brief Verify requirements text treats @satisfies as optional metadata.
+    """
+    requirements_path = PROJECT_ROOT / "docs" / "REQUIREMENTS.md"
+    requirements_text = requirements_path.read_text(encoding="utf-8")
+
+    required_clauses = (
+        "MUST NOT be mandatory for requirement audit pass/fail.",
+        "confirms req-check audit does not fail solely for missing `@satisfies` tags.",
+    )
+    for clause in required_clauses:
+        assert clause in requirements_text, f"Missing requirement policy clause: {clause}"
