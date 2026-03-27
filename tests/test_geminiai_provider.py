@@ -15,12 +15,14 @@ and Monitoring time-series aggregation behavior.
 """
 
 import asyncio
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
 
 import pytest
 from google.api_core.exceptions import Forbidden
+from google.auth.exceptions import RefreshError
 from google.cloud import bigquery  # pyright: ignore[reportAttributeAccessIssue]
 from google.oauth2.credentials import Credentials
 from googleapiclient.errors import HttpError
@@ -478,6 +480,56 @@ def test_geminiai_oauth_scopes_include_monitoring_bigquery_and_cloud_platform() 
         "https://www.googleapis.com/auth/monitoring.read",
         "https://www.googleapis.com/auth/cloud-platform",
     )
+
+
+def test_geminiai_load_credentials_refresh_error_surfaces_google_reason(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """
+    @brief Verify GeminiAI refresh failures include Google error reason detail.
+    @details Creates refresh-capable authorized-user token JSON, forces
+    `google.oauth2.credentials.Credentials.refresh(...)` to raise a structured
+    `RefreshError`, and asserts raised `AuthenticationError` includes both
+    canonical remediation text and the upstream Google error reason payload.
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @param tmp_path {Path} Temporary directory fixture.
+    @return {None} Function return value.
+    @satisfies REQ-056
+    @satisfies REQ-060
+    """
+    token_path = tmp_path / "geminiai_oauth_token.json"
+    client_path = tmp_path / "geminiai_oauth_client.json"
+    token_path.write_text(
+        json.dumps(
+            {
+                "token": "ya29.expired-token",
+                "refresh_token": "1//refresh-token",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "client_id": "client-id.apps.googleusercontent.com",
+                "client_secret": "secret",
+                "scopes": list(GEMINIAI_OAUTH_SCOPES),
+                "expiry": "2000-01-01T00:00:00Z",
+            }
+        ),
+        encoding="utf-8",
+    )
+    store = GeminiAICredentialStore(client_config_path=client_path, token_path=token_path)
+
+    def _raise_refresh_error(self, request):  # pylint: disable=unused-argument
+        raise RefreshError(
+            "invalid_grant",
+            response={"error": "invalid_grant", "error_description": "Token has been expired or revoked."},
+        )
+
+    monkeypatch.setattr(Credentials, "refresh", _raise_refresh_error)
+
+    with pytest.raises(AuthenticationError) as exc_info:
+        store.load_credentials(scopes=GEMINIAI_OAUTH_SCOPES)
+
+    message = str(exc_info.value)
+    assert "GeminiAI OAuth token refresh failed." in message
+    assert "invalid_grant" in message
 
 
 def test_geminiai_billing_query_uses_latest_invoice_month_with_fallback() -> None:

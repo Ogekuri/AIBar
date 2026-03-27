@@ -188,7 +188,7 @@
               - `get_api_call_timeout_seconds(...)`: resolve HTTP timeout from `RuntimeConfig.api_call_timeout_milliseconds` [`src/aibar/aibar/config.py`]
               - `resolve_currency_symbol(...)`: resolve ISO code or symbol from API raw → configured default → `"$"` [`src/aibar/aibar/config.py`]
             - `GeminiAIProvider.fetch(...)`: GeminiAI usage retrieval from Cloud Monitoring plus latest-available billing-period cost retrieval from BigQuery [`src/aibar/aibar/providers/geminiai.py`]
-              - `GeminiAIProvider._fetch_sync(...)`: blocking Monitoring + BigQuery retrieval with explicit auth/rate-limit error normalization [`src/aibar/aibar/providers/geminiai.py`]
+              - `GeminiAIProvider._fetch_sync(...)`: blocking Monitoring + BigQuery retrieval with explicit auth/rate-limit error normalization; refresh-token failures preserve Google refresh diagnostics (`response.error`, `response.error_description`) in AuthenticationError text for operator triage [`src/aibar/aibar/providers/geminiai.py`]
                 - `GeminiAIProvider._build_window_range(...)`: Monitoring interval resolver enforcing current UTC month bounds (`month-start -> now`) [`src/aibar/aibar/providers/geminiai.py`]
                 - `GeminiAIProvider._build_bigquery_client(...)`: BigQuery client construction from OAuth credentials [`src/aibar/aibar/providers/geminiai.py`]
                 - `GeminiAIProvider._resolve_billing_dataset(...)`: runtime-config dataset resolver with fallback `billing_data` [`src/aibar/aibar/providers/geminiai.py`]

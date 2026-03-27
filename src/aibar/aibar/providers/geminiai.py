@@ -167,6 +167,33 @@ def _is_scope_insufficient_error(error: Exception) -> bool:
     return False
 
 
+def _summarize_google_refresh_error(error: RefreshError) -> str:
+    """
+    @brief Build compact diagnostic string from Google OAuth refresh failure payload.
+    @details Extracts structured `response.error` and `response.error_description`
+    fields when available, then appends fallback exception message to preserve
+    actionable provider diagnostics for operators.
+    @param error {RefreshError} OAuth refresh exception emitted by google-auth.
+    @return {str} Stable diagnostic summary for user-facing authentication errors.
+    """
+    details: list[str] = []
+    response = getattr(error, "response", None)
+    if isinstance(response, dict):
+        error_code = response.get("error")
+        if isinstance(error_code, str) and error_code.strip():
+            details.append(error_code.strip())
+        error_description = response.get("error_description")
+        if isinstance(error_description, str) and error_description.strip():
+            details.append(error_description.strip())
+    fallback_message = str(error).strip()
+    if fallback_message:
+        details.append(fallback_message)
+    if not details:
+        return "unknown_refresh_error"
+    ordered_unique_details = list(dict.fromkeys(details))
+    return "; ".join(ordered_unique_details)
+
+
 @dataclass(frozen=True)
 class GeminiAIWindowRange:
     """
@@ -372,8 +399,11 @@ class GeminiAICredentialStore:
             try:
                 credentials.refresh(Request())
             except RefreshError as exc:
+                refresh_reason = _summarize_google_refresh_error(exc)
                 raise AuthenticationError(
-                    "GeminiAI OAuth token refresh failed. Run 'aibar setup' to re-authorize."
+                    "GeminiAI OAuth token refresh failed. "
+                    f"reason={refresh_reason}. "
+                    "Run 'aibar setup' to re-authorize."
                 ) from exc
             self.save_authorized_credentials(credentials)
             return credentials
