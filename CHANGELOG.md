@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.22.0](https://github.com/Ogekuri/AIBar/compare/v0.21.0..v0.22.0) - 2026-03-27
+### 🐛  Bug Fixes
+- normalize Claude retry fallback [useReq] *(cli)*
+  - normalize Claude error results without parseable Retry-After\n- add OAuth scope-error reproducer for default fallback idle-time\n- update WORKFLOW and REFERENCES runtime docs
+- honor fallback retry-after for claude auth errors [useReq] *(cli)*
+  - Add fail-first reproducer for Claude OAuth error idle-time scheduling.
+  - Mark synthesized Claude dual-fetch error payloads with retry_after_unavailable=true.
+  - Preserve existing REQ-041 behavior by applying configured default_retry_after_seconds.
+  - Update WORKFLOW and regenerate REFERENCES for traceability.
+
 ## [0.21.0](https://github.com/Ogekuri/AIBar/compare/v0.20.0..v0.21.0) - 2026-03-27
 ### 🐛  Bug Fixes
 - log claude dual-window retry-after evidence [useReq] *(cli)*
@@ -954,6 +964,7 @@
 - \[0.19.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.19.0
 - \[0.20.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.20.0
 - \[0.21.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.21.0
+- \[0.22.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.22.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -976,3 +987,4 @@
 [0.19.0]: https://github.com/Ogekuri/AIBar/compare/v0.18.0..v0.19.0
 [0.20.0]: https://github.com/Ogekuri/AIBar/compare/v0.19.0..v0.20.0
 [0.21.0]: https://github.com/Ogekuri/AIBar/compare/v0.20.0..v0.21.0
+[0.22.0]: https://github.com/Ogekuri/AIBar/compare/v0.21.0..v0.22.0
