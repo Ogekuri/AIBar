@@ -378,3 +378,55 @@ def test_version_and_ver_print_installed_version_without_dispatch() -> None:
     assert short_version_result.output.strip() == __version__
     assert bypass_result.exit_code == 0
     assert bypass_result.output.strip() == __version__
+
+
+def test_version_flags_force_startup_online_check_bypassing_idle_gate(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """
+    @brief Verify version flags force online startup check bypassing idle-time gate.
+    @details Persists startup idle-state with future `idle_until`, invokes
+    `--version` and `--ver`, and asserts startup release fetch executes once per
+    invocation despite active idle gate.
+    @param monkeypatch {pytest.MonkeyPatch} Pytest monkeypatch fixture.
+    @param tmp_path {Path} Temporary filesystem root for HOME isolation.
+    @return {None} Function return value.
+    @satisfies TST-032
+    @satisfies TST-036
+    """
+    fetch_calls: list[str] = []
+    monkeypatch.setenv("HOME", str(tmp_path))
+    now_epoch = int(time.time())
+
+    def _fake_fetch() -> cli_module.StartupReleaseCheckResponse:
+        """
+        @brief Record startup fetch invocation and return deterministic success payload.
+        @return {StartupReleaseCheckResponse} Mock success response.
+        """
+        fetch_calls.append("called")
+        return cli_module.StartupReleaseCheckResponse(
+            latest_version=__version__,
+            status_code=200,
+            error_message=None,
+            retry_after_seconds=0,
+        )
+
+    monkeypatch.setattr(cli_module, "_fetch_startup_latest_release", _fake_fetch)
+    monkeypatch.setattr(
+        cli_module,
+        "_run_startup_update_preflight",
+        _REAL_STARTUP_PREFLIGHT,
+    )
+
+    cli_module._save_startup_idle_state(
+        last_success_epoch=now_epoch,
+        idle_until_epoch=now_epoch + 3600,
+    )
+    runner = CliRunner()
+    version_result = runner.invoke(main, ["--version"])
+    short_version_result = runner.invoke(main, ["--ver"])
+
+    assert version_result.exit_code == 0
+    assert short_version_result.exit_code == 0
+    assert fetch_calls == ["called", "called"]

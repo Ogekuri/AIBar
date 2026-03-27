@@ -211,7 +211,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-068**: Bare `aibar` and `aibar --help` MUST print human-readable usage text listing all commands and global or command-specific options, including `show --force`, `show --json`, `gnome-install`, `gnome-uninstall`, `--version`/`--ver`, `--upgrade`, `--uninstall`, `--enable-log`/`--disable-log`, and `--enable-debug`/`--disable-debug` examples, without Doxygen tags.
 - **REQ-069**: GNOME panel icon MUST be bright white when all percentages are <= 25, bright yellow when any percentage > 25, bright orange when any percentage > 50, bright red when any percentage > 75, and blinking bright-red/dim-red when any percentage > 90.
 - **REQ-070**: MUST execute startup update-check preflight before CLI argument validation and command dispatch.
-- **REQ-071**: MUST skip startup update HTTP calls while current epoch is lower than persisted `idle_until` in `~/.cache/aibar/check_version_idle-time.json`.
+- **REQ-071**: MUST skip startup update HTTP calls while current epoch is lower than persisted `idle_until` in `~/.cache/aibar/check_version_idle-time.json`, except when invocation includes `--version` or `--ver`.
 - **REQ-072**: MUST create missing `~/.cache/aibar/` and create or overwrite `check_version_idle-time.json` after successful startup update checks with epoch and human-readable `last_success_at=now` and `idle_until=now+300`.
 - **REQ-073**: MUST print a bright-green message containing installed version and latest available version when the latest GitHub release is newer.
 - **REQ-074**: MUST print bright-red error diagnostics when startup update checks fail, including HTTP status details such as `403`.
@@ -220,7 +220,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-077**: MUST execute `uv tool uninstall aibar` only on Linux when `--uninstall` is provided, MUST propagate subprocess exit status, and MUST delete `~/.cache/aibar/check_version_idle-time.json` and `~/.cache/aibar/`.
 - **REQ-088**: MUST NOT execute lifecycle `uv tool` subprocess commands for `--upgrade` or `--uninstall` on non-Linux operating systems.
 - **REQ-089**: MUST print explicit manual command guidance for the current non-Linux operating system when `--upgrade` or `--uninstall` is provided.
-- **REQ-078**: MUST print installed program version and exit when `--version` or `--ver` is provided.
+- **REQ-078**: MUST print installed program version and exit when `--version` or `--ver` is provided, and MUST force one online startup release check ignoring `check_version_idle-time.json` content.
 - **REQ-079**: MUST include runtime files required by startup update-check behavior in `pyproject.toml` package configuration used by `.github/workflows/release-uvx+extension.yml`.
 - **REQ-080**: MUST disable the extension via `gnome-extensions disable aibar@aibar.panel` before removing files in `gnome-uninstall` with colored status output.
 - **REQ-081**: MUST remove the extension directory `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/` and all its contents in `gnome-uninstall`.
@@ -271,7 +271,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-029**: MUST verify GNOME extension renders GeminiAI provider tab/card with bright-purple style class assignment, provider title `GEMINIAI`, provider ordering as the last tab/card after `openai`, and GeminiAI cost/error status propagation from cache payload.
 - **TST-030**: MUST verify CLI `show` renders panels ordered `claude`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, keeps one shared panel width, never renders `Window 5h:/7d:/30d:` headings, and renders `Status` then right-aligned `Updated/Next` for both `OK` and `FAIL` states.
 - **TST-031**: MUST verify startup update preflight executes before invalid-argument diagnostics and before subcommand handlers run.
-- **TST-032**: MUST verify startup update idle-time gating skips HTTP calls until `idle_until` expires and resumes checks when the idle-state file is missing or expired.
+- **TST-032**: MUST verify startup update idle-time gating skips HTTP calls until `idle_until` expires and resumes checks when the idle-state file is missing or expired, except for invocations containing `--version` or `--ver`.
 - **TST-033**: MUST verify successful startup update checks create `~/.cache/aibar/` when missing and write `check_version_idle-time.json` with epoch and human-readable `last_success_at` and `idle_until`.
 - **TST-034**: MUST verify repeated startup update HTTP `429` responses compute idle-time using `max(300, max(retry-after values))`.
 - **TST-035**: MUST verify Linux `--upgrade` and `--uninstall` invoke required `uv tool` subprocess commands, propagate subprocess exit codes, and during `--uninstall` delete `~/.cache/aibar/check_version_idle-time.json` and `~/.cache/aibar/`.
@@ -285,7 +285,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-049**: MUST verify API-call debug logging writes API metadata and debug response summaries only when `log_enabled=true` and `debug_enabled=true`, includes unmodified full JSON `raw` payload on failed calls, and omits debug rows otherwise.
 - **TST-050**: MUST verify runtime logging records provider `FAIL` categories `oauth` and `rate_limit` when `log_enabled=true`, and logs `retry_after_seconds` for each category when that value exists.
 - **TST-051**: MUST verify lock acquisition timeout after 5 seconds raises explicit lock-file error for cache/idle operations, and `show` exits non-zero with the same diagnostic while runtime log records timeout when `log_enabled=true`.
-- **TST-036**: MUST verify `--version` and `--ver` print installed version and bypass subcommand execution.
+- **TST-036**: MUST verify `--version` and `--ver` print installed version, bypass subcommand execution, and force one online startup release check even when `check_version_idle-time.json` contains future `idle_until`.
 - **TST-038**: MUST verify CLI text `show` renders `FAIL` blocks as `Status: FAIL`, blank line, `Reason: <reason>`, blank line, and right-aligned `Updated/Next`, never renders `Window 5h:/7d:/30d:` headings, and preserves `show --json` freshness, API-counter, cost, and GeminiAI effective-window behaviors.
 - **TST-042**: MUST verify CLI `show` and GNOME provider cards render equivalent failed-provider blocks formatted as `Status: FAIL`, blank line, `Reason: <reason>`, blank line, and `Updated/Next`, without `Window 5h:/7d:/30d:` headings.
 - **TST-039**: MUST verify `scripts/aibar.sh` invokes `uv run python -m aibar.cli`, forwards CLI arguments, and contains no virtualenv creation/activation or `pip install -r requirements.txt` commands.
@@ -421,3 +421,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-095 | `src/aibar/aibar/config.py` + `RuntimeConfig.api_call_timeout_milliseconds` default `5000`; providers use `httpx.AsyncClient(timeout=api_call_timeout_milliseconds/1000.0)`. |
 | REQ-096 | `src/aibar/aibar/config.py` + `DEFAULT_API_CALL_DELAY_MILLISECONDS = 100`. |
 | TST-051 | `tests/test_cache_locking_and_io_minimization.py` + timeout assertions for lock acquisition failure diagnostics, runtime-log timeout row emission, and CLI `show` non-zero exit with explicit lock-timeout message. |
+| REQ-071 | `src/aibar/aibar/cli.py` + `StartupPreflightGroup.main` + `_startup_force_ignore_idle_from_args` + `_STARTUP_FORCE_IGNORE_IDLE_UNTIL_ACTIVE` + `_run_startup_update_preflight()` bypasses idle-state gate for `--version`/`--ver`, while keeping idle gating for other invocations. |
+| REQ-078 | `src/aibar/aibar/cli.py` + `_handle_version_option` prints installed version and exits; `StartupPreflightGroup.main` forces one online startup release check for `--version`/`--ver` even with future `check_version_idle-time.json` `idle_until`. |
+| TST-032 | `tests/test_cli_startup_update_preflight.py` + idle-gating test for normal invocations plus `test_version_flags_force_startup_online_check_bypassing_idle_gate` asserting `--version`/`--ver` ignore startup idle-time gate. |
+| TST-036 | `tests/test_cli_startup_update_preflight.py` + `test_version_and_ver_print_installed_version_without_dispatch` and version-idle-bypass test verify version output/dispatch bypass plus forced online startup check behavior. |

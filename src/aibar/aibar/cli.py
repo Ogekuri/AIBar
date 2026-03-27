@@ -118,6 +118,7 @@ _STARTUP_UPDATE_PROGRAM = "aibar"
 _STARTUP_UPDATE_URL = "https://api.github.com/repos/Ogekuri/AIBar/releases/latest"
 _STARTUP_IDLE_DELAY_SECONDS = 300
 _STARTUP_HTTP_TIMEOUT_SECONDS = 2
+_STARTUP_FORCE_IGNORE_IDLE_UNTIL_ACTIVE = False
 _STARTUP_IDLE_STATE_LAST_SUCCESS_EPOCH_KEY = "last_success_at_epoch"
 _STARTUP_IDLE_STATE_LAST_SUCCESS_HUMAN_KEY = "last_success_at_human"
 _STARTUP_IDLE_STATE_IDLE_UNTIL_EPOCH_KEY = "idle_until_epoch"
@@ -492,7 +493,7 @@ def _is_newer_release(installed_version: str, latest_version: str) -> bool:
 
 def _run_startup_update_preflight() -> None:
     """
-    @brief Execute startup update-check preflight with idle-time gating.
+    @brief Execute startup update-check preflight with optional idle-time bypass.
     @details Evaluates startup idle-state file; skips HTTP calls while idle is
     active; performs latest-release fetch when idle expires or file is missing;
     prints bright-green update notice for newer releases; prints bright-red error
@@ -516,7 +517,7 @@ def _run_startup_update_preflight() -> None:
         f"now_epoch={now_epoch} idle_until_epoch={idle_until_epoch} "
         f"last_success_epoch={last_success_epoch}"
     )
-    if now_epoch < idle_until_epoch:
+    if now_epoch < idle_until_epoch and not _STARTUP_FORCE_IGNORE_IDLE_UNTIL_ACTIVE:
         append_runtime_log_line("idle.startup.skip reason=idle_active")
         return
 
@@ -572,6 +573,26 @@ def _run_startup_update_preflight() -> None:
             color_code=_ANSI_BRIGHT_RED,
             err=True,
         )
+
+
+def _startup_force_ignore_idle_from_args(args: Sequence[str] | None) -> bool:
+    """
+    @brief Detect whether startup preflight must bypass idle gating from argv.
+    @details Returns true when invocation arguments contain `--version` or
+    `--ver`, forcing one online startup release check regardless of persisted
+    startup idle-time file state.
+    @param args {Sequence[str] | None} CLI argv sequence excluding executable
+        name when provided by Click group main.
+    @return {bool} True when startup preflight must bypass idle-time gating.
+    @satisfies REQ-071
+    @satisfies REQ-078
+    """
+    argument_tokens = list(args) if args is not None else list(sys.argv[1:])
+    return any(
+        token in {"--version", "--ver"}
+        for token in argument_tokens
+        if isinstance(token, str)
+    )
 
 
 def _execute_lifecycle_subprocess(command: list[str]) -> int:
@@ -882,6 +903,8 @@ class StartupPreflightGroup(click.Group):
         @details Appends execution-start log entry, runs update-check preflight,
         delegates to Click parser/dispatcher, and appends execution-end outcome
         plus one trailing separator line when runtime logging is enabled.
+        The preflight bypasses startup idle gating when invocation includes
+        eager `--version` or `--ver` options.
         @param args {Sequence[str] | None} Optional argv sequence.
         @param prog_name {str | None} Program display name override.
         @param complete_var {str | None} Shell-completion environment variable.
@@ -896,7 +919,16 @@ class StartupPreflightGroup(click.Group):
         execution_outcome = "unknown"
         append_runtime_log_line("execution.start stage=program_entry")
         try:
-            _run_startup_update_preflight()
+            force_ignore_idle_until = _startup_force_ignore_idle_from_args(args)
+            global _STARTUP_FORCE_IGNORE_IDLE_UNTIL_ACTIVE
+            previous_force_ignore_idle_until = _STARTUP_FORCE_IGNORE_IDLE_UNTIL_ACTIVE
+            _STARTUP_FORCE_IGNORE_IDLE_UNTIL_ACTIVE = force_ignore_idle_until
+            try:
+                _run_startup_update_preflight()
+            finally:
+                _STARTUP_FORCE_IGNORE_IDLE_UNTIL_ACTIVE = (
+                    previous_force_ignore_idle_until
+                )
             super().main(
                 args=args,
                 prog_name=prog_name,

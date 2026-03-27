@@ -91,7 +91,8 @@
 - `Internal Call-Trace Tree`
   - `StartupPreflightGroup.main(...)`: startup preflight wrapper around Click parser/dispatcher with execution start/end logging [`src/aibar/aibar/cli.py`]
     - `append_runtime_log_line(...)`: append execution-start and execution-end rows in runtime log [`src/aibar/aibar/config.py`]
-    - `_run_startup_update_preflight(...)`: startup release-check idle gate and diagnostics pipeline [`src/aibar/aibar/cli.py`]
+    - `_startup_force_ignore_idle_from_args(...)`: detect `--version`/`--ver` invocations that force one online startup check bypassing persisted startup idle gate [`src/aibar/aibar/cli.py`]
+    - `_run_startup_update_preflight(...)`: startup release-check idle gate and diagnostics pipeline with per-invocation idle-gate bypass for `--version`/`--ver` [`src/aibar/aibar/cli.py`]
       - `_load_startup_idle_state(...)`: load startup idle-state JSON from `~/.cache/aibar/check_version_idle-time.json` [`src/aibar/aibar/cli.py`]
       - `_startup_idle_epochs(...)`: normalize `last_success_at_epoch` and `idle_until_epoch` from startup idle-state payload [`src/aibar/aibar/cli.py`]
       - `_fetch_startup_latest_release(...)`: fetch and normalize latest GitHub release metadata with hardcoded timeout [`src/aibar/aibar/cli.py`]
