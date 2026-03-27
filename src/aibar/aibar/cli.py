@@ -1087,7 +1087,8 @@ def _append_provider_failure_runtime_log(result: ProviderResult) -> None:
     @brief Append runtime-log row for OAuth and rate-limit provider failures.
     @details Emits non-debug runtime-log entries for provider failure categories
     `oauth` and `rate_limit` when logging is enabled. Includes
-    `retry_after_seconds` when available in `result.raw.retry_after_seconds`.
+    `retry_after_seconds` plus extraction source when available; when unavailable,
+    appends explicit `retry_after_unavailable=true` evidence payload.
     @param result {ProviderResult} Provider result to log.
     @return {None} Function return value.
     @satisfies REQ-115
@@ -1103,12 +1104,76 @@ def _append_provider_failure_runtime_log(result: ProviderResult) -> None:
         f"category={category} "
         f"error={json.dumps(error_message, ensure_ascii=True)}"
     )
-    retry_after_seconds = _coerce_retry_after_seconds(
-        result.raw.get("retry_after_seconds")
-    )
+    retry_after_seconds, retry_after_source = _extract_retry_after_for_failure_log(result)
     if retry_after_seconds is not None:
-        log_line = f"{log_line} retry_after_seconds={retry_after_seconds}"
+        log_line = (
+            f"{log_line} retry_after_seconds={retry_after_seconds} "
+            f"retry_after_source={retry_after_source}"
+        )
+    else:
+        log_line = (
+            f"{log_line} retry_after_unavailable=true "
+            f"retry_after_source={retry_after_source} "
+            "retry_after_probe="
+            f"{json.dumps(_retry_after_probe_payload(result.raw), ensure_ascii=True)}"
+        )
     append_runtime_log_line(log_line)
+
+
+def _extract_retry_after_for_failure_log(result: ProviderResult) -> tuple[int | None, str]:
+    """
+    @brief Extract retry-after seconds and source path for failure runtime logs.
+    @details Probes normalized and fallback raw payload fields in deterministic order:
+    `raw.retry_after_seconds`, `raw.retry_after`, `raw.error.retry_after_seconds`,
+    and `raw.error.retry_after`. Returns first positive parsed value.
+    @param result {ProviderResult} Provider result to inspect.
+    @return {tuple[int | None, str]} Tuple `(retry_after_seconds_or_none, source_key)`.
+    @satisfies REQ-115
+    """
+    candidates: list[tuple[str, object]] = [
+        ("raw.retry_after_seconds", result.raw.get("retry_after_seconds")),
+        ("raw.retry_after", result.raw.get("retry_after")),
+    ]
+    error_payload = result.raw.get("error")
+    if isinstance(error_payload, dict):
+        candidates.extend(
+            [
+                (
+                    "raw.error.retry_after_seconds",
+                    error_payload.get("retry_after_seconds"),
+                ),
+                ("raw.error.retry_after", error_payload.get("retry_after")),
+            ]
+        )
+    for source_key, candidate in candidates:
+        parsed = _coerce_retry_after_seconds(candidate)
+        if parsed is not None:
+            return (parsed, source_key)
+    return (None, "probe_exhausted")
+
+
+def _retry_after_probe_payload(raw_payload: dict[str, object]) -> dict[str, object]:
+    """
+    @brief Build compact retry-after probe evidence for failure runtime logs.
+    @details Serializes inspected retry-after fields and top-level key inventory so
+    logs provide explicit evidence when retry-after extraction fails.
+    @param raw_payload {dict[str, object]} Provider raw payload dictionary.
+    @return {dict[str, object]} JSON-safe probe payload.
+    @satisfies REQ-115
+    """
+    error_payload = raw_payload.get("error")
+    error_retry_after_seconds: object = None
+    error_retry_after: object = None
+    if isinstance(error_payload, dict):
+        error_retry_after_seconds = error_payload.get("retry_after_seconds")
+        error_retry_after = error_payload.get("retry_after")
+    return {
+        "raw_keys": sorted(raw_payload.keys()),
+        "raw.retry_after_seconds": raw_payload.get("retry_after_seconds"),
+        "raw.retry_after": raw_payload.get("retry_after"),
+        "raw.error.retry_after_seconds": error_retry_after_seconds,
+        "raw.error.retry_after": error_retry_after,
+    }
 
 
 def _is_claude_oauth_authentication_error(message: object) -> bool:

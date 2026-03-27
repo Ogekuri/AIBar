@@ -142,7 +142,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-018**: MUST set GNOME panel label to `Err` and truncate popup error text to 40 characters when command execution or JSON parsing fails.
 - **REQ-019**: SHOULD order extension provider tabs/cards by `claude`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, with providers not listed in ordering array appended alphabetically.
 - **REQ-020**: MUST include each discovered source symbol in `docs/REFERENCES.md` with file path, symbol kind, line-range evidence, and parsed Doxygen fields (`@brief`, `@param`, `@return`, `@raises`) when present in source declarations.
-- **REQ-021**: GNOME panel status labels MUST render exactly one `Err` token when any provider/window `status.result=FAIL` error category is OAuth or rate-limit; token MUST replace normal percentage/cost labels, use failing provider color class, and render bold.
+- **REQ-021**: GNOME panel status labels MUST render `Err` only for providers whose `status.result=FAIL` category is OAuth or rate-limit, while providers without those failures MUST keep normal percentage/cost labels.
 - **REQ-022**: MUST style GNOME panel tab and label fonts with provider classes and bright colors: Claude red, OpenRouter orange, Copilot yellow, Codex green, OpenAI blue, GeminiAI purple; cost labels MUST use the same font family, render when numeric value is `0`, and hide only when cost metric is unavailable.
 - **REQ-023**: MUST declare a `[project.scripts]` entry `aibar = "aibar.cli:main"` in `pyproject.toml` so that `uv pip install` and `uvx` resolve the `aibar` console command.
 - **REQ-024**: MUST provide `src/aibar/aibar/__main__.py` that delegates to `aibar.cli:main` to enable `python -m aibar` execution.
@@ -187,7 +187,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-112**: Logging MUST record execution start, idle-time verification, idle-time-driven function branches, error-handling branches, and every load/save operation targeting `~/.cache/aibar/cache.json`.
 - **REQ-113**: Logging MUST record execution outcome and execution end time, then append one trailing empty line to separate the current execution block from the next execution block.
 - **REQ-114**: API-call debug logging MUST append API metadata and debug response summaries only when both `log_enabled` and `debug_enabled` are `true`.
-- **REQ-115**: When `log_enabled` is `true`, runtime logging MUST append non-debug rows for provider `FAIL` attempts categorized as `oauth` or HTTP `429` `rate_limit`, and MUST include `retry_after_seconds` when available.
+- **REQ-115**: When `log_enabled` is `true`, runtime logging MUST append non-debug rows for provider `FAIL` attempts categorized as `oauth` or HTTP `429` `rate_limit`, including `retry_after_seconds` or `retry_after_unavailable=true` with extraction evidence.
 - **REQ-050**: Provider `fetch` MUST attempt to extract `currency_symbol` from the raw API JSON response (field `currency`); when absent, MUST resolve `currency_symbol` from `RuntimeConfig.currency_symbols[provider_name]` with fallback `"$"`.
 - **REQ-051**: CLI `show` text output MUST render cost as `Cost: <currency_symbol><value>` where `<currency_symbol><value>` uses `metrics.currency_symbol`, is bold bright white, and MUST NOT use hardcoded `$`.
 - **REQ-053**: GNOME extension MUST NOT render aggregated total panel cost; panel and provider-card cost labels MUST use per-provider `metrics.currency_symbol` and display provider-local monetary values.

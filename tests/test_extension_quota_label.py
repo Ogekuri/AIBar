@@ -445,14 +445,14 @@ def test_panel_percentage_labels_hide_when_metrics_are_unavailable() -> None:
     assert "this._panelGeminiaiCostLabel.hide();" in source
 
 
-def test_panel_labels_render_single_bold_provider_colored_err_for_oauth_or_rate_limit() -> (
+def test_panel_labels_render_provider_scoped_bold_colored_err_for_oauth_or_rate_limit() -> (
     None
 ):
     """
-    @brief Verify panel collapse projects one provider-colored bold `Err` for OAuth/rate-limit.
+    @brief Verify panel renders provider-scoped bold `Err` labels for OAuth/rate-limit.
     @details Asserts extension source derives provider failure categories from
-    status metadata, chooses one provider in deterministic order, hides normal labels,
-    and renders exactly one `Err` with provider color class and bold style class.
+    status metadata, keeps normal labels for non-failing providers, and renders
+    provider-scoped `Err` tokens with provider color class and bold style class.
     @satisfies REQ-021
     """
     source = EXTENSION_PATH.read_text(encoding="utf-8")
@@ -464,11 +464,11 @@ def test_panel_labels_render_single_bold_provider_colored_err_for_oauth_or_rate_
     assert "const providerFailureStates = {" in source
     assert "const providerErrClassNames = {" in source
     assert "const providerErrPriority = ['claude', 'openrouter', 'copilot', 'codex', 'openai', 'geminiai'];" in source
-    assert "let singleErrProvider = null;" in source
+    assert "const errProviders = [];" in source
     assert "if (state.category === 'oauth' || state.category === 'rate_limit')" in source
-    assert "if (singleErrProvider !== null) {" in source
+    assert "if (errProviders.length > 0) {" in source
     assert "label.remove_style_class_name('aibar-panel-err-single');" in source
-    assert "const errLabel = usageLabels[`${singleErrProvider}Cost`] || usageLabels[singleErrProvider];" in source
+    assert "const errLabel = usageLabels[`${providerName}Cost`] || usageLabels[providerName];" in source
     assert "errLabel.set_text('Err');" in source
     assert "errLabel.add_style_class_name('aibar-panel-err-single');" in source
     assert "errLabel.add_style_class_name(providerColorClass);" in source
@@ -484,19 +484,15 @@ def test_panel_error_mapping_still_tracks_failed_provider_windows_and_costs() ->
     @satisfies TST-007
     """
     source = EXTENSION_PATH.read_text(encoding="utf-8")
-    assert "const resolveStatusEntry = (providerName, windowKey) => {" in source
-    assert "const isStatusFailure = (providerName, windowKey) => {" in source
-    assert "const panelStatusFailures = {" in source
-    assert "claude5h: isStatusFailure('claude', '5h')" in source
-    assert "claude7d: isStatusFailure('claude', '7d')" in source
-    assert "claudeCost: isStatusFailure('claude', '5h') || isStatusFailure('claude', '7d')" in source
-    assert "openrouterCost: isStatusFailure('openrouter', '30d')" in source
-    assert "copilot: isStatusFailure('copilot', '30d')" in source
-    assert "codex5h: isStatusFailure('codex', '5h')" in source
-    assert "codex7d: isStatusFailure('codex', '7d')" in source
-    assert "codexCost: isStatusFailure('codex', '5h') || isStatusFailure('codex', '7d')" in source
-    assert "openaiCost: isStatusFailure('openai', '30d')" in source
-    assert "geminiaiCost: isStatusFailure('geminiai', '30d')" in source
+    assert "function _panelProviderFailureState(statusData, providerName, windows)" in source
+    assert "entry.result !== 'FAIL'" in source
+    assert "const providerFailureStates = {" in source
+    assert "claude: _panelProviderFailureState(this._statusData, 'claude', ['5h', '7d'])" in source
+    assert "openrouter: _panelProviderFailureState(this._statusData, 'openrouter', ['30d'])" in source
+    assert "copilot: _panelProviderFailureState(this._statusData, 'copilot', ['30d'])" in source
+    assert "codex: _panelProviderFailureState(this._statusData, 'codex', ['5h', '7d'])" in source
+    assert "openai: _panelProviderFailureState(this._statusData, 'openai', ['30d'])" in source
+    assert "geminiai: _panelProviderFailureState(this._statusData, 'geminiai', ['30d'])" in source
 
 
 def test_panel_cost_text_keeps_zero_values_visible_with_currency_symbol() -> None:

@@ -1611,22 +1611,6 @@ class AIBarIndicator extends PanelMenu.Button {
             const numeric = Number(value);
             return Number.isFinite(numeric) ? numeric : null;
         };
-        const resolveStatusEntry = (providerName, windowKey) => {
-            const providerStatus = this._statusData[providerName];
-            if (!providerStatus || typeof providerStatus !== 'object' || Array.isArray(providerStatus))
-                return null;
-            if (!windowKey || typeof windowKey !== 'string')
-                return null;
-            const windowStatus = providerStatus[windowKey];
-            if (!windowStatus || typeof windowStatus !== 'object' || Array.isArray(windowStatus))
-                return null;
-            return windowStatus;
-        };
-        const isStatusFailure = (providerName, windowKey) => {
-            const statusEntry = resolveStatusEntry(providerName, windowKey);
-            return statusEntry !== null && statusEntry.result === 'FAIL';
-        };
-
         const getPanelUsageValues = (providerName, data) => {
             if (!data) {
                 return {primary: null, secondary: null};
@@ -1702,18 +1686,6 @@ class AIBarIndicator extends PanelMenu.Button {
             openaiCost: this._panelCostText(this._usageData.openai),
             geminiaiCost: this._panelCostText(this._usageData.geminiai),
         };
-        const panelStatusFailures = {
-            claude5h: isStatusFailure('claude', '5h'),
-            claude7d: isStatusFailure('claude', '7d'),
-            claudeCost: isStatusFailure('claude', '5h') || isStatusFailure('claude', '7d'),
-            openrouterCost: isStatusFailure('openrouter', '30d'),
-            copilot: isStatusFailure('copilot', '30d'),
-            codexCost: isStatusFailure('codex', '5h') || isStatusFailure('codex', '7d'),
-            codex5h: isStatusFailure('codex', '5h'),
-            codex7d: isStatusFailure('codex', '7d'),
-            openaiCost: isStatusFailure('openai', '30d'),
-            geminiaiCost: isStatusFailure('geminiai', '30d'),
-        };
         const providerFailureStates = {
             claude: _panelProviderFailureState(this._statusData, 'claude', ['5h', '7d']),
             openrouter: _panelProviderFailureState(this._statusData, 'openrouter', ['30d']),
@@ -1731,15 +1703,13 @@ class AIBarIndicator extends PanelMenu.Button {
             geminiai: 'aibar-tab-label-geminiai',
         };
         const providerErrPriority = ['claude', 'openrouter', 'copilot', 'codex', 'openai', 'geminiai'];
-        let singleErrProvider = null;
+        const errProviders = [];
         for (const providerName of providerErrPriority) {
             const state = providerFailureStates[providerName];
             if (!state || state.hasFailure !== true)
                 continue;
-            if (state.category === 'oauth' || state.category === 'rate_limit') {
-                singleErrProvider = providerName;
-                break;
-            }
+            if (state.category === 'oauth' || state.category === 'rate_limit')
+                errProviders.push(providerName);
         }
 
         for (let [labelKey, value] of Object.entries(panelValues)) {
@@ -1758,29 +1728,22 @@ class AIBarIndicator extends PanelMenu.Button {
             }
         }
 
-        if (singleErrProvider !== null) {
-            for (const label of Object.values(usageLabels)) {
-                if (!label)
+        for (const label of Object.values(usageLabels)) {
+            if (!label)
+                continue;
+            label.remove_style_class_name('aibar-panel-err-single');
+        }
+        if (errProviders.length > 0) {
+            for (const providerName of errProviders) {
+                const errLabel = usageLabels[`${providerName}Cost`] || usageLabels[providerName];
+                if (!errLabel)
                     continue;
-                label.set_text('');
-                label.hide();
-                label.remove_style_class_name('aibar-panel-err-single');
-            }
-            const errLabel = usageLabels[`${singleErrProvider}Cost`] || usageLabels[singleErrProvider];
-            if (errLabel) {
                 errLabel.set_text('Err');
                 errLabel.add_style_class_name('aibar-panel-err-single');
-                const providerColorClass = providerErrClassNames[singleErrProvider];
+                const providerColorClass = providerErrClassNames[providerName];
                 if (providerColorClass)
                     errLabel.add_style_class_name(providerColorClass);
                 errLabel.show();
-            }
-        } else {
-            for (let [labelKey] of Object.entries(panelValues)) {
-                const label = usageLabels[labelKey];
-                if (!label)
-                    continue;
-                label.remove_style_class_name('aibar-panel-err-single');
             }
         }
 

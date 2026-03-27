@@ -134,7 +134,8 @@ class _OAuthErrorProvider(BaseProvider):
     """
     @brief Deterministic provider stub returning OAuth-classified failures.
     @details Produces one failed result carrying OAuth error text without
-    retry-after metadata so runtime log classification can assert `oauth` branch.
+    retry-after metadata so runtime log classification can assert `oauth` branch
+    and missing retry-after evidence logging.
     """
 
     name = ProviderName.OPENAI
@@ -194,6 +195,44 @@ class _RateLimitProvider(BaseProvider):
     def is_configured(self) -> bool:
         """
         @brief Report deterministic configured state for rate-limit stub provider.
+        @return {bool} Always true.
+        """
+        return True
+
+    def get_config_help(self) -> str:
+        """
+        @brief Return deterministic configuration help text.
+        @return {str} Static helper text.
+        """
+        return "configured"
+
+
+class _OAuthErrorNoRetryAfterProvider(BaseProvider):
+    """
+    @brief Deterministic provider stub returning OAuth failures without retry-after keys.
+    @details Produces one failed result with OAuth error and raw payload that omits
+    retry-after fields to validate `retry_after_unavailable=true` evidence logging.
+    """
+
+    name = ProviderName.CLAUDE
+
+    async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult:
+        """
+        @brief Return deterministic OAuth failure with missing retry-after fields.
+        @param window {WindowPeriod} Requested usage window.
+        @return {ProviderResult} Failed result without retry-after payload keys.
+        """
+        return ProviderResult(
+            provider=self.name,
+            window=window,
+            metrics=UsageMetrics(),
+            raw={"status_code": 401, "failure_marker": "oauth_without_retry_after"},
+            error="OAuth access denied",
+        )
+
+    def is_configured(self) -> bool:
+        """
+        @brief Report deterministic configured state for OAuth no-retry stub provider.
         @return {bool} Always true.
         """
         return True
@@ -407,3 +446,42 @@ def test_failure_logging_captures_oauth_and_rate_limit_with_retry_after(
         "provider.fetch.failure provider=openrouter window=30d category=rate_limit"
     ) in log_text
     assert "retry_after_seconds=45" in log_text
+
+
+def test_failure_logging_records_retry_after_unavailable_evidence(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """
+    @brief Verify oauth failure logs include explicit retry-after extraction evidence.
+    @details Executes refresh with OAuth failure payload that omits retry-after keys
+    and asserts runtime log row contains `retry_after_unavailable=true` plus
+    extraction probe evidence fields.
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @param tmp_path {Path} Temporary path fixture.
+    @return {None} Function return value.
+    @satisfies TST-050
+    """
+    _, cache_dir = _patch_paths(monkeypatch, tmp_path)
+    config_module.save_runtime_config(
+        RuntimeConfig(log_enabled=True, debug_enabled=False)
+    )
+    providers: dict[ProviderName, BaseProvider] = {
+        ProviderName.CLAUDE: _OAuthErrorNoRetryAfterProvider(),
+    }
+
+    cli_module.retrieve_results_via_cache_pipeline(
+        provider_filter=None,
+        target_window=WindowPeriod.DAY_7,
+        force_refresh=True,
+        providers=providers,
+    )
+
+    log_text = _read_log(cache_dir)
+    assert (
+        "provider.fetch.failure provider=claude window=7d category=oauth"
+        in log_text
+    )
+    assert "retry_after_unavailable=true" in log_text
+    assert "retry_after_source=probe_exhausted" in log_text
+    assert '"raw.retry_after_seconds": null' in log_text
