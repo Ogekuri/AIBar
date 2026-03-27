@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.20.0](https://github.com/Ogekuri/AIBar/compare/v0.19.0..v0.20.0) - 2026-03-27
+### 🚜  Changes
+- refine provider-scoped Err and retry-after logging [useReq] *(core)*
+  - Update existing requirements REQ-021 and REQ-115.
+  - Apply provider-scoped GNOME panel Err rendering for oauth/rate-limit failures.
+  - Preserve normal panel percentage/cost labels for non-failing providers.
+  - Extend runtime failure logging with retry-after source/evidence fields.
+  - Log explicit retry_after_unavailable evidence when extraction is impossible.
+  - Add/adjust targeted regression tests and refresh docs workflow/references.
+- log oauth and rate-limit failures with retry-after [useReq] *(cli)*
+
 ## [0.19.0](https://github.com/Ogekuri/AIBar/compare/v0.18.0..v0.19.0) - 2026-03-26
 ### 🐛  Bug Fixes
 - normalize epoch Retry-After idle-time delay [useReq] *(claude_oauth)*
@@ -924,6 +935,7 @@
 - \[0.17.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.17.0
 - \[0.18.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.18.0
 - \[0.19.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.19.0
+- \[0.20.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.20.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -944,3 +956,4 @@
 [0.17.0]: https://github.com/Ogekuri/AIBar/compare/v0.16.0..v0.17.0
 [0.18.0]: https://github.com/Ogekuri/AIBar/compare/v0.17.0..v0.18.0
 [0.19.0]: https://github.com/Ogekuri/AIBar/compare/v0.18.0..v0.19.0
+[0.20.0]: https://github.com/Ogekuri/AIBar/compare/v0.19.0..v0.20.0
