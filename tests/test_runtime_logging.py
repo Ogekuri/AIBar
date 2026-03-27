@@ -246,6 +246,47 @@ class _OAuthErrorNoRetryAfterProvider(BaseProvider):
         return "configured"
 
 
+class _OAuthErrorWithRawJsonBodyProvider(BaseProvider):
+    """
+    @brief Deterministic provider stub returning OAuth failure with raw JSON body.
+    @details Produces one failed result carrying `raw["body"]` JSON text with
+    deliberate whitespace so debug logging can verify payload preservation.
+    """
+
+    name = ProviderName.CLAUDE
+
+    async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult:
+        """
+        @brief Return deterministic OAuth failure with JSON body string payload.
+        @param window {WindowPeriod} Requested usage window.
+        @return {ProviderResult} Failed result with raw JSON body text.
+        """
+        return ProviderResult(
+            provider=self.name,
+            window=window,
+            metrics=UsageMetrics(),
+            raw={
+                "status_code": 401,
+                "body": '{"error":{"message":"token expired","code":"oauth_error"},"meta":[1, 2, 3]}',
+            },
+            error="OAuth access denied",
+        )
+
+    def is_configured(self) -> bool:
+        """
+        @brief Report deterministic configured state for OAuth raw-body stub provider.
+        @return {bool} Always true.
+        """
+        return True
+
+    def get_config_help(self) -> str:
+        """
+        @brief Return deterministic configuration help text.
+        @return {str} Static helper text.
+        """
+        return "configured"
+
+
 def test_logging_flag_options_persist_without_cross_side_effects(
     monkeypatch,
     tmp_path: Path,
@@ -407,6 +448,54 @@ def test_debug_api_log_rows_require_both_log_and_debug_flags(
     )
     log_with_debug = _read_log(cache_dir)
     assert "provider.fetch.debug" in log_with_debug
+
+
+def test_debug_api_log_rows_include_unmodified_error_json_payload(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """
+    @brief Verify debug logging includes raw JSON error payload without mutation.
+    @details Executes failed refresh twice using provider payload with `raw.body`
+    JSON text; asserts no debug rows while debug flag is disabled, then asserts
+    debug rows include `provider.fetch.debug.error_json` containing exact payload.
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @param tmp_path {Path} Temporary path fixture.
+    @return {None} Function return value.
+    @satisfies TST-049
+    """
+    _, cache_dir = _patch_paths(monkeypatch, tmp_path)
+    raw_payload = (
+        '{"error":{"message":"token expired","code":"oauth_error"},"meta":[1, 2, 3]}'
+    )
+    providers: dict[ProviderName, BaseProvider] = {
+        ProviderName.CLAUDE: _OAuthErrorWithRawJsonBodyProvider(),
+    }
+
+    config_module.save_runtime_config(
+        RuntimeConfig(log_enabled=True, debug_enabled=False)
+    )
+    cli_module.retrieve_results_via_cache_pipeline(
+        provider_filter=None,
+        target_window=WindowPeriod.DAY_7,
+        force_refresh=True,
+        providers=providers,
+    )
+    log_without_debug = _read_log(cache_dir)
+    assert "provider.fetch.debug.error_json" not in log_without_debug
+
+    config_module.save_runtime_config(
+        RuntimeConfig(log_enabled=True, debug_enabled=True)
+    )
+    cli_module.retrieve_results_via_cache_pipeline(
+        provider_filter=None,
+        target_window=WindowPeriod.DAY_7,
+        force_refresh=True,
+        providers=providers,
+    )
+    log_with_debug = _read_log(cache_dir)
+    assert "provider.fetch.debug.error_json provider=claude window=7d payload=" in log_with_debug
+    assert f"payload={raw_payload}" in log_with_debug
 
 
 def test_failure_logging_captures_oauth_and_rate_limit_with_retry_after(

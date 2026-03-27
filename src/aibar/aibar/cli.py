@@ -2187,6 +2187,54 @@ def _provider_result_debug_summary(result: ProviderResult) -> str:
         )
 
 
+def _extract_error_json_payload_for_debug_log(result: ProviderResult) -> str | None:
+    """
+    @brief Extract unmodified JSON error payload text for debug logging.
+    @details Returns the original `raw["body"]` string only when provider result is
+    an error and `raw["body"]` is a syntactically valid JSON text payload.
+    Content is returned byte-for-byte without normalization or re-serialization.
+    @param result {ProviderResult} Provider result instance to inspect.
+    @return {str | None} Raw JSON payload text, or None when unavailable/non-JSON.
+    @satisfies REQ-114
+    """
+    if not result.is_error:
+        return None
+    raw_body = result.raw.get("body")
+    if not isinstance(raw_body, str):
+        return None
+    try:
+        json.loads(raw_body)
+    except (TypeError, ValueError):
+        return None
+    return raw_body
+
+
+def _append_provider_debug_runtime_log(result: ProviderResult) -> None:
+    """
+    @brief Append debug runtime-log rows for one provider fetch result.
+    @details Emits canonical provider debug summary row and, for failed API calls
+    with JSON error bodies, appends an additional row including the full unmodified
+    JSON response payload exactly as received from the API.
+    @param result {ProviderResult} Provider result to log.
+    @return {None} Function return value.
+    @satisfies REQ-114
+    """
+    append_runtime_log_line(
+        f"provider.fetch.debug {_provider_result_debug_summary(result)}",
+        debug_only=True,
+    )
+    error_json_payload = _extract_error_json_payload_for_debug_log(result)
+    if error_json_payload is None:
+        return
+    append_runtime_log_line(
+        "provider.fetch.debug.error_json "
+        f"provider={result.provider.value} "
+        f"window={result.window.value} "
+        f"payload={error_json_payload}",
+        debug_only=True,
+    )
+
+
 def _fetch_result(
     provider: BaseProvider,
     window: WindowPeriod,
@@ -2228,10 +2276,7 @@ def _fetch_result(
                 f"{_ATTEMPT_RESULT_FAIL if result_5h.is_error else _ATTEMPT_RESULT_OK}"
             )
             _append_provider_failure_runtime_log(result_5h)
-            append_runtime_log_line(
-                f"provider.fetch.debug {_provider_result_debug_summary(result_5h)}",
-                debug_only=True,
-            )
+            _append_provider_debug_runtime_log(result_5h)
             return result_5h
         append_runtime_log_line(
             "provider.fetch.end "
@@ -2239,10 +2284,7 @@ def _fetch_result(
             f"{_ATTEMPT_RESULT_FAIL if result_7d.is_error else _ATTEMPT_RESULT_OK}"
         )
         _append_provider_failure_runtime_log(result_7d)
-        append_runtime_log_line(
-            f"provider.fetch.debug {_provider_result_debug_summary(result_7d)}",
-            debug_only=True,
-        )
+        _append_provider_debug_runtime_log(result_7d)
         return result_7d
 
     try:
@@ -2269,10 +2311,7 @@ def _fetch_result(
         f"{_ATTEMPT_RESULT_FAIL if result.is_error else _ATTEMPT_RESULT_OK}"
     )
     _append_provider_failure_runtime_log(result)
-    append_runtime_log_line(
-        f"provider.fetch.debug {_provider_result_debug_summary(result)}",
-        debug_only=True,
-    )
+    _append_provider_debug_runtime_log(result)
     return result
 
 
@@ -2353,14 +2392,8 @@ def _fetch_claude_dual(
         "provider.fetch.end provider=claude window=7d "
         f"status={_ATTEMPT_RESULT_FAIL if result_7d.is_error else _ATTEMPT_RESULT_OK}"
     )
-    append_runtime_log_line(
-        f"provider.fetch.debug {_provider_result_debug_summary(result_5h)}",
-        debug_only=True,
-    )
-    append_runtime_log_line(
-        f"provider.fetch.debug {_provider_result_debug_summary(result_7d)}",
-        debug_only=True,
-    )
+    _append_provider_debug_runtime_log(result_5h)
+    _append_provider_debug_runtime_log(result_7d)
     return result_5h, result_7d
 
 
