@@ -105,6 +105,23 @@ def _extract_retry_after_seconds(error: HttpError) -> float:
         return 0.0
 
 
+def _has_retry_after_header(error: HttpError) -> bool:
+    """
+    @brief Detect Retry-After header presence in Google HttpError response.
+    @details Evaluates case-insensitive `retry-after` header availability using
+    `HttpError.resp.get(...)` access without parsing numeric values.
+    @param error {HttpError} Google API exception.
+    @return {bool} True when Retry-After header exists.
+    """
+    response = getattr(error, "resp", None)
+    if response is None or not hasattr(response, "get"):
+        return False
+    return bool(
+        response.get("retry-after") is not None
+        or response.get("Retry-After") is not None
+    )
+
+
 def _extract_google_api_status(error: GoogleAPICallError) -> int:
     """
     @brief Extract HTTP-like status code from Google API Core exceptions.
@@ -614,12 +631,14 @@ class GeminiAIProvider(BaseProvider):
                 ) from exc
             if status_code == 429:
                 retry_after_seconds = _extract_retry_after_seconds(exc)
+                has_retry_after_header = _has_retry_after_header(exc)
                 return self._make_error_result(
                     window=window,
                     error="Rate limited. Try again later.",
                     raw={
                         "status_code": 429,
                         "retry_after_seconds": retry_after_seconds,
+                        "retry_after_unavailable": not has_retry_after_header,
                         "body": str(exc),
                     },
                 )
@@ -637,6 +656,7 @@ class GeminiAIProvider(BaseProvider):
                     raw={
                         "status_code": 429,
                         "retry_after_seconds": 0.0,
+                        "retry_after_unavailable": True,
                         "body": str(exc),
                     },
                 )

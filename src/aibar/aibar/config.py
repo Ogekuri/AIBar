@@ -28,6 +28,7 @@ IDLE_TIME_PATH = APP_CACHE_DIR / "idle-time.json"
 DEFAULT_IDLE_DELAY_SECONDS = 300
 DEFAULT_API_CALL_DELAY_MILLISECONDS = 100
 DEFAULT_API_CALL_TIMEOUT_MILLISECONDS = 5000
+DEFAULT_RETRY_AFTER_SECONDS = 3600
 DEFAULT_GNOME_REFRESH_INTERVAL_SECONDS = 60
 DEFAULT_BILLING_DATASET = "billing_data"
 DEFAULT_CURRENCY_SYMBOL = "$"
@@ -53,6 +54,8 @@ class RuntimeConfig(BaseModel):
     `api_call_delay_milliseconds` defaults to `100` ms inter-call spacing.
     `api_call_timeout_milliseconds` defaults to `5000` ms HTTP response timeout
     applied to all provider API calls via `httpx.AsyncClient(timeout=<value>/1000.0)`.
+    `default_retry_after_seconds` defaults to `3600` seconds and is used when
+    provider failure payloads explicitly mark `retry_after_unavailable=true`.
     `currency_symbols` maps provider name strings to currency symbols (`$`, `£`, `€`);
     missing entries default to `DEFAULT_CURRENCY_SYMBOL` at resolution time.
     `billing_data` stores the Google BigQuery dataset name used for GeminiAI
@@ -66,6 +69,8 @@ class RuntimeConfig(BaseModel):
     @satisfies REQ-109
     @satisfies REQ-110
     @satisfies REQ-049
+    @satisfies REQ-005
+    @satisfies REQ-041
     @satisfies REQ-095
     @satisfies REQ-096
     """
@@ -77,6 +82,7 @@ class RuntimeConfig(BaseModel):
     api_call_timeout_milliseconds: int = Field(
         default=DEFAULT_API_CALL_TIMEOUT_MILLISECONDS, ge=1
     )
+    default_retry_after_seconds: int = Field(default=DEFAULT_RETRY_AFTER_SECONDS, ge=1)
     gnome_refresh_interval_seconds: int = Field(
         default=DEFAULT_GNOME_REFRESH_INTERVAL_SECONDS, ge=1
     )

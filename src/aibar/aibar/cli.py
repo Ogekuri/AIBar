@@ -1050,15 +1050,21 @@ def _extract_retry_after_seconds(result: ProviderResult) -> int:
     """
     @brief Extract normalized retry-after seconds from provider error payload.
     @details Reads `raw.retry_after_seconds` and clamps to non-negative integer
-    seconds. Invalid or missing values normalize to zero.
+    seconds. When unavailable and payload marks
+    `raw.retry_after_unavailable=true`, returns `RuntimeConfig.default_retry_after_seconds`.
+    Invalid or missing values without fallback marker normalize to zero.
     @param result {ProviderResult} Provider result to inspect.
     @return {int} Non-negative retry-after delay in seconds.
     @satisfies REQ-041
     """
     parsed = _coerce_retry_after_seconds(result.raw.get("retry_after_seconds"))
-    if parsed is None:
-        return 0
-    return parsed
+    if parsed is not None:
+        return parsed
+    retry_after_unavailable = result.raw.get("retry_after_unavailable")
+    if retry_after_unavailable is True:
+        runtime_config = load_runtime_config()
+        return max(0, int(runtime_config.default_retry_after_seconds))
+    return 0
 
 
 def _classify_provider_failure_log_category(result: ProviderResult) -> str | None:
@@ -1960,7 +1966,9 @@ def _update_idle_time_after_refresh(
     @details Computes per-provider idle-time state after refresh execution.
     Successful-only provider cycles schedule `idle_until = last_success_at + idle_delay_seconds`.
     Provider cycles containing failures schedule
-    `idle_until = last_attempt_at + max(idle_delay_seconds, retry_after_seconds_or_0)`.
+    `idle_until = last_attempt_at + max(idle_delay_seconds, resolved_retry_after_seconds)`,
+    where fallback resolution uses `RuntimeConfig.default_retry_after_seconds` when
+    provider payload marks `retry_after_unavailable=true`.
     @param fetched_results {list[ProviderResult]} Live results produced by refresh calls.
     @param runtime_config {RuntimeConfig} Runtime delay configuration.
     @return {None} Function return value.
@@ -3893,7 +3901,8 @@ def setup() -> None:
     """
     @brief Execute setup.
     @details Prompts for `idle_delay_seconds`, `api_call_delay_milliseconds`,
-    `api_call_timeout_milliseconds`, `gnome_refresh_interval_seconds`, and `billing_data` in order, then prompts for provider
+    `api_call_timeout_milliseconds`, `default_retry_after_seconds`,
+    `gnome_refresh_interval_seconds`, and `billing_data` in order, then prompts for provider
     currency symbols including `geminiai` (choices: `$`, `£`, `€`, default `$`), then persists
     all values to `~/.config/aibar/config.json`. Final setup section configures
     logging flags (`log_enabled`, `debug_enabled`). GeminiAI OAuth source supports
@@ -3938,6 +3947,9 @@ def setup() -> None:
     click.echo(
         "  api-call timeout controls HTTP response timeout for provider API calls."
     )
+    click.echo(
+        "  default-retry-after controls fallback delay when API errors omit Retry-After."
+    )
     click.echo("  gnome-refresh-interval controls GNOME extension auto-refresh rate.")
     idle_delay_seconds = click.prompt(
         "  idle-delay seconds",
@@ -3953,6 +3965,11 @@ def setup() -> None:
         "  api-call timeout milliseconds",
         type=int,
         default=runtime_config.api_call_timeout_milliseconds,
+    )
+    default_retry_after_seconds = click.prompt(
+        "  default-retry-after seconds",
+        type=int,
+        default=runtime_config.default_retry_after_seconds,
     )
     gnome_refresh_interval_seconds = click.prompt(
         "  gnome-refresh-interval seconds",
@@ -4179,6 +4196,7 @@ def setup() -> None:
         idle_delay_seconds=idle_delay_seconds,
         api_call_delay_milliseconds=api_call_delay_milliseconds,
         api_call_timeout_milliseconds=api_call_timeout_milliseconds,
+        default_retry_after_seconds=default_retry_after_seconds,
         gnome_refresh_interval_seconds=gnome_refresh_interval_seconds,
         billing_data=billing_data,
         currency_symbols=currency_symbols,

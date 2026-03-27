@@ -2,7 +2,7 @@
 @file
 @brief Setup runtime-config prompt and persistence tests.
 @details Verifies setup prompt order for idle-delay, API-call delay milliseconds,
-API-call timeout milliseconds, gnome-refresh-interval, billing dataset, and
+API-call timeout milliseconds, default Retry-After seconds, gnome-refresh-interval, billing dataset, and
 per-provider currency symbol fields, then final logging mode fields;
 persists selected values to `~/.config/aibar/config.json`.
 @satisfies REQ-005
@@ -61,8 +61,8 @@ def test_setup_prompts_runtime_config_before_credentials(
     """
     @brief Verify setup prompt order and runtime-config persistence.
     @details Ensures setup asks `idle-delay` first, `api-call delay` second,
-    `api-call timeout` third, `gnome-refresh-interval` fourth, `billing_data`
-    fifth, then per-provider currency symbols (one prompt per provider:
+    `api-call timeout` third, `default-retry-after` fourth, `gnome-refresh-interval` fifth, `billing_data`
+    sixth, then per-provider currency symbols (one prompt per provider:
     claude, openai, openrouter, copilot, codex, geminiai), then GeminiAI
     OAuth source prompt, provider credential prompts, final logging prompts,
     then writes all selected values to runtime config JSON.
@@ -75,12 +75,13 @@ def test_setup_prompts_runtime_config_before_credentials(
     """
     config_dir = _patch_config_paths(monkeypatch, tmp_path)
     prompts: list[str] = []
-    # 5 runtime values + 6 currency symbols + OAuth source + empty credentials + 2 logging modes
+    # 6 runtime values + 6 currency symbols + OAuth source + empty credentials + 2 logging modes
     responses = iter(
         [
             450,
             2500,
             5200,
+            3600,
             90,
             "billing_data",
             "$",
@@ -125,20 +126,21 @@ def test_setup_prompts_runtime_config_before_credentials(
     assert prompts[0] == "  idle-delay seconds"
     assert prompts[1] == "  api-call delay milliseconds"
     assert prompts[2] == "  api-call timeout milliseconds"
-    assert prompts[3] == "  gnome-refresh-interval seconds"
-    assert prompts[4] == "  billing_data"
-    assert prompts[5] == "  claude currency symbol"
-    assert prompts[6] == "  openai currency symbol"
-    assert prompts[7] == "  openrouter currency symbol"
-    assert prompts[8] == "  copilot currency symbol"
-    assert prompts[9] == "  codex currency symbol"
-    assert prompts[10] == "  geminiai currency symbol"
-    assert prompts[11] == "  geminiai oauth source"
-    assert prompts[12] == "  OPENROUTER_API_KEY"
-    assert prompts[13] == "  OPENAI_ADMIN_KEY"
-    assert prompts[14] == "  GITHUB_TOKEN"
-    assert prompts[15] == "  execution log mode"
-    assert prompts[16] == "  debug api log mode"
+    assert prompts[3] == "  default-retry-after seconds"
+    assert prompts[4] == "  gnome-refresh-interval seconds"
+    assert prompts[5] == "  billing_data"
+    assert prompts[6] == "  claude currency symbol"
+    assert prompts[7] == "  openai currency symbol"
+    assert prompts[8] == "  openrouter currency symbol"
+    assert prompts[9] == "  copilot currency symbol"
+    assert prompts[10] == "  codex currency symbol"
+    assert prompts[11] == "  geminiai currency symbol"
+    assert prompts[12] == "  geminiai oauth source"
+    assert prompts[13] == "  OPENROUTER_API_KEY"
+    assert prompts[14] == "  OPENAI_ADMIN_KEY"
+    assert prompts[15] == "  GITHUB_TOKEN"
+    assert prompts[16] == "  execution log mode"
+    assert prompts[17] == "  debug api log mode"
 
     runtime_config = json.loads(
         (config_dir / "config.json").read_text(encoding="utf-8")
@@ -146,6 +148,7 @@ def test_setup_prompts_runtime_config_before_credentials(
     assert runtime_config["idle_delay_seconds"] == 450
     assert runtime_config["api_call_delay_milliseconds"] == 2500
     assert runtime_config["api_call_timeout_milliseconds"] == 5200
+    assert runtime_config["default_retry_after_seconds"] == 3600
     assert runtime_config["gnome_refresh_interval_seconds"] == 90
     assert runtime_config["billing_data"] == "billing_data"
     assert runtime_config["currency_symbols"] == {
@@ -204,6 +207,7 @@ def test_setup_accepts_geminiai_oauth_json_paste_and_persists_runtime_fields(
             300,
             1000,
             5000,
+            3600,
             60,
             "billing_data",
             "$",
@@ -330,6 +334,7 @@ def test_setup_geminiai_oauth_login_source_reauthorizes_with_current_scopes(
             300,
             1000,
             5000,
+            3600,
             60,
             "billing_data",
             "$",

@@ -48,11 +48,13 @@ def _patch_config_paths(monkeypatch, tmp_path: Path) -> Path:
 def _make_429_provider_result(
     provider_name: ProviderName,
     retry_after_seconds: int | float | str,
+    retry_after_unavailable: bool = False,
 ) -> ProviderResult:
     """
     @brief Build deterministic HTTP 429 provider result payload.
     @param provider_name {ProviderName} Provider identifier.
     @param retry_after_seconds {int | float | str} Retry-after value to encode.
+    @param retry_after_unavailable {bool} Whether Retry-After metadata is unavailable.
     @return {ProviderResult} Error result with status/retry metadata.
     """
     return ProviderResult(
@@ -63,6 +65,7 @@ def _make_429_provider_result(
         raw={
             "status_code": 429,
             "retry_after_seconds": retry_after_seconds,
+            "retry_after_unavailable": retry_after_unavailable,
         },
     )
 
@@ -316,3 +319,56 @@ def test_auth_failure_updates_idle_time_with_idle_delay_floor(
         codex_state["idle_until_timestamp"] - codex_state["last_success_timestamp"]
     )
     assert 299 <= codex_delta <= 301
+
+
+def test_429_without_retry_after_uses_configured_default_retry_after(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """
+    @brief Verify retry-after-unavailable path uses setup-configured default Retry-After.
+    @details Executes one rate-limit provider failure with `retry_after_unavailable=true`
+    and `retry_after_seconds=0`, then asserts idle-time delta follows
+    `RuntimeConfig.default_retry_after_seconds` (fallback 1h in this scenario).
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @param tmp_path {Path} Temporary path fixture.
+    @return {None} Function return value.
+    @satisfies REQ-041
+    """
+    _patch_config_paths(monkeypatch, tmp_path)
+    config_module.save_runtime_config(
+        config_module.RuntimeConfig(
+            idle_delay_seconds=300,
+            api_call_delay_milliseconds=20,
+            default_retry_after_seconds=3600,
+        )
+    )
+
+    openrouter = MagicMock()
+    openrouter.name = ProviderName.OPENROUTER
+    openrouter.is_configured.return_value = True
+    openrouter.fetch = AsyncMock(
+        return_value=_make_429_provider_result(
+            ProviderName.OPENROUTER,
+            0,
+            retry_after_unavailable=True,
+        )
+    )
+
+    monkeypatch.setattr(
+        "aibar.cli.get_providers",
+        lambda: {ProviderName.OPENROUTER: openrouter},
+    )
+    monkeypatch.setattr("aibar.cli._apply_api_call_delay", lambda state: None)
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["show", "--json", "--force"])
+    assert result.exit_code == 0
+
+    idle_state = json.loads(config_module.IDLE_TIME_PATH.read_text(encoding="utf-8"))
+    openrouter_state = idle_state[ProviderName.OPENROUTER.value]
+    openrouter_delta = (
+        openrouter_state["idle_until_timestamp"]
+        - openrouter_state["last_success_timestamp"]
+    )
+    assert 3599 <= openrouter_delta <= 3601

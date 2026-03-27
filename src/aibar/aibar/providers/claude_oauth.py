@@ -297,7 +297,7 @@ Note: Token must start with 'sk-ant-' prefix."""
             )
 
         if response.status_code == 429:
-            retry_after_raw = response.headers.get("retry-after", "0")
+            retry_after_raw = response.headers.get("retry-after")
             retry_after_seconds = _parse_retry_after_header(retry_after_raw)
             return self._make_error_result(
                 window=window,
@@ -305,6 +305,7 @@ Note: Token must start with 'sk-ant-' prefix."""
                 raw={
                     "status_code": 429,
                     "retry_after_seconds": retry_after_seconds,
+                    "retry_after_unavailable": retry_after_raw is None,
                 },
             )
 

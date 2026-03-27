@@ -285,13 +285,18 @@ Note: Token needs 'read:user' scope."""
                         "body": response.text,
                     }
                     if response.status_code == 429:
-                        retry_after_raw = response.headers.get("retry-after", "0")
+                        retry_after_raw = response.headers.get("retry-after")
                         try:
-                            raw_payload["retry_after_seconds"] = max(
-                                0.0, float(retry_after_raw)
+                            raw_payload["retry_after_seconds"] = (
+                                max(0.0, float(retry_after_raw))
+                                if retry_after_raw is not None
+                                else 0.0
                             )
                         except (TypeError, ValueError):
                             raw_payload["retry_after_seconds"] = 0.0
+                        raw_payload["retry_after_unavailable"] = (
+                            retry_after_raw is None
+                        )
                     return self._make_error_result(
                         window=effective_window,
                         error=f"API error: HTTP {response.status_code}",
