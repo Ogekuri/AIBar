@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.23.0](https://github.com/Ogekuri/AIBar/compare/v0.22.0..v0.23.0) - 2026-03-27
+### 🐛  Bug Fixes
+- include refresh error reason [useReq] *(geminiai)*
+  - include Google refresh reason in GeminiAI auth error message\n- add reproducer for refresh error diagnostics\n- update workflow and regenerate references
+
+### 🚜  Changes
+- enforce lock acquisition timeout [useReq] *(config)*
+  - update REQ-066/REQ-112 and add TST-051 for lock timeout behavior\n- enforce 5s lock-file acquisition timeout with explicit error and runtime log row\n- propagate lock timeout to CLI show with non-zero exit\n- add lock-timeout regression tests and update workflow/references
+
 ## [0.22.0](https://github.com/Ogekuri/AIBar/compare/v0.21.0..v0.22.0) - 2026-03-27
 ### 🐛  Bug Fixes
 - normalize Claude retry fallback [useReq] *(cli)*
@@ -965,6 +974,7 @@
 - \[0.20.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.20.0
 - \[0.21.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.21.0
 - \[0.22.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.22.0
+- \[0.23.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.23.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -988,3 +998,4 @@
 [0.20.0]: https://github.com/Ogekuri/AIBar/compare/v0.19.0..v0.20.0
 [0.21.0]: https://github.com/Ogekuri/AIBar/compare/v0.20.0..v0.21.0
 [0.22.0]: https://github.com/Ogekuri/AIBar/compare/v0.21.0..v0.22.0
+[0.23.0]: https://github.com/Ogekuri/AIBar/compare/v0.22.0..v0.23.0
