@@ -17,6 +17,7 @@ from click.testing import CliRunner
 from aibar import cli as cli_module
 from aibar import config as config_module
 from aibar.config import RuntimeConfig
+from aibar.providers.claude_oauth import ClaudeOAuthProvider
 from aibar.providers.base import (
     BaseProvider,
     ProviderError,
@@ -485,3 +486,67 @@ def test_failure_logging_records_retry_after_unavailable_evidence(
     assert "retry_after_unavailable=true" in log_text
     assert "retry_after_source=probe_exhausted" in log_text
     assert '"raw.retry_after_seconds": null' in log_text
+
+
+def test_claude_dual_window_failures_log_retry_after_and_unavailable_evidence(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """
+    @brief Verify Claude dual-window fail results emit retry-after and unavailable evidence.
+    @details Routes retrieval through Claude dual-window refresh branch and asserts
+    runtime log contains one rate-limit row with `retry_after_seconds` plus one
+    oauth row with `retry_after_unavailable=true` evidence payload.
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @param tmp_path {Path} Temporary path fixture.
+    @return {None} Function return value.
+    @satisfies TST-050
+    """
+    _, cache_dir = _patch_paths(monkeypatch, tmp_path)
+    config_module.save_runtime_config(
+        RuntimeConfig(log_enabled=True, debug_enabled=False)
+    )
+    claude_provider = ClaudeOAuthProvider(token="sk-ant-test-token")
+    providers: dict[ProviderName, BaseProvider] = {
+        ProviderName.CLAUDE: claude_provider,
+    }
+    claude_rate_limit = ProviderResult(
+        provider=ProviderName.CLAUDE,
+        window=WindowPeriod.HOUR_5,
+        metrics=UsageMetrics(),
+        raw={"status_code": 429, "retry_after_seconds": 180},
+        error="Rate limited. Try again later.",
+    )
+    claude_oauth = ProviderResult(
+        provider=ProviderName.CLAUDE,
+        window=WindowPeriod.DAY_7,
+        metrics=UsageMetrics(),
+        raw={"status_code": 401, "oauth_marker": "missing_retry_after"},
+        error="OAuth access denied",
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "_fetch_claude_dual_with_auth_recovery",
+        lambda provider, throttle_state=None: (claude_rate_limit, claude_oauth),
+    )
+
+    cli_module.retrieve_results_via_cache_pipeline(
+        provider_filter=None,
+        target_window=WindowPeriod.DAY_7,
+        force_refresh=True,
+        providers=providers,
+    )
+
+    log_text = _read_log(cache_dir)
+    assert (
+        "provider.fetch.failure provider=claude window=5h category=rate_limit"
+        in log_text
+    )
+    assert "retry_after_seconds=180" in log_text
+    assert "retry_after_source=raw.retry_after_seconds" in log_text
+    assert (
+        "provider.fetch.failure provider=claude window=7d category=oauth"
+        in log_text
+    )
+    assert "retry_after_unavailable=true" in log_text
+    assert "retry_after_source=probe_exhausted" in log_text

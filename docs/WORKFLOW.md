@@ -151,7 +151,7 @@
           - `_blocking_file_lock(...)`: poll lock-file release at 250ms and own lock lifecycle for `cache.json` read [`src/aibar/aibar/config.py`]
           - `_lock_file_path(...)`: resolve lock-file name `<cache-file>.lock` under `~/.cache/aibar/` [`src/aibar/aibar/config.py`]
         - `_normalize_cache_document(...)`: normalize decoded cache payload to canonical sectioned schema [`src/aibar/aibar/cli.py`]
-        - `_refresh_and_persist_cache_payload(...)`: execute modular API calls for expired providers, merge results in memory, persist cache/idle updates, and append refresh-branch runtime log rows [`src/aibar/aibar/cli.py`]
+        - `_refresh_and_persist_cache_payload(...)`: execute modular API calls for expired providers, merge results in memory, persist cache/idle updates, and append refresh-branch runtime log rows; Claude dual-window refresh path appends provider failure runtime logs for both `5h` and `7d` results so OAuth/429 failures always emit retry-after or unavailability evidence [`src/aibar/aibar/cli.py`]
           - `append_runtime_log_line(...)`: append refresh branch start/skip/write/end rows [`src/aibar/aibar/config.py`]
           - `_fetch_result(...)`: throttled provider fetch wrapper with API-call start/end/error runtime logging, OAuth/rate-limit failure-category logging, and debug-result logging [`src/aibar/aibar/cli.py`]
             - `_append_provider_failure_runtime_log(...)`: append non-debug failure rows for categories `oauth` and `rate_limit`, including extracted `retry_after_seconds` plus source when available, otherwise `retry_after_unavailable=true` and retry-after probe evidence payload [`src/aibar/aibar/cli.py`]

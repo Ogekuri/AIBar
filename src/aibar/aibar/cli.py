@@ -2564,6 +2564,8 @@ def _refresh_and_persist_cache_payload(
             fetched_results.extend([result_5h, result_7d])
             _record_attempt_status(status_section, result_5h)
             _record_attempt_status(status_section, result_7d)
+            _append_provider_failure_runtime_log(result_5h)
+            _append_provider_failure_runtime_log(result_7d)
 
             preferred_success: ProviderResult | None = None
             if target_window == WindowPeriod.HOUR_5:
