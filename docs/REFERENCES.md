@@ -340,7 +340,7 @@ from typing import Any
 
 ---
 
-# cli.py | Python | 4605L | 125 symbols | 31 imports | 140 comments
+# cli.py | Python | 4615L | 125 symbols | 31 imports | 142 comments
 > Path: `src/aibar/aibar/cli.py`
 - @brief Command-line interface for aibar.
 - @details Defines command parsing, provider dispatch, formatted output, setup helpers, login flows, and UI launch hooks.
@@ -1096,7 +1096,7 @@ used to enforce inter-call spacing for live API requests.
 - @satisfies REQ-114
 - @satisfies REQ-115
 
-### fn `def _extract_claude_dual_payload(` `priv` (L2356-2358)
+### fn `def _extract_claude_dual_payload(` `priv` (L2366-2368)
 - @brief Fetch Claude 5h and 7d results via a single API call.
 - @details Executes ClaudeOAuthProvider.fetch_all_windows for 5h and 7d on each invocation.
 Returns normalized provider results exactly as fetched (or synthesized error
@@ -1109,7 +1109,7 @@ used to enforce inter-call spacing for live API requests.
 - @satisfies REQ-112
 - @satisfies REQ-114
 
-### fn `def _normalize_claude_dual_payload(payload: object) -> dict[str, object] | None` `priv` (L2380-2402)
+### fn `def _normalize_claude_dual_payload(payload: object) -> dict[str, object] | None` `priv` (L2390-2412)
 - @brief Extract dual-window Claude payload dictionary from successful results.
 - @brief Normalize persisted Claude payload shape into dual-window raw dictionary.
 - @details Returns first raw payload containing both `five_hour` and `seven_day`
@@ -1124,9 +1124,9 @@ mapping objects. Returns None when payload shape is invalid.
 - @satisfies REQ-047
 - @satisfies REQ-036
 
-### fn `def _extract_snapshot_reset_at(` `priv` (L2403-2405)
+### fn `def _extract_snapshot_reset_at(` `priv` (L2413-2415)
 
-### fn `def _extract_snapshot_utilization(` `priv` (L2428-2430)
+### fn `def _extract_snapshot_utilization(` `priv` (L2438-2440)
 - @brief Resolve projected reset timestamp from persisted Claude snapshot payload.
 - @details Uses window-specific `resets_at` string from persisted payload and
 projects next reset boundary through `_project_next_reset`.
@@ -1135,7 +1135,7 @@ projects next reset boundary through `_project_next_reset`.
 - @return {datetime | None} Projected reset timestamp or None.
 - @satisfies REQ-036
 
-### fn `def _is_claude_rate_limited_result(result: ProviderResult) -> bool` `priv` (L2459-2474)
+### fn `def _is_claude_rate_limited_result(result: ProviderResult) -> bool` `priv` (L2469-2484)
 - @brief Resolve utilization percentage from persisted Claude snapshot payload.
 - @brief Check whether a ProviderResult represents Claude HTTP 429.
 - @details Reads window-specific `utilization`, validates finite range, and clamps
@@ -1149,9 +1149,9 @@ values to [0.0, 100.0] for deterministic percentage rendering.
 - @satisfies REQ-036
 - @satisfies REQ-036
 
-### fn `def _build_claude_rate_limited_partial_result(` `priv` (L2475-2478)
+### fn `def _build_claude_rate_limited_partial_result(` `priv` (L2485-2488)
 
-### fn `def _refresh_and_persist_cache_payload(` `priv` (L2523-2527)
+### fn `def _refresh_and_persist_cache_payload(` `priv` (L2533-2537)
 - @brief Build Claude 429 partial-window result using persisted payload when available.
 - @details For 5h window, usage is always forced to 100.0% while reset time is read
 from persisted payload (`five_hour.resets_at`) when possible. For 7d window,
@@ -1165,7 +1165,7 @@ available; otherwise synthetic window-based fallback values are used.
 - @satisfies REQ-036
 - @satisfies REQ-037
 
-### fn `def retrieve_results_via_cache_pipeline(` (L2635-2639)
+### fn `def retrieve_results_via_cache_pipeline(` (L2645-2649)
 - @brief Execute modular API calls, merge results into cache in memory, then persist.
 - @details Executes provider fetches for configured providers only, records
 per-provider/window attempt status in memory, updates payload only for successful
@@ -1193,7 +1193,7 @@ The `cache_document` parameter is the previously loaded cache content passed fro
 - @satisfies REQ-092
 - @satisfies REQ-094
 
-### fn `def _build_cached_dual_window_results(` `priv` (L2816-2819)
+### fn `def _build_cached_dual_window_results(` `priv` (L2826-2829)
 - @brief Execute shared cache-based retrieval pipeline for CLI `show`.
 - @details Implements the canonical `show` process flow:
 (1) Evaluate idle-time per provider to determine refresh need.
@@ -1224,13 +1224,13 @@ After refresh, the in-memory cache document is used directly without a second re
 - @satisfies REQ-093
 - @satisfies REQ-094
 
-### fn `def main(ctx: click.Context) -> None` `@click.pass_context` (L2935-2945)
+### fn `def main(ctx: click.Context) -> None` `@click.pass_context` (L2945-2955)
 - @brief Execute main.
 - @details Applies main logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 - @satisfies REQ-068
 
-### fn `def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> None` (L2978-3159)
+### fn `def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> None` (L2988-3169)
 - @brief Execute `show` with idle-time cache gating and throttled provider refresh.
 - @details Delegates provider retrieval to a shared cache-based pipeline that applies force handling, idle-time gating, conditional cache refresh, and deterministic readback from `cache.json` before rendering. When `--provider` targets `copilot`, `openrouter`, `openai`, or `geminiai`, effective window is forced to `30d` regardless of `--window`.
 - @param provider {str} CLI provider selector string.
@@ -1252,14 +1252,14 @@ After refresh, the in-memory cache document is used directly without a second re
 - @satisfies REQ-067
 - @satisfies REQ-097
 
-### fn `def _provider_display_name(provider_name: ProviderName) -> str` `priv` (L3160-3174)
+### fn `def _provider_display_name(provider_name: ProviderName) -> str` `priv` (L3170-3184)
 - @brief Resolve human-facing provider title for terminal panel rendering.
 - @details Maps machine-readable provider keys to display names aligned with CLI and GNOME extension output surfaces; applies uppercase `GEMINIAI` override for provider key `geminiai`.
 - @param provider_name {ProviderName} Provider enum key.
 - @return {str} Human-facing provider display name.
 - @satisfies REQ-062
 
-### fn `def _provider_panel_sort_key(provider_name: ProviderName) -> tuple[int, str]` `priv` (L3175-3190)
+### fn `def _provider_panel_sort_key(provider_name: ProviderName) -> tuple[int, str]` `priv` (L3185-3200)
 - @brief Build deterministic provider sort key for CLI `show` panel ordering.
 - @details Applies canonical provider order `claude/openrouter/copilot/codex/openai/geminiai`; unknown providers are appended after known providers using lexical fallback.
 - @param provider_name {ProviderName} Provider enum key.
@@ -1267,34 +1267,34 @@ After refresh, the in-memory cache document is used directly without a second re
 - @satisfies REQ-067
 - @satisfies TST-030
 
-### fn `def _provider_panel_color_code(provider_name: ProviderName) -> str` `priv` (L3191-3200)
+### fn `def _provider_panel_color_code(provider_name: ProviderName) -> str` `priv` (L3201-3210)
 - @brief Resolve ANSI color code for one provider output surface.
 - @param provider_name {ProviderName} Provider enum key.
 - @return {str} ANSI foreground color code.
 - @satisfies REQ-067
 
-### fn `def _provider_supports_api_counters(provider_name: ProviderName) -> bool` `priv` (L3201-3212)
+### fn `def _provider_supports_api_counters(provider_name: ProviderName) -> bool` `priv` (L3211-3222)
 - @brief Determine whether provider panels always render API counter lines.
 - @details Returns true for providers that expose requests/token counters in CLI and GNOME output surfaces, enforcing null-to-zero normalization.
 - @param provider_name {ProviderName} Provider enum key.
 - @return {bool} True when requests/tokens lines must render on OK state.
 - @satisfies REQ-036
 
-### fn `def _strip_ansi_sequences(value: str) -> str` `priv` (L3213-3224)
+### fn `def _strip_ansi_sequences(value: str) -> str` `priv` (L3223-3234)
 - @brief Remove ANSI SGR color escape sequences from terminal text.
 - @details Strips `\x1b[...m` segments so panel width calculations can use visible glyph length instead of byte length with hidden control codes.
 - @param value {str} Input string that may include ANSI color escapes.
 - @return {str} String with ANSI SGR escapes removed.
 - @satisfies REQ-067
 
-### fn `def _visible_text_length(value: str) -> int` `priv` (L3225-3236)
+### fn `def _visible_text_length(value: str) -> int` `priv` (L3235-3246)
 - @brief Compute visible text length for terminal panel alignment.
 - @details Calculates string length after ANSI SGR stripping to keep bordered-panel width deterministic for colored progress bar rows.
 - @param value {str} Input string potentially containing ANSI escapes.
 - @return {int} Visible glyph count used by panel width and padding logic.
 - @satisfies REQ-067
 
-### fn `def _ansi_ljust(value: str, width: int) -> str` `priv` (L3237-3249)
+### fn `def _ansi_ljust(value: str, width: int) -> str` `priv` (L3247-3259)
 - @brief Left-pad ANSI-colored text to one visible width.
 - @details Appends trailing spaces using visible-length semantics so rows that include ANSI escapes align with border columns exactly.
 - @param value {str} Source text rendered inside one panel cell.
@@ -1302,7 +1302,7 @@ After refresh, the in-memory cache document is used directly without a second re
 - @return {str} Padded terminal text preserving existing ANSI sequences.
 - @satisfies REQ-067
 
-### fn `def _ansi_rjust(value: str, width: int) -> str` `priv` (L3250-3262)
+### fn `def _ansi_rjust(value: str, width: int) -> str` `priv` (L3260-3272)
 - @brief Right-pad ANSI-colored text to one visible width.
 - @details Prefixes leading spaces using visible-length semantics so rows that include ANSI escapes align right to panel content width deterministically.
 - @param value {str} Source text rendered inside one panel cell.
@@ -1310,7 +1310,7 @@ After refresh, the in-memory cache document is used directly without a second re
 - @return {str} Right-aligned terminal text preserving ANSI sequences.
 - @satisfies REQ-067
 
-### fn `def _is_right_aligned_panel_line(value: str) -> bool` `priv` (L3263-3275)
+### fn `def _is_right_aligned_panel_line(value: str) -> bool` `priv` (L3273-3285)
 - @brief Determine whether one panel body line must render right-aligned.
 - @details Marks freshness rows (`Updated: ..., Next: ...`) for right-aligned rendering while all other body rows remain left-aligned.
 - @param value {str} Panel body line candidate.
@@ -1318,7 +1318,7 @@ After refresh, the in-memory cache document is used directly without a second re
 - @satisfies REQ-067
 - @satisfies REQ-084
 
-### fn `def _format_bright_white_bold(value: str) -> str` `priv` (L3276-3288)
+### fn `def _format_bright_white_bold(value: str) -> str` `priv` (L3286-3298)
 - @brief Wrap one metric value with bright-white bold ANSI style.
 - @details Applies ANSI SGR sequences for bold (`1`) and bright-white foreground (`97`) and appends reset (`0`) for deterministic inline metric emphasis.
 - @param value {str} Visible metric value string.
@@ -1326,7 +1326,7 @@ After refresh, the in-memory cache document is used directly without a second re
 - @satisfies REQ-035
 - @satisfies REQ-051
 
-### fn `def _wrap_panel_lines(body_lines: list[str], wrap_width: int) -> list[str]` `priv` (L3289-3313)
+### fn `def _wrap_panel_lines(body_lines: list[str], wrap_width: int) -> list[str]` `priv` (L3299-3323)
 - @brief Wrap panel body lines to one deterministic visible width.
 - @details Applies ANSI-aware wrapping: lines containing ANSI SGR sequences are measured by visible glyph length and wrapped on stripped text only when needed.
 - @param body_lines {list[str]} Raw panel body lines.
@@ -1334,7 +1334,7 @@ After refresh, the in-memory cache document is used directly without a second re
 - @return {list[str]} Wrapped panel lines ready for width calculation/rendering.
 - @satisfies REQ-067
 
-### fn `def _panel_content_width(title: str, body_lines: list[str]) -> int` `priv` (L3314-3333)
+### fn `def _panel_content_width(title: str, body_lines: list[str]) -> int` `priv` (L3324-3343)
 - @brief Resolve one panel visible content width from title and body lines.
 - @details Computes width from wrapped visible-line lengths and clamps to configured min/max panel boundaries.
 - @param title {str} Panel title string.
@@ -1342,9 +1342,9 @@ After refresh, the in-memory cache document is used directly without a second re
 - @return {int} Content width used for bordered panel rendering.
 - @satisfies REQ-067
 
-### fn `def _resolve_shared_panel_content_width(` `priv` (L3334-3335)
+### fn `def _resolve_shared_panel_content_width(` `priv` (L3344-3345)
 
-### fn `def _emit_provider_panel(` `priv` (L3353-3357)
+### fn `def _emit_provider_panel(` `priv` (L3363-3367)
 - @brief Resolve shared panel width for one CLI show rendering cycle.
 - @details Selects the largest computed content width across all rendered
 provider panels, then applies that width to every panel in the cycle.
@@ -1352,7 +1352,7 @@ provider panels, then applies that width to every panel in the cycle.
 - @return {int} Shared content width used by all emitted panels.
 - @satisfies REQ-067
 
-### fn `def _format_http_status_retry_line(` `priv` (L3401-3403)
+### fn `def _format_http_status_retry_line(` `priv` (L3411-3413)
 - @brief Render provider-colored ANSI bordered output panel with wrapped content lines.
 - @details Creates fixed-width terminal panels aligned with GNOME extension
 card layout, preserving deterministic borders and line wrapping behavior.
@@ -1364,7 +1364,7 @@ Border and title color use provider-specific ANSI palette.
 - @return {None} Function return value.
 - @satisfies REQ-067
 
-### fn `def _build_fail_panel_lines(` `priv` (L3425-3428)
+### fn `def _build_fail_panel_lines(` `priv` (L3435-3438)
 - @brief Build normalized HTTP status/retry diagnostic line for text output.
 - @details Returns one deterministic line matching requirement wording:
 `HTTP status: <code>, Retry after: <seconds> sec.` when both values exist.
@@ -1373,7 +1373,7 @@ Border and title color use provider-specific ANSI palette.
 - @return {str | None} Diagnostic line or None when both values are missing.
 - @satisfies REQ-037
 
-### fn `def _build_result_panel(` `priv` (L3449-3453)
+### fn `def _build_result_panel(` `priv` (L3459-3463)
 - @brief Build deterministic CLI body lines for one failed provider panel.
 - @details Emits the required failed-state block layout: `Status: FAIL`, blank
 separator, `Reason: <reason>`, blank separator, and one right-aligned
@@ -1385,7 +1385,7 @@ freshness line (`Updated: ..., Next: ...`) using provider freshness state.
 - @satisfies REQ-036
 - @satisfies REQ-084
 
-### fn `def _format_billing_service_descriptions(services: list[object]) -> str | None` `priv` (L3606-3633)
+### fn `def _format_billing_service_descriptions(services: list[object]) -> str | None` `priv` (L3616-3643)
 - @brief Build one provider panel title/body payload for CLI text rendering.
 - @brief Build human-readable GeminiAI billing service summary.
 - @details Formats deterministic panel lines for one provider/window result and
@@ -1412,9 +1412,9 @@ carrying `last_success_timestamp` and `idle_until_timestamp` freshness values.
 - @satisfies REQ-084
 - @satisfies REQ-106
 
-### fn `def _build_dual_window_panel(` `priv` (L3634-3638)
+### fn `def _build_dual_window_panel(` `priv` (L3644-3648)
 
-### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L3749-3767)
+### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L3759-3777)
 - @brief Build one grouped CLI panel for dual-window providers.
 - @brief Render CLI text output for one provider result.
 - @details Produces one provider panel from `5h` and `7d` results while
@@ -1441,15 +1441,15 @@ trailing right-aligned freshness line.
 - @satisfies REQ-051
 - @satisfies REQ-067
 
-### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L3768-3783)
+### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L3778-3793)
 - @brief Execute format reset duration.
 - @details Applies format reset duration logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param seconds {float} Input parameter `seconds`.
 - @return {str} Function return value.
 
-### fn `def _should_print_claude_reset_pending_hint(` `priv` (L3784-3786)
+### fn `def _should_print_claude_reset_pending_hint(` `priv` (L3794-3796)
 
-### fn `def _is_displayed_zero_percent(percent: float | None) -> bool` `priv` (L3806-3822)
+### fn `def _is_displayed_zero_percent(percent: float | None) -> bool` `priv` (L3816-3832)
 - @brief Determine whether CLI output must render the reset-pending fallback hint.
 - @brief Check whether a percentage renders as `0.0%` in one-decimal UI output.
 - @details The hint is only valid for Claude windows when no reset timestamp is
@@ -1465,7 +1465,7 @@ providers other than Claude.
 - @satisfies REQ-002
 - @satisfies REQ-002
 
-### fn `def _progress_bar(percent: float, provider_name: ProviderName, width: int = 20) -> str` `priv` (L3823-3838)
+### fn `def _progress_bar(percent: float, provider_name: ProviderName, width: int = 20) -> str` `priv` (L3833-3848)
 - @brief Execute progress bar.
 - @details Applies progress bar logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param percent {float} Input parameter `percent`.
@@ -1473,17 +1473,17 @@ providers other than Claude.
 - @param width {int} Input parameter `width`.
 - @return {str} Function return value.
 
-### fn `def doctor() -> None` (L3843-3895)
+### fn `def doctor() -> None` (L3853-3905)
 - @brief Execute doctor.
 - @details Applies doctor logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def env() -> None` (L3900-3908)
+### fn `def env() -> None` (L3910-3918)
 - @brief Execute env.
 - @details Applies env logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def setup() -> None` (L3913-4112)
+### fn `def setup() -> None` (L3923-4122)
 - @brief Execute setup.
 - @details Prompts for `idle_delay_seconds`, `api_call_delay_milliseconds`, `api_call_timeout_milliseconds`, `default_retry_after_seconds`, `gnome_refresh_interval_seconds`, and `billing_data` in order, then prompts for provider currency symbols including `geminiai` (choices: `$`, `£`, `€`, default `$`), then persists all values to `~/.config/aibar/config.json`. Final setup section configures logging flags (`log_enabled`, `debug_enabled`). GeminiAI OAuth source supports `skip`, `file`, `paste`, and `login` (re-authorization with current scopes). Also prompts for provider API keys and writes them to `~/.config/aibar/env`.
 - @return {None} Function return value.
@@ -1494,43 +1494,43 @@ providers other than Claude.
 - @satisfies REQ-056
 - @satisfies REQ-059
 
-### fn `def login(provider: str) -> None` (L4240-4258)
+### fn `def login(provider: str) -> None` (L4250-4268)
 - @brief Execute login.
 - @details Applies login logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param provider {str} Input parameter `provider`.
 - @return {None} Function return value.
 
-### fn `def _login_claude() -> None` `priv` (L4259-4307)
+### fn `def _login_claude() -> None` `priv` (L4269-4317)
 - @brief Execute login claude.
 - @details Applies login claude logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_copilot() -> None` `priv` (L4308-4335)
+### fn `def _login_copilot() -> None` `priv` (L4318-4345)
 - @brief Execute login copilot.
 - @details Applies login copilot logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_geminiai() -> None` `priv` (L4336-4374)
+### fn `def _login_geminiai() -> None` `priv` (L4346-4384)
 - @brief Execute GeminiAI OAuth login flow.
 - @details Reuses persisted OAuth client configuration to launch browser-based authorization and persist refresh-capable Google credentials.
 - @return {None} Function return value.
 - @satisfies REQ-055
 - @satisfies REQ-056
 
-### fn `def _resolve_extension_source_dir() -> Path` `priv` (L4375-4387)
+### fn `def _resolve_extension_source_dir() -> Path` `priv` (L4385-4397)
 - @brief Resolve GNOME extension source directory from within the `aibar` package.
 - @details Uses `Path(__file__).resolve().parent` to locate the `aibar` package directory, then appends `gnome-extension/<UUID>/`. Works in development (editable install), wheel-installed, and `uv tool install` layouts because the extension directory resides inside the `aibar` Python package subtree.
 - @return {Path} Absolute path to the extension source directory.
 - @satisfies REQ-025, REQ-083
 
-### fn `def gnome_install() -> None` (L4398-4524)
+### fn `def gnome_install() -> None` (L4408-4534)
 - @brief Install or update the AIBar GNOME Shell extension to the user's local extensions directory.
 - @details Resolves extension source from the installed package path, validates source directory contains `metadata.json` and is non-empty, then executes one of two flows: install flow (`target` absent) creates target and copies files before enabling extension; update flow (`target` present) disables extension, copies files, then enables extension. Update flow masks non-zero disable outcomes caused by missing extension and continues. Produces colored Click-styled terminal output for all status messages.
 - @return {None} Function return value.
 - @throws {SystemExit} Exits with code 1 on prerequisite validation failure.
 - @satisfies PRJ-008, REQ-025, REQ-026, REQ-027, REQ-028, REQ-029, REQ-030, REQ-032, REQ-099
 
-### fn `def gnome_uninstall() -> None` (L4534-4603)
+### fn `def gnome_uninstall() -> None` (L4544-4613)
 - @brief Remove the AIBar GNOME Shell extension from the user's local extensions directory.
 - @details Disables the extension via `gnome-extensions disable`, then removes the entire extension directory at `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/`. Exits with code 1 if the extension directory does not exist. Produces colored Click-styled terminal output for all status messages.
 - @return {None} Function return value.
@@ -1620,51 +1620,51 @@ providers other than Claude.
 |`_provider_result_debug_summary`|fn|priv|2163-2188|def _provider_result_debug_summary(result: ProviderResult...|
 |`_fetch_result`|fn|priv|2189-2192|def _fetch_result(|
 |`_fetch_claude_dual`|fn|priv|2278-2280|def _fetch_claude_dual(|
-|`_extract_claude_dual_payload`|fn|priv|2356-2358|def _extract_claude_dual_payload(|
-|`_normalize_claude_dual_payload`|fn|priv|2380-2402|def _normalize_claude_dual_payload(payload: object) -> di...|
-|`_extract_snapshot_reset_at`|fn|priv|2403-2405|def _extract_snapshot_reset_at(|
-|`_extract_snapshot_utilization`|fn|priv|2428-2430|def _extract_snapshot_utilization(|
-|`_is_claude_rate_limited_result`|fn|priv|2459-2474|def _is_claude_rate_limited_result(result: ProviderResult...|
-|`_build_claude_rate_limited_partial_result`|fn|priv|2475-2478|def _build_claude_rate_limited_partial_result(|
-|`_refresh_and_persist_cache_payload`|fn|priv|2523-2527|def _refresh_and_persist_cache_payload(|
-|`retrieve_results_via_cache_pipeline`|fn|pub|2635-2639|def retrieve_results_via_cache_pipeline(|
-|`_build_cached_dual_window_results`|fn|priv|2816-2819|def _build_cached_dual_window_results(|
-|`main`|fn|pub|2935-2945|def main(ctx: click.Context) -> None|
-|`show`|fn|pub|2978-3159|def show(provider: str, window: str, output_json: bool, f...|
-|`_provider_display_name`|fn|priv|3160-3174|def _provider_display_name(provider_name: ProviderName) -...|
-|`_provider_panel_sort_key`|fn|priv|3175-3190|def _provider_panel_sort_key(provider_name: ProviderName)...|
-|`_provider_panel_color_code`|fn|priv|3191-3200|def _provider_panel_color_code(provider_name: ProviderNam...|
-|`_provider_supports_api_counters`|fn|priv|3201-3212|def _provider_supports_api_counters(provider_name: Provid...|
-|`_strip_ansi_sequences`|fn|priv|3213-3224|def _strip_ansi_sequences(value: str) -> str|
-|`_visible_text_length`|fn|priv|3225-3236|def _visible_text_length(value: str) -> int|
-|`_ansi_ljust`|fn|priv|3237-3249|def _ansi_ljust(value: str, width: int) -> str|
-|`_ansi_rjust`|fn|priv|3250-3262|def _ansi_rjust(value: str, width: int) -> str|
-|`_is_right_aligned_panel_line`|fn|priv|3263-3275|def _is_right_aligned_panel_line(value: str) -> bool|
-|`_format_bright_white_bold`|fn|priv|3276-3288|def _format_bright_white_bold(value: str) -> str|
-|`_wrap_panel_lines`|fn|priv|3289-3313|def _wrap_panel_lines(body_lines: list[str], wrap_width: ...|
-|`_panel_content_width`|fn|priv|3314-3333|def _panel_content_width(title: str, body_lines: list[str...|
-|`_resolve_shared_panel_content_width`|fn|priv|3334-3335|def _resolve_shared_panel_content_width(|
-|`_emit_provider_panel`|fn|priv|3353-3357|def _emit_provider_panel(|
-|`_format_http_status_retry_line`|fn|priv|3401-3403|def _format_http_status_retry_line(|
-|`_build_fail_panel_lines`|fn|priv|3425-3428|def _build_fail_panel_lines(|
-|`_build_result_panel`|fn|priv|3449-3453|def _build_result_panel(|
-|`_format_billing_service_descriptions`|fn|priv|3606-3633|def _format_billing_service_descriptions(services: list[o...|
-|`_build_dual_window_panel`|fn|priv|3634-3638|def _build_dual_window_panel(|
-|`_print_result`|fn|priv|3749-3767|def _print_result(name: ProviderName, result, label: str ...|
-|`_format_reset_duration`|fn|priv|3768-3783|def _format_reset_duration(seconds: float) -> str|
-|`_should_print_claude_reset_pending_hint`|fn|priv|3784-3786|def _should_print_claude_reset_pending_hint(|
-|`_is_displayed_zero_percent`|fn|priv|3806-3822|def _is_displayed_zero_percent(percent: float | None) -> ...|
-|`_progress_bar`|fn|priv|3823-3838|def _progress_bar(percent: float, provider_name: Provider...|
-|`doctor`|fn|pub|3843-3895|def doctor() -> None|
-|`env`|fn|pub|3900-3908|def env() -> None|
-|`setup`|fn|pub|3913-4112|def setup() -> None|
-|`login`|fn|pub|4240-4258|def login(provider: str) -> None|
-|`_login_claude`|fn|priv|4259-4307|def _login_claude() -> None|
-|`_login_copilot`|fn|priv|4308-4335|def _login_copilot() -> None|
-|`_login_geminiai`|fn|priv|4336-4374|def _login_geminiai() -> None|
-|`_resolve_extension_source_dir`|fn|priv|4375-4387|def _resolve_extension_source_dir() -> Path|
-|`gnome_install`|fn|pub|4398-4524|def gnome_install() -> None|
-|`gnome_uninstall`|fn|pub|4534-4603|def gnome_uninstall() -> None|
+|`_extract_claude_dual_payload`|fn|priv|2366-2368|def _extract_claude_dual_payload(|
+|`_normalize_claude_dual_payload`|fn|priv|2390-2412|def _normalize_claude_dual_payload(payload: object) -> di...|
+|`_extract_snapshot_reset_at`|fn|priv|2413-2415|def _extract_snapshot_reset_at(|
+|`_extract_snapshot_utilization`|fn|priv|2438-2440|def _extract_snapshot_utilization(|
+|`_is_claude_rate_limited_result`|fn|priv|2469-2484|def _is_claude_rate_limited_result(result: ProviderResult...|
+|`_build_claude_rate_limited_partial_result`|fn|priv|2485-2488|def _build_claude_rate_limited_partial_result(|
+|`_refresh_and_persist_cache_payload`|fn|priv|2533-2537|def _refresh_and_persist_cache_payload(|
+|`retrieve_results_via_cache_pipeline`|fn|pub|2645-2649|def retrieve_results_via_cache_pipeline(|
+|`_build_cached_dual_window_results`|fn|priv|2826-2829|def _build_cached_dual_window_results(|
+|`main`|fn|pub|2945-2955|def main(ctx: click.Context) -> None|
+|`show`|fn|pub|2988-3169|def show(provider: str, window: str, output_json: bool, f...|
+|`_provider_display_name`|fn|priv|3170-3184|def _provider_display_name(provider_name: ProviderName) -...|
+|`_provider_panel_sort_key`|fn|priv|3185-3200|def _provider_panel_sort_key(provider_name: ProviderName)...|
+|`_provider_panel_color_code`|fn|priv|3201-3210|def _provider_panel_color_code(provider_name: ProviderNam...|
+|`_provider_supports_api_counters`|fn|priv|3211-3222|def _provider_supports_api_counters(provider_name: Provid...|
+|`_strip_ansi_sequences`|fn|priv|3223-3234|def _strip_ansi_sequences(value: str) -> str|
+|`_visible_text_length`|fn|priv|3235-3246|def _visible_text_length(value: str) -> int|
+|`_ansi_ljust`|fn|priv|3247-3259|def _ansi_ljust(value: str, width: int) -> str|
+|`_ansi_rjust`|fn|priv|3260-3272|def _ansi_rjust(value: str, width: int) -> str|
+|`_is_right_aligned_panel_line`|fn|priv|3273-3285|def _is_right_aligned_panel_line(value: str) -> bool|
+|`_format_bright_white_bold`|fn|priv|3286-3298|def _format_bright_white_bold(value: str) -> str|
+|`_wrap_panel_lines`|fn|priv|3299-3323|def _wrap_panel_lines(body_lines: list[str], wrap_width: ...|
+|`_panel_content_width`|fn|priv|3324-3343|def _panel_content_width(title: str, body_lines: list[str...|
+|`_resolve_shared_panel_content_width`|fn|priv|3344-3345|def _resolve_shared_panel_content_width(|
+|`_emit_provider_panel`|fn|priv|3363-3367|def _emit_provider_panel(|
+|`_format_http_status_retry_line`|fn|priv|3411-3413|def _format_http_status_retry_line(|
+|`_build_fail_panel_lines`|fn|priv|3435-3438|def _build_fail_panel_lines(|
+|`_build_result_panel`|fn|priv|3459-3463|def _build_result_panel(|
+|`_format_billing_service_descriptions`|fn|priv|3616-3643|def _format_billing_service_descriptions(services: list[o...|
+|`_build_dual_window_panel`|fn|priv|3644-3648|def _build_dual_window_panel(|
+|`_print_result`|fn|priv|3759-3777|def _print_result(name: ProviderName, result, label: str ...|
+|`_format_reset_duration`|fn|priv|3778-3793|def _format_reset_duration(seconds: float) -> str|
+|`_should_print_claude_reset_pending_hint`|fn|priv|3794-3796|def _should_print_claude_reset_pending_hint(|
+|`_is_displayed_zero_percent`|fn|priv|3816-3832|def _is_displayed_zero_percent(percent: float | None) -> ...|
+|`_progress_bar`|fn|priv|3833-3848|def _progress_bar(percent: float, provider_name: Provider...|
+|`doctor`|fn|pub|3853-3905|def doctor() -> None|
+|`env`|fn|pub|3910-3918|def env() -> None|
+|`setup`|fn|pub|3923-4122|def setup() -> None|
+|`login`|fn|pub|4250-4268|def login(provider: str) -> None|
+|`_login_claude`|fn|priv|4269-4317|def _login_claude() -> None|
+|`_login_copilot`|fn|priv|4318-4345|def _login_copilot() -> None|
+|`_login_geminiai`|fn|priv|4346-4384|def _login_geminiai() -> None|
+|`_resolve_extension_source_dir`|fn|priv|4385-4397|def _resolve_extension_source_dir() -> Path|
+|`gnome_install`|fn|pub|4408-4534|def gnome_install() -> None|
+|`gnome_uninstall`|fn|pub|4544-4613|def gnome_uninstall() -> None|
 
 
 ---

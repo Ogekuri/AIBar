@@ -2333,6 +2333,16 @@ def _fetch_claude_dual(
     result_7d = fetched.get(WindowPeriod.DAY_7) or provider._make_error_result(
         window=WindowPeriod.DAY_7, error="Missing 7d result"
     )
+    # Ensure fallback retry-after policy can be applied for Claude OAuth/rate-limit
+    # errors when provider payload does not include Retry-After metadata.
+    for _result in (result_5h, result_7d):
+        if not _result.is_error:
+            continue
+        if _coerce_retry_after_seconds(_result.raw.get("retry_after_seconds")) is not None:
+            continue
+        if _result.raw.get("retry_after_unavailable") is True:
+            continue
+        _result.raw["retry_after_unavailable"] = True
 
     append_runtime_log_line(
         "provider.fetch.end provider=claude window=5h "
