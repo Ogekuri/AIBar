@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.21.0](https://github.com/Ogekuri/AIBar/compare/v0.20.0..v0.21.0) - 2026-03-27
+### 🐛  Bug Fixes
+- log claude dual-window retry-after evidence [useReq] *(cli)*
+  - Restore REQ-115 compliance for Claude fail paths in refresh pipeline.
+  - Append provider failure runtime logs for Claude 5h/7d dual-window results.
+  - Add failing reproducer then validate retry_after and unavailable evidence logging.
+  - Update workflow/references docs to reflect runtime call-trace behavior.
+
+### 🚜  Changes
+- add default Retry-After fallback in setup [useReq] *(cli)*
+  - Update REQ-005 and REQ-041 for configurable fallback retry delay.
+  - Add RuntimeConfig.default_retry_after_seconds defaulting to 3600 seconds.
+  - Extend setup timing prompts/persistence with default-retry-after seconds.
+  - Mark provider 429 payloads with retry_after_unavailable when header is absent.
+  - Use configured fallback to compute provider idle_until on retry-after-unavailable.
+  - Update tests plus WORKFLOW/REFERENCES traceability for changed behavior.
+
 ## [0.20.0](https://github.com/Ogekuri/AIBar/compare/v0.19.0..v0.20.0) - 2026-03-27
 ### 🚜  Changes
 - refine provider-scoped Err and retry-after logging [useReq] *(core)*
@@ -936,6 +953,7 @@
 - \[0.18.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.18.0
 - \[0.19.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.19.0
 - \[0.20.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.20.0
+- \[0.21.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.21.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -957,3 +975,4 @@
 [0.18.0]: https://github.com/Ogekuri/AIBar/compare/v0.17.0..v0.18.0
 [0.19.0]: https://github.com/Ogekuri/AIBar/compare/v0.18.0..v0.19.0
 [0.20.0]: https://github.com/Ogekuri/AIBar/compare/v0.19.0..v0.20.0
+[0.21.0]: https://github.com/Ogekuri/AIBar/compare/v0.20.0..v0.21.0
