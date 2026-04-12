@@ -32,10 +32,11 @@ AIBar aggregates usage metrics for Claude, OpenAI, OpenRouter, GitHub Copilot, C
 
 ## Feature Highlights
 - Unified `show` command for multiple providers (`claude`, `openai`, `openrouter`, `copilot`, `codex`, `geminiai`).
-- Human-readable output and JSON output (`--json`) for scripting/integration.
-- Provider diagnostics (`doctor`) and interactive setup (`setup`) for credentials.
-- Local cache of successful results under `~/.cache/aibar` to reduce repeated API calls.
-- GNOME Shell extension
+- Text output and machine output (`show --json`) with stable top-level sections (`payload`, `status`, `idle_time`, `freshness`, `extension`).
+- Per-run refresh override with `show --force` (bypasses idle-time gating for that execution).
+- Interactive setup (`setup`) for runtime controls, credentials, GeminiAI OAuth, provider currency symbols, and logging flags.
+- Built-in lifecycle and observability flags: `--version|--ver`, `--upgrade`, `--uninstall`, `--enable-log`, `--disable-log`, `--enable-debug`, `--disable-debug`.
+- GNOME Shell extension support via `gnome-install` / `gnome-uninstall` plus JSON-driven auto-refresh metadata.
 
 ### Screenshot
 
@@ -46,18 +47,18 @@ AIBar aggregates usage metrics for Claude, OpenAI, OpenRouter, GitHub Copilot, C
 ## Quick Start
 
 ```bash
-# 1) From the repository root, run the launcher
-aibar --help
+# 1) From the repository root, run the repository launcher
+scripts/aibar.sh --help
 
-# 2) Configure credentials interactively
-aibar setup
+# 2) Configure credentials and runtime settings
+scripts/aibar.sh setup
 
 # 3) Verify provider configuration and connectivity
-aibar doctor
+scripts/aibar.sh doctor
 
 # 4) Show usage
-aibar show
-aibar show --json
+scripts/aibar.sh show
+scripts/aibar.sh show --json
 ```
 
 ## Requirements (uv)
@@ -109,20 +110,26 @@ uv tool uninstall aibar
 
 ## Usage
 
+### Core commands
+
 ```bash
-# Show all configured providers (default window: 7d)
+# Show all configured providers
+# (default flow renders dual windows for claude/codex when --window is not set)
 aibar show
 
-# Show one provider and select window
+# Provider selection
+# allowed values: claude, openai, openrouter, copilot, codex, geminiai, all
 aibar show --provider claude --window 5h
 
-# JSON output
+# JSON output for scripts/integrations
 aibar show --json
 
-# Print required environment variables
-aibar env
+# Force refresh for current execution (ignore idle-time gate)
+aibar show --force
 
-# Interactive setup wizard
+# Diagnostics and configuration
+aibar doctor
+aibar env
 aibar setup
 
 # Provider login helpers
@@ -130,19 +137,63 @@ aibar login --provider claude
 aibar login --provider copilot
 aibar login --provider geminiai
 
+# GNOME extension lifecycle
+aibar gnome-install
+aibar gnome-uninstall
+```
+
+### Global lifecycle and logging options
+
+```bash
+# Version
+# aibar --version and aibar --ver are equivalent
+aibar --version
+
+# Package lifecycle helpers (Linux: executed directly; non-Linux: prints manual command)
+aibar --upgrade
+aibar --uninstall
+
+# Runtime logging flags
+# execution log path: ~/.cache/aibar/aibar.log
+aibar --enable-log
+aibar --disable-log
+aibar --enable-debug
+aibar --disable-debug
+```
+
+### `show` window behavior
+
+- Allowed windows: `5h`, `7d`, `30d`.
+- `claude` and `codex` support dual-window rendering (`5h` and `7d`) in default text output.
+- For `copilot`, `openrouter`, `openai`, and `geminiai`, the effective window is fixed to `30d` even if another `--window` is provided.
+
+### Repository helper scripts
+
+```bash
+# Repository launcher (delegates to uv run --project ... python -m aibar.cli)
+scripts/aibar.sh --help
+
+# Claude token refresh helper
+scripts/claude_token_refresh.sh {start|stop|status|once|loop}
+
+# GNOME nested-shell test helper
+# runs gnome-install, then starts a nested Wayland GNOME Shell (1280x720)
+scripts/test-gnome-extension.sh
 ```
 
 ## GeminiAI prerequisites
 
 To enable GeminiAI features, configure Google Cloud before running `aibar setup`:
 
-1. Enable **Desktop Client OAuth 2.0** credentials in the target Google Cloud application.
-2. Create a BigQuery dataset in Google Cloud Console and provide its name in setup prompt `billing_data` (default: `billing_data`).
-3. Enable API access for the OAuth client project:
+1. Create **Desktop Client OAuth 2.0** credentials in the target Google Cloud project.
+2. In `aibar setup`, configure GeminiAI OAuth client JSON (`file` or `paste`) and authorize requested scopes:
+   - `https://www.googleapis.com/auth/bigquery.readonly`
+   - `https://www.googleapis.com/auth/monitoring.read`
+   - `https://www.googleapis.com/auth/cloud-platform`
+3. Configure the Gemini project id in setup (`geminiai project id`) or via `GEMINIAI_PROJECT_ID`.
+4. Set setup field `billing_data` to the BigQuery dataset containing billing export tables (`gcp_billing_export_v1_*`, default dataset name: `billing_data`).
+5. Ensure required Google APIs are enabled for the project used by OAuth credentials:
    - Cloud Monitoring API
-   - Dataform API
-   - Generative Language API
-   - Cloud Dataplex API
    - BigQuery API
 
 
