@@ -47,7 +47,7 @@ const DEFAULT_WINDOW_LABELS = Object.freeze({
     openai: '30d',
     geminiai: '30d',
 });
-const DEFAULT_COPILOT_EXTRA_PREMIUM_REQUEST_COST = 0.004;
+const DEFAULT_COPILOT_EXTRA_PREMIUM_REQUEST_COST = 0.04;
 
 /**
  * @brief Resolve provider label text for GNOME tab/card rendering.

@@ -2,9 +2,10 @@
 @file
 @brief Setup runtime-config prompt and persistence tests.
 @details Verifies setup prompt order for idle-delay, API-call delay milliseconds,
-API-call timeout milliseconds, default Retry-After seconds, gnome-refresh-interval, billing dataset, and
-per-provider currency symbol fields, then final logging mode fields;
-persists selected values to `~/.config/aibar/config.json`.
+API-call timeout milliseconds, default Retry-After seconds, gnome-refresh-interval,
+billing dataset, Copilot extra premium-request unit cost, and per-provider
+currency symbol fields, then final logging mode fields; persists selected values
+to `~/.config/aibar/config.json`.
 @satisfies REQ-005
 @satisfies REQ-049
 @satisfies TST-013
@@ -61,11 +62,13 @@ def test_setup_prompts_runtime_config_before_credentials(
     """
     @brief Verify setup prompt order and runtime-config persistence.
     @details Ensures setup asks `idle-delay` first, `api-call delay` second,
-    `api-call timeout` third, `default-retry-after` fourth, `gnome-refresh-interval` fifth, `billing_data`
-    sixth, then per-provider currency symbols (one prompt per provider:
-    claude, openai, openrouter, copilot, codex, geminiai), then GeminiAI
-    OAuth source prompt, provider credential prompts, final logging prompts,
-    then writes all selected values to runtime config JSON.
+    `api-call timeout` third, `default-retry-after` fourth,
+    `gnome-refresh-interval` fifth, `billing_data` sixth, Copilot extra
+    premium-request unit cost seventh, then per-provider currency symbols
+    (one prompt per provider: claude, openai, openrouter, copilot, codex,
+    geminiai), then GeminiAI OAuth source prompt, provider credential prompts,
+    final logging prompts, then writes all selected values to runtime config
+    JSON.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
     @param tmp_path {Path} Temporary path fixture.
     @return {None} Function return value.
@@ -75,7 +78,7 @@ def test_setup_prompts_runtime_config_before_credentials(
     """
     config_dir = _patch_config_paths(monkeypatch, tmp_path)
     prompts: list[str] = []
-    # 6 runtime values + 6 currency symbols + OAuth source + empty credentials + 2 logging modes
+    # 7 runtime values + 6 currency symbols + OAuth source + empty credentials + 2 logging modes
     responses = iter(
         [
             450,
@@ -84,6 +87,7 @@ def test_setup_prompts_runtime_config_before_credentials(
             3600,
             90,
             "billing_data",
+            0.04,
             "$",
             "$",
             "$",
@@ -129,18 +133,19 @@ def test_setup_prompts_runtime_config_before_credentials(
     assert prompts[3] == "  default-retry-after seconds"
     assert prompts[4] == "  gnome-refresh-interval seconds"
     assert prompts[5] == "  billing_data"
-    assert prompts[6] == "  claude currency symbol"
-    assert prompts[7] == "  openai currency symbol"
-    assert prompts[8] == "  openrouter currency symbol"
-    assert prompts[9] == "  copilot currency symbol"
-    assert prompts[10] == "  codex currency symbol"
-    assert prompts[11] == "  geminiai currency symbol"
-    assert prompts[12] == "  geminiai oauth source"
-    assert prompts[13] == "  OPENROUTER_API_KEY"
-    assert prompts[14] == "  OPENAI_ADMIN_KEY"
-    assert prompts[15] == "  GITHUB_TOKEN"
-    assert prompts[16] == "  execution log mode"
-    assert prompts[17] == "  debug api log mode"
+    assert prompts[6] == "  copilot extra premium request cost (USD/request)"
+    assert prompts[7] == "  claude currency symbol"
+    assert prompts[8] == "  openai currency symbol"
+    assert prompts[9] == "  openrouter currency symbol"
+    assert prompts[10] == "  copilot currency symbol"
+    assert prompts[11] == "  codex currency symbol"
+    assert prompts[12] == "  geminiai currency symbol"
+    assert prompts[13] == "  geminiai oauth source"
+    assert prompts[14] == "  OPENROUTER_API_KEY"
+    assert prompts[15] == "  OPENAI_ADMIN_KEY"
+    assert prompts[16] == "  GITHUB_TOKEN"
+    assert prompts[17] == "  execution log mode"
+    assert prompts[18] == "  debug api log mode"
 
     runtime_config = json.loads(
         (config_dir / "config.json").read_text(encoding="utf-8")
@@ -151,6 +156,7 @@ def test_setup_prompts_runtime_config_before_credentials(
     assert runtime_config["default_retry_after_seconds"] == 3600
     assert runtime_config["gnome_refresh_interval_seconds"] == 90
     assert runtime_config["billing_data"] == "billing_data"
+    assert runtime_config["copilot_extra_premium_request_cost"] == 0.04
     assert runtime_config["currency_symbols"] == {
         "claude": "$",
         "openai": "$",
@@ -210,6 +216,7 @@ def test_setup_accepts_geminiai_oauth_json_paste_and_persists_runtime_fields(
             3600,
             60,
             "billing_data",
+            0.04,
             "$",
             "$",
             "$",
@@ -337,6 +344,7 @@ def test_setup_geminiai_oauth_login_source_reauthorizes_with_current_scopes(
             3600,
             60,
             "billing_data",
+            0.04,
             "$",
             "$",
             "$",

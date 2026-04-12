@@ -1750,7 +1750,7 @@ from aibar.providers import (
 - var `DEFAULT_RETRY_AFTER_SECONDS = 3600` (L31)
 - var `DEFAULT_GNOME_REFRESH_INTERVAL_SECONDS = 60` (L32)
 - var `DEFAULT_BILLING_DATASET = "billing_data"` (L33)
-- var `DEFAULT_COPILOT_EXTRA_PREMIUM_REQUEST_COST = 0.004` (L34)
+- var `DEFAULT_COPILOT_EXTRA_PREMIUM_REQUEST_COST = 0.04` (L34)
 - var `DEFAULT_CURRENCY_SYMBOL = "$"` (L35)
 - var `DEFAULT_LOG_ENABLED = False` (L36)
 - var `DEFAULT_DEBUG_ENABLED = False` (L37)
@@ -2079,7 +2079,7 @@ import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 - const `const API_COUNTER_PROVIDERS = new Set(['openai', 'openrouter', 'codex', 'geminiai']);` (L42)
 - const `const WINDOW_BAR_30D_PROVIDERS = new Set(['copilot', 'openrouter', 'openai', 'geminiai']);` (L43)
 - const `const DEFAULT_WINDOW_LABELS = Object.freeze({` (L44)
-- const `const DEFAULT_COPILOT_EXTRA_PREMIUM_REQUEST_COST = 0.004;` (L50)
+- const `const DEFAULT_COPILOT_EXTRA_PREMIUM_REQUEST_COST = 0.04;` (L50)
 ### fn `function _getProviderDisplayName(providerName)` (L57-61)
 - @brief Resolve provider label text for GNOME tab/card rendering.
 - @param {string} providerName Provider key from JSON payload.
