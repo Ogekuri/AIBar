@@ -1,5 +1,65 @@
 # Changelog
 
+## [0.25.0](https://github.com/Ogekuri/AIBar/compare/v0.24.0..v0.25.0) - 2026-04-12
+### 🐛  Bug Fixes
+- Fix scripts/test-gnome-extension.sh script.
+- derive cost from remaining overage for show [useReq] *(copilot)*
+  - compute Copilot metrics.cost from remaining sign semantics
+  - align CLI and GNOME fallback overage calculations
+  - add regression tests for positive/negative remaining cases
+  - refresh WORKFLOW and REFERENCES documentation
+- clamp over-100 progress bars [useReq] *(gnome-extension)*
+  - unify over-limit progress geometry for all provider bars
+  - reserve window-label and percentage label slot widths
+  - add regression assertions and refresh workflow/reference docs
+- remove trailing braces causing shell parse error [useReq] *(gnome-extension)*
+  - Remove stray closing braces at extension.js EOF that caused GNOME Shell SyntaxError.
+  - Add regression test asserting extension.js terminates at AIBarExtension class closure.
+  - Regenerate docs/REFERENCES.md for updated extension source line map.
+- Fix scripts/test-gnome-extension.sh script.
+- Fix scripts/test-gnome-extension.sh script.
+- clamp progress bar width and indicate overflow beyond 100% [useReq] *(gnome-extension)*
+- align stale assertions with current runtime behavior [useReq] *(tests)*
+  - update Claude dual-window 429 assertions to match live error passthrough
+  - update GeminiAI extension provider-order expectation to include openai
+
+### 🚜  Changes
+- align Copilot cost surfaces to Cost label [useReq] *(copilot-ui)*
+  - Update REQ-067/REQ-117/REQ-118 and related TST IDs for Cost label semantics.
+  - Set Copilot metrics.cost from premium request overage with 0.0 fallback in provider payload.
+  - Render Copilot CLI row as Cost and keep raw-overage fallback when metrics cost is missing.
+  - Render GNOME Copilot card and panel token as currency cost (no leading plus), using metrics.cost with overage fallback.
+  - Regenerate WORKFLOW and REFERENCES documentation to reflect updated runtime and symbols.
+- set default extra premium request cost to 0.04 [useReq] *(copilot-cost)*
+  - Update REQ-116 and TST-013 default unit cost from 0.004 to 0.04 USD/request.
+  - Set runtime and GNOME fallback constants to 0.04 for copilot extra premium request cost.
+  - Align setup runtime-config tests with the dedicated Copilot cost prompt and persisted value.
+  - Regenerate docs/REFERENCES.md to reflect symbol default updates.
+- add premium overage cost config and UI [useReq] *(copilot)*
+  - Update REQUIREMENTS for Copilot premium-request overage pricing behavior.
+  - Persist copilot_extra_premium_request_cost in RuntimeConfig and setup.
+  - Compute premium_requests_extra_cost in Copilot provider payload.
+  - Render Copilot extra premium cost in CLI show and GNOME card/panel.
+  - Expose copilot_extra_premium_request_cost via show --json extension section.
+  - Refresh WORKFLOW and REFERENCES documentation for updated runtime model.
+- enforce fixed popup dimensions and wrap error messages [useReq] *(gnome-extension)*
+  - This commit enforces a fixed standard width and height for the GNOME extension popup window, preventing UI expansion. It also adds word-wrapping to verbose error messages and constrains the maximum width of tab content and status bars, satisfying the new requirement REQ-102 and test TST-052.
+- relax satisfies audit gate [useReq] *(requirements)*
+  - Update REQ-020 and TST-006 to make @satisfies optional for audit pass/fail.
+  - Add regression in tests/test_references_inventory.py for requirements policy text.
+- force online check on version flags [useReq] *(startup-preflight)*
+  - Update REQ-071/REQ-078 and TST-032/TST-036 for version-flag behavior.
+  - When invocation includes --version/--ver, startup preflight bypasses
+  - check_version_idle-time gating and performs one online release check.
+  - Keep existing idle gating unchanged for non-version invocations.
+  - Add targeted startup preflight regression test and refresh docs.
+
+### 📚  Documentation
+- Update README.md file.
+
+### ◀️  Revert
+- Roll back branch to fa4948bc (fa4948bc5b3eb287fd1bd8f8648130298473cc52).
+
 ## [0.24.0](https://github.com/Ogekuri/AIBar/compare/v0.23.0..v0.24.0) - 2026-03-27
 ### 🚜  Changes
 - log raw API error JSON in debug rows [useReq] *(cli-logging)*
@@ -985,6 +1045,7 @@
 - \[0.22.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.22.0
 - \[0.23.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.23.0
 - \[0.24.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.24.0
+- \[0.25.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.25.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1010,3 +1071,4 @@
 [0.22.0]: https://github.com/Ogekuri/AIBar/compare/v0.21.0..v0.22.0
 [0.23.0]: https://github.com/Ogekuri/AIBar/compare/v0.22.0..v0.23.0
 [0.24.0]: https://github.com/Ogekuri/AIBar/compare/v0.23.0..v0.24.0
+[0.25.0]: https://github.com/Ogekuri/AIBar/compare/v0.24.0..v0.25.0
