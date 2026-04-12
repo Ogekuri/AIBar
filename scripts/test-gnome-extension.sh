@@ -9,5 +9,14 @@
 
 set -euo pipefail
 
+full_path="$(readlink -f "$0")"
+script_dir="$(dirname "$full_path")"
+project_root="$(dirname "$script_dir")"
+
+cd "$project_root"
+
+# update installed version
+scripts/aibar.sh gnome-install
+
 echo "Starting nested GNOME Shell at 1024x800..."
 env MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800 dbus-run-session -- gnome-shell --nested --wayland
