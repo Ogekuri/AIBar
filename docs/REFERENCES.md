@@ -70,7 +70,7 @@
 
 ---
 
-# test-gnome-extension.sh | Shell | 13L | 0 symbols | 0 imports | 8 comments
+# test-gnome-extension.sh | Shell | 22L | 0 symbols | 0 imports | 8 comments
 > Path: `scripts/test-gnome-extension.sh`
 
 
@@ -2024,7 +2024,7 @@ Invalid map entries are skipped.
 
 ---
 
-# extension.js | JavaScript | 1930L | 37 symbols | 9 imports | 42 comments
+# extension.js | JavaScript | 1927L | 37 symbols | 9 imports | 42 comments
 > Path: `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`
 - @brief GNOME Shell panel extension for aibar metrics.
 - @details Collects usage JSON from the aibar CLI and renders provider-specific quota/cost cards in the GNOME panel popup.

@@ -81,3 +81,24 @@ def test_extension_imports_extension_base_class_and_extends_it() -> None:
         in source
     )
     assert "export default class AIBarExtension extends Extension" in source
+
+
+def test_extension_file_ends_after_extension_class_closure() -> None:
+    """
+    @brief Verify extension.js has no trailing tokens after AIBarExtension closing brace.
+    @details Prevents parse-time module SyntaxError caused by stray trailing braces or
+    garbage tokens after the exported extension class block.
+    @satisfies PRJ-004
+    """
+    source = EXTENSION_PATH.read_text(encoding="utf-8")
+    expected_tail = (
+        "    disable() {\n"
+        "        console.debug('aibar: Disabling extension');\n\n"
+        "        if (this._indicator) {\n"
+        "            this._indicator.destroy();\n"
+        "            this._indicator = null;\n"
+        "        }\n"
+        "    }\n"
+        "}\n"
+    )
+    assert source.rstrip().endswith(expected_tail.rstrip())

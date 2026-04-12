@@ -1925,6 +1925,3 @@ export default class AIBarExtension extends Extension {
         }
     }
 }
-    }
-    }
-}
