@@ -1014,7 +1014,7 @@ class AIBarIndicator extends PanelMenu.Button {
      * while keeping `Updated: ..., Next: ...` freshness output and suppressing
      * usage/reset/quota/cost rows. Successful states render metrics using
      * existing provider-specific card rules, including Copilot
-     * `Extra premium cost: <currency_symbol><value>` row.
+     * `Cost: <currency_symbol><value>` row.
      * @param {any} card Input parameter `card`.
      * @param {any} providerName Input parameter `providerName`.
      * @param {any} data Input parameter `data`.
@@ -1278,9 +1278,26 @@ class AIBarIndicator extends PanelMenu.Button {
             data,
             this._copilotExtraPremiumRequestCost,
         );
-        if (metrics.cost !== null && metrics.cost !== undefined) {
+        const metricsCost = Number(metrics.cost);
+        const hasMetricsCost = Number.isFinite(metricsCost);
+        if (providerName === 'copilot') {
+            const effectiveCopilotCost = hasMetricsCost
+                ? metricsCost
+                : copilotExtraPremiumCost;
+            if (effectiveCopilotCost !== null && Number.isFinite(Number(effectiveCopilotCost))) {
+                const currencySymbol = metrics.currency_symbol || '$';
+                const costText = `${currencySymbol}${Number(effectiveCopilotCost).toFixed(4)}`;
+                card.costLabel.clutter_text.set_markup(
+                    `Cost: ${_boldWhiteMarkup(costText)}`
+                );
+                card.costLabel.show();
+            } else {
+                card.costLabel.text = '';
+                card.costLabel.hide();
+            }
+        } else if (hasMetricsCost) {
             const currencySymbol = metrics.currency_symbol || '$';
-            const costText = `${currencySymbol}${metrics.cost.toFixed(4)}`;
+            const costText = `${currencySymbol}${metricsCost.toFixed(4)}`;
             if (providerName === 'openrouter' && metrics.limit !== null && metrics.limit !== undefined) {
                 const limitText = `${currencySymbol}${metrics.limit.toFixed(2)}`;
                 card.costLabel.clutter_text.set_markup(
@@ -1289,13 +1306,6 @@ class AIBarIndicator extends PanelMenu.Button {
             } else {
                 card.costLabel.clutter_text.set_markup(`Costs: ${_boldWhiteMarkup(costText)}`);
             }
-            card.costLabel.show();
-        } else if (providerName === 'copilot' && copilotExtraPremiumCost !== null) {
-            const currencySymbol = metrics.currency_symbol || '$';
-            const costText = `${currencySymbol}${copilotExtraPremiumCost.toFixed(4)}`;
-            card.costLabel.clutter_text.set_markup(
-                `Extra premium cost: ${_boldWhiteMarkup(costText)}`
-            );
             card.costLabel.show();
         } else {
             card.costLabel.text = '';
@@ -1626,23 +1636,29 @@ class AIBarIndicator extends PanelMenu.Button {
     }
 
     /**
-     * @brief Build panel status token for Copilot premium-request extra cost.
+     * @brief Build panel status token for Copilot cost label rendering.
+     * @details Uses payload `metrics.cost` as primary source and falls back to
+     * computed premium-request overage when metrics cost is unavailable.
      * @param {Object<string, any> | null} data Copilot provider payload object.
-     * @returns {string | null} Formatted `+<currency><value>` token or null.
+     * @returns {string | null} Formatted `<currency><value>` token or null.
      * @satisfies REQ-118
      */
     _panelCopilotExtraCostText(data) {
+        const metrics = (data && data.metrics && typeof data.metrics === 'object')
+            ? data.metrics
+            : {};
+        const metricsCost = Number(metrics.cost);
         const extraCost = _resolveCopilotExtraPremiumCost(
             data,
             this._copilotExtraPremiumRequestCost,
         );
-        if (extraCost === null)
+        const effectiveCost = Number.isFinite(metricsCost)
+            ? metricsCost
+            : extraCost;
+        if (effectiveCost === null || !Number.isFinite(Number(effectiveCost)))
             return null;
-        const metrics = (data && data.metrics && typeof data.metrics === 'object')
-            ? data.metrics
-            : {};
         const currencySymbol = metrics.currency_symbol || '$';
-        return `+${currencySymbol}${extraCost.toFixed(2)}`;
+        return `${currencySymbol}${Number(effectiveCost).toFixed(2)}`;
     }
 
     /**

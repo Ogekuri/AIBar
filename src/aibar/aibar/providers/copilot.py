@@ -322,8 +322,8 @@ Note: Token needs 'read:user' scope."""
         @details Resolves quota snapshot fields, computes quota metrics, derives
         Copilot premium-request overage quantities, and computes
         `premium_requests_extra_cost = max(premium_requests - premium_requests_included, 0) * copilot_extra_premium_request_cost`.
-        Computed premium-overage fields are persisted in `raw` for CLI and GNOME
-        rendering surfaces.
+        Sets `metrics.cost` to the computed overage monetary value (fallback `0.0`)
+        and persists premium-overage fields in `raw` for CLI and GNOME rendering.
         @param data {dict} Raw Copilot API JSON payload.
         @param window {WindowPeriod} Effective window (`30d` for Copilot).
         @return {ProviderResult} Normalized provider result payload.
@@ -522,6 +522,11 @@ Note: Token needs 'read:user' scope."""
             premium_requests_extra_cost = (
                 premium_requests_extra * configured_extra_cost
             )
+        copilot_cost = (
+            premium_requests_extra_cost
+            if premium_requests_extra_cost is not None
+            else 0.0
+        )
 
         # Parse reset date from various possible field names.
         reset_raw = (
@@ -544,7 +549,7 @@ Note: Token needs 'read:user' scope."""
             remaining=remaining,
             limit=limit,
             reset_at=reset_at,
-            cost=None,
+            cost=copilot_cost,
             requests=None,
             input_tokens=None,
             output_tokens=None,

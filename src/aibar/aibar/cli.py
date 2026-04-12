@@ -3576,21 +3576,18 @@ def _extract_copilot_extra_premium_cost(result: ProviderResult) -> float | None:
 
 def _build_copilot_extra_premium_cost_line(result: ProviderResult) -> str | None:
     """
-    @brief Build CLI row text for Copilot premium-request overage cost.
-    @details Formats overage monetary value with provider currency symbol and
-    bright-white bold numeric emphasis used by existing cost surfaces.
+    @brief Build CLI Copilot cost row from premium-request overage payload fields.
+    @details Formats fallback Copilot cost text as `Cost: <currency><value>` when
+    `metrics.cost` is unavailable and overage fields can still be resolved from raw payload.
     @param result {ProviderResult} Copilot provider result candidate.
-    @return {str | None} Formatted row `Extra premium cost: ...` or None.
+    @return {str | None} Formatted row `Cost: ...` or None.
     @satisfies REQ-067
     """
     extra_cost = _extract_copilot_extra_premium_cost(result)
     if extra_cost is None:
         return None
     currency_symbol = result.metrics.currency_symbol
-    return (
-        "Extra premium cost: "
-        + _format_bright_white_bold(f"{currency_symbol}{extra_cost:.4f}")
-    )
+    return "Cost: " + _format_bright_white_bold(f"{currency_symbol}{extra_cost:.4f}")
 
 
 def _build_result_panel(
@@ -3680,7 +3677,7 @@ def _build_result_panel(
                 f"Cost: {_format_bright_white_bold(f'{m.currency_symbol}{m.cost:.4f}')}"
             )
 
-    if name == ProviderName.COPILOT:
+    if name == ProviderName.COPILOT and m.cost is None:
         copilot_extra_cost_line = _build_copilot_extra_premium_cost_line(result)
         if copilot_extra_cost_line is not None:
             detail_lines.append(copilot_extra_cost_line)
