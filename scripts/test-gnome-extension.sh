@@ -18,5 +18,5 @@ cd "$project_root"
 echo "Update installed version..."
 scripts/aibar.sh gnome-install
 
-echo "Starting nested GNOME Shell at 1024x800..."
-env MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800 dbus-run-session -- gnome-shell --nested --wayland
+echo "Starting nested GNOME Shell at 1280x720..."
+env MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720 dbus-run-session -- gnome-shell --nested --wayland
