@@ -221,7 +221,9 @@
 .aibar-progress-label {
     font-size: 0.9em;
     color: #aaa;
-    min-width: 42px;
+    min-width: 56px;
+    width: 56px;
+    text-align: right;
 }
 
 /* Window bars (5h / 7d) */
@@ -235,20 +237,24 @@
 }
 
 .aibar-window-row {
-    spacing: 6px;
+    spacing: 8px;
 }
 
 .aibar-window-label {
     font-size: 0.85em;
     color: #999;
-    min-width: 20px;
+    min-width: 34px;
+    width: 34px;
+    text-align: left;
     font-weight: bold;
 }
 
 .aibar-window-pct {
     font-size: 0.9em;
     color: #aaa;
-    min-width: 42px;
+    min-width: 56px;
+    width: 56px;
+    text-align: right;
 }
 
 .aibar-reset-label {

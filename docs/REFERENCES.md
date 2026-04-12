@@ -2024,7 +2024,7 @@ Invalid map entries are skipped.
 
 ---
 
-# extension.js | JavaScript | 1927L | 37 symbols | 9 imports | 42 comments
+# extension.js | JavaScript | 1928L | 38 symbols | 9 imports | 43 comments
 > Path: `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`
 - @brief GNOME Shell panel extension for aibar metrics.
 - @details Collects usage JSON from the aibar CLI and renders provider-specific quota/cost cards in the GNOME panel popup.
@@ -2174,19 +2174,31 @@ full usage for limit-reached warning rendering.
 - @param {number} pct Usage percentage candidate.
 - @return s {boolean} True when value is finite and rounds to `100.0`.
 
-### class `class AIBarIndicator extends PanelMenu.Button` : PanelMenu.Button (L404-703)
+### fn `function _applyProgressFillGeometry(fillActor, backgroundActor, pct)` (L414-431)
+- @brief Apply deterministic progress-fill geometry with over-limit marker support.
+- @details Computes one bar fill width from percentage and current background width,
+clamps the fill to the background bounds, and toggles `aibar-progress-over-limit`
+when percentage exceeds `100`. The helper preserves side-label layout by preventing
+fill overflow into adjacent label slots and reserves 2px for the black marker.
+- @param {St.Widget} fillActor Progress fill widget receiving width updates.
+- @param {St.Widget} backgroundActor Progress background widget providing max width.
+- @param {number} pct Usage percentage value.
+- @return s {void} No return value.
+- @satisfies REQ-102
+
+### class `class AIBarIndicator extends PanelMenu.Button` : PanelMenu.Button (L435-734)
 - @brief Panel indicator widget that manages popup rendering and refresh lifecycle. */
 - @brief Execute init.
 - @details Applies init logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @return s {any} Function return value.
 
-### fn `const createWindowBar = (labelText) =>` (L822-868)
+### fn `const createWindowBar = (labelText) =>` (L834-880)
 - @brief Execute create provider card.
 - @details Applies create provider card logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @param {any} providerName Input parameter `providerName`.
 - @return s {any} Function return value.
 
-### fn `const updateWindowBar = (bar, pct, resetTime, useDays, allowResetPendingHint = true) =>` (L1052-1120)
+### fn `const updateWindowBar = (bar, pct, resetTime, useDays, allowResetPendingHint = true) =>` (L1064-1128)
 - @brief Execute populate provider card.
 - @details Projects provider payload and cached status into one card surface.
 Failed states render a strict block with `Status: FAIL` and `Reason: ...`
@@ -2201,11 +2213,11 @@ existing provider-specific card rules.
 - @return s {any} Function return value.
 - @satisfies REQ-017
 
-### fn `const setResetLabel = (baseText) =>` (L1058-1064)
+### fn `const setResetLabel = (baseText) =>` (L1070-1076)
 
-### fn `const showResetPendingHint = () =>` (L1075-1077)
+### fn `const showResetPendingHint = () =>` (L1083-1085)
 
-### fn `const toPercent = (value) =>` (L1619-1624)
+### fn `const toPercent = (value) =>` (L1620-1625)
 - @brief Execute update u i.
 - @details Applies update u i logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 Resolves provider-window failure metadata from cache `status` section and forwards it
@@ -2215,9 +2227,9 @@ to card renderers. Panel status row renders fixed-order percentages and per-prov
 - @satisfies REQ-053
 - @satisfies REQ-069
 
-### fn `const getPanelUsageValues = (providerName, data) =>` (L1625-1682)
+### fn `const getPanelUsageValues = (providerName, data) =>` (L1626-1683)
 
-### class `export default class AIBarExtension extends Extension` : Extension (L1901-1927)
+### class `export default class AIBarExtension extends Extension` : Extension (L1902-1928)
 - @brief GNOME extension lifecycle adapter for AIBarIndicator registration.
 - @brief Execute enable.
 - @details Extends Extension (GNOME Shell 45+ API) to integrate with the extension lifecycle.
@@ -2258,14 +2270,15 @@ Uses this.uuid (provided by the Extension base class) as the status-area key.
 |`_getProviderProgressClass`|fn||368-370|function _getProviderProgressClass(providerName)|
 |`_isDisplayedZeroPercent`|fn||379-386|function _isDisplayedZeroPercent(pct)|
 |`_isDisplayedFullPercent`|fn||395-400|function _isDisplayedFullPercent(pct)|
-|`AIBarIndicator`|class||404-703|class AIBarIndicator extends PanelMenu.Button|
-|`createWindowBar`|fn||822-868|const createWindowBar = (labelText) =>|
-|`updateWindowBar`|fn||1052-1120|const updateWindowBar = (bar, pct, resetTime, useDays, al...|
-|`setResetLabel`|fn||1058-1064|const setResetLabel = (baseText) =>|
-|`showResetPendingHint`|fn||1075-1077|const showResetPendingHint = () =>|
-|`toPercent`|fn||1619-1624|const toPercent = (value) =>|
-|`getPanelUsageValues`|fn||1625-1682|const getPanelUsageValues = (providerName, data) =>|
-|`AIBarExtension`|class||1901-1927|export default class AIBarExtension extends Extension|
+|`_applyProgressFillGeometry`|fn||414-431|function _applyProgressFillGeometry(fillActor, background...|
+|`AIBarIndicator`|class||435-734|class AIBarIndicator extends PanelMenu.Button|
+|`createWindowBar`|fn||834-880|const createWindowBar = (labelText) =>|
+|`updateWindowBar`|fn||1064-1128|const updateWindowBar = (bar, pct, resetTime, useDays, al...|
+|`setResetLabel`|fn||1070-1076|const setResetLabel = (baseText) =>|
+|`showResetPendingHint`|fn||1083-1085|const showResetPendingHint = () =>|
+|`toPercent`|fn||1620-1625|const toPercent = (value) =>|
+|`getPanelUsageValues`|fn||1626-1683|const getPanelUsageValues = (providerName, data) =>|
+|`AIBarExtension`|class||1902-1928|export default class AIBarExtension extends Extension|
 
 
 ---

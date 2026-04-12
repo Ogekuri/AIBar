@@ -399,6 +399,37 @@ function _isDisplayedFullPercent(pct) {
     return Math.round(numeric * 10) >= 1000;
 }
 
+/**
+ * @brief Apply deterministic progress-fill geometry with over-limit marker support.
+ * @details Computes one bar fill width from percentage and current background width,
+ * clamps the fill to the background bounds, and toggles `aibar-progress-over-limit`
+ * when percentage exceeds `100`. The helper preserves side-label layout by preventing
+ * fill overflow into adjacent label slots and reserves 2px for the black marker.
+ * @param {St.Widget} fillActor Progress fill widget receiving width updates.
+ * @param {St.Widget} backgroundActor Progress background widget providing max width.
+ * @param {number} pct Usage percentage value.
+ * @returns {void} No return value.
+ * @satisfies REQ-102
+ */
+function _applyProgressFillGeometry(fillActor, backgroundActor, pct) {
+    const bgWidth = backgroundActor ? backgroundActor.get_width() : 0;
+    if (bgWidth <= 0)
+        return;
+
+    const numericPct = Number(pct);
+    const normalizedPct = Number.isFinite(numericPct) ? numericPct : 0;
+    const rawWidth = Math.round((normalizedPct / 100) * bgWidth);
+    const clampedWidth = Math.max(0, Math.min(rawWidth, bgWidth));
+    const isOverLimit = normalizedPct > 100;
+    const markerWidth = isOverLimit ? 2 : 0;
+    fillActor.set_width(Math.max(0, clampedWidth - markerWidth));
+
+    if (isOverLimit)
+        fillActor.add_style_class_name('aibar-progress-over-limit');
+    else
+        fillActor.remove_style_class_name('aibar-progress-over-limit');
+}
+
 const AIBarIndicator = GObject.registerClass(
 /** @brief Panel indicator widget that manages popup rendering and refresh lifecycle. */
 class AIBarIndicator extends PanelMenu.Button {
@@ -644,33 +675,14 @@ class AIBarIndicator extends PanelMenu.Button {
                 if (!card._barData)
                     continue;
 
-                if (card._barData.fiveHour) {
-                    let bgW = card.fiveHourBar.barBg.get_width();
-                    if (bgW > 0) {
-                        let w = Math.round((card._barData.fiveHour.pct / 100) * bgW);
-                        card.fiveHourBar.barFill.set_width(w);
-                    }
-                }
+                if (card._barData.fiveHour)
+                    _applyProgressFillGeometry(card.fiveHourBar.barFill, card.fiveHourBar.barBg, card._barData.fiveHour.pct);
 
-                if (card._barData.sevenDay) {
-                    let bgW = card.sevenDayBar.barBg.get_width();
-                    if (bgW > 0) {
-                        let w = Math.round((card._barData.sevenDay.pct / 100) * bgW);
-                        card.sevenDayBar.barFill.set_width(w);
-                    }
-                }
+                if (card._barData.sevenDay)
+                    _applyProgressFillGeometry(card.sevenDayBar.barFill, card.sevenDayBar.barBg, card._barData.sevenDay.pct);
 
-                if (card._barData.progress) {
-                    let bgW = card.progressBg ? card.progressBg.get_width() : 0;
-                    if (bgW > 0) {
-                        let pct = card._barData.progress.pct;
-                        let w = Math.round((pct / 100) * bgW);
-                        let fillW = Math.min(w, bgW);
-                        card.progressFill.set_width(pct > 100 ? Math.max(0, fillW - 2) : fillW);
-                        if (pct > 100) card.progressFill.add_style_class_name('aibar-progress-over-limit');
-                        else card.progressFill.remove_style_class_name('aibar-progress-over-limit');
-                    }
-                }
+                if (card._barData.progress)
+                    _applyProgressFillGeometry(card.progressFill, card.progressBg, card._barData.progress.pct);
             }
             return GLib.SOURCE_REMOVE;
         });
@@ -1064,11 +1076,7 @@ class AIBarIndicator extends PanelMenu.Button {
             };
 
             GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
-                let barBgWidth = bar.barBg.get_width();
-                if (barBgWidth > 0) {
-                    let width = Math.round((pct / 100) * barBgWidth);
-                    bar.barFill.set_width(width);
-                }
+                _applyProgressFillGeometry(bar.barFill, bar.barBg, pct);
                 return GLib.SOURCE_REMOVE;
             });
 
@@ -1203,14 +1211,7 @@ class AIBarIndicator extends PanelMenu.Button {
                 card.progressFill.style_class = `aibar-progress-fill ${_getProviderProgressClass(providerName)}`;
 
                 GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
-                    let barBgWidth = card.progressBg ? card.progressBg.get_width() : 0;
-                    if (barBgWidth > 0) {
-                        let width = Math.round((pct / 100) * barBgWidth);
-                        let fillW = Math.min(width, barBgWidth);
-                        card.progressFill.set_width(pct > 100 ? Math.max(0, fillW - 2) : fillW);
-                        if (pct > 100) card.progressFill.add_style_class_name('aibar-progress-over-limit');
-                        else card.progressFill.remove_style_class_name('aibar-progress-over-limit');
-                    }
+                    _applyProgressFillGeometry(card.progressFill, card.progressBg, pct);
                     return GLib.SOURCE_REMOVE;
                 });
             } else {
