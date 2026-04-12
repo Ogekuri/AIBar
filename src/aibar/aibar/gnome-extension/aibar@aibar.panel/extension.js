@@ -891,6 +891,10 @@ class AIBarIndicator extends PanelMenu.Button {
         let tokensLabel = new St.Label({style_class: 'aibar-stat'});
         let resetsLabel = new St.Label({style_class: 'aibar-stat-reset'});
         let errorLabel = new St.Label({style_class: 'aibar-error'});
+        if (errorLabel.clutter_text) {
+            errorLabel.clutter_text.line_wrap = true;
+            errorLabel.clutter_text.line_wrap_mode = 1; // Pango.WrapMode.WORD_CHAR equivalent
+        }
 
         statsGrid.add_child(costLabel);
         statsGrid.add_child(byokLabel);
