@@ -15,7 +15,7 @@ project_root="$(dirname "$script_dir")"
 
 cd "$project_root"
 
-# update installed version
+echo "Update installed version..."
 scripts/aibar.sh gnome-install
 
 echo "Starting nested GNOME Shell at 1024x800..."
