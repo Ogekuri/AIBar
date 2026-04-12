@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.26.0](https://github.com/Ogekuri/AIBar/compare/v0.25.0..v0.26.0) - 2026-04-12
+### 🚜  Changes
+- enforce Copilot blank separator before cost [useReq] *(cli.show)*
+  - Update REQ-067 and TST-030 for Copilot spacing behavior.
+  - Insert one blank CLI row between Copilot Remaining credits and Cost.
+  - Extend panel-alignment test assertions for the new spacing contract.
+  - Refresh WORKFLOW.md and regenerate REFERENCES.md for traceability.
+
 ## [0.25.0](https://github.com/Ogekuri/AIBar/compare/v0.24.0..v0.25.0) - 2026-04-12
 ### 🐛  Bug Fixes
 - Fix scripts/test-gnome-extension.sh script.
@@ -1046,6 +1054,7 @@
 - \[0.23.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.23.0
 - \[0.24.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.24.0
 - \[0.25.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.25.0
+- \[0.26.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.26.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1072,3 +1081,4 @@
 [0.23.0]: https://github.com/Ogekuri/AIBar/compare/v0.22.0..v0.23.0
 [0.24.0]: https://github.com/Ogekuri/AIBar/compare/v0.23.0..v0.24.0
 [0.25.0]: https://github.com/Ogekuri/AIBar/compare/v0.24.0..v0.25.0
+[0.26.0]: https://github.com/Ogekuri/AIBar/compare/v0.25.0..v0.26.0
