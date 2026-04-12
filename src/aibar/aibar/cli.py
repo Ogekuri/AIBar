@@ -3116,6 +3116,7 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
             output_doc[_CACHE_EXTENSION_SECTION_KEY] = {
                 "gnome_refresh_interval_seconds": runtime_cfg.gnome_refresh_interval_seconds,
                 "idle_delay_seconds": runtime_cfg.idle_delay_seconds,
+                "copilot_extra_premium_request_cost": runtime_cfg.copilot_extra_premium_request_cost,
                 "window_labels": _serialize_extension_window_labels(),
             }
             click.echo(json.dumps(output_doc, indent=2))
@@ -3134,6 +3135,7 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
         output_doc[_CACHE_EXTENSION_SECTION_KEY] = {
             "gnome_refresh_interval_seconds": runtime_cfg.gnome_refresh_interval_seconds,
             "idle_delay_seconds": runtime_cfg.idle_delay_seconds,
+            "copilot_extra_premium_request_cost": runtime_cfg.copilot_extra_premium_request_cost,
             "window_labels": _serialize_extension_window_labels(),
         }
         click.echo(json.dumps(output_doc, indent=2))
@@ -3526,6 +3528,71 @@ def _build_fail_panel_lines(
     return ["Status: FAIL", "", f"Reason: {reason}", "", freshness_line]
 
 
+def _extract_copilot_extra_premium_cost(result: ProviderResult) -> float | None:
+    """
+    @brief Resolve Copilot premium-request overage cost from normalized raw payload.
+    @details Reads direct `premium_requests_extra_cost` when available; otherwise
+    computes `max(premium_requests - premium_requests_included, 0) * unit_cost`
+    using raw payload fields and runtime-config fallback for unit cost.
+    @param result {ProviderResult} Copilot provider result candidate.
+    @return {float | None} Non-negative overage cost value or None when unavailable.
+    @satisfies REQ-012
+    @satisfies REQ-067
+    """
+    if result.provider != ProviderName.COPILOT:
+        return None
+    raw_payload = result.raw if isinstance(result.raw, dict) else {}
+    direct_cost = raw_payload.get("premium_requests_extra_cost")
+    if isinstance(direct_cost, (int, float)) and math.isfinite(float(direct_cost)):
+        return max(0.0, float(direct_cost))
+
+    premium_requests = raw_payload.get("premium_requests")
+    premium_requests_included = raw_payload.get("premium_requests_included")
+    if not isinstance(premium_requests, (int, float)):
+        return None
+    if not isinstance(premium_requests_included, (int, float)):
+        return None
+    if not math.isfinite(float(premium_requests)):
+        return None
+    if not math.isfinite(float(premium_requests_included)):
+        return None
+
+    raw_unit_cost = raw_payload.get("copilot_extra_premium_request_cost")
+    unit_cost = None
+    if isinstance(raw_unit_cost, (int, float)) and math.isfinite(float(raw_unit_cost)):
+        unit_cost = max(0.0, float(raw_unit_cost))
+    if unit_cost is None:
+        unit_cost = max(
+            0.0,
+            float(load_runtime_config().copilot_extra_premium_request_cost),
+        )
+
+    premium_requests_extra = max(
+        0.0,
+        float(premium_requests) - float(premium_requests_included),
+    )
+    return premium_requests_extra * unit_cost
+
+
+def _build_copilot_extra_premium_cost_line(result: ProviderResult) -> str | None:
+    """
+    @brief Build CLI row text for Copilot premium-request overage cost.
+    @details Formats overage monetary value with provider currency symbol and
+    bright-white bold numeric emphasis used by existing cost surfaces.
+    @param result {ProviderResult} Copilot provider result candidate.
+    @return {str | None} Formatted row `Extra premium cost: ...` or None.
+    @satisfies REQ-067
+    """
+    extra_cost = _extract_copilot_extra_premium_cost(result)
+    if extra_cost is None:
+        return None
+    currency_symbol = result.metrics.currency_symbol
+    return (
+        "Extra premium cost: "
+        + _format_bright_white_bold(f"{currency_symbol}{extra_cost:.4f}")
+    )
+
+
 def _build_result_panel(
     name: ProviderName,
     result: ProviderResult,
@@ -3550,6 +3617,7 @@ def _build_result_panel(
     @satisfies REQ-035
     @satisfies REQ-036
     @satisfies REQ-051
+    @satisfies REQ-012
     @satisfies REQ-060
     @satisfies REQ-067
     @satisfies REQ-084
@@ -3611,6 +3679,11 @@ def _build_result_panel(
             detail_lines.append(
                 f"Cost: {_format_bright_white_bold(f'{m.currency_symbol}{m.cost:.4f}')}"
             )
+
+    if name == ProviderName.COPILOT:
+        copilot_extra_cost_line = _build_copilot_extra_premium_cost_line(result)
+        if copilot_extra_cost_line is not None:
+            detail_lines.append(copilot_extra_cost_line)
 
     if _provider_supports_api_counters(name):
         requests_count = m.requests if m.requests is not None else 0
@@ -3995,16 +4068,19 @@ def setup() -> None:
     @brief Execute setup.
     @details Prompts for `idle_delay_seconds`, `api_call_delay_milliseconds`,
     `api_call_timeout_milliseconds`, `default_retry_after_seconds`,
-    `gnome_refresh_interval_seconds`, and `billing_data` in order, then prompts for provider
-    currency symbols including `geminiai` (choices: `$`, `£`, `€`, default `$`), then persists
-    all values to `~/.config/aibar/config.json`. Final setup section configures
-    logging flags (`log_enabled`, `debug_enabled`). GeminiAI OAuth source supports
-    `skip`, `file`, `paste`, and `login` (re-authorization with current scopes).
-    Also prompts for provider API keys and writes them to `~/.config/aibar/env`.
+    `gnome_refresh_interval_seconds`, and `billing_data` in order, then prompts
+    dedicated Copilot overage pricing field `copilot_extra_premium_request_cost`
+    (USD/request), then prompts provider currency symbols including `geminiai`
+    (choices: `$`, `£`, `€`, default `$`), then persists all values to
+    `~/.config/aibar/config.json`. Final setup section configures logging flags
+    (`log_enabled`, `debug_enabled`). GeminiAI OAuth source supports `skip`,
+    `file`, `paste`, and `login` (re-authorization with current scopes). Also
+    prompts for provider API keys and writes them to `~/.config/aibar/env`.
     @return {None} Function return value.
     @satisfies REQ-005
     @satisfies REQ-049
     @satisfies REQ-108
+    @satisfies REQ-116
     @satisfies REQ-055
     @satisfies REQ-056
     @satisfies REQ-059
@@ -4076,6 +4152,17 @@ def setup() -> None:
             show_default=True,
         ).strip()
         or runtime_config.billing_data
+    )
+    click.echo()
+    click.echo(click.style("Copilot premium overage", bold=True))
+    click.echo(
+        "  Configure extra cost per Copilot premium request above included plan quota."
+    )
+    copilot_extra_premium_request_cost = click.prompt(
+        "  copilot extra premium request cost (USD/request)",
+        type=float,
+        default=runtime_config.copilot_extra_premium_request_cost,
+        show_default=True,
     )
     click.echo()
     click.echo(click.style("Currency symbols", bold=True))
@@ -4292,6 +4379,7 @@ def setup() -> None:
         default_retry_after_seconds=default_retry_after_seconds,
         gnome_refresh_interval_seconds=gnome_refresh_interval_seconds,
         billing_data=billing_data,
+        copilot_extra_premium_request_cost=copilot_extra_premium_request_cost,
         currency_symbols=currency_symbols,
         log_enabled=(log_mode == "enable"),
         debug_enabled=(debug_mode == "enable"),

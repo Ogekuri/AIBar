@@ -47,6 +47,7 @@ const DEFAULT_WINDOW_LABELS = Object.freeze({
     openai: '30d',
     geminiai: '30d',
 });
+const DEFAULT_COPILOT_EXTRA_PREMIUM_REQUEST_COST = 0.004;
 
 /**
  * @brief Resolve provider label text for GNOME tab/card rendering.
@@ -86,6 +87,44 @@ function _resetMenuItemFocusVisualState(menuItem) {
  */
 function _providerSupportsApiCounters(providerName) {
     return API_COUNTER_PROVIDERS.has(providerName);
+}
+
+/**
+ * @brief Resolve Copilot premium-request overage monetary value.
+ * @details Uses direct `raw.premium_requests_extra_cost` when present; otherwise
+ * computes `max(premium_requests - premium_requests_included, 0) * unit_cost`.
+ * @param {Object<string, any> | null} data Copilot provider payload.
+ * @param {number} configuredUnitCost Configured USD unit cost per extra request.
+ * @returns {number | null} Non-negative overage monetary value or null.
+ * @satisfies REQ-117
+ * @satisfies REQ-118
+ */
+function _resolveCopilotExtraPremiumCost(data, configuredUnitCost) {
+    if (!data || typeof data !== 'object' || Array.isArray(data))
+        return null;
+    const raw = (data.raw && typeof data.raw === 'object' && !Array.isArray(data.raw))
+        ? data.raw
+        : null;
+    if (!raw)
+        return null;
+
+    const directValue = Number(raw.premium_requests_extra_cost);
+    if (Number.isFinite(directValue))
+        return Math.max(0, directValue);
+
+    const premiumRequests = Number(raw.premium_requests);
+    const premiumRequestsIncluded = Number(raw.premium_requests_included);
+    if (!Number.isFinite(premiumRequests) || !Number.isFinite(premiumRequestsIncluded))
+        return null;
+
+    let unitCost = Number(raw.copilot_extra_premium_request_cost);
+    if (!Number.isFinite(unitCost))
+        unitCost = Number(configuredUnitCost);
+    if (!Number.isFinite(unitCost))
+        return null;
+
+    const extraRequests = Math.max(0, premiumRequests - premiumRequestsIncluded);
+    return extraRequests * Math.max(0, unitCost);
 }
 
 /**
@@ -451,6 +490,7 @@ class AIBarIndicator extends PanelMenu.Button {
         this._refreshIntervalSeconds = REFRESH_INTERVAL_SECONDS;
         this._idleDelaySeconds = IDLE_DELAY_SECONDS;
         this._windowLabels = {...DEFAULT_WINDOW_LABELS};
+        this._copilotExtraPremiumRequestCost = DEFAULT_COPILOT_EXTRA_PREMIUM_REQUEST_COST;
         this._activeProvider = null;
         this._providerOrder = ['claude', 'openrouter', 'copilot', 'codex', 'openai', 'geminiai'];
         this._iconBlinkTimeout = null;
@@ -519,6 +559,12 @@ class AIBarIndicator extends PanelMenu.Button {
             style_class: 'aibar-panel-pct aibar-panel-pct-primary aibar-tab-label-copilot',
         });
 
+        this._panelCopilotExtraCostLabel = new St.Label({
+            text: '',
+            y_align: Clutter.ActorAlign.CENTER,
+            style_class: 'aibar-panel-pct aibar-panel-cost aibar-tab-label-copilot',
+        });
+
         this._panelCodexPctLabel = new St.Label({
             text: '',
             y_align: Clutter.ActorAlign.CENTER,
@@ -554,6 +600,7 @@ class AIBarIndicator extends PanelMenu.Button {
         this._panelClaudeCostLabel.hide();
         this._panelOpenRouterCostLabel.hide();
         this._panelCopilotPctLabel.hide();
+        this._panelCopilotExtraCostLabel.hide();
         this._panelCodexPctLabel.hide();
         this._panelCodex7dPctLabel.hide();
         this._panelCodexCostLabel.hide();
@@ -566,6 +613,7 @@ class AIBarIndicator extends PanelMenu.Button {
         this._panelPercentages.add_child(this._panelClaudeCostLabel);
         this._panelPercentages.add_child(this._panelOpenRouterCostLabel);
         this._panelPercentages.add_child(this._panelCopilotPctLabel);
+        this._panelPercentages.add_child(this._panelCopilotExtraCostLabel);
         this._panelPercentages.add_child(this._panelCodexPctLabel);
         this._panelPercentages.add_child(this._panelCodex7dPctLabel);
         this._panelPercentages.add_child(this._panelCodexCostLabel);
@@ -965,7 +1013,8 @@ class AIBarIndicator extends PanelMenu.Button {
      * Failed states render a strict block with `Status: FAIL` and `Reason: ...`
      * while keeping `Updated: ..., Next: ...` freshness output and suppressing
      * usage/reset/quota/cost rows. Successful states render metrics using
-     * existing provider-specific card rules.
+     * existing provider-specific card rules, including Copilot
+     * `Extra premium cost: <currency_symbol><value>` row.
      * @param {any} card Input parameter `card`.
      * @param {any} providerName Input parameter `providerName`.
      * @param {any} data Input parameter `data`.
@@ -973,6 +1022,7 @@ class AIBarIndicator extends PanelMenu.Button {
      * @param {any} freshnessState Provider-scoped freshness entry from `freshness` section.
      * @returns {any} Function return value.
      * @satisfies REQ-017
+     * @satisfies REQ-117
      */
     _populateProviderCard(card, providerName, data, statusEntry = null, freshnessState = null) {
         const metrics = data.metrics || {};
@@ -1224,6 +1274,10 @@ class AIBarIndicator extends PanelMenu.Button {
             card._barData.progress = null;
         }
 
+        const copilotExtraPremiumCost = _resolveCopilotExtraPremiumCost(
+            data,
+            this._copilotExtraPremiumRequestCost,
+        );
         if (metrics.cost !== null && metrics.cost !== undefined) {
             const currencySymbol = metrics.currency_symbol || '$';
             const costText = `${currencySymbol}${metrics.cost.toFixed(4)}`;
@@ -1235,6 +1289,13 @@ class AIBarIndicator extends PanelMenu.Button {
             } else {
                 card.costLabel.clutter_text.set_markup(`Costs: ${_boldWhiteMarkup(costText)}`);
             }
+            card.costLabel.show();
+        } else if (providerName === 'copilot' && copilotExtraPremiumCost !== null) {
+            const currencySymbol = metrics.currency_symbol || '$';
+            const costText = `${currencySymbol}${copilotExtraPremiumCost.toFixed(4)}`;
+            card.costLabel.clutter_text.set_markup(
+                `Extra premium cost: ${_boldWhiteMarkup(costText)}`
+            );
             card.costLabel.show();
         } else {
             card.costLabel.text = '';
@@ -1426,13 +1487,16 @@ class AIBarIndicator extends PanelMenu.Button {
      * @brief Execute parse output.
      * @details Parses CLI JSON output supporting canonical cache schema sections
      * (`payload`, `status`, `idle_time`, `freshness`, `extension`). Reads
-     * `extension.gnome_refresh_interval_seconds` to update the auto-refresh interval and
-     * `extension.idle_delay_seconds` for freshness fallback timestamp derivation.
-     * Parses `extension.window_labels` for provider bar left labels.
+     * `extension.gnome_refresh_interval_seconds` to update the auto-refresh interval,
+     * `extension.idle_delay_seconds` for freshness fallback timestamp derivation,
+     * and `extension.copilot_extra_premium_request_cost` for Copilot overage-cost
+     * fallback calculations. Parses `extension.window_labels` for provider bar left
+     * labels.
      * @param {any} output Input parameter `output`.
      * @returns {any} Function return value.
      * @satisfies DES-006
      * @satisfies REQ-003
+     * @satisfies REQ-118
      */
     _parseOutput(output) {
         console.debug('aibar: Parsing output');
@@ -1502,6 +1566,16 @@ class AIBarIndicator extends PanelMenu.Button {
                 }
                 if (
                     extensionData &&
+                    typeof extensionData.copilot_extra_premium_request_cost === 'number' &&
+                    Number.isFinite(extensionData.copilot_extra_premium_request_cost) &&
+                    extensionData.copilot_extra_premium_request_cost >= 0
+                ) {
+                    this._copilotExtraPremiumRequestCost = extensionData.copilot_extra_premium_request_cost;
+                } else {
+                    this._copilotExtraPremiumRequestCost = DEFAULT_COPILOT_EXTRA_PREMIUM_REQUEST_COST;
+                }
+                if (
+                    extensionData &&
                     extensionData.window_labels &&
                     typeof extensionData.window_labels === 'object' &&
                     !Array.isArray(extensionData.window_labels)
@@ -1523,6 +1597,7 @@ class AIBarIndicator extends PanelMenu.Button {
                 this._statusData = {};
                 this._freshnessData = {};
                 this._idleDelaySeconds = IDLE_DELAY_SECONDS;
+                this._copilotExtraPremiumRequestCost = DEFAULT_COPILOT_EXTRA_PREMIUM_REQUEST_COST;
                 this._windowLabels = {...DEFAULT_WINDOW_LABELS};
             }
             console.debug(`aibar: Parsed ${Object.keys(this._usageData).length} providers`);
@@ -1548,6 +1623,26 @@ class AIBarIndicator extends PanelMenu.Button {
             return null;
         const currencySymbol = metrics.currency_symbol || '$';
         return `${currencySymbol}${numeric.toFixed(2)}`;
+    }
+
+    /**
+     * @brief Build panel status token for Copilot premium-request extra cost.
+     * @param {Object<string, any> | null} data Copilot provider payload object.
+     * @returns {string | null} Formatted `+<currency><value>` token or null.
+     * @satisfies REQ-118
+     */
+    _panelCopilotExtraCostText(data) {
+        const extraCost = _resolveCopilotExtraPremiumCost(
+            data,
+            this._copilotExtraPremiumRequestCost,
+        );
+        if (extraCost === null)
+            return null;
+        const metrics = (data && data.metrics && typeof data.metrics === 'object')
+            ? data.metrics
+            : {};
+        const currencySymbol = metrics.currency_symbol || '$';
+        return `+${currencySymbol}${extraCost.toFixed(2)}`;
     }
 
     /**
@@ -1602,6 +1697,7 @@ class AIBarIndicator extends PanelMenu.Button {
      * @satisfies REQ-021
      * @satisfies REQ-053
      * @satisfies REQ-069
+     * @satisfies REQ-118
      */
     _updateUI() {
         const usageLabels = {
@@ -1610,6 +1706,7 @@ class AIBarIndicator extends PanelMenu.Button {
             claudeCost: this._panelClaudeCostLabel,
             openrouterCost: this._panelOpenRouterCostLabel,
             copilot: this._panelCopilotPctLabel,
+            copilotExtraCost: this._panelCopilotExtraCostLabel,
             codex5h: this._panelCodexPctLabel,
             codex7d: this._panelCodex7dPctLabel,
             codexCost: this._panelCodexCostLabel,
@@ -1692,6 +1789,7 @@ class AIBarIndicator extends PanelMenu.Button {
             claudeCost: this._panelCostText(this._usageData.claude),
             openrouterCost: this._panelCostText(this._usageData.openrouter),
             copilot: copilotUsage.primary,
+            copilotExtraCost: this._panelCopilotExtraCostText(this._usageData.copilot),
             codex5h: codexUsage.primary,
             codex7d: codexUsage.secondary,
             codexCost: this._panelCostText(this._usageData.codex),
@@ -1757,6 +1855,10 @@ class AIBarIndicator extends PanelMenu.Button {
                     errLabel.add_style_class_name(providerColorClass);
                 errLabel.show();
             }
+        }
+        if (errProviders.includes('copilot')) {
+            this._panelCopilotExtraCostLabel.set_text('');
+            this._panelCopilotExtraCostLabel.hide();
         }
 
         const panelPercents = [
@@ -1835,6 +1937,7 @@ class AIBarIndicator extends PanelMenu.Button {
         this._panelClaudeCostLabel.set_text('');
         this._panelOpenRouterCostLabel.set_text('');
         this._panelCopilotPctLabel.set_text('');
+        this._panelCopilotExtraCostLabel.set_text('');
         this._panelCodexPctLabel.set_text('');
         this._panelCodex7dPctLabel.set_text('');
         this._panelCodexCostLabel.set_text('');
@@ -1844,6 +1947,7 @@ class AIBarIndicator extends PanelMenu.Button {
         this._panelClaudeCostLabel.hide();
         this._panelOpenRouterCostLabel.hide();
         this._panelCopilotPctLabel.hide();
+        this._panelCopilotExtraCostLabel.hide();
         this._panelCodexPctLabel.hide();
         this._panelCodex7dPctLabel.hide();
         this._panelCodexCostLabel.hide();

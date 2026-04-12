@@ -31,6 +31,7 @@ DEFAULT_API_CALL_TIMEOUT_MILLISECONDS = 5000
 DEFAULT_RETRY_AFTER_SECONDS = 3600
 DEFAULT_GNOME_REFRESH_INTERVAL_SECONDS = 60
 DEFAULT_BILLING_DATASET = "billing_data"
+DEFAULT_COPILOT_EXTRA_PREMIUM_REQUEST_COST = 0.004
 DEFAULT_CURRENCY_SYMBOL = "$"
 DEFAULT_LOG_ENABLED = False
 DEFAULT_DEBUG_ENABLED = False
@@ -61,6 +62,8 @@ class RuntimeConfig(BaseModel):
     missing entries default to `DEFAULT_CURRENCY_SYMBOL` at resolution time.
     `billing_data` stores the Google BigQuery dataset name used for GeminiAI
     billing export table discovery.
+    `copilot_extra_premium_request_cost` stores the configured unit price (USD)
+    for one Copilot premium request above included-plan quota.
     `log_enabled` controls append logging to `~/.cache/aibar/aibar.log`.
     `debug_enabled` controls API debug-result logging and requires `log_enabled`.
     Optional GeminiAI field persists Google Cloud project identifier used by
@@ -74,6 +77,7 @@ class RuntimeConfig(BaseModel):
     @satisfies REQ-041
     @satisfies REQ-095
     @satisfies REQ-096
+    @satisfies REQ-116
     """
 
     idle_delay_seconds: int = Field(default=DEFAULT_IDLE_DELAY_SECONDS, ge=1)
@@ -88,6 +92,10 @@ class RuntimeConfig(BaseModel):
         default=DEFAULT_GNOME_REFRESH_INTERVAL_SECONDS, ge=1
     )
     billing_data: str = Field(default=DEFAULT_BILLING_DATASET, min_length=1)
+    copilot_extra_premium_request_cost: float = Field(
+        default=DEFAULT_COPILOT_EXTRA_PREMIUM_REQUEST_COST,
+        ge=0,
+    )
     currency_symbols: dict[str, str] = Field(default_factory=dict)
     log_enabled: bool = Field(default=DEFAULT_LOG_ENABLED)
     debug_enabled: bool = Field(default=DEFAULT_DEBUG_ENABLED)

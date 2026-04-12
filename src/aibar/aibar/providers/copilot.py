@@ -5,6 +5,7 @@
 """
 
 import json
+import math
 import os
 from datetime import datetime, timezone
 from pathlib import Path
@@ -317,52 +318,169 @@ Note: Token needs 'read:user' scope."""
 
     def _parse_response(self, data: dict, window: WindowPeriod) -> ProviderResult:
         """
-        @brief Execute parse response.
-        @details Applies parse response logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
-        @param data {dict} Input parameter `data`.
-        @param window {WindowPeriod} Input parameter `window`.
-        @return {ProviderResult} Function return value.
+        @brief Normalize Copilot quota payload to ProviderResult.
+        @details Resolves quota snapshot fields, computes quota metrics, derives
+        Copilot premium-request overage quantities, and computes
+        `premium_requests_extra_cost = max(premium_requests - premium_requests_included, 0) * copilot_extra_premium_request_cost`.
+        Computed premium-overage fields are persisted in `raw` for CLI and GNOME
+        rendering surfaces.
+        @param data {dict} Raw Copilot API JSON payload.
+        @param window {WindowPeriod} Effective window (`30d` for Copilot).
+        @return {ProviderResult} Normalized provider result payload.
+        @satisfies REQ-012
+        @satisfies REQ-116
+        @satisfies REQ-117
+        @satisfies REQ-118
         """
         quota = data.get("quotaSnapshots") or data.get("quota_snapshots") or {}
 
+        def _coerce_float(value: Any) -> float | None:
+            """
+            @brief Parse one finite numeric value to float.
+            @details Returns None for non-numeric values and non-finite floats.
+            @param value {object} Candidate numeric value.
+            @return {float | None} Parsed finite float or None.
+            """
+            try:
+                numeric = float(value)
+            except (TypeError, ValueError):
+                return None
+            if not math.isfinite(numeric):
+                return None
+            return numeric
+
+        def _first_numeric(snapshot: dict[str, Any], keys: tuple[str, ...]) -> float | None:
+            """
+            @brief Resolve first available numeric field from snapshot keys.
+            @details Scans keys in order and returns the first finite numeric value.
+            @param snapshot {dict[str, Any]} Snapshot payload mapping.
+            @param keys {tuple[str, ...]} Candidate key sequence.
+            @return {float | None} First parsed float value or None.
+            """
+            for key in keys:
+                if key not in snapshot:
+                    continue
+                parsed = _coerce_float(snapshot.get(key))
+                if parsed is not None:
+                    return parsed
+            return None
+
         def _get_snapshot(key_camel: str, key_snake: str) -> dict:
             """
-            @brief Execute get snapshot.
-            @details Applies get snapshot logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
-            @param key_camel {str} Input parameter `key_camel`.
-            @param key_snake {str} Input parameter `key_snake`.
-            @return {dict} Function return value.
+            @brief Resolve one quota snapshot object by camel/snake aliases.
+            @param key_camel {str} CamelCase snapshot key.
+            @param key_snake {str} snake_case snapshot key.
+            @return {dict} Snapshot mapping or empty dict.
             """
             return quota.get(key_camel) or quota.get(key_snake) or {}
 
         def _extract_quota_data(snapshot: dict) -> tuple[float | None, float | None]:
             """
-            @brief Execute extract quota data.
-            @details Applies extract quota data logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
-            @param snapshot {dict} Input parameter `snapshot`.
-            @return {tuple[float | None, float | None]} Function return value.
+            @brief Extract remaining and limit values from one quota snapshot.
+            @details Prefers entitlement/remaining numeric values and falls back to
+            percentage-normalized `(remaining_percent, 100.0)` representation.
+            @param snapshot {dict} Snapshot payload mapping.
+            @return {tuple[float | None, float | None]} Tuple `(remaining, limit)`.
             """
-            # Try to get actual credit numbers first
-            entitlement = snapshot.get("entitlement")
-            quota_remaining = snapshot.get("quota_remaining") or snapshot.get("remaining")
-
+            entitlement = _coerce_float(snapshot.get("entitlement"))
+            quota_remaining = _first_numeric(
+                snapshot,
+                ("quota_remaining", "remaining", "quotaRemaining"),
+            )
             if entitlement is not None and quota_remaining is not None:
-                try:
-                    return (float(quota_remaining), float(entitlement))
-                except (TypeError, ValueError):
-                    pass
+                return (quota_remaining, entitlement)
 
-            # Fall back to percentage if available
-            percent = snapshot.get("percentRemaining") or snapshot.get("percent_remaining")
+            percent = _first_numeric(
+                snapshot,
+                ("percentRemaining", "percent_remaining"),
+            )
             if percent is not None:
-                try:
-                    return (float(percent), 100.0)
-                except (TypeError, ValueError):
-                    pass
+                return (percent, 100.0)
 
             return (None, None)
 
-        # Try quota snapshots in priority order
+        def _extract_premium_request_dimensions(
+            snapshot: dict[str, Any],
+        ) -> tuple[float | None, float | None, float | None]:
+            """
+            @brief Extract premium request usage dimensions from Copilot quota snapshot.
+            @details Normalizes current-period premium-request count, included-plan
+            premium-request quota, and computed extra-request count. When direct
+            `premium_requests_extra` is absent, derives value from usage vs quota.
+            @param snapshot {dict[str, Any]} Premium snapshot payload.
+            @return {tuple[float | None, float | None, float | None]} Tuple
+            `(premium_requests, premium_requests_included, premium_requests_extra)`.
+            """
+            premium_requests_included = _first_numeric(
+                snapshot,
+                (
+                    "entitlement",
+                    "included",
+                    "included_requests",
+                    "premium_requests_included",
+                ),
+            )
+            premium_requests_remaining = _first_numeric(
+                snapshot,
+                (
+                    "quota_remaining",
+                    "remaining",
+                    "quotaRemaining",
+                    "premium_requests_remaining",
+                ),
+            )
+            premium_requests = _first_numeric(
+                snapshot,
+                (
+                    "used",
+                    "quota_used",
+                    "used_count",
+                    "requests_used",
+                    "premium_requests",
+                ),
+            )
+            if (
+                premium_requests is None
+                and premium_requests_included is not None
+                and premium_requests_remaining is not None
+            ):
+                premium_requests = premium_requests_included - premium_requests_remaining
+
+            premium_requests_extra = _first_numeric(
+                snapshot,
+                (
+                    "overage",
+                    "overage_count",
+                    "extra",
+                    "extra_requests",
+                    "premium_requests_extra",
+                ),
+            )
+            if (
+                premium_requests_extra is None
+                and premium_requests is not None
+                and premium_requests_included is not None
+            ):
+                premium_requests_extra = premium_requests - premium_requests_included
+            if (
+                premium_requests_extra is None
+                and premium_requests_remaining is not None
+                and premium_requests_remaining < 0
+            ):
+                premium_requests_extra = -premium_requests_remaining
+
+            if premium_requests is not None:
+                premium_requests = max(0.0, premium_requests)
+            if premium_requests_extra is not None:
+                premium_requests_extra = max(0.0, premium_requests_extra)
+
+            return (
+                premium_requests,
+                premium_requests_included,
+                premium_requests_extra,
+            )
+
+        # Try quota snapshots in priority order.
         snapshots_to_try = [
             ("premiumInteractions", "premium_interactions"),
             ("chat", "chat"),
@@ -377,7 +495,35 @@ Note: Token needs 'read:user' scope."""
             if remaining is not None:
                 break
 
-        # Parse reset date from various possible field names
+        premium_snapshot = _get_snapshot("premiumInteractions", "premium_interactions")
+        (
+            premium_requests,
+            premium_requests_included,
+            premium_requests_extra,
+        ) = _extract_premium_request_dimensions(premium_snapshot)
+
+        from aibar.config import (
+            DEFAULT_COPILOT_EXTRA_PREMIUM_REQUEST_COST,
+            load_runtime_config,
+        )
+
+        configured_extra_cost = DEFAULT_COPILOT_EXTRA_PREMIUM_REQUEST_COST
+        try:
+            runtime_config = load_runtime_config()
+            configured_extra_cost = max(
+                0.0,
+                float(runtime_config.copilot_extra_premium_request_cost),
+            )
+        except Exception:
+            pass
+
+        premium_requests_extra_cost = None
+        if premium_requests_extra is not None:
+            premium_requests_extra_cost = (
+                premium_requests_extra * configured_extra_cost
+            )
+
+        # Parse reset date from various possible field names.
         reset_raw = (
             data.get("quota_reset_date_utc")
             or data.get("quotaResetDateUtc")
@@ -405,11 +551,18 @@ Note: Token needs 'read:user' scope."""
             currency_symbol=_resolve_provider_currency(data, ProviderName.COPILOT.value),
         )
 
+        raw_payload = dict(data)
+        raw_payload["premium_requests"] = premium_requests
+        raw_payload["premium_requests_included"] = premium_requests_included
+        raw_payload["premium_requests_extra"] = premium_requests_extra
+        raw_payload["premium_requests_extra_cost"] = premium_requests_extra_cost
+        raw_payload["copilot_extra_premium_request_cost"] = configured_extra_cost
+
         return ProviderResult(
             provider=self.name,
             window=window,
             metrics=metrics,
-            raw=data,
+            raw=raw_payload,
         )
 
     async def login(self) -> str:
