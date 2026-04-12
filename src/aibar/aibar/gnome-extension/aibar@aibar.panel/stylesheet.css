@@ -303,3 +303,8 @@
     color: #888;
     margin-left: 0;
 }
+
+.aibar-progress-over-limit {
+    border-right: 2px solid black;
+}
+

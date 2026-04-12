@@ -663,8 +663,12 @@ class AIBarIndicator extends PanelMenu.Button {
                 if (card._barData.progress) {
                     let bgW = card.progressBg ? card.progressBg.get_width() : 0;
                     if (bgW > 0) {
-                        let w = Math.round((card._barData.progress.pct / 100) * bgW);
-                        card.progressFill.set_width(w);
+                        let pct = card._barData.progress.pct;
+                        let w = Math.round((pct / 100) * bgW);
+                        let fillW = Math.min(w, bgW);
+                        card.progressFill.set_width(pct > 100 ? Math.max(0, fillW - 2) : fillW);
+                        if (pct > 100) card.progressFill.add_style_class_name('aibar-progress-over-limit');
+                        else card.progressFill.remove_style_class_name('aibar-progress-over-limit');
                     }
                 }
             }
@@ -1202,7 +1206,10 @@ class AIBarIndicator extends PanelMenu.Button {
                     let barBgWidth = card.progressBg ? card.progressBg.get_width() : 0;
                     if (barBgWidth > 0) {
                         let width = Math.round((pct / 100) * barBgWidth);
-                        card.progressFill.set_width(width);
+                        let fillW = Math.min(width, barBgWidth);
+                        card.progressFill.set_width(pct > 100 ? Math.max(0, fillW - 2) : fillW);
+                        if (pct > 100) card.progressFill.add_style_class_name('aibar-progress-over-limit');
+                        else card.progressFill.remove_style_class_name('aibar-progress-over-limit');
                     }
                     return GLib.SOURCE_REMOVE;
                 });
@@ -1916,5 +1923,8 @@ export default class AIBarExtension extends Extension {
             this._indicator.destroy();
             this._indicator = null;
         }
+    }
+}
+    }
     }
 }

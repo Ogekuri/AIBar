@@ -647,3 +647,21 @@ def test_extension_uses_cached_status_error_for_provider_cards() -> None:
     assert "const statusError = (" in source
     assert "const effectiveError = statusError || data.error;" in source
     assert "statusEntry.retry_after_seconds" in source
+
+
+def test_progress_bar_handles_percentages_over_100() -> None:
+    """
+    @brief Verify progress bar rendering limits width and adds indicator when pct > 100.
+    @details Asserts the extension bounds the progress fill width to barBgWidth,
+    subtracts 2px for the black boundary, and adds the `aibar-progress-over-limit` class
+    to prevent UI expansion.
+    """
+    source = EXTENSION_PATH.read_text(encoding="utf-8")
+    assert "let fillW = Math.min(w, barBgWidth);" in source or "let fillW = Math.min(w, bgW);" in source or "let fillW = Math.min(width, barBgWidth);" in source
+    assert "pct > 100 ? Math.max(0, fillW - 2) : fillW" in source
+    assert "add_style_class_name('aibar-progress-over-limit')" in source
+    
+    stylesheet_source = STYLESHEET_PATH.read_text(encoding="utf-8")
+    assert ".aibar-progress-over-limit {" in stylesheet_source
+    assert "border-right: 2px solid black;" in stylesheet_source
+
