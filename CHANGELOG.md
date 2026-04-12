@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.27.0](https://github.com/Ogekuri/AIBar/compare/v0.26.0..v0.27.0) - 2026-04-12
+### 📚  Documentation
+- align usage docs with current CLI interfaces [useReq] *(readme)*
+  - document global lifecycle/logging flags and show --force behavior
+  - add fixed-window notes for copilot/openrouter/openai/geminiai
+  - add repository helper scripts and correct GeminiAI setup prerequisites
+
 ## [0.26.0](https://github.com/Ogekuri/AIBar/compare/v0.25.0..v0.26.0) - 2026-04-12
 ### 🚜  Changes
 - enforce Copilot blank separator before cost [useReq] *(cli.show)*
@@ -1055,6 +1062,7 @@
 - \[0.24.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.24.0
 - \[0.25.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.25.0
 - \[0.26.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.26.0
+- \[0.27.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.27.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1082,3 +1090,4 @@
 [0.24.0]: https://github.com/Ogekuri/AIBar/compare/v0.23.0..v0.24.0
 [0.25.0]: https://github.com/Ogekuri/AIBar/compare/v0.24.0..v0.25.0
 [0.26.0]: https://github.com/Ogekuri/AIBar/compare/v0.25.0..v0.26.0
+[0.27.0]: https://github.com/Ogekuri/AIBar/compare/v0.26.0..v0.27.0
