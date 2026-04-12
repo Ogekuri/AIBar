@@ -340,7 +340,7 @@ from typing import Any
 
 ---
 
-# cli.py | Python | 4785L | 130 symbols | 31 imports | 147 comments
+# cli.py | Python | 4799L | 130 symbols | 31 imports | 147 comments
 > Path: `src/aibar/aibar/cli.py`
 - @brief Command-line interface for aibar.
 - @details Defines command parsing, provider dispatch, formatted output, setup helpers, login flows, and UI launch hooks.
@@ -1422,14 +1422,16 @@ freshness line (`Updated: ..., Next: ...`) using provider freshness state.
 
 ### fn `def _build_result_panel(` `priv` (L3608-3612)
 
-### fn `def _format_billing_service_descriptions(services: list[object]) -> str | None` `priv` (L3771-3798)
+### fn `def _format_billing_service_descriptions(services: list[object]) -> str | None` `priv` (L3785-3812)
 - @brief Build one provider panel title/body payload for CLI text rendering.
 - @brief Build human-readable GeminiAI billing service summary.
 - @details Formats deterministic panel lines for one provider/window result and
 preserves provider-specific metrics/error rendering rules used by `show`.
 `FAIL` states emit `Status: FAIL`, `Reason: <reason>`, and `Updated/Next`
 separated by blank lines. `OK` states emit `Status: OK` first, do not emit
-`Window <window>` headings, and end with one right-aligned freshness line.
+`Window <window>` headings, insert one blank separator between Copilot
+`Remaining credits` and `Cost` rows, and end with one right-aligned freshness
+line.
 - @details Extracts ordered `service_description` values from billing service entries and returns all valid names in source order as one comma-separated summary string.
 - @param name {ProviderName} Provider name enum value.
 - @param result {ProviderResult} Provider result to render.
@@ -1450,9 +1452,9 @@ carrying `last_success_timestamp` and `idle_until_timestamp` freshness values.
 - @satisfies REQ-084
 - @satisfies REQ-106
 
-### fn `def _build_dual_window_panel(` `priv` (L3799-3803)
+### fn `def _build_dual_window_panel(` `priv` (L3813-3817)
 
-### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L3914-3932)
+### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L3928-3946)
 - @brief Build one grouped CLI panel for dual-window providers.
 - @brief Render CLI text output for one provider result.
 - @details Produces one provider panel from `5h` and `7d` results while
@@ -1479,15 +1481,15 @@ trailing right-aligned freshness line.
 - @satisfies REQ-051
 - @satisfies REQ-067
 
-### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L3933-3948)
+### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L3947-3962)
 - @brief Execute format reset duration.
 - @details Applies format reset duration logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param seconds {float} Input parameter `seconds`.
 - @return {str} Function return value.
 
-### fn `def _should_print_claude_reset_pending_hint(` `priv` (L3949-3951)
+### fn `def _should_print_claude_reset_pending_hint(` `priv` (L3963-3965)
 
-### fn `def _is_displayed_zero_percent(percent: float | None) -> bool` `priv` (L3971-3987)
+### fn `def _is_displayed_zero_percent(percent: float | None) -> bool` `priv` (L3985-4001)
 - @brief Determine whether CLI output must render the reset-pending fallback hint.
 - @brief Check whether a percentage renders as `0.0%` in one-decimal UI output.
 - @details The hint is only valid for Claude windows when no reset timestamp is
@@ -1503,7 +1505,7 @@ providers other than Claude.
 - @satisfies REQ-002
 - @satisfies REQ-002
 
-### fn `def _progress_bar(percent: float, provider_name: ProviderName, width: int = 20) -> str` `priv` (L3988-4003)
+### fn `def _progress_bar(percent: float, provider_name: ProviderName, width: int = 20) -> str` `priv` (L4002-4017)
 - @brief Execute progress bar.
 - @details Applies progress bar logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param percent {float} Input parameter `percent`.
@@ -1511,17 +1513,17 @@ providers other than Claude.
 - @param width {int} Input parameter `width`.
 - @return {str} Function return value.
 
-### fn `def doctor() -> None` (L4008-4060)
+### fn `def doctor() -> None` (L4022-4074)
 - @brief Execute doctor.
 - @details Applies doctor logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def env() -> None` (L4065-4073)
+### fn `def env() -> None` (L4079-4087)
 - @brief Execute env.
 - @details Applies env logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def setup() -> None` (L4078-4277)
+### fn `def setup() -> None` (L4092-4291)
 - @brief Execute setup.
 - @details Prompts for `idle_delay_seconds`, `api_call_delay_milliseconds`, `api_call_timeout_milliseconds`, `default_retry_after_seconds`, `gnome_refresh_interval_seconds`, and `billing_data` in order, then prompts dedicated Copilot overage pricing field `copilot_extra_premium_request_cost` (USD/request), then prompts provider currency symbols including `geminiai` (choices: `$`, `£`, `€`, default `$`), then persists all values to `~/.config/aibar/config.json`. Final setup section configures logging flags (`log_enabled`, `debug_enabled`). GeminiAI OAuth source supports `skip`, `file`, `paste`, and `login` (re-authorization with current scopes). Also prompts for provider API keys and writes them to `~/.config/aibar/env`.
 - @return {None} Function return value.
@@ -1533,43 +1535,43 @@ providers other than Claude.
 - @satisfies REQ-056
 - @satisfies REQ-059
 
-### fn `def login(provider: str) -> None` (L4420-4438)
+### fn `def login(provider: str) -> None` (L4434-4452)
 - @brief Execute login.
 - @details Applies login logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param provider {str} Input parameter `provider`.
 - @return {None} Function return value.
 
-### fn `def _login_claude() -> None` `priv` (L4439-4487)
+### fn `def _login_claude() -> None` `priv` (L4453-4501)
 - @brief Execute login claude.
 - @details Applies login claude logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_copilot() -> None` `priv` (L4488-4515)
+### fn `def _login_copilot() -> None` `priv` (L4502-4529)
 - @brief Execute login copilot.
 - @details Applies login copilot logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_geminiai() -> None` `priv` (L4516-4554)
+### fn `def _login_geminiai() -> None` `priv` (L4530-4568)
 - @brief Execute GeminiAI OAuth login flow.
 - @details Reuses persisted OAuth client configuration to launch browser-based authorization and persist refresh-capable Google credentials.
 - @return {None} Function return value.
 - @satisfies REQ-055
 - @satisfies REQ-056
 
-### fn `def _resolve_extension_source_dir() -> Path` `priv` (L4555-4567)
+### fn `def _resolve_extension_source_dir() -> Path` `priv` (L4569-4581)
 - @brief Resolve GNOME extension source directory from within the `aibar` package.
 - @details Uses `Path(__file__).resolve().parent` to locate the `aibar` package directory, then appends `gnome-extension/<UUID>/`. Works in development (editable install), wheel-installed, and `uv tool install` layouts because the extension directory resides inside the `aibar` Python package subtree.
 - @return {Path} Absolute path to the extension source directory.
 - @satisfies REQ-025, REQ-083
 
-### fn `def gnome_install() -> None` (L4578-4704)
+### fn `def gnome_install() -> None` (L4592-4718)
 - @brief Install or update the AIBar GNOME Shell extension to the user's local extensions directory.
 - @details Resolves extension source from the installed package path, validates source directory contains `metadata.json` and is non-empty, then executes one of two flows: install flow (`target` absent) creates target and copies files before enabling extension; update flow (`target` present) disables extension, copies files, then enables extension. Update flow masks non-zero disable outcomes caused by missing extension and continues. Produces colored Click-styled terminal output for all status messages.
 - @return {None} Function return value.
 - @throws {SystemExit} Exits with code 1 on prerequisite validation failure.
 - @satisfies PRJ-008, REQ-025, REQ-026, REQ-027, REQ-028, REQ-029, REQ-030, REQ-032, REQ-099
 
-### fn `def gnome_uninstall() -> None` (L4714-4783)
+### fn `def gnome_uninstall() -> None` (L4728-4797)
 - @brief Remove the AIBar GNOME Shell extension from the user's local extensions directory.
 - @details Disables the extension via `gnome-extensions disable`, then removes the entire extension directory at `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/`. Exits with code 1 if the extension directory does not exist. Produces colored Click-styled terminal output for all status messages.
 - @return {None} Function return value.
@@ -1692,23 +1694,23 @@ providers other than Claude.
 |`_extract_copilot_extra_premium_cost`|fn|priv|3531-3591|def _extract_copilot_extra_premium_cost(result: ProviderR...|
 |`_build_copilot_extra_premium_cost_line`|fn|priv|3592-3607|def _build_copilot_extra_premium_cost_line(result: Provid...|
 |`_build_result_panel`|fn|priv|3608-3612|def _build_result_panel(|
-|`_format_billing_service_descriptions`|fn|priv|3771-3798|def _format_billing_service_descriptions(services: list[o...|
-|`_build_dual_window_panel`|fn|priv|3799-3803|def _build_dual_window_panel(|
-|`_print_result`|fn|priv|3914-3932|def _print_result(name: ProviderName, result, label: str ...|
-|`_format_reset_duration`|fn|priv|3933-3948|def _format_reset_duration(seconds: float) -> str|
-|`_should_print_claude_reset_pending_hint`|fn|priv|3949-3951|def _should_print_claude_reset_pending_hint(|
-|`_is_displayed_zero_percent`|fn|priv|3971-3987|def _is_displayed_zero_percent(percent: float | None) -> ...|
-|`_progress_bar`|fn|priv|3988-4003|def _progress_bar(percent: float, provider_name: Provider...|
-|`doctor`|fn|pub|4008-4060|def doctor() -> None|
-|`env`|fn|pub|4065-4073|def env() -> None|
-|`setup`|fn|pub|4078-4277|def setup() -> None|
-|`login`|fn|pub|4420-4438|def login(provider: str) -> None|
-|`_login_claude`|fn|priv|4439-4487|def _login_claude() -> None|
-|`_login_copilot`|fn|priv|4488-4515|def _login_copilot() -> None|
-|`_login_geminiai`|fn|priv|4516-4554|def _login_geminiai() -> None|
-|`_resolve_extension_source_dir`|fn|priv|4555-4567|def _resolve_extension_source_dir() -> Path|
-|`gnome_install`|fn|pub|4578-4704|def gnome_install() -> None|
-|`gnome_uninstall`|fn|pub|4714-4783|def gnome_uninstall() -> None|
+|`_format_billing_service_descriptions`|fn|priv|3785-3812|def _format_billing_service_descriptions(services: list[o...|
+|`_build_dual_window_panel`|fn|priv|3813-3817|def _build_dual_window_panel(|
+|`_print_result`|fn|priv|3928-3946|def _print_result(name: ProviderName, result, label: str ...|
+|`_format_reset_duration`|fn|priv|3947-3962|def _format_reset_duration(seconds: float) -> str|
+|`_should_print_claude_reset_pending_hint`|fn|priv|3963-3965|def _should_print_claude_reset_pending_hint(|
+|`_is_displayed_zero_percent`|fn|priv|3985-4001|def _is_displayed_zero_percent(percent: float | None) -> ...|
+|`_progress_bar`|fn|priv|4002-4017|def _progress_bar(percent: float, provider_name: Provider...|
+|`doctor`|fn|pub|4022-4074|def doctor() -> None|
+|`env`|fn|pub|4079-4087|def env() -> None|
+|`setup`|fn|pub|4092-4291|def setup() -> None|
+|`login`|fn|pub|4434-4452|def login(provider: str) -> None|
+|`_login_claude`|fn|priv|4453-4501|def _login_claude() -> None|
+|`_login_copilot`|fn|priv|4502-4529|def _login_copilot() -> None|
+|`_login_geminiai`|fn|priv|4530-4568|def _login_geminiai() -> None|
+|`_resolve_extension_source_dir`|fn|priv|4569-4581|def _resolve_extension_source_dir() -> Path|
+|`gnome_install`|fn|pub|4592-4718|def gnome_install() -> None|
+|`gnome_uninstall`|fn|pub|4728-4797|def gnome_uninstall() -> None|
 
 
 ---

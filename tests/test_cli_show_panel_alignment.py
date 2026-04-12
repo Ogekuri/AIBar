@@ -397,7 +397,8 @@ def test_show_orders_provider_panels_status_first_and_updated_last(monkeypatch) 
     @brief Verify `show` panel order and per-panel status/freshness row placement.
     @details Forces explicit `7d` rendering across all providers with shuffled input maps
     and asserts output panel order `CLAUDE, OPENROUTER, COPILOT, CODEX, OPENAI, GEMINIAI`
-    while each panel body starts with `Status:` and ends with `Updated: ..., Next: ...`.
+    while each panel body starts with `Status:` and ends with `Updated: ..., Next: ...`,
+    and Copilot inserts one blank line between `Remaining credits` and `Cost`.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
     @return {None} Function return value.
     @satisfies REQ-067
@@ -466,3 +467,18 @@ def test_show_orders_provider_panels_status_first_and_updated_last(monkeypatch) 
     ]
     for _title, body_lines in panel_data:
         _assert_status_and_freshness_layout(body_lines)
+
+    copilot_body_lines = panel_data[2][1]
+    normalized_copilot_lines = [line.strip() for line in copilot_body_lines]
+    remaining_line_index = next(
+        index
+        for index, line in enumerate(normalized_copilot_lines)
+        if line.startswith("Remaining credits:")
+    )
+    cost_line_index = next(
+        index
+        for index, line in enumerate(normalized_copilot_lines)
+        if line.startswith("Cost:")
+    )
+    assert cost_line_index == remaining_line_index + 2
+    assert normalized_copilot_lines[remaining_line_index + 1] == ""

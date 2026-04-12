@@ -3617,7 +3617,9 @@ def _build_result_panel(
     preserves provider-specific metrics/error rendering rules used by `show`.
     `FAIL` states emit `Status: FAIL`, `Reason: <reason>`, and `Updated/Next`
     separated by blank lines. `OK` states emit `Status: OK` first, do not emit
-    `Window <window>` headings, and end with one right-aligned freshness line.
+    `Window <window>` headings, insert one blank separator between Copilot
+    `Remaining credits` and `Cost` rows, and end with one right-aligned freshness
+    line.
     @param name {ProviderName} Provider name enum value.
     @param result {ProviderResult} Provider result to render.
     @param label {str | None} Optional window label suffix (e.g. `"5h"`, `"7d"`).
@@ -3681,7 +3683,16 @@ def _build_result_panel(
             f"Remaining credits: {_format_bright_white_bold(f'{m.remaining:.1f}')} / {m.limit:.1f}"
         )
 
+    copilot_has_remaining_credits = (
+        name == ProviderName.COPILOT
+        and bool(detail_lines)
+        and detail_lines[-1].startswith("Remaining credits: ")
+    )
+
     if m.cost is not None:
+        if copilot_has_remaining_credits:
+            detail_lines.append("")
+            copilot_has_remaining_credits = False
         if name == ProviderName.OPENROUTER and m.limit is not None:
             detail_lines.append(
                 f"Cost: {_format_bright_white_bold(f'{m.currency_symbol}{m.cost:.4f}')} / "
@@ -3695,6 +3706,9 @@ def _build_result_panel(
     if name == ProviderName.COPILOT and m.cost is None:
         copilot_extra_cost_line = _build_copilot_extra_premium_cost_line(result)
         if copilot_extra_cost_line is not None:
+            if copilot_has_remaining_credits:
+                detail_lines.append("")
+                copilot_has_remaining_credits = False
             detail_lines.append(copilot_extra_cost_line)
 
     if _provider_supports_api_counters(name):
