@@ -3531,9 +3531,11 @@ def _build_fail_panel_lines(
 def _extract_copilot_extra_premium_cost(result: ProviderResult) -> float | None:
     """
     @brief Resolve Copilot premium-request overage cost from normalized raw payload.
-    @details Reads direct `premium_requests_extra_cost` when available; otherwise
-    computes `max(premium_requests - premium_requests_included, 0) * unit_cost`
-    using raw payload fields and runtime-config fallback for unit cost.
+    @details Computes Copilot overage primarily from `metrics.remaining` semantics:
+    `0` when `remaining >= 0`, otherwise `-remaining * unit_cost`. Falls back to
+    direct `premium_requests_extra_cost` or
+    `max(premium_requests - premium_requests_included, 0) * unit_cost` when
+    `remaining` is unavailable.
     @param result {ProviderResult} Copilot provider result candidate.
     @return {float | None} Non-negative overage cost value or None when unavailable.
     @satisfies REQ-012
@@ -3542,6 +3544,27 @@ def _extract_copilot_extra_premium_cost(result: ProviderResult) -> float | None:
     if result.provider != ProviderName.COPILOT:
         return None
     raw_payload = result.raw if isinstance(result.raw, dict) else {}
+    raw_unit_cost = raw_payload.get("copilot_extra_premium_request_cost")
+    unit_cost: float | None = None
+    if isinstance(raw_unit_cost, (int, float)) and math.isfinite(float(raw_unit_cost)):
+        unit_cost = max(0.0, float(raw_unit_cost))
+    if unit_cost is None:
+        try:
+            unit_cost = max(
+                0.0,
+                float(load_runtime_config().copilot_extra_premium_request_cost),
+            )
+        except Exception:
+            unit_cost = None
+
+    remaining = result.metrics.remaining
+    if isinstance(remaining, (int, float)) and math.isfinite(float(remaining)):
+        if float(remaining) >= 0:
+            return 0.0
+        if unit_cost is None:
+            return None
+        return max(0.0, -float(remaining)) * unit_cost
+
     direct_cost = raw_payload.get("premium_requests_extra_cost")
     if isinstance(direct_cost, (int, float)) and math.isfinite(float(direct_cost)):
         return max(0.0, float(direct_cost))
@@ -3556,16 +3579,8 @@ def _extract_copilot_extra_premium_cost(result: ProviderResult) -> float | None:
         return None
     if not math.isfinite(float(premium_requests_included)):
         return None
-
-    raw_unit_cost = raw_payload.get("copilot_extra_premium_request_cost")
-    unit_cost = None
-    if isinstance(raw_unit_cost, (int, float)) and math.isfinite(float(raw_unit_cost)):
-        unit_cost = max(0.0, float(raw_unit_cost))
     if unit_cost is None:
-        unit_cost = max(
-            0.0,
-            float(load_runtime_config().copilot_extra_premium_request_cost),
-        )
+        return None
 
     premium_requests_extra = max(
         0.0,

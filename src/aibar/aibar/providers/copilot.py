@@ -319,11 +319,12 @@ Note: Token needs 'read:user' scope."""
     def _parse_response(self, data: dict, window: WindowPeriod) -> ProviderResult:
         """
         @brief Normalize Copilot quota payload to ProviderResult.
-        @details Resolves quota snapshot fields, computes quota metrics, derives
-        Copilot premium-request overage quantities, and computes
-        `premium_requests_extra_cost = max(premium_requests - premium_requests_included, 0) * copilot_extra_premium_request_cost`.
-        Sets `metrics.cost` to the computed overage monetary value (fallback `0.0`)
-        and persists premium-overage fields in `raw` for CLI and GNOME rendering.
+        @details Resolves quota snapshot fields and computes Copilot premium-request
+        overage from normalized `remaining` semantics: when `remaining >= 0`,
+        overage is `0`; when `remaining < 0`, overage is `-remaining`. Computes
+        `premium_requests_extra_cost = premium_requests_extra * copilot_extra_premium_request_cost`,
+        sets `metrics.cost` to the computed overage monetary value (fallback `0.0`),
+        and persists normalized premium-overage fields in `raw` for CLI and GNOME rendering.
         @param data {dict} Raw Copilot API JSON payload.
         @param window {WindowPeriod} Effective window (`30d` for Copilot).
         @return {ProviderResult} Normalized provider result payload.
@@ -502,6 +503,11 @@ Note: Token needs 'read:user' scope."""
             premium_requests_extra,
         ) = _extract_premium_request_dimensions(premium_snapshot)
 
+        if limit is not None and remaining is not None:
+            premium_requests_included = max(0.0, limit)
+            premium_requests = max(0.0, premium_requests_included - remaining)
+            premium_requests_extra = max(0.0, -remaining)
+
         from aibar.config import (
             DEFAULT_COPILOT_EXTRA_PREMIUM_REQUEST_COST,
             load_runtime_config,
@@ -518,10 +524,15 @@ Note: Token needs 'read:user' scope."""
             pass
 
         premium_requests_extra_cost = None
-        if premium_requests_extra is not None:
+        if remaining is not None:
+            premium_requests_extra_cost = (
+                max(0.0, -remaining) * configured_extra_cost
+            )
+        elif premium_requests_extra is not None:
             premium_requests_extra_cost = (
                 premium_requests_extra * configured_extra_cost
             )
+
         copilot_cost = (
             premium_requests_extra_cost
             if premium_requests_extra_cost is not None

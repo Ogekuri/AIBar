@@ -91,8 +91,11 @@ function _providerSupportsApiCounters(providerName) {
 
 /**
  * @brief Resolve Copilot premium-request overage monetary value.
- * @details Uses direct `raw.premium_requests_extra_cost` when present; otherwise
- * computes `max(premium_requests - premium_requests_included, 0) * unit_cost`.
+ * @details Computes overage primarily from `metrics.remaining`: returns `0` when
+ * `remaining >= 0`; returns `-remaining * unit_cost` when `remaining < 0`.
+ * Falls back to raw `premium_requests_extra_cost` or
+ * `max(premium_requests - premium_requests_included, 0) * unit_cost` when
+ * `remaining` is unavailable.
  * @param {Object<string, any> | null} data Copilot provider payload.
  * @param {number} configuredUnitCost Configured USD unit cost per extra request.
  * @returns {number | null} Non-negative overage monetary value or null.
@@ -102,9 +105,27 @@ function _providerSupportsApiCounters(providerName) {
 function _resolveCopilotExtraPremiumCost(data, configuredUnitCost) {
     if (!data || typeof data !== 'object' || Array.isArray(data))
         return null;
+
+    const metrics = (data.metrics && typeof data.metrics === 'object' && !Array.isArray(data.metrics))
+        ? data.metrics
+        : null;
     const raw = (data.raw && typeof data.raw === 'object' && !Array.isArray(data.raw))
         ? data.raw
         : null;
+
+    let unitCost = raw ? Number(raw.copilot_extra_premium_request_cost) : Number.NaN;
+    if (!Number.isFinite(unitCost))
+        unitCost = Number(configuredUnitCost);
+
+    const remaining = metrics ? Number(metrics.remaining) : Number.NaN;
+    if (Number.isFinite(remaining)) {
+        if (remaining >= 0)
+            return 0;
+        if (!Number.isFinite(unitCost))
+            return null;
+        return Math.max(0, -remaining) * Math.max(0, unitCost);
+    }
+
     if (!raw)
         return null;
 
@@ -116,10 +137,6 @@ function _resolveCopilotExtraPremiumCost(data, configuredUnitCost) {
     const premiumRequestsIncluded = Number(raw.premium_requests_included);
     if (!Number.isFinite(premiumRequests) || !Number.isFinite(premiumRequestsIncluded))
         return null;
-
-    let unitCost = Number(raw.copilot_extra_premium_request_cost);
-    if (!Number.isFinite(unitCost))
-        unitCost = Number(configuredUnitCost);
     if (!Number.isFinite(unitCost))
         return null;
 

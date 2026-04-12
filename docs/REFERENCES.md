@@ -340,7 +340,7 @@ from typing import Any
 
 ---
 
-# cli.py | Python | 4770L | 130 symbols | 31 imports | 147 comments
+# cli.py | Python | 4785L | 130 symbols | 31 imports | 147 comments
 > Path: `src/aibar/aibar/cli.py`
 - @brief Command-line interface for aibar.
 - @details Defines command parsing, provider dispatch, formatted output, setup helpers, login flows, and UI launch hooks.
@@ -1395,13 +1395,13 @@ Border and title color use provider-specific ANSI palette.
 - @return {str | None} Diagnostic line or None when both values are missing.
 - @satisfies REQ-037
 
-### fn `def _extract_copilot_extra_premium_cost(result: ProviderResult) -> float | None` `priv` (L3531-3576)
+### fn `def _extract_copilot_extra_premium_cost(result: ProviderResult) -> float | None` `priv` (L3531-3591)
 - @brief Build deterministic CLI body lines for one failed provider panel.
 - @brief Resolve Copilot premium-request overage cost from normalized raw payload.
 - @details Emits the required failed-state block layout: `Status: FAIL`, blank
 separator, `Reason: <reason>`, blank separator, and one right-aligned
 freshness line (`Updated: ..., Next: ...`) using provider freshness state.
-- @details Reads direct `premium_requests_extra_cost` when available; otherwise computes `max(premium_requests - premium_requests_included, 0) * unit_cost` using raw payload fields and runtime-config fallback for unit cost.
+- @details Computes Copilot overage primarily from `metrics.remaining` semantics: `0` when `remaining >= 0`, otherwise `-remaining * unit_cost`. Falls back to direct `premium_requests_extra_cost` or `max(premium_requests - premium_requests_included, 0) * unit_cost` when `remaining` is unavailable.
 - @param result {ProviderResult} Provider result used for freshness fallback.
 - @param reason {str} Normalized failure reason text.
 - @param freshness_state {IdleTimeState | None} Optional provider freshness state.
@@ -1413,16 +1413,16 @@ freshness line (`Updated: ..., Next: ...`) using provider freshness state.
 - @satisfies REQ-012
 - @satisfies REQ-067
 
-### fn `def _build_copilot_extra_premium_cost_line(result: ProviderResult) -> str | None` `priv` (L3577-3592)
+### fn `def _build_copilot_extra_premium_cost_line(result: ProviderResult) -> str | None` `priv` (L3592-3607)
 - @brief Build CLI Copilot cost row from premium-request overage payload fields.
 - @details Formats fallback Copilot cost text as `Cost: <currency><value>` when `metrics.cost` is unavailable and overage fields can still be resolved from raw payload.
 - @param result {ProviderResult} Copilot provider result candidate.
 - @return {str | None} Formatted row `Cost: ...` or None.
 - @satisfies REQ-067
 
-### fn `def _build_result_panel(` `priv` (L3593-3597)
+### fn `def _build_result_panel(` `priv` (L3608-3612)
 
-### fn `def _format_billing_service_descriptions(services: list[object]) -> str | None` `priv` (L3756-3783)
+### fn `def _format_billing_service_descriptions(services: list[object]) -> str | None` `priv` (L3771-3798)
 - @brief Build one provider panel title/body payload for CLI text rendering.
 - @brief Build human-readable GeminiAI billing service summary.
 - @details Formats deterministic panel lines for one provider/window result and
@@ -1450,9 +1450,9 @@ carrying `last_success_timestamp` and `idle_until_timestamp` freshness values.
 - @satisfies REQ-084
 - @satisfies REQ-106
 
-### fn `def _build_dual_window_panel(` `priv` (L3784-3788)
+### fn `def _build_dual_window_panel(` `priv` (L3799-3803)
 
-### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L3899-3917)
+### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L3914-3932)
 - @brief Build one grouped CLI panel for dual-window providers.
 - @brief Render CLI text output for one provider result.
 - @details Produces one provider panel from `5h` and `7d` results while
@@ -1479,15 +1479,15 @@ trailing right-aligned freshness line.
 - @satisfies REQ-051
 - @satisfies REQ-067
 
-### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L3918-3933)
+### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L3933-3948)
 - @brief Execute format reset duration.
 - @details Applies format reset duration logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param seconds {float} Input parameter `seconds`.
 - @return {str} Function return value.
 
-### fn `def _should_print_claude_reset_pending_hint(` `priv` (L3934-3936)
+### fn `def _should_print_claude_reset_pending_hint(` `priv` (L3949-3951)
 
-### fn `def _is_displayed_zero_percent(percent: float | None) -> bool` `priv` (L3956-3972)
+### fn `def _is_displayed_zero_percent(percent: float | None) -> bool` `priv` (L3971-3987)
 - @brief Determine whether CLI output must render the reset-pending fallback hint.
 - @brief Check whether a percentage renders as `0.0%` in one-decimal UI output.
 - @details The hint is only valid for Claude windows when no reset timestamp is
@@ -1503,7 +1503,7 @@ providers other than Claude.
 - @satisfies REQ-002
 - @satisfies REQ-002
 
-### fn `def _progress_bar(percent: float, provider_name: ProviderName, width: int = 20) -> str` `priv` (L3973-3988)
+### fn `def _progress_bar(percent: float, provider_name: ProviderName, width: int = 20) -> str` `priv` (L3988-4003)
 - @brief Execute progress bar.
 - @details Applies progress bar logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param percent {float} Input parameter `percent`.
@@ -1511,17 +1511,17 @@ providers other than Claude.
 - @param width {int} Input parameter `width`.
 - @return {str} Function return value.
 
-### fn `def doctor() -> None` (L3993-4045)
+### fn `def doctor() -> None` (L4008-4060)
 - @brief Execute doctor.
 - @details Applies doctor logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def env() -> None` (L4050-4058)
+### fn `def env() -> None` (L4065-4073)
 - @brief Execute env.
 - @details Applies env logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def setup() -> None` (L4063-4262)
+### fn `def setup() -> None` (L4078-4277)
 - @brief Execute setup.
 - @details Prompts for `idle_delay_seconds`, `api_call_delay_milliseconds`, `api_call_timeout_milliseconds`, `default_retry_after_seconds`, `gnome_refresh_interval_seconds`, and `billing_data` in order, then prompts dedicated Copilot overage pricing field `copilot_extra_premium_request_cost` (USD/request), then prompts provider currency symbols including `geminiai` (choices: `$`, `£`, `€`, default `$`), then persists all values to `~/.config/aibar/config.json`. Final setup section configures logging flags (`log_enabled`, `debug_enabled`). GeminiAI OAuth source supports `skip`, `file`, `paste`, and `login` (re-authorization with current scopes). Also prompts for provider API keys and writes them to `~/.config/aibar/env`.
 - @return {None} Function return value.
@@ -1533,43 +1533,43 @@ providers other than Claude.
 - @satisfies REQ-056
 - @satisfies REQ-059
 
-### fn `def login(provider: str) -> None` (L4405-4423)
+### fn `def login(provider: str) -> None` (L4420-4438)
 - @brief Execute login.
 - @details Applies login logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param provider {str} Input parameter `provider`.
 - @return {None} Function return value.
 
-### fn `def _login_claude() -> None` `priv` (L4424-4472)
+### fn `def _login_claude() -> None` `priv` (L4439-4487)
 - @brief Execute login claude.
 - @details Applies login claude logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_copilot() -> None` `priv` (L4473-4500)
+### fn `def _login_copilot() -> None` `priv` (L4488-4515)
 - @brief Execute login copilot.
 - @details Applies login copilot logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_geminiai() -> None` `priv` (L4501-4539)
+### fn `def _login_geminiai() -> None` `priv` (L4516-4554)
 - @brief Execute GeminiAI OAuth login flow.
 - @details Reuses persisted OAuth client configuration to launch browser-based authorization and persist refresh-capable Google credentials.
 - @return {None} Function return value.
 - @satisfies REQ-055
 - @satisfies REQ-056
 
-### fn `def _resolve_extension_source_dir() -> Path` `priv` (L4540-4552)
+### fn `def _resolve_extension_source_dir() -> Path` `priv` (L4555-4567)
 - @brief Resolve GNOME extension source directory from within the `aibar` package.
 - @details Uses `Path(__file__).resolve().parent` to locate the `aibar` package directory, then appends `gnome-extension/<UUID>/`. Works in development (editable install), wheel-installed, and `uv tool install` layouts because the extension directory resides inside the `aibar` Python package subtree.
 - @return {Path} Absolute path to the extension source directory.
 - @satisfies REQ-025, REQ-083
 
-### fn `def gnome_install() -> None` (L4563-4689)
+### fn `def gnome_install() -> None` (L4578-4704)
 - @brief Install or update the AIBar GNOME Shell extension to the user's local extensions directory.
 - @details Resolves extension source from the installed package path, validates source directory contains `metadata.json` and is non-empty, then executes one of two flows: install flow (`target` absent) creates target and copies files before enabling extension; update flow (`target` present) disables extension, copies files, then enables extension. Update flow masks non-zero disable outcomes caused by missing extension and continues. Produces colored Click-styled terminal output for all status messages.
 - @return {None} Function return value.
 - @throws {SystemExit} Exits with code 1 on prerequisite validation failure.
 - @satisfies PRJ-008, REQ-025, REQ-026, REQ-027, REQ-028, REQ-029, REQ-030, REQ-032, REQ-099
 
-### fn `def gnome_uninstall() -> None` (L4699-4768)
+### fn `def gnome_uninstall() -> None` (L4714-4783)
 - @brief Remove the AIBar GNOME Shell extension from the user's local extensions directory.
 - @details Disables the extension via `gnome-extensions disable`, then removes the entire extension directory at `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/`. Exits with code 1 if the extension directory does not exist. Produces colored Click-styled terminal output for all status messages.
 - @return {None} Function return value.
@@ -1689,26 +1689,26 @@ providers other than Claude.
 |`_emit_provider_panel`|fn|priv|3435-3439|def _emit_provider_panel(|
 |`_format_http_status_retry_line`|fn|priv|3483-3485|def _format_http_status_retry_line(|
 |`_build_fail_panel_lines`|fn|priv|3507-3510|def _build_fail_panel_lines(|
-|`_extract_copilot_extra_premium_cost`|fn|priv|3531-3576|def _extract_copilot_extra_premium_cost(result: ProviderR...|
-|`_build_copilot_extra_premium_cost_line`|fn|priv|3577-3592|def _build_copilot_extra_premium_cost_line(result: Provid...|
-|`_build_result_panel`|fn|priv|3593-3597|def _build_result_panel(|
-|`_format_billing_service_descriptions`|fn|priv|3756-3783|def _format_billing_service_descriptions(services: list[o...|
-|`_build_dual_window_panel`|fn|priv|3784-3788|def _build_dual_window_panel(|
-|`_print_result`|fn|priv|3899-3917|def _print_result(name: ProviderName, result, label: str ...|
-|`_format_reset_duration`|fn|priv|3918-3933|def _format_reset_duration(seconds: float) -> str|
-|`_should_print_claude_reset_pending_hint`|fn|priv|3934-3936|def _should_print_claude_reset_pending_hint(|
-|`_is_displayed_zero_percent`|fn|priv|3956-3972|def _is_displayed_zero_percent(percent: float | None) -> ...|
-|`_progress_bar`|fn|priv|3973-3988|def _progress_bar(percent: float, provider_name: Provider...|
-|`doctor`|fn|pub|3993-4045|def doctor() -> None|
-|`env`|fn|pub|4050-4058|def env() -> None|
-|`setup`|fn|pub|4063-4262|def setup() -> None|
-|`login`|fn|pub|4405-4423|def login(provider: str) -> None|
-|`_login_claude`|fn|priv|4424-4472|def _login_claude() -> None|
-|`_login_copilot`|fn|priv|4473-4500|def _login_copilot() -> None|
-|`_login_geminiai`|fn|priv|4501-4539|def _login_geminiai() -> None|
-|`_resolve_extension_source_dir`|fn|priv|4540-4552|def _resolve_extension_source_dir() -> Path|
-|`gnome_install`|fn|pub|4563-4689|def gnome_install() -> None|
-|`gnome_uninstall`|fn|pub|4699-4768|def gnome_uninstall() -> None|
+|`_extract_copilot_extra_premium_cost`|fn|priv|3531-3591|def _extract_copilot_extra_premium_cost(result: ProviderR...|
+|`_build_copilot_extra_premium_cost_line`|fn|priv|3592-3607|def _build_copilot_extra_premium_cost_line(result: Provid...|
+|`_build_result_panel`|fn|priv|3608-3612|def _build_result_panel(|
+|`_format_billing_service_descriptions`|fn|priv|3771-3798|def _format_billing_service_descriptions(services: list[o...|
+|`_build_dual_window_panel`|fn|priv|3799-3803|def _build_dual_window_panel(|
+|`_print_result`|fn|priv|3914-3932|def _print_result(name: ProviderName, result, label: str ...|
+|`_format_reset_duration`|fn|priv|3933-3948|def _format_reset_duration(seconds: float) -> str|
+|`_should_print_claude_reset_pending_hint`|fn|priv|3949-3951|def _should_print_claude_reset_pending_hint(|
+|`_is_displayed_zero_percent`|fn|priv|3971-3987|def _is_displayed_zero_percent(percent: float | None) -> ...|
+|`_progress_bar`|fn|priv|3988-4003|def _progress_bar(percent: float, provider_name: Provider...|
+|`doctor`|fn|pub|4008-4060|def doctor() -> None|
+|`env`|fn|pub|4065-4073|def env() -> None|
+|`setup`|fn|pub|4078-4277|def setup() -> None|
+|`login`|fn|pub|4420-4438|def login(provider: str) -> None|
+|`_login_claude`|fn|priv|4439-4487|def _login_claude() -> None|
+|`_login_copilot`|fn|priv|4488-4515|def _login_copilot() -> None|
+|`_login_geminiai`|fn|priv|4516-4554|def _login_geminiai() -> None|
+|`_resolve_extension_source_dir`|fn|priv|4555-4567|def _resolve_extension_source_dir() -> Path|
+|`gnome_install`|fn|pub|4578-4704|def gnome_install() -> None|
+|`gnome_uninstall`|fn|pub|4714-4783|def gnome_uninstall() -> None|
 
 
 ---
@@ -2046,7 +2046,7 @@ Invalid map entries are skipped.
 
 ---
 
-# extension.js | JavaScript | 2048L | 40 symbols | 9 imports | 45 comments
+# extension.js | JavaScript | 2065L | 40 symbols | 9 imports | 45 comments
 > Path: `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`
 - @brief GNOME Shell panel extension for aibar metrics.
 - @details Collects usage JSON from the aibar CLI and renders provider-specific quota/cost cards in the GNOME panel popup.
@@ -2102,35 +2102,38 @@ with null/undefined counters normalized to zero.
 - @return s {boolean} True when provider requires API counter label rendering.
 - @satisfies REQ-017
 
-### fn `function _resolveCopilotExtraPremiumCost(data, configuredUnitCost)` (L102-128)
+### fn `function _resolveCopilotExtraPremiumCost(data, configuredUnitCost)` (L105-145)
 - @brief Resolve Copilot premium-request overage monetary value.
-- @details Uses direct `raw.premium_requests_extra_cost` when present; otherwise
-computes `max(premium_requests - premium_requests_included, 0) * unit_cost`.
+- @details Computes overage primarily from `metrics.remaining`: returns `0` when
+`remaining >= 0`; returns `-remaining * unit_cost` when `remaining < 0`.
+Falls back to raw `premium_requests_extra_cost` or
+`max(premium_requests - premium_requests_included, 0) * unit_cost` when
+`remaining` is unavailable.
 - @param {Object<string, any> | null} data Copilot provider payload.
 - @param {number} configuredUnitCost Configured USD unit cost per extra request.
 - @return s {number | null} Non-negative overage monetary value or null.
 - @satisfies REQ-117
 - @satisfies REQ-118
 
-### fn `function _formatLocalDateTime(value)` (L136-147)
+### fn `function _formatLocalDateTime(value)` (L153-164)
 - @brief Format one Date object as local datetime for provider freshness labels.
 - @details Produces `%Y-%m-%d %H:%M` in runtime local timezone; invalid Date values return null.
 - @param {Date} value Date object to format.
 - @return s {string | null} Formatted local datetime string or null.
 
-### fn `function _coerceRetryAfterSeconds(value)` (L154-164)
+### fn `function _coerceRetryAfterSeconds(value)` (L171-181)
 - @brief Normalize retry-after value to positive integer seconds.
 - @param {any} value Retry-after candidate value.
 - @return s {number | null} Integer retry-after seconds or null when unavailable.
 
-### fn `function _classifyPanelFailureCategory(statusEntry)` (L173-187)
+### fn `function _classifyPanelFailureCategory(statusEntry)` (L190-204)
 - @brief Classify panel-failure category from cache status metadata.
 - @details Returns one of `oauth`, `rate_limit`, or `other` by inspecting
 normalized status error text and optional HTTP status code.
 - @param {any} statusEntry Window-specific cache status entry.
 - @return s {'oauth' | 'rate_limit' | 'other'} Failure category.
 
-### fn `function _panelProviderFailureState(statusData, providerName, windows)` (L198-221)
+### fn `function _panelProviderFailureState(statusData, providerName, windows)` (L215-238)
 - @brief Build provider-scoped panel failure state for one provider.
 - @details Resolves per-window FAIL entries from status data and computes
 `hasFailure` plus failure category for panel collapse logic.
@@ -2139,24 +2142,24 @@ normalized status error text and optional HTTP status code.
 - @param {string[]} windows Ordered window keys to inspect.
 - @return s {{hasFailure: boolean, category: 'oauth' | 'rate_limit' | 'other'}} Provider failure state.
 
-### fn `function _buildHttpStatusRetryLabel(statusCodeRaw, retryAfterRaw)` (L230-240)
+### fn `function _buildHttpStatusRetryLabel(statusCodeRaw, retryAfterRaw)` (L247-257)
 - @brief Build normalized HTTP status/retry metadata label.
 - @param {any} statusCodeRaw HTTP status candidate value.
 - @param {any} retryAfterRaw Retry-after candidate value.
 - @return s {string} Diagnostic label text or empty string.
 - @satisfies REQ-037
 
-### fn `function _escapeMarkup(value)` (L247-254)
+### fn `function _escapeMarkup(value)` (L264-271)
 - @brief Escape text for safe Pango markup insertion.
 - @param {string} value Raw text.
 - @return s {string} Markup-safe text.
 
-### fn `function _boldWhiteMarkup(value)` (L261-263)
+### fn `function _boldWhiteMarkup(value)` (L278-280)
 - @brief Wrap one value as bright-white bold Pango markup.
 - @param {string} value Raw text value.
 - @return s {string} Bright-white bold markup snippet.
 
-### fn `function _buildFallbackFreshnessState(statusEntry, idleDelaySeconds)` (L275-296)
+### fn `function _buildFallbackFreshnessState(statusEntry, idleDelaySeconds)` (L292-313)
 - @brief Build provider freshness fallback from cache-status `updated_at` metadata.
 - @details Converts `statusEntry.updated_at` to epoch seconds and derives
 `idle_until_timestamp` using configured idle-delay seconds when `freshness`/`idle_time`
@@ -2166,7 +2169,7 @@ sections are unavailable from CLI JSON output.
 - @return s {{last_success_timestamp: number, idle_until_timestamp: number} | null} Fallback freshness state or null.
 - @satisfies REQ-017
 
-### fn `function _resolveProviderFreshnessState(freshnessData, providerName, statusEntry, idleDelaySeconds)` (L310-324)
+### fn `function _resolveProviderFreshnessState(freshnessData, providerName, statusEntry, idleDelaySeconds)` (L327-341)
 - @brief Resolve provider freshness state from canonical CLI freshness source.
 - @details Uses `freshness.<provider>` (or `idle_time.<provider>` compatibility
 alias populated by parser) and falls back to status-derived timestamps only
@@ -2178,36 +2181,36 @@ when freshness state is unavailable in CLI JSON.
 - @return s {{last_success_timestamp: number, idle_until_timestamp: number} | null} Resolved freshness state.
 - @satisfies REQ-017
 
-### fn `function _getAiBarPath()` (L331-341)
+### fn `function _getAiBarPath()` (L348-358)
 - @brief Resolve aibar executable path.
 - @details Prefers PATH discovery and falls back to AIBAR_PATH from the env file.
 - @return s {string} Resolved executable path or fallback command name.
 
-### fn `function _loadEnvFromFile()` (L348-400)
+### fn `function _loadEnvFromFile()` (L365-417)
 - @brief Load key-value environment variables from aibar env file.
 - @details Parses export syntax, quoted values, and inline comments.
 - @return s {Object<string,string>} Parsed environment map.
 
-### fn `function _getProviderProgressClass(providerName)` (L407-409)
+### fn `function _getProviderProgressClass(providerName)` (L424-426)
 - @brief Map percentage usage to CSS progress severity class.
 - @param {number} pct Usage percentage.
 - @return s {string} CSS class suffix for progress state.
 
-### fn `function _isDisplayedZeroPercent(pct)` (L418-425)
+### fn `function _isDisplayedZeroPercent(pct)` (L435-442)
 - @brief Check whether a percentage renders as `0.0%` in one-decimal UI output.
 - @details Mirrors display rounding semantics so fallback reset text is shown when
 usage is effectively zero from the user's perspective (e.g. internal 0.04 -> 0.0%).
 - @param {number} pct Usage percentage candidate.
 - @return s {boolean} True when value is finite, non-negative, and rounds to 0.0.
 
-### fn `function _isDisplayedFullPercent(pct)` (L434-439)
+### fn `function _isDisplayedFullPercent(pct)` (L451-456)
 - @brief Check whether a percentage renders as `100.0%` in one-decimal UI output.
 - @details Mirrors display rounding semantics so near-full values are treated as
 full usage for limit-reached warning rendering.
 - @param {number} pct Usage percentage candidate.
 - @return s {boolean} True when value is finite and rounds to `100.0`.
 
-### fn `function _applyProgressFillGeometry(fillActor, backgroundActor, pct)` (L453-470)
+### fn `function _applyProgressFillGeometry(fillActor, backgroundActor, pct)` (L470-487)
 - @brief Apply deterministic progress-fill geometry with over-limit marker support.
 - @details Computes one bar fill width from percentage and current background width,
 clamps the fill to the background bounds, and toggles `aibar-progress-over-limit`
@@ -2219,19 +2222,19 @@ fill overflow into adjacent label slots and reserves 2px for the black marker.
 - @return s {void} No return value.
 - @satisfies REQ-102
 
-### class `class AIBarIndicator extends PanelMenu.Button` : PanelMenu.Button (L474-773)
+### class `class AIBarIndicator extends PanelMenu.Button` : PanelMenu.Button (L491-790)
 - @brief Panel indicator widget that manages popup rendering and refresh lifecycle. */
 - @brief Execute init.
 - @details Applies init logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @return s {any} Function return value.
 
-### fn `const createWindowBar = (labelText) =>` (L882-928)
+### fn `const createWindowBar = (labelText) =>` (L899-945)
 - @brief Execute create provider card.
 - @details Applies create provider card logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @param {any} providerName Input parameter `providerName`.
 - @return s {any} Function return value.
 
-### fn `const updateWindowBar = (bar, pct, resetTime, useDays, allowResetPendingHint = true) =>` (L1114-1178)
+### fn `const updateWindowBar = (bar, pct, resetTime, useDays, allowResetPendingHint = true) =>` (L1131-1195)
 - @brief Execute populate provider card.
 - @details Projects provider payload and cached status into one card surface.
 Failed states render a strict block with `Status: FAIL` and `Reason: ...`
@@ -2248,11 +2251,11 @@ existing provider-specific card rules, including Copilot
 - @satisfies REQ-017
 - @satisfies REQ-117
 
-### fn `const setResetLabel = (baseText) =>` (L1120-1126)
+### fn `const setResetLabel = (baseText) =>` (L1137-1143)
 
-### fn `const showResetPendingHint = () =>` (L1133-1135)
+### fn `const showResetPendingHint = () =>` (L1150-1152)
 
-### fn `const toPercent = (value) =>` (L1733-1738)
+### fn `const toPercent = (value) =>` (L1750-1755)
 - @brief Execute update u i.
 - @details Applies update u i logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 Resolves provider-window failure metadata from cache `status` section and forwards it
@@ -2263,9 +2266,9 @@ to card renderers. Panel status row renders fixed-order percentages and per-prov
 - @satisfies REQ-069
 - @satisfies REQ-118
 
-### fn `const getPanelUsageValues = (providerName, data) =>` (L1739-1796)
+### fn `const getPanelUsageValues = (providerName, data) =>` (L1756-1813)
 
-### class `export default class AIBarExtension extends Extension` : Extension (L2022-2048)
+### class `export default class AIBarExtension extends Extension` : Extension (L2039-2065)
 - @brief GNOME extension lifecycle adapter for AIBarIndicator registration.
 - @brief Execute enable.
 - @details Extends Extension (GNOME Shell 45+ API) to integrate with the extension lifecycle.
@@ -2293,30 +2296,30 @@ Uses this.uuid (provided by the Extension base class) as the status-area key.
 |`_getProviderDisplayName`|fn||57-61|function _getProviderDisplayName(providerName)|
 |`_resetMenuItemFocusVisualState`|fn||72-78|function _resetMenuItemFocusVisualState(menuItem)|
 |`_providerSupportsApiCounters`|fn||88-90|function _providerSupportsApiCounters(providerName)|
-|`_resolveCopilotExtraPremiumCost`|fn||102-128|function _resolveCopilotExtraPremiumCost(data, configured...|
-|`_formatLocalDateTime`|fn||136-147|function _formatLocalDateTime(value)|
-|`_coerceRetryAfterSeconds`|fn||154-164|function _coerceRetryAfterSeconds(value)|
-|`_classifyPanelFailureCategory`|fn||173-187|function _classifyPanelFailureCategory(statusEntry)|
-|`_panelProviderFailureState`|fn||198-221|function _panelProviderFailureState(statusData, providerN...|
-|`_buildHttpStatusRetryLabel`|fn||230-240|function _buildHttpStatusRetryLabel(statusCodeRaw, retryA...|
-|`_escapeMarkup`|fn||247-254|function _escapeMarkup(value)|
-|`_boldWhiteMarkup`|fn||261-263|function _boldWhiteMarkup(value)|
-|`_buildFallbackFreshnessState`|fn||275-296|function _buildFallbackFreshnessState(statusEntry, idleDe...|
-|`_resolveProviderFreshnessState`|fn||310-324|function _resolveProviderFreshnessState(freshnessData, pr...|
-|`_getAiBarPath`|fn||331-341|function _getAiBarPath()|
-|`_loadEnvFromFile`|fn||348-400|function _loadEnvFromFile()|
-|`_getProviderProgressClass`|fn||407-409|function _getProviderProgressClass(providerName)|
-|`_isDisplayedZeroPercent`|fn||418-425|function _isDisplayedZeroPercent(pct)|
-|`_isDisplayedFullPercent`|fn||434-439|function _isDisplayedFullPercent(pct)|
-|`_applyProgressFillGeometry`|fn||453-470|function _applyProgressFillGeometry(fillActor, background...|
-|`AIBarIndicator`|class||474-773|class AIBarIndicator extends PanelMenu.Button|
-|`createWindowBar`|fn||882-928|const createWindowBar = (labelText) =>|
-|`updateWindowBar`|fn||1114-1178|const updateWindowBar = (bar, pct, resetTime, useDays, al...|
-|`setResetLabel`|fn||1120-1126|const setResetLabel = (baseText) =>|
-|`showResetPendingHint`|fn||1133-1135|const showResetPendingHint = () =>|
-|`toPercent`|fn||1733-1738|const toPercent = (value) =>|
-|`getPanelUsageValues`|fn||1739-1796|const getPanelUsageValues = (providerName, data) =>|
-|`AIBarExtension`|class||2022-2048|export default class AIBarExtension extends Extension|
+|`_resolveCopilotExtraPremiumCost`|fn||105-145|function _resolveCopilotExtraPremiumCost(data, configured...|
+|`_formatLocalDateTime`|fn||153-164|function _formatLocalDateTime(value)|
+|`_coerceRetryAfterSeconds`|fn||171-181|function _coerceRetryAfterSeconds(value)|
+|`_classifyPanelFailureCategory`|fn||190-204|function _classifyPanelFailureCategory(statusEntry)|
+|`_panelProviderFailureState`|fn||215-238|function _panelProviderFailureState(statusData, providerN...|
+|`_buildHttpStatusRetryLabel`|fn||247-257|function _buildHttpStatusRetryLabel(statusCodeRaw, retryA...|
+|`_escapeMarkup`|fn||264-271|function _escapeMarkup(value)|
+|`_boldWhiteMarkup`|fn||278-280|function _boldWhiteMarkup(value)|
+|`_buildFallbackFreshnessState`|fn||292-313|function _buildFallbackFreshnessState(statusEntry, idleDe...|
+|`_resolveProviderFreshnessState`|fn||327-341|function _resolveProviderFreshnessState(freshnessData, pr...|
+|`_getAiBarPath`|fn||348-358|function _getAiBarPath()|
+|`_loadEnvFromFile`|fn||365-417|function _loadEnvFromFile()|
+|`_getProviderProgressClass`|fn||424-426|function _getProviderProgressClass(providerName)|
+|`_isDisplayedZeroPercent`|fn||435-442|function _isDisplayedZeroPercent(pct)|
+|`_isDisplayedFullPercent`|fn||451-456|function _isDisplayedFullPercent(pct)|
+|`_applyProgressFillGeometry`|fn||470-487|function _applyProgressFillGeometry(fillActor, background...|
+|`AIBarIndicator`|class||491-790|class AIBarIndicator extends PanelMenu.Button|
+|`createWindowBar`|fn||899-945|const createWindowBar = (labelText) =>|
+|`updateWindowBar`|fn||1131-1195|const updateWindowBar = (bar, pct, resetTime, useDays, al...|
+|`setResetLabel`|fn||1137-1143|const setResetLabel = (baseText) =>|
+|`showResetPendingHint`|fn||1150-1152|const showResetPendingHint = () =>|
+|`toPercent`|fn||1750-1755|const toPercent = (value) =>|
+|`getPanelUsageValues`|fn||1756-1813|const getPanelUsageValues = (providerName, data) =>|
+|`AIBarExtension`|class||2039-2065|export default class AIBarExtension extends Extension|
 
 
 ---
@@ -2730,7 +2733,7 @@ from aibar.config import get_api_call_timeout_seconds
 
 ---
 
-# copilot.py | Python | 603L | 31 symbols | 14 imports | 33 comments
+# copilot.py | Python | 614L | 31 symbols | 14 imports | 33 comments
 > Path: `src/aibar/aibar/providers/copilot.py`
 - @brief GitHub Copilot usage provider and device-flow authentication.
 - @details Handles device-code authorization, token storage resolution, Copilot quota retrieval, and normalization to provider result schema.
@@ -2834,7 +2837,7 @@ from aibar.config import (
 
 ### fn `def _parse_response(self, data: dict, window: WindowPeriod) -> ProviderResult` `priv` (L319-518)
 - @brief Normalize Copilot quota payload to ProviderResult.
-- @details Resolves quota snapshot fields, computes quota metrics, derives Copilot premium-request overage quantities, and computes `premium_requests_extra_cost = max(premium_requests - premium_requests_included, 0) * copilot_extra_premium_request_cost`. Sets `metrics.cost` to the computed overage monetary value (fallback `0.0`) and persists premium-overage fields in `raw` for CLI and GNOME rendering.
+- @details Resolves quota snapshot fields and computes Copilot premium-request overage from normalized `remaining` semantics: when `remaining >= 0`, overage is `0`; when `remaining < 0`, overage is `-remaining`. Computes `premium_requests_extra_cost = premium_requests_extra * copilot_extra_premium_request_cost`, sets `metrics.cost` to the computed overage monetary value (fallback `0.0`), and persists normalized premium-overage fields in `raw` for CLI and GNOME rendering.
 - @param data {dict} Raw Copilot API JSON payload.
 - @param window {WindowPeriod} Effective window (`30d` for Copilot).
 - @return {ProviderResult} Normalized provider result payload.
@@ -2843,14 +2846,15 @@ from aibar.config import (
 - @satisfies REQ-117
 - @satisfies REQ-118
 
-### fn `def _coerce_float(value: Any) -> float | None` `priv` (L337-351)
+### fn `def _coerce_float(value: Any) -> float | None` `priv` (L338-352)
 - @brief Normalize Copilot quota payload to ProviderResult.
 - @brief Parse one finite numeric value to float.
-- @details Resolves quota snapshot fields, computes quota metrics, derives
-Copilot premium-request overage quantities, and computes
-`premium_requests_extra_cost = max(premium_requests - premium_requests_included, 0) * copilot_extra_premium_request_cost`.
-Sets `metrics.cost` to the computed overage monetary value (fallback `0.0`)
-and persists premium-overage fields in `raw` for CLI and GNOME rendering.
+- @details Resolves quota snapshot fields and computes Copilot premium-request
+overage from normalized `remaining` semantics: when `remaining >= 0`,
+overage is `0`; when `remaining < 0`, overage is `-remaining`. Computes
+`premium_requests_extra_cost = premium_requests_extra * copilot_extra_premium_request_cost`,
+sets `metrics.cost` to the computed overage monetary value (fallback `0.0`),
+and persists normalized premium-overage fields in `raw` for CLI and GNOME rendering.
 - @details Returns None for non-numeric values and non-finite floats.
 - @param data {dict} Raw Copilot API JSON payload.
 - @param window {WindowPeriod} Effective window (`30d` for Copilot).
@@ -2862,28 +2866,28 @@ and persists premium-overage fields in `raw` for CLI and GNOME rendering.
 - @satisfies REQ-117
 - @satisfies REQ-118
 
-### fn `def _first_numeric(snapshot: dict[str, Any], keys: tuple[str, ...]) -> float | None` `priv` (L352-367)
+### fn `def _first_numeric(snapshot: dict[str, Any], keys: tuple[str, ...]) -> float | None` `priv` (L353-368)
 - @brief Resolve first available numeric field from snapshot keys.
 - @details Scans keys in order and returns the first finite numeric value.
 - @param snapshot {dict[str, Any]} Snapshot payload mapping.
 - @param keys {tuple[str, ...]} Candidate key sequence.
 - @return {float | None} First parsed float value or None.
 
-### fn `def _get_snapshot(key_camel: str, key_snake: str) -> dict` `priv` (L368-376)
+### fn `def _get_snapshot(key_camel: str, key_snake: str) -> dict` `priv` (L369-377)
 - @brief Resolve one quota snapshot object by camel/snake aliases.
 - @param key_camel {str} CamelCase snapshot key.
 - @param key_snake {str} snake_case snapshot key.
 - @return {dict} Snapshot mapping or empty dict.
 
-### fn `def _extract_quota_data(snapshot: dict) -> tuple[float | None, float | None]` `priv` (L377-401)
+### fn `def _extract_quota_data(snapshot: dict) -> tuple[float | None, float | None]` `priv` (L378-402)
 - @brief Extract remaining and limit values from one quota snapshot.
 - @details Prefers entitlement/remaining numeric values and falls back to percentage-normalized `(remaining_percent, 100.0)` representation.
 - @param snapshot {dict} Snapshot payload mapping.
 - @return {tuple[float | None, float | None]} Tuple `(remaining, limit)`.
 
-### fn `def _extract_premium_request_dimensions(` `priv` (L402-403)
+### fn `def _extract_premium_request_dimensions(` `priv` (L403-404)
 
-### fn `async def login(self) -> str` (L573-603)
+### fn `async def login(self) -> str` (L584-614)
 - @brief Execute login.
 - @details Applies login logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {str} Function return value.
@@ -2916,12 +2920,12 @@ and persists premium-overage fields in `raw` for CLI and GNOME rendering.
 |`CopilotProvider.get_config_help`|fn|pub|223-230|def get_config_help(self) -> str|
 |`fetch`|fn|pub|240-318|async def fetch(self, window: WindowPeriod = WindowPeriod...|
 |`_parse_response`|fn|priv|319-518|def _parse_response(self, data: dict, window: WindowPerio...|
-|`_coerce_float`|fn|priv|337-351|def _coerce_float(value: Any) -> float | None|
-|`_first_numeric`|fn|priv|352-367|def _first_numeric(snapshot: dict[str, Any], keys: tuple[...|
-|`_get_snapshot`|fn|priv|368-376|def _get_snapshot(key_camel: str, key_snake: str) -> dict|
-|`_extract_quota_data`|fn|priv|377-401|def _extract_quota_data(snapshot: dict) -> tuple[float | ...|
-|`_extract_premium_request_dimensions`|fn|priv|402-403|def _extract_premium_request_dimensions(|
-|`login`|fn|pub|573-603|async def login(self) -> str|
+|`_coerce_float`|fn|priv|338-352|def _coerce_float(value: Any) -> float | None|
+|`_first_numeric`|fn|priv|353-368|def _first_numeric(snapshot: dict[str, Any], keys: tuple[...|
+|`_get_snapshot`|fn|priv|369-377|def _get_snapshot(key_camel: str, key_snake: str) -> dict|
+|`_extract_quota_data`|fn|priv|378-402|def _extract_quota_data(snapshot: dict) -> tuple[float | ...|
+|`_extract_premium_request_dimensions`|fn|priv|403-404|def _extract_premium_request_dimensions(|
+|`login`|fn|pub|584-614|async def login(self) -> str|
 
 
 ---
