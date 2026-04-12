@@ -66,7 +66,7 @@ def test_extension_and_dependencies_include_geminiai_support() -> None:
     pyproject_source = PYPROJECT_PATH.read_text(encoding="utf-8")
     uv_lock_source = UV_LOCK_PATH.read_text(encoding="utf-8")
 
-    assert "this._providerOrder = ['claude', 'openrouter', 'copilot', 'codex', 'geminiai'];" in extension_source
+    assert "this._providerOrder = ['claude', 'openrouter', 'copilot', 'codex', 'openai', 'geminiai'];" in extension_source
     assert "geminiai: 'GEMINIAI'" in extension_source
     assert "google-api-python-client" in pyproject_source
     assert "google-cloud-bigquery" in pyproject_source
