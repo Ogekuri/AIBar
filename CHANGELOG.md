@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.28.0](https://github.com/Ogekuri/AIBar/compare/v0.27.0..v0.28.0) - 2026-04-13
+### 🚜  Changes
+- shrink popup viewport height for active card [useReq] *(gnome-extension)*
+  - Worktree: useReq-AIBar-work-20260413114433
+  - Requirements: add REQ-119 and REQ-120 for adaptive popup viewport sizing.
+  - Implementation: replace fixed 380px popup viewport with content-driven sizing capped at 260px.
+  - Docs: update WORKFLOW.md and regenerate REFERENCES.md.
+
 ## [0.27.0](https://github.com/Ogekuri/AIBar/compare/v0.26.0..v0.27.0) - 2026-04-12
 ### 📚  Documentation
 - align usage docs with current CLI interfaces [useReq] *(readme)*
@@ -1063,6 +1071,7 @@
 - \[0.25.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.25.0
 - \[0.26.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.26.0
 - \[0.27.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.27.0
+- \[0.28.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.28.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1091,3 +1100,4 @@
 [0.25.0]: https://github.com/Ogekuri/AIBar/compare/v0.24.0..v0.25.0
 [0.26.0]: https://github.com/Ogekuri/AIBar/compare/v0.25.0..v0.26.0
 [0.27.0]: https://github.com/Ogekuri/AIBar/compare/v0.26.0..v0.27.0
+[0.28.0]: https://github.com/Ogekuri/AIBar/compare/v0.27.0..v0.28.0
