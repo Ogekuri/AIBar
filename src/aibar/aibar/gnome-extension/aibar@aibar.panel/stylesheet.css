@@ -130,10 +130,15 @@
     max-width: 360px;
 }
 
+/**
+ * @brief Provider-card popup viewport height contract.
+ * @details Uses content-driven height with a fixed maximum so short cards do
+ * not leave persistent empty bottom space while taller cards remain scrollable.
+ * @satisfies REQ-119
+ * @satisfies REQ-120
+ */
 .aibar-providers-scroll {
-    min-height: 380px;
-    height: 380px;
-    max-height: 380px;
+    max-height: 260px;
 }
 
 /* Provider card */

@@ -47,6 +47,14 @@ const DEFAULT_WINDOW_LABELS = Object.freeze({
     openai: '30d',
     geminiai: '30d',
 });
+/**
+ * @brief Maximum popup viewport height for provider cards in pixels.
+ * @details Caps popup vertical growth while allowing short provider cards to
+ * collapse the viewport height to content size. Time complexity O(1). Space
+ * complexity O(1).
+ * @satisfies REQ-120
+ */
+const PROVIDER_VIEWPORT_MAX_HEIGHT_PX = 260;
 const DEFAULT_COPILOT_EXTRA_PREMIUM_REQUEST_COST = 0.04;
 
 /**
@@ -465,7 +473,7 @@ function _isDisplayedFullPercent(pct) {
  * @param {St.Widget} backgroundActor Progress background widget providing max width.
  * @param {number} pct Usage percentage value.
  * @returns {void} No return value.
- * @satisfies REQ-102
+ * @satisfies REQ-119
  */
 function _applyProgressFillGeometry(fillActor, backgroundActor, pct) {
     const bgWidth = backgroundActor ? backgroundActor.get_width() : 0;
@@ -645,8 +653,10 @@ class AIBarIndicator extends PanelMenu.Button {
 
     /**
      * @brief Execute build popup menu.
-     * @details Applies build popup menu logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects, including forced CLI refresh wiring for `Refresh Now`.
+     * @details Applies build popup menu logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects, including forced CLI refresh wiring for `Refresh Now` and dynamic provider-viewport height control.
      * @returns {any} Function return value.
+     * @satisfies REQ-119
+     * @satisfies REQ-120
      */
     _buildPopupMenu() {
         let headerBox = new St.BoxLayout({
@@ -692,7 +702,7 @@ class AIBarIndicator extends PanelMenu.Button {
         });
         this._providersScrollView = new St.ScrollView({
             x_expand: true,
-            y_expand: true,
+            y_expand: false,
             style_class: 'aibar-providers-scroll',
         });
         this._providersScrollView.set_policy(St.PolicyType.NEVER, St.PolicyType.AUTOMATIC);
@@ -722,8 +732,10 @@ class AIBarIndicator extends PanelMenu.Button {
         this.menu.addMenuItem(refreshItem);
 
         this.menu.connect('open-state-changed', (_menu, isOpen) => {
-            if (isOpen)
+            if (isOpen) {
+                this._syncProviderViewportHeight();
                 this._applyBarWidths();
+            }
         });
     }
 
@@ -749,6 +761,35 @@ class AIBarIndicator extends PanelMenu.Button {
                 if (card._barData.progress)
                     _applyProgressFillGeometry(card.progressFill, card.progressBg, card._barData.progress.pct);
             }
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
+    /**
+     * @brief Synchronize popup provider viewport height with visible content.
+     * @details Measures `_providersContainer` natural height after visibility and
+     * label updates, then clamps the scroll viewport to `PROVIDER_VIEWPORT_MAX_HEIGHT_PX`.
+     * This removes persistent empty bottom space for short cards while preserving
+     * scroll containment for taller cards. Time complexity O(1). Space complexity O(1).
+     * @returns {void} No return value.
+     * @satisfies REQ-119
+     * @satisfies REQ-120
+     */
+    _syncProviderViewportHeight() {
+        GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+            if (!this._providersScrollView || !this._providersContainer)
+                return GLib.SOURCE_REMOVE;
+            if (typeof this._providersContainer.get_preferred_height !== 'function')
+                return GLib.SOURCE_REMOVE;
+            const [, naturalHeight] = this._providersContainer.get_preferred_height(-1);
+            const targetHeight = Math.max(
+                0,
+                Math.min(PROVIDER_VIEWPORT_MAX_HEIGHT_PX, Math.ceil(naturalHeight)),
+            );
+            if (targetHeight > 0)
+                this._providersScrollView.set_style(`height: ${targetHeight}px;`);
+            else
+                this._providersScrollView.set_style('');
             return GLib.SOURCE_REMOVE;
         });
     }
@@ -780,9 +821,10 @@ class AIBarIndicator extends PanelMenu.Button {
 
     /**
      * @brief Execute switch to provider.
-     * @details Applies switch to provider logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
+     * @details Applies switch to provider logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects, then re-sizes the popup viewport to the visible provider card.
      * @param {any} providerName Input parameter `providerName`.
      * @returns {any} Function return value.
+     * @satisfies REQ-120
      */
     _switchToProvider(providerName) {
         if (this._activeProvider === providerName)
@@ -826,6 +868,7 @@ class AIBarIndicator extends PanelMenu.Button {
                 card.container.hide();
             }
         }
+        this._syncProviderViewportHeight();
     }
 
     /**
@@ -1726,11 +1769,13 @@ class AIBarIndicator extends PanelMenu.Button {
      * @details Applies update u i logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
      * Resolves provider-window failure metadata from cache `status` section and forwards it
      * to card renderers. Panel status row renders fixed-order percentages and per-provider costs.
+     * After card refresh, re-sizes the popup provider viewport to the visible card height.
      * @returns {any} Function return value.
      * @satisfies REQ-021
      * @satisfies REQ-053
      * @satisfies REQ-069
      * @satisfies REQ-118
+     * @satisfies REQ-120
      */
     _updateUI() {
         const usageLabels = {
@@ -1951,6 +1996,7 @@ class AIBarIndicator extends PanelMenu.Button {
 
         if (!this._activeProvider && firstProvider)
             this._switchToProvider(firstProvider);
+        this._syncProviderViewportHeight();
         this._panelLabel.set_text('');
         this._panelLabel.hide();
     }
