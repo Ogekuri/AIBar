@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.29.0](https://github.com/Ogekuri/AIBar/compare/v0.28.0..v0.29.0) - 2026-04-15
+### 🚜  Changes
+- render over-limit segments in GNOME and CLI [useReq] *(progress-bar)*
+  - update REQUIREMENTS.md with REQ-121, REQ-122, TST-052, and TST-054
+  - add GNOME over-limit marker plus neutral extra-quota segment rendering
+  - add CLI fixed-width over-limit marker plus neutral extra-quota segment rendering
+  - refresh WORKFLOW.md and REFERENCES.md for updated symbols and call traces
+
 ## [0.28.0](https://github.com/Ogekuri/AIBar/compare/v0.27.0..v0.28.0) - 2026-04-13
 ### 🚜  Changes
 - shrink popup viewport height for active card [useReq] *(gnome-extension)*
@@ -1072,6 +1080,7 @@
 - \[0.26.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.26.0
 - \[0.27.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.27.0
 - \[0.28.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.28.0
+- \[0.29.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.29.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1101,3 +1110,4 @@
 [0.26.0]: https://github.com/Ogekuri/AIBar/compare/v0.25.0..v0.26.0
 [0.27.0]: https://github.com/Ogekuri/AIBar/compare/v0.26.0..v0.27.0
 [0.28.0]: https://github.com/Ogekuri/AIBar/compare/v0.27.0..v0.28.0
+[0.29.0]: https://github.com/Ogekuri/AIBar/compare/v0.28.0..v0.29.0
