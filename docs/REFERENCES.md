@@ -340,7 +340,7 @@ from typing import Any
 
 ---
 
-# cli.py | Python | 4799L | 130 symbols | 31 imports | 147 comments
+# cli.py | Python | 4841L | 131 symbols | 31 imports | 148 comments
 > Path: `src/aibar/aibar/cli.py`
 - @brief Command-line interface for aibar.
 - @details Defines command parsing, provider dispatch, formatted output, setup helpers, login flows, and UI launch hooks.
@@ -1505,25 +1505,35 @@ providers other than Claude.
 - @satisfies REQ-002
 - @satisfies REQ-002
 
-### fn `def _progress_bar(percent: float, provider_name: ProviderName, width: int = 20) -> str` `priv` (L4002-4017)
-- @brief Execute progress bar.
-- @details Applies progress bar logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
-- @param percent {float} Input parameter `percent`.
-- @param provider_name {ProviderName} Provider enum key for color mapping.
-- @param width {int} Input parameter `width`.
-- @return {str} Function return value.
+### fn `def _progress_bar_layout(percent: float, width: int) -> tuple[int, int, int]` `priv` (L4002-4034)
+- @brief Compute fixed-width CLI progress-bar segment widths.
+- @details Normalizes `percent` to a non-negative finite value. Percentages up to `100` allocate provider-color fill plus empty cells. Percentages above `100` allocate one 100%-boundary marker cell and one over-limit segment scaled across the extra `0..100` range, clamped for larger values, and forced visible for any positive over-limit usage. Time complexity O(1). Space complexity O(1).
+- @param percent {float} Raw usage percentage.
+- @param width {int} Total cell width inside the surrounding brackets.
+- @return {tuple[int, int, int]} Tuple `(base_width, over_limit_width, marker_width)`.
+- @satisfies REQ-122
 
-### fn `def doctor() -> None` (L4022-4074)
+### fn `def _progress_bar(percent: float, provider_name: ProviderName, width: int = 20) -> str` `priv` (L4035-4059)
+- @brief Render one fixed-width CLI usage bar.
+- @details Uses provider-color fill for in-limit usage. Percentages above `100` preserve fixed bar width by rendering a bright-white `|` marker at the 100% boundary and a neutral shaded over-limit segment (`▓`) inside the same bar. Time complexity O(width). Space complexity O(width).
+- @param percent {float} Raw usage percentage.
+- @param provider_name {ProviderName} Provider enum key for base-fill color mapping.
+- @param width {int} Total cell width inside the surrounding brackets.
+- @return {str} ANSI-colored progress bar string.
+- @satisfies REQ-067
+- @satisfies REQ-122
+
+### fn `def doctor() -> None` (L4064-4116)
 - @brief Execute doctor.
 - @details Applies doctor logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def env() -> None` (L4079-4087)
+### fn `def env() -> None` (L4121-4129)
 - @brief Execute env.
 - @details Applies env logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def setup() -> None` (L4092-4291)
+### fn `def setup() -> None` (L4134-4333)
 - @brief Execute setup.
 - @details Prompts for `idle_delay_seconds`, `api_call_delay_milliseconds`, `api_call_timeout_milliseconds`, `default_retry_after_seconds`, `gnome_refresh_interval_seconds`, and `billing_data` in order, then prompts dedicated Copilot overage pricing field `copilot_extra_premium_request_cost` (USD/request), then prompts provider currency symbols including `geminiai` (choices: `$`, `£`, `€`, default `$`), then persists all values to `~/.config/aibar/config.json`. Final setup section configures logging flags (`log_enabled`, `debug_enabled`). GeminiAI OAuth source supports `skip`, `file`, `paste`, and `login` (re-authorization with current scopes). Also prompts for provider API keys and writes them to `~/.config/aibar/env`.
 - @return {None} Function return value.
@@ -1535,43 +1545,43 @@ providers other than Claude.
 - @satisfies REQ-056
 - @satisfies REQ-059
 
-### fn `def login(provider: str) -> None` (L4434-4452)
+### fn `def login(provider: str) -> None` (L4476-4494)
 - @brief Execute login.
 - @details Applies login logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param provider {str} Input parameter `provider`.
 - @return {None} Function return value.
 
-### fn `def _login_claude() -> None` `priv` (L4453-4501)
+### fn `def _login_claude() -> None` `priv` (L4495-4543)
 - @brief Execute login claude.
 - @details Applies login claude logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_copilot() -> None` `priv` (L4502-4529)
+### fn `def _login_copilot() -> None` `priv` (L4544-4571)
 - @brief Execute login copilot.
 - @details Applies login copilot logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_geminiai() -> None` `priv` (L4530-4568)
+### fn `def _login_geminiai() -> None` `priv` (L4572-4610)
 - @brief Execute GeminiAI OAuth login flow.
 - @details Reuses persisted OAuth client configuration to launch browser-based authorization and persist refresh-capable Google credentials.
 - @return {None} Function return value.
 - @satisfies REQ-055
 - @satisfies REQ-056
 
-### fn `def _resolve_extension_source_dir() -> Path` `priv` (L4569-4581)
+### fn `def _resolve_extension_source_dir() -> Path` `priv` (L4611-4623)
 - @brief Resolve GNOME extension source directory from within the `aibar` package.
 - @details Uses `Path(__file__).resolve().parent` to locate the `aibar` package directory, then appends `gnome-extension/<UUID>/`. Works in development (editable install), wheel-installed, and `uv tool install` layouts because the extension directory resides inside the `aibar` Python package subtree.
 - @return {Path} Absolute path to the extension source directory.
 - @satisfies REQ-025, REQ-083
 
-### fn `def gnome_install() -> None` (L4592-4718)
+### fn `def gnome_install() -> None` (L4634-4760)
 - @brief Install or update the AIBar GNOME Shell extension to the user's local extensions directory.
 - @details Resolves extension source from the installed package path, validates source directory contains `metadata.json` and is non-empty, then executes one of two flows: install flow (`target` absent) creates target and copies files before enabling extension; update flow (`target` present) disables extension, copies files, then enables extension. Update flow masks non-zero disable outcomes caused by missing extension and continues. Produces colored Click-styled terminal output for all status messages.
 - @return {None} Function return value.
 - @throws {SystemExit} Exits with code 1 on prerequisite validation failure.
 - @satisfies PRJ-008, REQ-025, REQ-026, REQ-027, REQ-028, REQ-029, REQ-030, REQ-032, REQ-099
 
-### fn `def gnome_uninstall() -> None` (L4728-4797)
+### fn `def gnome_uninstall() -> None` (L4770-4839)
 - @brief Remove the AIBar GNOME Shell extension from the user's local extensions directory.
 - @details Disables the extension via `gnome-extensions disable`, then removes the entire extension directory at `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/`. Exits with code 1 if the extension directory does not exist. Produces colored Click-styled terminal output for all status messages.
 - @return {None} Function return value.
@@ -1700,17 +1710,18 @@ providers other than Claude.
 |`_format_reset_duration`|fn|priv|3947-3962|def _format_reset_duration(seconds: float) -> str|
 |`_should_print_claude_reset_pending_hint`|fn|priv|3963-3965|def _should_print_claude_reset_pending_hint(|
 |`_is_displayed_zero_percent`|fn|priv|3985-4001|def _is_displayed_zero_percent(percent: float | None) -> ...|
-|`_progress_bar`|fn|priv|4002-4017|def _progress_bar(percent: float, provider_name: Provider...|
-|`doctor`|fn|pub|4022-4074|def doctor() -> None|
-|`env`|fn|pub|4079-4087|def env() -> None|
-|`setup`|fn|pub|4092-4291|def setup() -> None|
-|`login`|fn|pub|4434-4452|def login(provider: str) -> None|
-|`_login_claude`|fn|priv|4453-4501|def _login_claude() -> None|
-|`_login_copilot`|fn|priv|4502-4529|def _login_copilot() -> None|
-|`_login_geminiai`|fn|priv|4530-4568|def _login_geminiai() -> None|
-|`_resolve_extension_source_dir`|fn|priv|4569-4581|def _resolve_extension_source_dir() -> Path|
-|`gnome_install`|fn|pub|4592-4718|def gnome_install() -> None|
-|`gnome_uninstall`|fn|pub|4728-4797|def gnome_uninstall() -> None|
+|`_progress_bar_layout`|fn|priv|4002-4034|def _progress_bar_layout(percent: float, width: int) -> t...|
+|`_progress_bar`|fn|priv|4035-4059|def _progress_bar(percent: float, provider_name: Provider...|
+|`doctor`|fn|pub|4064-4116|def doctor() -> None|
+|`env`|fn|pub|4121-4129|def env() -> None|
+|`setup`|fn|pub|4134-4333|def setup() -> None|
+|`login`|fn|pub|4476-4494|def login(provider: str) -> None|
+|`_login_claude`|fn|priv|4495-4543|def _login_claude() -> None|
+|`_login_copilot`|fn|priv|4544-4571|def _login_copilot() -> None|
+|`_login_geminiai`|fn|priv|4572-4610|def _login_geminiai() -> None|
+|`_resolve_extension_source_dir`|fn|priv|4611-4623|def _resolve_extension_source_dir() -> Path|
+|`gnome_install`|fn|pub|4634-4760|def gnome_install() -> None|
+|`gnome_uninstall`|fn|pub|4770-4839|def gnome_uninstall() -> None|
 
 
 ---
@@ -2048,7 +2059,7 @@ Invalid map entries are skipped.
 
 ---
 
-# extension.js | JavaScript | 2111L | 41 symbols | 9 imports | 47 comments
+# extension.js | JavaScript | 2172L | 42 symbols | 9 imports | 48 comments
 > Path: `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`
 - @brief GNOME Shell panel extension for aibar metrics.
 - @details Collects usage JSON from the aibar CLI and renders provider-specific quota/cost cards in the GNOME panel popup.
@@ -2218,31 +2229,46 @@ full usage for limit-reached warning rendering.
 - @param {number} pct Usage percentage candidate.
 - @return s {boolean} True when value is finite and rounds to `100.0`.
 
-### fn `function _applyProgressFillGeometry(fillActor, backgroundActor, pct)` (L478-495)
-- @brief Apply deterministic progress-fill geometry with over-limit marker support.
-- @details Computes one bar fill width from percentage and current background width,
-clamps the fill to the background bounds, and toggles `aibar-progress-over-limit`
-when percentage exceeds `100`. The helper preserves side-label layout by preventing
-fill overflow into adjacent label slots and reserves 2px for the black marker.
+### fn `function _attachOverLimitActors(backgroundActor, fillActor)` (L478-492)
+- @brief Attach over-limit visualization actors to one progress background.
+- @details Appends one black 100%-boundary marker actor and one neutral over-limit
+fill actor to the same horizontal background container used by the provider fill.
+Stores actor references on `fillActor` so shared geometry updates require only the
+existing `_applyProgressFillGeometry(...)` call sites. Time complexity O(1). Space
+complexity O(1).
+- @param {St.BoxLayout} backgroundActor Progress background container.
+- @param {St.Widget} fillActor Primary provider-color fill actor.
+- @return s {void} No return value.
+- @satisfies REQ-121
+
+### fn `function _applyProgressFillGeometry(fillActor, backgroundActor, pct)` (L509-548)
+- @brief Apply deterministic progress-fill geometry with over-limit segment support.
+- @details Computes fixed-width progress geometry from percentage and current
+background width. Percentages up to `100` render provider-color fill plus background.
+Percentages above `100` render a provider-color base segment, a fixed 2px 100%
+boundary marker, and a neutral over-limit segment scaled across the extra `0..100`
+range and clamped for larger values. The helper preserves side-label layout by
+never exceeding the background width. Time complexity O(1). Space complexity O(1).
 - @param {St.Widget} fillActor Progress fill widget receiving width updates.
 - @param {St.Widget} backgroundActor Progress background widget providing max width.
 - @param {number} pct Usage percentage value.
 - @return s {void} No return value.
 - @satisfies REQ-119
+- @satisfies REQ-121
 
-### class `class AIBarIndicator extends PanelMenu.Button` : PanelMenu.Button (L499-798)
+### class `class AIBarIndicator extends PanelMenu.Button` : PanelMenu.Button (L552-851)
 - @brief Panel indicator widget that manages popup rendering and refresh lifecycle. */
 - @brief Execute init.
 - @details Applies init logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @return s {any} Function return value.
 
-### fn `const createWindowBar = (labelText) =>` (L942-988)
+### fn `const createWindowBar = (labelText) =>` (L995-1041)
 - @brief Execute create provider card.
 - @details Applies create provider card logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @param {any} providerName Input parameter `providerName`.
 - @return s {any} Function return value.
 
-### fn `const updateWindowBar = (bar, pct, resetTime, useDays, allowResetPendingHint = true) =>` (L1174-1238)
+### fn `const updateWindowBar = (bar, pct, resetTime, useDays, allowResetPendingHint = true) =>` (L1227-1291)
 - @brief Execute populate provider card.
 - @details Projects provider payload and cached status into one card surface.
 Failed states render a strict block with `Status: FAIL` and `Reason: ...`
@@ -2259,11 +2285,11 @@ existing provider-specific card rules, including Copilot
 - @satisfies REQ-017
 - @satisfies REQ-117
 
-### fn `const setResetLabel = (baseText) =>` (L1180-1186)
+### fn `const setResetLabel = (baseText) =>` (L1233-1239)
 
-### fn `const showResetPendingHint = () =>` (L1193-1195)
+### fn `const showResetPendingHint = () =>` (L1246-1248)
 
-### fn `const toPercent = (value) =>` (L1795-1800)
+### fn `const toPercent = (value) =>` (L1856-1861)
 - @brief Execute update u i.
 - @details Applies update u i logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 Resolves provider-window failure metadata from cache `status` section and forwards it
@@ -2276,9 +2302,9 @@ After card refresh, re-sizes the popup provider viewport to the visible card hei
 - @satisfies REQ-118
 - @satisfies REQ-120
 
-### fn `const getPanelUsageValues = (providerName, data) =>` (L1801-1858)
+### fn `const getPanelUsageValues = (providerName, data) =>` (L1862-1919)
 
-### class `export default class AIBarExtension extends Extension` : Extension (L2085-2111)
+### class `export default class AIBarExtension extends Extension` : Extension (L2146-2172)
 - @brief GNOME extension lifecycle adapter for AIBarIndicator registration.
 - @brief Execute enable.
 - @details Extends Extension (GNOME Shell 45+ API) to integrate with the extension lifecycle.
@@ -2322,15 +2348,16 @@ Uses this.uuid (provided by the Extension base class) as the status-area key.
 |`_getProviderProgressClass`|fn||432-434|function _getProviderProgressClass(providerName)|
 |`_isDisplayedZeroPercent`|fn||443-450|function _isDisplayedZeroPercent(pct)|
 |`_isDisplayedFullPercent`|fn||459-464|function _isDisplayedFullPercent(pct)|
-|`_applyProgressFillGeometry`|fn||478-495|function _applyProgressFillGeometry(fillActor, background...|
-|`AIBarIndicator`|class||499-798|class AIBarIndicator extends PanelMenu.Button|
-|`createWindowBar`|fn||942-988|const createWindowBar = (labelText) =>|
-|`updateWindowBar`|fn||1174-1238|const updateWindowBar = (bar, pct, resetTime, useDays, al...|
-|`setResetLabel`|fn||1180-1186|const setResetLabel = (baseText) =>|
-|`showResetPendingHint`|fn||1193-1195|const showResetPendingHint = () =>|
-|`toPercent`|fn||1795-1800|const toPercent = (value) =>|
-|`getPanelUsageValues`|fn||1801-1858|const getPanelUsageValues = (providerName, data) =>|
-|`AIBarExtension`|class||2085-2111|export default class AIBarExtension extends Extension|
+|`_attachOverLimitActors`|fn||478-492|function _attachOverLimitActors(backgroundActor, fillActor)|
+|`_applyProgressFillGeometry`|fn||509-548|function _applyProgressFillGeometry(fillActor, background...|
+|`AIBarIndicator`|class||552-851|class AIBarIndicator extends PanelMenu.Button|
+|`createWindowBar`|fn||995-1041|const createWindowBar = (labelText) =>|
+|`updateWindowBar`|fn||1227-1291|const updateWindowBar = (bar, pct, resetTime, useDays, al...|
+|`setResetLabel`|fn||1233-1239|const setResetLabel = (baseText) =>|
+|`showResetPendingHint`|fn||1246-1248|const showResetPendingHint = () =>|
+|`toPercent`|fn||1856-1861|const toPercent = (value) =>|
+|`getPanelUsageValues`|fn||1862-1919|const getPanelUsageValues = (providerName, data) =>|
+|`AIBarExtension`|class||2146-2172|export default class AIBarExtension extends Extension|
 
 
 ---

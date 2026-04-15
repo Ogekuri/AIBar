@@ -651,23 +651,28 @@ def test_extension_uses_cached_status_error_for_provider_cards() -> None:
 
 def test_progress_bar_handles_percentages_over_100() -> None:
     """
-    @brief Verify over-limit progress rendering clamps fill width for every provider mode.
+    @brief Verify GNOME over-limit progress bars expose a dedicated extra-quota segment.
     @details Asserts one shared geometry helper is used by single-window bars,
-    dual-window bars, and fallback progress rows so percentages above 100 keep
-    full-width fill, preserve side-label space, and render the black 100% marker.
-    @satisfies REQ-102
+    dual-window bars, and fallback progress rows so percentages above 100 render
+    a neutral over-limit segment plus a black 100% marker without widening label slots.
+    @satisfies REQ-121
     @satisfies TST-052
     """
     source = EXTENSION_PATH.read_text(encoding="utf-8")
-    assert "function _applyProgressFillGeometry(fillActor, backgroundActor, pct)" in source
-    assert "const markerWidth = isOverLimit ? 2 : 0;" in source
-    assert "fillActor.set_width(Math.max(0, clampedWidth - markerWidth));" in source
+    assert "function _attachOverLimitActors(backgroundActor, fillActor)" in source
+    assert "fillActor._aibarMarkerActor = markerActor;" in source
+    assert "fillActor._aibarOverLimitActor = overLimitActor;" in source
+    assert "const markerWidth = isOverLimit ? Math.min(2, bgWidth) : 0;" in source
+    assert "const clampedOverLimitPercent = Math.min(normalizedPct - 100, 100);" in source
+    assert "fillWidth = Math.max(0, availableWidth - overLimitWidth);" in source
     assert "_applyProgressFillGeometry(bar.barFill, bar.barBg, pct);" in source
     assert "_applyProgressFillGeometry(card.progressFill, card.progressBg, pct);" in source
 
     stylesheet_source = STYLESHEET_PATH.read_text(encoding="utf-8")
-    assert ".aibar-progress-over-limit {" in stylesheet_source
-    assert "border-right: 2px solid black;" in stylesheet_source
+    assert ".aibar-progress-marker {" in stylesheet_source
+    assert "background-color: #000;" in stylesheet_source
+    assert ".aibar-progress-over-limit-fill {" in stylesheet_source
+    assert "rgba(255, 255, 255, 0.35)" in stylesheet_source
     assert "width: 34px;" in stylesheet_source
     assert "width: 56px;" in stylesheet_source
 

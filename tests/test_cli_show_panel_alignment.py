@@ -142,6 +142,49 @@ def test_print_result_keeps_panel_rows_aligned_with_colored_progress_bar(
     assert all(len(line) == row_length for line in panel_rows)
 
 
+def test_print_result_keeps_panel_rows_aligned_with_over_limit_progress_bar(
+    capsys,
+) -> None:
+    """
+    @brief Verify CLI text output renders over-limit quota inside a fixed-width bar.
+    @details Renders one Copilot result above 100% usage and asserts the visible
+    usage row contains provider fill (`█`), one 100%-boundary marker (`|`), and
+    one neutral over-limit segment (`▓`) while preserving identical visible width
+    for all non-empty panel rows after ANSI stripping.
+    @param capsys {pytest.CaptureFixture} Pytest stdout/stderr capture fixture.
+    @return {None} Function return value.
+    @satisfies REQ-122
+    @satisfies TST-054
+    """
+    metrics = UsageMetrics(
+        usage_percent=111.1,
+        remaining=-167.0,
+        limit=1500.0,
+        cost=6.68,
+        currency_symbol="$",
+    )
+    result = ProviderResult(
+        provider=ProviderName.COPILOT,
+        window=WindowPeriod.DAY_30,
+        updated_at=datetime(2026, 4, 15, 15, 19, tzinfo=timezone.utc),
+        metrics=metrics,
+    )
+
+    _print_result(ProviderName.COPILOT, result)
+    panel_rows = [
+        _strip_ansi_sequences(line)
+        for line in capsys.readouterr().out.splitlines()
+        if line.strip()
+    ]
+
+    usage_row = next(line for line in panel_rows if "Usage:" in line)
+    assert "█" in usage_row
+    assert usage_row.count("|") == 1
+    assert "▓" in usage_row
+    row_length = len(panel_rows[0])
+    assert all(len(line) == row_length for line in panel_rows)
+
+
 def test_show_uses_one_shared_panel_width_for_all_rendered_providers(
     monkeypatch,
 ) -> None:

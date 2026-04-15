@@ -464,34 +464,87 @@ function _isDisplayedFullPercent(pct) {
 }
 
 /**
- * @brief Apply deterministic progress-fill geometry with over-limit marker support.
- * @details Computes one bar fill width from percentage and current background width,
- * clamps the fill to the background bounds, and toggles `aibar-progress-over-limit`
- * when percentage exceeds `100`. The helper preserves side-label layout by preventing
- * fill overflow into adjacent label slots and reserves 2px for the black marker.
+ * @brief Attach over-limit visualization actors to one progress background.
+ * @details Appends one black 100%-boundary marker actor and one neutral over-limit
+ * fill actor to the same horizontal background container used by the provider fill.
+ * Stores actor references on `fillActor` so shared geometry updates require only the
+ * existing `_applyProgressFillGeometry(...)` call sites. Time complexity O(1). Space
+ * complexity O(1).
+ * @param {St.BoxLayout} backgroundActor Progress background container.
+ * @param {St.Widget} fillActor Primary provider-color fill actor.
+ * @returns {void} No return value.
+ * @satisfies REQ-121
+ */
+function _attachOverLimitActors(backgroundActor, fillActor) {
+    const markerActor = new St.Widget({
+        style_class: 'aibar-progress-marker',
+        visible: false,
+    });
+    const overLimitActor = new St.Widget({
+        style_class: 'aibar-progress-over-limit-fill',
+        visible: false,
+    });
+    fillActor._aibarMarkerActor = markerActor;
+    fillActor._aibarOverLimitActor = overLimitActor;
+    backgroundActor.add_child(fillActor);
+    backgroundActor.add_child(markerActor);
+    backgroundActor.add_child(overLimitActor);
+}
+
+/**
+ * @brief Apply deterministic progress-fill geometry with over-limit segment support.
+ * @details Computes fixed-width progress geometry from percentage and current
+ * background width. Percentages up to `100` render provider-color fill plus background.
+ * Percentages above `100` render a provider-color base segment, a fixed 2px 100%
+ * boundary marker, and a neutral over-limit segment scaled across the extra `0..100`
+ * range and clamped for larger values. The helper preserves side-label layout by
+ * never exceeding the background width. Time complexity O(1). Space complexity O(1).
  * @param {St.Widget} fillActor Progress fill widget receiving width updates.
  * @param {St.Widget} backgroundActor Progress background widget providing max width.
  * @param {number} pct Usage percentage value.
  * @returns {void} No return value.
  * @satisfies REQ-119
+ * @satisfies REQ-121
  */
 function _applyProgressFillGeometry(fillActor, backgroundActor, pct) {
     const bgWidth = backgroundActor ? backgroundActor.get_width() : 0;
     if (bgWidth <= 0)
         return;
 
+    const markerActor = fillActor._aibarMarkerActor || null;
+    const overLimitActor = fillActor._aibarOverLimitActor || null;
     const numericPct = Number(pct);
-    const normalizedPct = Number.isFinite(numericPct) ? numericPct : 0;
-    const rawWidth = Math.round((normalizedPct / 100) * bgWidth);
-    const clampedWidth = Math.max(0, Math.min(rawWidth, bgWidth));
+    const normalizedPct = Number.isFinite(numericPct) ? Math.max(0, numericPct) : 0;
     const isOverLimit = normalizedPct > 100;
-    const markerWidth = isOverLimit ? 2 : 0;
-    fillActor.set_width(Math.max(0, clampedWidth - markerWidth));
+    const markerWidth = isOverLimit ? Math.min(2, bgWidth) : 0;
+    let fillWidth = Math.round((Math.min(normalizedPct, 100) / 100) * bgWidth);
+    let overLimitWidth = 0;
 
-    if (isOverLimit)
-        fillActor.add_style_class_name('aibar-progress-over-limit');
-    else
-        fillActor.remove_style_class_name('aibar-progress-over-limit');
+    if (isOverLimit) {
+        const availableWidth = Math.max(0, bgWidth - markerWidth);
+        const clampedOverLimitPercent = Math.min(normalizedPct - 100, 100);
+        overLimitWidth = Math.round((clampedOverLimitPercent / 100) * availableWidth);
+        if (clampedOverLimitPercent > 0 && availableWidth > 0)
+            overLimitWidth = Math.max(1, overLimitWidth);
+        overLimitWidth = Math.min(availableWidth, overLimitWidth);
+        fillWidth = Math.max(0, availableWidth - overLimitWidth);
+    }
+
+    fillActor.set_width(Math.max(0, fillWidth));
+    if (markerActor) {
+        markerActor.set_width(markerWidth);
+        if (markerWidth > 0)
+            markerActor.show();
+        else
+            markerActor.hide();
+    }
+    if (overLimitActor) {
+        overLimitActor.set_width(overLimitWidth);
+        if (overLimitWidth > 0)
+            overLimitActor.show();
+        else
+            overLimitActor.hide();
+    }
 }
 
 const AIBarIndicator = GObject.registerClass(
@@ -928,7 +981,7 @@ class AIBarIndicator extends PanelMenu.Button {
             style_class: 'aibar-progress-fill',
         });
 
-        progressBg.add_child(progressFill);
+        _attachOverLimitActors(progressBg, progressFill);
         progressContainer.add_child(progressBg);
 
         let progressLabel = new St.Label({
@@ -976,7 +1029,7 @@ class AIBarIndicator extends PanelMenu.Button {
                 style_class: 'aibar-reset-label',
             });
 
-            barBg.add_child(barFill);
+            _attachOverLimitActors(barBg, barFill);
             row.add_child(label);
             row.add_child(barBg);
             row.add_child(pctLabel);
@@ -1328,6 +1381,14 @@ class AIBarIndicator extends PanelMenu.Button {
                 card._barData.progress = null;
                 card.progressFill.style_class = 'aibar-progress-fill aibar-progress-none';
                 card.progressFill.set_width(0);
+                if (card.progressFill._aibarMarkerActor) {
+                    card.progressFill._aibarMarkerActor.set_width(0);
+                    card.progressFill._aibarMarkerActor.hide();
+                }
+                if (card.progressFill._aibarOverLimitActor) {
+                    card.progressFill._aibarOverLimitActor.set_width(0);
+                    card.progressFill._aibarOverLimitActor.hide();
+                }
                 card.progressLabel.text = '';
             }
         } else {

@@ -3999,20 +3999,62 @@ def _is_displayed_zero_percent(percent: float | None) -> bool:
     return round(percent, 1) == 0.0
 
 
+def _progress_bar_layout(percent: float, width: int) -> tuple[int, int, int]:
+    """
+    @brief Compute fixed-width CLI progress-bar segment widths.
+    @details Normalizes `percent` to a non-negative finite value. Percentages up to
+    `100` allocate provider-color fill plus empty cells. Percentages above `100`
+    allocate one 100%-boundary marker cell and one over-limit segment scaled across
+    the extra `0..100` range, clamped for larger values, and forced visible for any
+    positive over-limit usage. Time complexity O(1). Space complexity O(1).
+    @param percent {float} Raw usage percentage.
+    @param width {int} Total cell width inside the surrounding brackets.
+    @return {tuple[int, int, int]} Tuple `(base_width, over_limit_width, marker_width)`.
+    @satisfies REQ-122
+    """
+    safe_width = max(0, width)
+    if safe_width == 0 or not math.isfinite(percent):
+        return 0, 0, 0
+
+    normalized_percent = max(0.0, percent)
+    if normalized_percent <= 100.0:
+        base_width = min(safe_width, int(safe_width * normalized_percent / 100))
+        return base_width, 0, 0
+
+    marker_width = 1
+    available_width = max(0, safe_width - marker_width)
+    over_limit_percent = min(normalized_percent - 100.0, 100.0)
+    over_limit_width = int(round((over_limit_percent / 100.0) * available_width))
+    if over_limit_percent > 0 and available_width > 0:
+        over_limit_width = max(1, over_limit_width)
+    over_limit_width = min(available_width, over_limit_width)
+    base_width = max(0, available_width - over_limit_width)
+    return base_width, over_limit_width, marker_width
+
+
 def _progress_bar(percent: float, provider_name: ProviderName, width: int = 20) -> str:
     """
-    @brief Execute progress bar.
-    @details Applies progress bar logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
-    @param percent {float} Input parameter `percent`.
-    @param provider_name {ProviderName} Provider enum key for color mapping.
-    @param width {int} Input parameter `width`.
-    @return {str} Function return value.
+    @brief Render one fixed-width CLI usage bar.
+    @details Uses provider-color fill for in-limit usage. Percentages above `100`
+    preserve fixed bar width by rendering a bright-white `|` marker at the 100%
+    boundary and a neutral shaded over-limit segment (`▓`) inside the same bar.
+    Time complexity O(width). Space complexity O(width).
+    @param percent {float} Raw usage percentage.
+    @param provider_name {ProviderName} Provider enum key for base-fill color mapping.
+    @param width {int} Total cell width inside the surrounding brackets.
+    @return {str} ANSI-colored progress bar string.
+    @satisfies REQ-067
+    @satisfies REQ-122
     """
-    normalized_percent = max(0.0, min(100.0, percent))
-    filled = int(width * normalized_percent / 100)
-    empty = width - filled
+    base_width, over_limit_width, marker_width = _progress_bar_layout(percent, width)
     color_code = _provider_panel_color_code(provider_name)
-    return f"[{color_code}{'█' * filled}{_ANSI_RESET}{'░' * empty}]"
+    if marker_width == 0:
+        empty_width = max(0, width - base_width)
+        return f"[{color_code}{'█' * base_width}{_ANSI_RESET}{'░' * empty_width}]"
+
+    marker = f"{_ANSI_BOLD}{_ANSI_BRIGHT_WHITE}|{_ANSI_RESET}"
+    over_limit_fill = f"\033[90m{'▓' * over_limit_width}{_ANSI_RESET}"
+    return f"[{color_code}{'█' * base_width}{_ANSI_RESET}{marker}{over_limit_fill}]"
 
 
 @main.command(
