@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.34.0](https://github.com/Ogekuri/AIBar/compare/v0.33.0..v0.34.0) - 2026-04-18
+### 🐛  Bug Fixes
+- restore Claude/Codex bar labels [useReq] *(gnome-extension)*
+  - WT: useReq-AIBar-work-20260418181825
+  - keep dual-window 5h/7d labels in GNOME cards
+  - add regression test for label blanking
+  - update workflow and references docs
+
+### 🚜  Changes
+- move provider activation to first setup section [useReq] *(setup)*
+  - update REQ-123, TST-013, and TST-055 for setup section order
+  - reorder setup prompts so provider activation runs before runtime throttling
+  - align setup tests, workflow, and references with the new requirement
+
 ## [0.33.0](https://github.com/Ogekuri/AIBar/compare/v0.32.0..v0.33.0) - 2026-04-18
 ### ⛰️  Features
 - add provider enable flags for show and GNOME [useReq] *(cli)*
@@ -1112,6 +1126,7 @@
 - \[0.31.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.31.0
 - \[0.32.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.32.0
 - \[0.33.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.33.0
+- \[0.34.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.34.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1146,3 +1161,4 @@
 [0.31.0]: https://github.com/Ogekuri/AIBar/compare/v0.30.0..v0.31.0
 [0.32.0]: https://github.com/Ogekuri/AIBar/compare/v0.31.0..v0.32.0
 [0.33.0]: https://github.com/Ogekuri/AIBar/compare/v0.32.0..v0.33.0
+[0.34.0]: https://github.com/Ogekuri/AIBar/compare/v0.33.0..v0.34.0
