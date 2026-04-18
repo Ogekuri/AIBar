@@ -662,15 +662,27 @@ def test_progress_bar_handles_percentages_over_100() -> None:
     assert "function _attachOverLimitActors(backgroundActor, fillActor)" in source
     assert "fillActor._aibarMarkerActor = markerActor;" in source
     assert "fillActor._aibarOverLimitActor = overLimitActor;" in source
+    assert "function _applyProgressSegmentRadii(fillActor, markerActor, overLimitActor, fillWidth, markerWidth, overLimitWidth)" in source
     assert "const markerWidth = isOverLimit ? Math.min(2, bgWidth) : 0;" in source
     assert "const clampedOverLimitPercent = Math.min(normalizedPct - 100, 100);" in source
     assert "fillWidth = Math.max(0, availableWidth - overLimitWidth);" in source
+    assert "const visibleSegments = segments.filter(segment => segment.actor && segment.width > 0);" in source
+    assert "firstVisible.add_style_class_name('aibar-progress-shape-left');" in source
+    assert "lastVisible.add_style_class_name('aibar-progress-shape-right');" in source
+    assert "visibleSegments[0].actor.add_style_class_name('aibar-progress-shape-full');" in source
+    assert "_applyProgressSegmentRadii(fillActor, markerActor, overLimitActor, fillWidth, markerWidth, overLimitWidth);" in source
     assert "_applyProgressFillGeometry(bar.barFill, bar.barBg, pct);" in source
     assert "_applyProgressFillGeometry(card.progressFill, card.progressBg, pct);" in source
 
     stylesheet_source = STYLESHEET_PATH.read_text(encoding="utf-8")
+    assert ".aibar-progress-shape-none {" in stylesheet_source
+    assert ".aibar-progress-shape-full {" in stylesheet_source
+    assert ".aibar-progress-shape-left {" in stylesheet_source
+    assert ".aibar-progress-shape-right {" in stylesheet_source
     assert ".aibar-progress-marker {" in stylesheet_source
     assert ".aibar-progress-over-limit-fill {" in stylesheet_source
+    assert "border-radius: 3px 0 0 3px;" in stylesheet_source
+    assert "border-radius: 0 3px 3px 0;" in stylesheet_source
     assert "width: 34px;" in stylesheet_source
     assert "width: 56px;" in stylesheet_source
 

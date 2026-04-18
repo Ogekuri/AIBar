@@ -56,6 +56,12 @@ const DEFAULT_WINDOW_LABELS = Object.freeze({
  */
 const PROVIDER_VIEWPORT_MAX_HEIGHT_PX = 260;
 const DEFAULT_COPILOT_EXTRA_PREMIUM_REQUEST_COST = 0.04;
+const PROGRESS_SEGMENT_SHAPE_CLASSES = Object.freeze([
+    'aibar-progress-shape-none',
+    'aibar-progress-shape-full',
+    'aibar-progress-shape-left',
+    'aibar-progress-shape-right',
+]);
 
 /**
  * @brief Resolve provider label text for GNOME tab/card rendering.
@@ -493,6 +499,54 @@ function _attachOverLimitActors(backgroundActor, fillActor) {
 }
 
 /**
+ * @brief Apply rounded-edge shape classes to the currently visible progress segments.
+ * @details Ensures the bar start and end caps are rounded on whichever actors
+ * actually touch the outer edges of the progress bar. This keeps sub-100 bars,
+ * exactly-full bars, and over-limit bars visually correct even when the provider
+ * fill no longer reaches the right edge because neutral overflow segments are
+ * visible. Time complexity O(1). Space complexity O(1).
+ * @param {St.Widget | null} fillActor Provider-color segment actor.
+ * @param {St.Widget | null} markerActor Fixed 100%-boundary marker actor.
+ * @param {St.Widget | null} overLimitActor Neutral overflow segment actor.
+ * @param {number} fillWidth Computed width of the provider-color segment.
+ * @param {number} markerWidth Computed width of the 100%-boundary marker.
+ * @param {number} overLimitWidth Computed width of the neutral overflow segment.
+ * @returns {void} No return value.
+ * @satisfies REQ-121
+ */
+function _applyProgressSegmentRadii(fillActor, markerActor, overLimitActor, fillWidth, markerWidth, overLimitWidth) {
+    const segments = [
+        {actor: fillActor, width: Math.max(0, fillWidth)},
+        {actor: markerActor, width: Math.max(0, markerWidth)},
+        {actor: overLimitActor, width: Math.max(0, overLimitWidth)},
+    ];
+
+    for (const segment of segments) {
+        if (!segment.actor)
+            continue;
+        for (const className of PROGRESS_SEGMENT_SHAPE_CLASSES)
+            segment.actor.remove_style_class_name(className);
+        segment.actor.add_style_class_name('aibar-progress-shape-none');
+    }
+
+    const visibleSegments = segments.filter(segment => segment.actor && segment.width > 0);
+    if (visibleSegments.length === 0)
+        return;
+    if (visibleSegments.length === 1) {
+        visibleSegments[0].actor.remove_style_class_name('aibar-progress-shape-none');
+        visibleSegments[0].actor.add_style_class_name('aibar-progress-shape-full');
+        return;
+    }
+
+    const firstVisible = visibleSegments[0].actor;
+    const lastVisible = visibleSegments[visibleSegments.length - 1].actor;
+    firstVisible.remove_style_class_name('aibar-progress-shape-none');
+    firstVisible.add_style_class_name('aibar-progress-shape-left');
+    lastVisible.remove_style_class_name('aibar-progress-shape-none');
+    lastVisible.add_style_class_name('aibar-progress-shape-right');
+}
+
+/**
  * @brief Apply deterministic progress-fill geometry with over-limit segment support.
  * @details Computes fixed-width progress geometry from percentage and current
  * background width. Percentages up to `100` render provider-color fill plus background.
@@ -531,6 +585,7 @@ function _applyProgressFillGeometry(fillActor, backgroundActor, pct) {
         fillWidth = Math.max(0, availableWidth - overLimitWidth);
     }
 
+    _applyProgressSegmentRadii(fillActor, markerActor, overLimitActor, fillWidth, markerWidth, overLimitWidth);
     fillActor.set_width(Math.max(0, fillWidth));
     if (markerActor) {
         markerActor.set_width(markerWidth);

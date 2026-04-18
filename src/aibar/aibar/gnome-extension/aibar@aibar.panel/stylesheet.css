@@ -187,8 +187,24 @@
 }
 
 .aibar-progress-fill {
-    border-radius: 3px;
+    border-radius: 0;
     height: 6px;
+}
+
+.aibar-progress-shape-none {
+    border-radius: 0;
+}
+
+.aibar-progress-shape-full {
+    border-radius: 3px;
+}
+
+.aibar-progress-shape-left {
+    border-radius: 3px 0 0 3px;
+}
+
+.aibar-progress-shape-right {
+    border-radius: 0 3px 3px 0;
 }
 
 /**
@@ -201,6 +217,7 @@
  */
 .aibar-progress-marker {
     background-color: #f2f2f2;
+    border-radius: 0;
     height: 6px;
 }
 
@@ -214,6 +231,7 @@
  */
 .aibar-progress-over-limit-fill {
     background-color: #8c8c8c;
+    border-radius: 0;
     height: 6px;
 }
 
