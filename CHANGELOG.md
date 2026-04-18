@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.30.0](https://github.com/Ogekuri/AIBar/compare/v0.29.0..v0.30.0) - 2026-04-18
+### 🐛  Bug Fixes
+- highlight >100 progress overflow [useReq] *(gnome-extension)*
+  - restore visible neutral overflow contrast in GNOME popup bars
+  - add regression coverage for REQ-121 and TST-052
+  - refresh WORKFLOW and REFERENCES metadata
+
 ## [0.29.0](https://github.com/Ogekuri/AIBar/compare/v0.28.0..v0.29.0) - 2026-04-15
 ### 🚜  Changes
 - render over-limit segments in GNOME and CLI [useReq] *(progress-bar)*
@@ -1081,6 +1088,7 @@
 - \[0.27.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.27.0
 - \[0.28.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.28.0
 - \[0.29.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.29.0
+- \[0.30.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.30.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1111,3 +1119,4 @@
 [0.27.0]: https://github.com/Ogekuri/AIBar/compare/v0.26.0..v0.27.0
 [0.28.0]: https://github.com/Ogekuri/AIBar/compare/v0.27.0..v0.28.0
 [0.29.0]: https://github.com/Ogekuri/AIBar/compare/v0.28.0..v0.29.0
+[0.30.0]: https://github.com/Ogekuri/AIBar/compare/v0.29.0..v0.30.0
