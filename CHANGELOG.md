@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.31.0](https://github.com/Ogekuri/AIBar/compare/v0.30.0..v0.31.0) - 2026-04-18
+### 🐛  Bug Fixes
+- Fix staus bar borders.
+
 ## [0.30.0](https://github.com/Ogekuri/AIBar/compare/v0.29.0..v0.30.0) - 2026-04-18
 ### 🐛  Bug Fixes
 - highlight >100 progress overflow [useReq] *(gnome-extension)*
@@ -1089,6 +1093,7 @@
 - \[0.28.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.28.0
 - \[0.29.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.29.0
 - \[0.30.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.30.0
+- \[0.31.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.31.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1120,3 +1125,4 @@
 [0.28.0]: https://github.com/Ogekuri/AIBar/compare/v0.27.0..v0.28.0
 [0.29.0]: https://github.com/Ogekuri/AIBar/compare/v0.28.0..v0.29.0
 [0.30.0]: https://github.com/Ogekuri/AIBar/compare/v0.29.0..v0.30.0
+[0.31.0]: https://github.com/Ogekuri/AIBar/compare/v0.30.0..v0.31.0
