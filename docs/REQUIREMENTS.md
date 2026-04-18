@@ -1,8 +1,8 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.3.28"
-date: "2026-03-20"
+version: "0.3.29"
+date: "2026-04-18"
 author: "req-new"
 scope:
   paths:
@@ -109,6 +109,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **CTN-014**: MUST perform at most one startup update HTTP check per 300 seconds unless `~/.cache/aibar/check_version_idle-time.json` is missing or expired.
 - **CTN-015**: MUST use lifecycle command strings exactly as `uv tool install aibar --force --from git+https://github.com/Ogekuri/AIBar.git` and `uv tool uninstall aibar`.
 - **CTN-016**: MUST allow `~/.cache/aibar/idle-time.json` provider entries to include optional boolean field `oauth_refresh_blocked` for Claude authentication-retry suppression state.
+- **CTN-017**: MUST persist `enabled_providers` in `~/.config/aibar/config.json` as provider-keyed booleans for `claude`, `openrouter`, `copilot`, `codex`, `openai`, and `geminiai`; missing keys MUST default to `true`.
 
 ## 3. Requirements
 
@@ -128,9 +129,13 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-003**: MUST emit pretty-printed JSON (`indent=2`) for `show --json` with top-level sections `payload`, `status`, `idle_time`, `freshness`, and `extension`; `freshness` MUST expose provider-keyed `last_success_timestamp`/`idle_until_timestamp` plus local-time `%Y-%m-%d %H:%M` strings, and `extension` MUST expose `gnome_refresh_interval_seconds`, `idle_delay_seconds`, `copilot_extra_premium_request_cost`, and provider-keyed `window_labels` values consumed by GNOME provider bars.
 - **REQ-004**: MUST run provider health checks in `doctor` using the 5-hour window and report per-provider configuration and test status.
 - **REQ-005**: MUST prompt `setup` for `idle_delay_seconds` (`300`) first, `api_call_delay_milliseconds` (`100`) second, `api_call_timeout_milliseconds` (`5000`) third, `default_retry_after_seconds` (`3600`) fourth, `gnome_refresh_interval_seconds` (`60`) fifth, and `billing_data` (`billing_data`) sixth, then persist values in `~/.config/aibar/config.json`.
+- **REQ-123**: `setup` MUST present a dedicated provider activation section after `billing_data` that prompts toggleable `enable`/`disable` values for `claude`, `openrouter`, `copilot`, `codex`, `openai`, and `geminiai`.
 - **REQ-006**: MUST fail Claude login when CLI credentials are missing or expired and MUST print `claude setup-token` remediation guidance.
 - **REQ-007**: MUST execute GitHub device-flow login for Copilot and save the token in `~/.config/aibar/copilot.json`.
 - **REQ-009**: MUST execute provider retrieval for `show` in this order: force-flag handling, per-provider idle-time evaluation, per-provider conditional refresh to `~/.cache/aibar/cache.json`, then data load from `~/.cache/aibar/cache.json`.
+- **REQ-124**: `show` refresh execution MUST exclude disabled providers from fetch scheduling and MUST NOT apply idle-time, API-delay, API-timeout, or retry-after handling to disabled providers.
+- **REQ-125**: CLI text `show` MUST omit disabled providers and MUST NOT render panels or not-configured hints for providers whose `enabled_providers.<provider>` flag is `false`.
+- **REQ-126**: `show --json` MUST emit top-level section `enabled_providers` and MUST omit disabled providers from `payload`, `status`, `idle_time`, `freshness`, and `extension.window_labels`.
 - **REQ-010**: MUST ignore requested window for OpenAI fetch and return effective window `30d` in provider payload, CLI text output, and `show --json`.
 - **REQ-011**: MUST ignore requested window for OpenRouter fetch and return effective window `30d` in provider payload, CLI text output, and `show --json`; OpenRouter cost MUST derive from `usage_monthly` and include `limit` and `limit_remaining`.
 - **REQ-012**: MUST ignore requested window for Copilot fetch, return effective window `30d`, and publish `premium_requests_extra_cost = max(premium_requests - premium_requests_included, 0) * copilot_extra_premium_request_cost` in payload, CLI text, and `show --json`.
@@ -203,6 +208,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-097**: GeminiAI effective window MUST always be `30d` in CLI text and JSON output, and GeminiAI fetch logic MUST ignore requested window arguments.
 - **REQ-098**: GeminiAI monitoring queries MUST use interval `[UTC month start, current UTC time]` so `30d` behavior represents current-month usage scope.
 - **REQ-061**: GNOME extension MUST render GeminiAI provider tab/card using bright-purple style classes, include GeminiAI payload and status in panel aggregation logic, and order `geminiai` as the last provider tab/card.
+- **REQ-127**: GNOME extension MUST parse `enabled_providers` before provider extraction and MUST hide tabs, cards, and panel status labels for providers whose flag is `false`.
 - **REQ-062**: GNOME tab/card labels MUST render `GEMINIAI`; machine-readable payload keys and CLI provider arguments MUST remain lowercase `geminiai`; CLI display title for provider `geminiai` MUST render `GEMINIAI`.
 - **REQ-063**: Refresh scheduling MUST apply configured inter-provider call delay and provider-scoped idle-time lifecycle updates to GeminiAI fetches identically to existing providers, including `idle-time.json` updates after success and rate-limited failures.
 - **REQ-064**: GeminiAI billing fetch MUST read `<project_id>` from `~/.config/aibar/geminiai_oauth_client.json`, discover `<table_id>` by listing tables in dataset `RuntimeConfig.billing_data` (default `billing_data`), and fail with structured error when billing export table is unavailable.
@@ -260,6 +266,9 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-010**: MUST verify `Remaining credits: <remaining> / <limit>` appears for Claude, Codex, and Copilot only when corresponding status is `OK`, appears after one blank line following `Resets in`, and renders `<remaining>` as bold bright white.
 - **TST-011**: MUST verify every provider refresh failure updates provider-scoped idle-time using `idle_until = last_attempt_at + max(idle_delay_seconds, retry_after_seconds_or_0)`, including HTTP `429` and authentication failures without `retry_after` metadata.
 - **TST-013**: MUST verify `setup` prompts idle-delay first, API-call delay milliseconds second (default `100`), API-call timeout milliseconds third (default `5000`), `gnome_refresh_interval_seconds` fourth, `billing_data` fifth, Copilot extra-premium cost sixth (default `0.04`), then currency prompts, then final logging prompts, and persists all values into `~/.config/aibar/config.json`.
+- **TST-055**: MUST verify `setup` persists `enabled_providers` after the `billing_data` prompt and before Copilot pricing prompts, with provider order `claude`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`.
+- **TST-056**: MUST verify disabled providers are omitted from `show` text and `show --json`, emit `enabled_providers`, and skip refresh plus idle-time updates for providers marked disabled.
+- **TST-057**: MUST verify GNOME extension source parses `enabled_providers` before provider extraction and hides tabs, cards, and panel labels for disabled providers.
 - **TST-014**: MUST verify `show` evaluates idle-time per provider, serves `~/.cache/aibar/cache.json` for providers with future `idle_until`, and refreshes only providers with missing or expired idle-time state.
 - **TST-015**: MUST verify `show --force` removes `~/.cache/aibar/idle-time.json`, bypasses idle-time gating for current execution, refreshes providers, and recreates idle-time metadata before loading `~/.cache/aibar/cache.json`.
 - **TST-016**: MUST verify refresh execution enforces configured inter-call delay in milliseconds between provider API requests, using `100` milliseconds when `api_call_delay_milliseconds` is absent.

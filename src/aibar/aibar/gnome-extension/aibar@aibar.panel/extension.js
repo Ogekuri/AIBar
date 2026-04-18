@@ -47,6 +47,22 @@ const DEFAULT_WINDOW_LABELS = Object.freeze({
     openai: '30d',
     geminiai: '30d',
 });
+const ALL_PROVIDER_NAMES = Object.freeze([
+    'claude',
+    'openrouter',
+    'copilot',
+    'codex',
+    'openai',
+    'geminiai',
+]);
+const DEFAULT_ENABLED_PROVIDERS = Object.freeze({
+    claude: true,
+    openrouter: true,
+    copilot: true,
+    codex: true,
+    openai: true,
+    geminiai: true,
+});
 /**
  * @brief Maximum popup viewport height for provider cards in pixels.
  * @details Caps popup vertical growth while allowing short provider cards to
@@ -81,6 +97,48 @@ function _getProviderDisplayName(providerName) {
     if (providerName in PROVIDER_DISPLAY_NAMES)
         return PROVIDER_DISPLAY_NAMES[providerName];
     return providerName.toUpperCase();
+}
+
+/**
+ * @brief Normalize `enabled_providers` JSON section for extension state.
+ * @details Builds one provider-keyed boolean map for all known providers.
+ * Missing keys normalize to `true` for backward compatibility with CLI JSON
+ * documents emitted before provider-disable support existed.
+ * @param {Object<string, any> | null} enabledProviders Raw `enabled_providers` JSON section.
+ * @returns {Object<string, boolean>} Normalized provider-enabled mapping.
+ * @satisfies REQ-127
+ */
+function _normalizeEnabledProvidersSection(enabledProviders) {
+    const normalized = {...DEFAULT_ENABLED_PROVIDERS};
+    if (!enabledProviders || typeof enabledProviders !== 'object' || Array.isArray(enabledProviders))
+        return normalized;
+    for (const providerName of ALL_PROVIDER_NAMES) {
+        if (typeof enabledProviders[providerName] === 'boolean')
+            normalized[providerName] = enabledProviders[providerName];
+    }
+    return normalized;
+}
+
+/**
+ * @brief Filter provider-keyed JSON object by normalized enable-state map.
+ * @details Copies only provider entries whose normalized enabled flag is not
+ * `false`. Non-object inputs normalize to `{}` to keep parser state
+ * deterministic.
+ * @param {Object<string, any> | null} providerData Provider-keyed JSON section.
+ * @param {Object<string, boolean>} enabledProviders Normalized provider-enabled mapping.
+ * @returns {Object<string, any>} Filtered provider-keyed object.
+ * @satisfies REQ-127
+ */
+function _filterProviderObjectByEnabledProviders(providerData, enabledProviders) {
+    if (!providerData || typeof providerData !== 'object' || Array.isArray(providerData))
+        return {};
+    const filtered = {};
+    for (const [providerName, providerValue] of Object.entries(providerData)) {
+        if (enabledProviders[providerName] === false)
+            continue;
+        filtered[providerName] = providerValue;
+    }
+    return filtered;
 }
 
 /**
@@ -639,6 +697,7 @@ class AIBarIndicator extends PanelMenu.Button {
         this._usageData = {};
         this._statusData = {};
         this._freshnessData = {};
+        this._enabledProviders = {...DEFAULT_ENABLED_PROVIDERS};
         this._providerRows = {};
         this._providerTabs = {};
         this._refreshIntervalSeconds = REFRESH_INTERVAL_SECONDS;
@@ -954,8 +1013,11 @@ class AIBarIndicator extends PanelMenu.Button {
      * @param {any} providerName Input parameter `providerName`.
      * @returns {any} Function return value.
      * @satisfies REQ-120
+     * @satisfies REQ-127
      */
     _switchToProvider(providerName) {
+        if (this._enabledProviders[providerName] === false)
+            return;
         if (this._activeProvider === providerName)
             return;
 
@@ -1693,8 +1755,11 @@ class AIBarIndicator extends PanelMenu.Button {
     /**
      * @brief Execute parse output.
      * @details Parses CLI JSON output supporting canonical cache schema sections
-     * (`payload`, `status`, `idle_time`, `freshness`, `extension`). Reads
-     * `extension.gnome_refresh_interval_seconds` to update the auto-refresh interval,
+     * (`payload`, `status`, `idle_time`, `freshness`, `extension`,
+     * `enabled_providers`). Parses `enabled_providers` before provider data
+     * extraction so disabled providers are removed from all downstream UI
+     * projections. Reads `extension.gnome_refresh_interval_seconds` to update
+     * the auto-refresh interval,
      * `extension.idle_delay_seconds` for freshness fallback timestamp derivation,
      * and `extension.copilot_extra_premium_request_cost` for Copilot overage-cost
      * fallback calculations. Parses `extension.window_labels` for provider bar left
@@ -1704,6 +1769,7 @@ class AIBarIndicator extends PanelMenu.Button {
      * @satisfies DES-006
      * @satisfies REQ-003
      * @satisfies REQ-118
+     * @satisfies REQ-127
      */
     _parseOutput(output) {
         console.debug('aibar: Parsing output');
@@ -1718,13 +1784,22 @@ class AIBarIndicator extends PanelMenu.Button {
                 typeof json.payload === 'object' &&
                 !Array.isArray(json.payload)
             ) {
-                this._usageData = json.payload;
+                this._enabledProviders = _normalizeEnabledProvidersSection(
+                    json.enabled_providers
+                );
+                this._usageData = _filterProviderObjectByEnabledProviders(
+                    json.payload,
+                    this._enabledProviders,
+                );
                 if (
                     json.status &&
                     typeof json.status === 'object' &&
                     !Array.isArray(json.status)
                 ) {
-                    this._statusData = json.status;
+                    this._statusData = _filterProviderObjectByEnabledProviders(
+                        json.status,
+                        this._enabledProviders,
+                    );
                 } else {
                     this._statusData = {};
                 }
@@ -1745,12 +1820,19 @@ class AIBarIndicator extends PanelMenu.Button {
                 )
                     ? json.extension
                     : null;
-                if (hasFreshnessSection)
-                    this._freshnessData = json.freshness;
-                else if (hasIdleTimeSection)
-                    this._freshnessData = json.idle_time;
-                else
+                if (hasFreshnessSection) {
+                    this._freshnessData = _filterProviderObjectByEnabledProviders(
+                        json.freshness,
+                        this._enabledProviders,
+                    );
+                } else if (hasIdleTimeSection) {
+                    this._freshnessData = _filterProviderObjectByEnabledProviders(
+                        json.idle_time,
+                        this._enabledProviders,
+                    );
+                } else {
                     this._freshnessData = {};
+                }
                 if (
                     extensionData &&
                     typeof extensionData.gnome_refresh_interval_seconds === 'number' &&
@@ -1789,6 +1871,8 @@ class AIBarIndicator extends PanelMenu.Button {
                 ) {
                     this._windowLabels = {...DEFAULT_WINDOW_LABELS};
                     for (const providerName of Object.keys(DEFAULT_WINDOW_LABELS)) {
+                        if (this._enabledProviders[providerName] === false)
+                            continue;
                         const providerWindowLabel = extensionData.window_labels[providerName];
                         if (
                             typeof providerWindowLabel === 'string' &&
@@ -1800,6 +1884,7 @@ class AIBarIndicator extends PanelMenu.Button {
                     this._windowLabels = {...DEFAULT_WINDOW_LABELS};
                 }
             } else {
+                this._enabledProviders = {...DEFAULT_ENABLED_PROVIDERS};
                 this._usageData = json;
                 this._statusData = {};
                 this._freshnessData = {};
@@ -1913,6 +1998,7 @@ class AIBarIndicator extends PanelMenu.Button {
      * @satisfies REQ-069
      * @satisfies REQ-118
      * @satisfies REQ-120
+     * @satisfies REQ-127
      */
     _updateUI() {
         const usageLabels = {
@@ -2036,6 +2122,22 @@ class AIBarIndicator extends PanelMenu.Button {
             if (state.category === 'oauth' || state.category === 'rate_limit')
                 errProviders.push(providerName);
         }
+        for (const [providerName, tabData] of Object.entries(this._providerTabs)) {
+            if (this._enabledProviders[providerName] === false)
+                tabData.button.hide();
+            else
+                tabData.button.show();
+        }
+        for (const [providerName, card] of Object.entries(this._providerRows)) {
+            if (this._enabledProviders[providerName] === false)
+                card.container.hide();
+        }
+        if (
+            this._activeProvider &&
+            this._enabledProviders[this._activeProvider] === false
+        ) {
+            this._activeProvider = null;
+        }
 
         for (let [labelKey, value] of Object.entries(panelValues)) {
             const label = usageLabels[labelKey];
@@ -2133,6 +2235,8 @@ class AIBarIndicator extends PanelMenu.Button {
 
         if (!this._activeProvider && firstProvider)
             this._switchToProvider(firstProvider);
+        else if (!firstProvider)
+            this._activeProvider = null;
         this._syncProviderViewportHeight();
         this._panelLabel.set_text('');
         this._panelLabel.hide();

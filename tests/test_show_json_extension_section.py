@@ -1,14 +1,15 @@
 """
 @file test_show_json_extension_section.py
-@brief Tests for the `extension` section emitted by `show --json`.
+@brief Tests for the `extension` and `enabled_providers` sections emitted by `show --json`.
 @details Verifies that `aibar show --json` includes top-level `idle_time`,
-`freshness`, and `extension` objects, with
+`freshness`, `extension`, and `enabled_providers` objects, with
 `extension.gnome_refresh_interval_seconds`, `extension.idle_delay_seconds`,
 and provider-keyed `extension.window_labels` sourced from runtime config and
 fixed-window provider mapping.
 @satisfies REQ-003
+@satisfies REQ-126
 @satisfies CTN-008
-@satisfies TST-004
+@satisfies TST-056
 """
 
 import json
@@ -45,13 +46,14 @@ def test_show_json_emits_extension_section_with_default_gnome_refresh_interval(
     tmp_path: Path,
 ) -> None:
     """
-    @brief Verify `show --json` emits default extension refresh, idle-delay, and window-label values.
+    @brief Verify `show --json` emits default extension refresh, idle-delay, window-label, and enabled-provider values.
     @details Persists an empty cache, ensures no idle-time gate is active, then asserts
     the JSON output contains an `extension` section with the default refresh interval.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
     @param tmp_path {Path} Temporary path fixture.
     @return {None} Function return value.
     @satisfies REQ-003
+    @satisfies REQ-126
     @satisfies CTN-008
     """
     _patch_config_paths(monkeypatch, tmp_path)
@@ -83,6 +85,7 @@ def test_show_json_emits_extension_section_with_default_gnome_refresh_interval(
     assert "extension" in doc
     assert "idle_time" in doc
     assert "freshness" in doc
+    assert "enabled_providers" in doc
     assert doc["idle_time"] == {}
     assert doc["freshness"] == {}
     assert "gnome_refresh_interval_seconds" in doc["extension"]
@@ -95,6 +98,14 @@ def test_show_json_emits_extension_section_with_default_gnome_refresh_interval(
         "openai": "30d",
         "geminiai": "30d",
     }
+    assert doc["enabled_providers"] == {
+        "claude": True,
+        "openai": True,
+        "openrouter": True,
+        "copilot": True,
+        "codex": True,
+        "geminiai": True,
+    }
 
 
 def test_show_json_emits_extension_section_with_configured_gnome_refresh_interval(
@@ -102,20 +113,32 @@ def test_show_json_emits_extension_section_with_configured_gnome_refresh_interva
     tmp_path: Path,
 ) -> None:
     """
-    @brief Verify `show --json` emits extension refresh, idle-delay, and window-label values from config.
-    @details Persists runtime config with custom refresh and idle-delay values, then asserts
+    @brief Verify `show --json` emits configured refresh, idle-delay, enabled-provider, and window-label values.
+    @details Persists runtime config with custom refresh, idle-delay, and provider-enable values, then asserts
     the JSON output reflects that configured value in the `extension` section.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
     @param tmp_path {Path} Temporary path fixture.
     @return {None} Function return value.
     @satisfies REQ-003
+    @satisfies REQ-126
     @satisfies CTN-008
     """
     _patch_config_paths(monkeypatch, tmp_path)
     empty_cache = {"payload": {}, "status": {}}
     config_module.save_cli_cache(empty_cache)
     config_module.save_runtime_config(
-        RuntimeConfig(gnome_refresh_interval_seconds=120, idle_delay_seconds=420)
+        RuntimeConfig(
+            gnome_refresh_interval_seconds=120,
+            idle_delay_seconds=420,
+            enabled_providers={
+                "claude": True,
+                "openrouter": False,
+                "copilot": True,
+                "codex": True,
+                "openai": False,
+                "geminiai": True,
+            },
+        )
     )
 
     monkeypatch.setattr("aibar.cli.get_providers", lambda: {})
@@ -142,15 +165,22 @@ def test_show_json_emits_extension_section_with_configured_gnome_refresh_interva
     assert "extension" in doc
     assert "idle_time" in doc
     assert "freshness" in doc
+    assert "enabled_providers" in doc
     assert doc["idle_time"] == {}
     assert doc["freshness"] == {}
     assert doc["extension"]["gnome_refresh_interval_seconds"] == 120
     assert doc["extension"]["idle_delay_seconds"] == 420
     assert doc["extension"]["window_labels"] == {
         "copilot": "30d",
-        "openrouter": "30d",
-        "openai": "30d",
         "geminiai": "30d",
+    }
+    assert doc["enabled_providers"] == {
+        "claude": True,
+        "openrouter": False,
+        "copilot": True,
+        "codex": True,
+        "openai": False,
+        "geminiai": True,
     }
 
 

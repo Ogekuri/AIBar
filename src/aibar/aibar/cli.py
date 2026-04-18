@@ -41,6 +41,7 @@ from aibar.config import (
     load_idle_time,
     load_runtime_config,
     remove_idle_time_file,
+    resolve_enabled_providers,
     save_cli_cache,
     save_idle_time,
     save_runtime_config,
@@ -74,6 +75,7 @@ _CACHE_STATUS_SECTION_KEY = "status"
 _CACHE_IDLE_TIME_SECTION_KEY = "idle_time"
 _CACHE_FRESHNESS_SECTION_KEY = "freshness"
 _CACHE_EXTENSION_SECTION_KEY = "extension"
+_CACHE_ENABLED_PROVIDERS_SECTION_KEY = "enabled_providers"
 _ATTEMPT_RESULT_OK = "OK"
 _ATTEMPT_RESULT_FAIL = "FAIL"
 _SHOW_PANEL_MIN_WIDTH = 72
@@ -1763,24 +1765,48 @@ def _overlay_cached_failure_status(
 def _filter_cached_payload(
     cache_document: dict[str, object],
     provider_filter: ProviderName | None,
+    allowed_provider_keys: set[str] | None = None,
 ) -> dict[str, object]:
     """
-    @brief Filter canonical cache document by optional provider selector.
-    @details Filters both cache sections (`payload`, `status`) so selected-provider
-    output contains only relevant provider nodes while preserving schema keys.
+    @brief Filter canonical cache document by provider selector and enable-state.
+    @details Filters both cache sections (`payload`, `status`) so output
+    contains only provider nodes allowed by `allowed_provider_keys` and the
+    optional selected provider. Schema keys remain stable even when all
+    providers are filtered out.
     @param cache_document {dict[str, object]} Canonical cache document.
     @param provider_filter {ProviderName | None} Optional provider selector.
+    @param allowed_provider_keys {set[str] | None} Optional enabled-provider key set.
     @return {dict[str, object]} Filtered cache document with canonical sections.
+    @satisfies REQ-126
     """
     payload_section = _cache_payload_section(cache_document)
     status_section = _cache_status_section(cache_document)
     if provider_filter is None:
+        if allowed_provider_keys is None:
+            filtered_payload = dict(payload_section)
+            filtered_status = dict(status_section)
+        else:
+            filtered_payload = {
+                provider_key: provider_payload
+                for provider_key, provider_payload in payload_section.items()
+                if provider_key in allowed_provider_keys
+            }
+            filtered_status = {
+                provider_key: provider_status
+                for provider_key, provider_status in status_section.items()
+                if provider_key in allowed_provider_keys
+            }
         return {
-            _CACHE_PAYLOAD_SECTION_KEY: payload_section,
-            _CACHE_STATUS_SECTION_KEY: status_section,
+            _CACHE_PAYLOAD_SECTION_KEY: filtered_payload,
+            _CACHE_STATUS_SECTION_KEY: filtered_status,
         }
 
     provider_key = provider_filter.value
+    if (
+        allowed_provider_keys is not None
+        and provider_key not in allowed_provider_keys
+    ):
+        return _empty_cache_document()
     selected_payload = payload_section.get(provider_key)
     selected_status = status_section.get(provider_key)
     filtered_payload: dict[str, object] = {}
@@ -1798,21 +1824,74 @@ def _filter_cached_payload(
 def _filter_idle_time_by_provider(
     idle_time_by_provider: dict[str, IdleTimeState],
     provider_filter: ProviderName | None,
+    allowed_provider_keys: set[str] | None = None,
 ) -> dict[str, IdleTimeState]:
     """
-    @brief Filter provider-keyed idle-time map by optional provider selector.
+    @brief Filter provider-keyed idle-time map by selector and enable-state.
     @param idle_time_by_provider {dict[str, IdleTimeState]} Provider idle-time state map.
     @param provider_filter {ProviderName | None} Optional provider selector.
+    @param allowed_provider_keys {set[str] | None} Optional enabled-provider key set.
     @return {dict[str, IdleTimeState]} Filtered provider idle-time map.
     @satisfies REQ-003
     @satisfies REQ-084
+    @satisfies REQ-124
+    @satisfies REQ-126
     """
     if provider_filter is None:
-        return dict(idle_time_by_provider)
-    selected = idle_time_by_provider.get(provider_filter.value)
+        if allowed_provider_keys is None:
+            return dict(idle_time_by_provider)
+        return {
+            provider_key: state
+            for provider_key, state in idle_time_by_provider.items()
+            if provider_key in allowed_provider_keys
+        }
+    provider_key = provider_filter.value
+    if (
+        allowed_provider_keys is not None
+        and provider_key not in allowed_provider_keys
+    ):
+        return {}
+    selected = idle_time_by_provider.get(provider_key)
     if selected is None:
         return {}
-    return {provider_filter.value: selected}
+    return {provider_key: selected}
+
+
+def _enabled_provider_keys(runtime_config: RuntimeConfig) -> set[str]:
+    """
+    @brief Resolve enabled-provider key set from runtime configuration.
+    @details Converts `resolve_enabled_providers(...)` mapping output into a set
+    of enabled provider keys used by cache, idle-time, and render filtering.
+    Time complexity O(P). Space complexity O(P), where P is provider count.
+    @param runtime_config {RuntimeConfig} Runtime configuration carrying provider flags.
+    @return {set[str]} Enabled provider keys.
+    @satisfies CTN-017
+    @satisfies REQ-123
+    @satisfies REQ-124
+    @satisfies REQ-126
+    """
+    return {
+        provider_key
+        for provider_key, enabled in resolve_enabled_providers(runtime_config).items()
+        if enabled
+    }
+
+
+def _serialize_enabled_providers(
+    runtime_config: RuntimeConfig,
+) -> dict[str, bool]:
+    """
+    @brief Serialize provider-enable flags for `show --json`.
+    @details Returns normalized provider-keyed booleans for all known
+    providers. Missing config keys normalize to `true` for backward
+    compatibility.
+    @param runtime_config {RuntimeConfig} Runtime configuration carrying provider flags.
+    @return {dict[str, bool]} Provider-keyed enabled-state mapping.
+    @satisfies CTN-017
+    @satisfies REQ-126
+    @satisfies REQ-127
+    """
+    return resolve_enabled_providers(runtime_config)
 
 
 def _serialize_idle_time_state(
@@ -1871,18 +1950,27 @@ def _fixed_effective_window(provider_name: ProviderName) -> WindowPeriod | None:
     return _FIXED_WINDOW_BY_PROVIDER.get(provider_name)
 
 
-def _serialize_extension_window_labels() -> dict[str, str]:
+def _serialize_extension_window_labels(
+    enabled_provider_keys: set[str] | None = None,
+) -> dict[str, str]:
     """
     @brief Serialize provider window labels for GNOME extension bar rendering.
     @details Exports provider-keyed fixed window labels from canonical
     fixed-window provider mapping for `show --json` `extension.window_labels`.
+    When `enabled_provider_keys` is provided, disabled providers are omitted.
+    @param enabled_provider_keys {set[str] | None} Optional enabled-provider key set.
     @return {dict[str, str]} Provider-keyed window label map.
     @satisfies REQ-003
     @satisfies REQ-017
+    @satisfies REQ-126
     """
     return {
         provider_name.value: window_period.value
         for provider_name, window_period in _FIXED_WINDOW_BY_PROVIDER.items()
+        if (
+            enabled_provider_keys is None
+            or provider_name.value in enabled_provider_keys
+        )
     }
 
 
@@ -2713,6 +2801,7 @@ def retrieve_results_via_cache_pipeline(
     target_window: WindowPeriod,
     force_refresh: bool,
     providers: dict[ProviderName, BaseProvider],
+    enabled_provider_keys: set[str] | None = None,
 ) -> RetrievalPipelineOutput:
     """
     @brief Execute shared cache-based retrieval pipeline for CLI `show`.
@@ -2730,6 +2819,7 @@ def retrieve_results_via_cache_pipeline(
     @param target_window {WindowPeriod} Target window requested by caller.
     @param force_refresh {bool} Force-refresh flag for current execution.
     @param providers {dict[ProviderName, BaseProvider]} Provider registry.
+    @param enabled_provider_keys {set[str] | None} Optional enabled-provider key set.
     @return {RetrievalPipelineOutput} Shared retrieval state and decoded results.
     @satisfies REQ-009
     @satisfies REQ-039
@@ -2744,6 +2834,8 @@ def retrieve_results_via_cache_pipeline(
     @satisfies REQ-092
     @satisfies REQ-093
     @satisfies REQ-094
+    @satisfies REQ-124
+    @satisfies REQ-126
     """
     append_runtime_log_line(
         "idle.pipeline.start "
@@ -2772,6 +2864,12 @@ def retrieve_results_via_cache_pipeline(
         selected_providers = (
             {} if selected_provider is None else {provider_filter: selected_provider}
         )
+    if enabled_provider_keys is not None:
+        selected_providers = {
+            provider_name: provider
+            for provider_name, provider in selected_providers.items()
+            if provider_name.value in enabled_provider_keys
+        }
 
     idle_blocked_provider_keys: set[str] = set()
     if not force_refresh:
@@ -2831,13 +2929,16 @@ def retrieve_results_via_cache_pipeline(
                 idle_time_by_provider=_filter_idle_time_by_provider(
                     load_idle_time(),
                     provider_filter,
+                    enabled_provider_keys,
                 ),
                 idle_active=False,
                 cache_available=False,
             )
         refreshed_idle_state = load_idle_time()
         filtered_effective_payload = _filter_cached_payload(
-            effective_payload, provider_filter
+            effective_payload,
+            provider_filter,
+            enabled_provider_keys,
         )
         append_runtime_log_line("idle.pipeline.end cache_available=true source=refresh")
         return RetrievalPipelineOutput(
@@ -2851,6 +2952,7 @@ def retrieve_results_via_cache_pipeline(
             idle_time_by_provider=_filter_idle_time_by_provider(
                 refreshed_idle_state,
                 provider_filter,
+                enabled_provider_keys,
             ),
             idle_active=idle_active,
             cache_available=True,
@@ -2865,12 +2967,17 @@ def retrieve_results_via_cache_pipeline(
             idle_time_by_provider=_filter_idle_time_by_provider(
                 idle_state_by_provider,
                 provider_filter,
+                enabled_provider_keys,
             ),
             idle_active=idle_active,
             cache_available=False,
         )
     cached_document = _normalize_cache_document(cached_payload_raw)
-    filtered_cached_document = _filter_cached_payload(cached_document, provider_filter)
+    filtered_cached_document = _filter_cached_payload(
+        cached_document,
+        provider_filter,
+        enabled_provider_keys,
+    )
     append_runtime_log_line("idle.pipeline.end cache_available=true source=cache_only")
     return RetrievalPipelineOutput(
         payload=filtered_cached_document,
@@ -2883,6 +2990,7 @@ def retrieve_results_via_cache_pipeline(
         idle_time_by_provider=_filter_idle_time_by_provider(
             idle_state_by_provider,
             provider_filter,
+            enabled_provider_keys,
         ),
         idle_active=idle_active,
         cache_available=True,
@@ -3077,6 +3185,10 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
     @satisfies REQ-085
     @satisfies REQ-067
     @satisfies REQ-097
+    @satisfies REQ-123
+    @satisfies REQ-124
+    @satisfies REQ-125
+    @satisfies REQ-126
     """
     provider_filter = parse_provider(provider)
     window_period = parse_window(window)
@@ -3088,6 +3200,13 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
         if fixed_window is not None:
             window_period = fixed_window
     providers = get_providers()
+    runtime_cfg = load_runtime_config()
+    enabled_provider_flags = _serialize_enabled_providers(runtime_cfg)
+    enabled_provider_keys = _enabled_provider_keys(runtime_cfg)
+    provider_requested_disabled = (
+        provider_filter is not None
+        and not enabled_provider_flags.get(provider_filter.value, True)
+    )
 
     # Filter to specific provider if requested
     if provider_filter:
@@ -3103,11 +3222,11 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
             target_window=window_period,
             force_refresh=force_refresh,
             providers=providers,
+            enabled_provider_keys=enabled_provider_keys,
         )
     except LockAcquisitionTimeoutError as exc:
         click.echo(str(exc), err=True)
         sys.exit(1)
-    runtime_cfg = load_runtime_config()
     if retrieval.idle_active and not retrieval.cache_available:
         if output_json:
             output_doc = _empty_cache_document()
@@ -3117,8 +3236,11 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
                 "gnome_refresh_interval_seconds": runtime_cfg.gnome_refresh_interval_seconds,
                 "idle_delay_seconds": runtime_cfg.idle_delay_seconds,
                 "copilot_extra_premium_request_cost": runtime_cfg.copilot_extra_premium_request_cost,
-                "window_labels": _serialize_extension_window_labels(),
+                "window_labels": _serialize_extension_window_labels(
+                    enabled_provider_keys
+                ),
             }
+            output_doc[_CACHE_ENABLED_PROVIDERS_SECTION_KEY] = enabled_provider_flags
             click.echo(json.dumps(output_doc, indent=2))
         else:
             click.echo("Cache unavailable while idle-time is active.")
@@ -3136,14 +3258,22 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
             "gnome_refresh_interval_seconds": runtime_cfg.gnome_refresh_interval_seconds,
             "idle_delay_seconds": runtime_cfg.idle_delay_seconds,
             "copilot_extra_premium_request_cost": runtime_cfg.copilot_extra_premium_request_cost,
-            "window_labels": _serialize_extension_window_labels(),
+            "window_labels": _serialize_extension_window_labels(
+                enabled_provider_keys
+            ),
         }
+        output_doc[_CACHE_ENABLED_PROVIDERS_SECTION_KEY] = enabled_provider_flags
         click.echo(json.dumps(output_doc, indent=2))
+        return
+
+    if provider_requested_disabled:
         return
 
     rendered_panels: list[tuple[ProviderName, str, list[str]]] = []
     status_section = _cache_status_section(retrieval.payload)
     for name, prov in providers.items():
+        if name.value not in enabled_provider_keys:
+            continue
         if not prov.is_configured():
             if provider_filter is None or provider_filter == name:
                 rendered_panels.append(
@@ -4137,6 +4267,7 @@ def setup() -> None:
     @details Prompts for `idle_delay_seconds`, `api_call_delay_milliseconds`,
     `api_call_timeout_milliseconds`, `default_retry_after_seconds`,
     `gnome_refresh_interval_seconds`, and `billing_data` in order, then prompts
+    dedicated provider-activation section after `billing_data`, then prompts
     dedicated Copilot overage pricing field `copilot_extra_premium_request_cost`
     (USD/request), then prompts provider currency symbols including `geminiai`
     (choices: `$`, `£`, `€`, default `$`), then persists all values to
@@ -4147,6 +4278,7 @@ def setup() -> None:
     @return {None} Function return value.
     @satisfies REQ-005
     @satisfies REQ-049
+    @satisfies REQ-123
     @satisfies REQ-108
     @satisfies REQ-116
     @satisfies REQ-055
@@ -4159,6 +4291,7 @@ def setup() -> None:
         RuntimeConfig,
         VALID_CURRENCY_SYMBOLS,
         load_runtime_config,
+        resolve_enabled_providers,
         save_runtime_config,
         write_env_file,
     )
@@ -4221,6 +4354,32 @@ def setup() -> None:
         ).strip()
         or runtime_config.billing_data
     )
+    click.echo()
+    click.echo(click.style("Provider activation", bold=True))
+    click.echo("  Configure whether each provider participates in refresh and UI output.")
+    configured_enabled_providers = resolve_enabled_providers(runtime_config)
+    activation_provider_order = [
+        ProviderName.CLAUDE,
+        ProviderName.OPENROUTER,
+        ProviderName.COPILOT,
+        ProviderName.CODEX,
+        ProviderName.OPENAI,
+        ProviderName.GEMINIAI,
+    ]
+    enabled_providers: dict[str, bool] = {}
+    for activation_provider in activation_provider_order:
+        activation_default = (
+            "enable"
+            if configured_enabled_providers.get(activation_provider.value, True)
+            else "disable"
+        )
+        activation_mode = click.prompt(
+            f"  {activation_provider.value} statistics mode",
+            type=click.Choice(["enable", "disable"]),
+            default=activation_default,
+            show_choices=True,
+        )
+        enabled_providers[activation_provider.value] = activation_mode == "enable"
     click.echo()
     click.echo(click.style("Copilot premium overage", bold=True))
     click.echo(
@@ -4447,6 +4606,7 @@ def setup() -> None:
         default_retry_after_seconds=default_retry_after_seconds,
         gnome_refresh_interval_seconds=gnome_refresh_interval_seconds,
         billing_data=billing_data,
+        enabled_providers=enabled_providers,
         copilot_extra_premium_request_cost=copilot_extra_premium_request_cost,
         currency_symbols=currency_symbols,
         log_enabled=(log_mode == "enable"),

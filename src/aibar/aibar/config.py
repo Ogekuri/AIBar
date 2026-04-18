@@ -49,9 +49,10 @@ _CURRENCY_CODE_TO_SYMBOL: dict[str, str] = {
 
 class RuntimeConfig(BaseModel):
     """
-    @brief Define runtime configuration component for refresh throttling, timeout, and currency controls.
+    @brief Define runtime configuration component for refresh throttling, timeout, currency, and provider-activation controls.
     @details Encodes persisted CLI runtime controls used by `show` refresh logic,
-    GNOME extension scheduling, and per-provider currency symbol resolution.
+    GNOME extension scheduling, per-provider currency symbol resolution, and
+    provider enable/disable gating.
     Fields are validated with defaults that reduce rate-limit pressure.
     `api_call_delay_milliseconds` defaults to `100` ms inter-call spacing.
     `api_call_timeout_milliseconds` defaults to `5000` ms HTTP response timeout
@@ -64,6 +65,8 @@ class RuntimeConfig(BaseModel):
     billing export table discovery.
     `copilot_extra_premium_request_cost` stores the configured unit price (USD)
     for one Copilot premium request above included-plan quota.
+    `enabled_providers` stores provider-keyed booleans; missing keys normalize
+    to `true` via `resolve_enabled_providers(...)` for backward compatibility.
     `log_enabled` controls append logging to `~/.cache/aibar/aibar.log`.
     `debug_enabled` controls API debug-result logging and requires `log_enabled`.
     Optional GeminiAI field persists Google Cloud project identifier used by
@@ -78,6 +81,10 @@ class RuntimeConfig(BaseModel):
     @satisfies REQ-095
     @satisfies REQ-096
     @satisfies REQ-116
+    @satisfies CTN-017
+    @satisfies REQ-123
+    @satisfies REQ-124
+    @satisfies REQ-126
     """
 
     idle_delay_seconds: int = Field(default=DEFAULT_IDLE_DELAY_SECONDS, ge=1)
@@ -92,6 +99,7 @@ class RuntimeConfig(BaseModel):
         default=DEFAULT_GNOME_REFRESH_INTERVAL_SECONDS, ge=1
     )
     billing_data: str = Field(default=DEFAULT_BILLING_DATASET, min_length=1)
+    enabled_providers: dict[str, bool] = Field(default_factory=dict)
     copilot_extra_premium_request_cost: float = Field(
         default=DEFAULT_COPILOT_EXTRA_PREMIUM_REQUEST_COST,
         ge=0,
@@ -344,12 +352,37 @@ def save_runtime_config(runtime_config: RuntimeConfig) -> None:
     @param runtime_config {RuntimeConfig} Validated runtime configuration model.
     @return {None} Function return value.
     @satisfies CTN-008
+    @satisfies CTN-017
     """
     _ensure_app_config_dir()
     RUNTIME_CONFIG_PATH.write_text(
         runtime_config.model_dump_json(indent=2),
         encoding="utf-8",
     )
+
+
+def resolve_enabled_providers(
+    runtime_config: RuntimeConfig | None = None,
+) -> dict[str, bool]:
+    """
+    @brief Resolve normalized provider-enable flags from runtime configuration.
+    @details Produces a provider-keyed boolean map for all `ProviderName`
+    values. Missing `enabled_providers` keys normalize to `True` to preserve
+    backward compatibility with pre-flag config documents. Time complexity
+    O(P). Space complexity O(P), where P is provider count.
+    @param runtime_config {RuntimeConfig | None} Optional preloaded runtime configuration.
+    @return {dict[str, bool]} Provider-keyed enabled-state mapping for all providers.
+    @satisfies CTN-017
+    @satisfies REQ-123
+    @satisfies REQ-124
+    @satisfies REQ-126
+    """
+    effective_runtime_config = runtime_config or load_runtime_config()
+    configured_flags = effective_runtime_config.enabled_providers
+    return {
+        provider_name.value: bool(configured_flags.get(provider_name.value, True))
+        for provider_name in ProviderName
+    }
 
 
 def load_cli_cache() -> dict[str, Any] | None:

@@ -1,11 +1,15 @@
 """
 @file
 @brief Idle-time cache gating tests for CLI show command.
-@details Verifies `show` serves cached JSON payload while idle-time is active and
-skips live provider refresh execution.
+@details Verifies `show` serves cached JSON payload while idle-time is active,
+skips live provider refresh execution, and omits providers disabled by runtime
+configuration.
 @satisfies REQ-003
 @satisfies REQ-009
+@satisfies REQ-124
+@satisfies REQ-126
 @satisfies TST-014
+@satisfies TST-056
 """
 
 import json
@@ -123,3 +127,110 @@ def test_show_uses_cache_for_idle_provider_and_refreshes_non_idle_provider(
     persisted_idle_state = json.loads(config_module.IDLE_TIME_PATH.read_text(encoding="utf-8"))
     assert ProviderName.OPENROUTER.value in persisted_idle_state
     assert ProviderName.OPENAI.value in persisted_idle_state
+
+
+def test_show_omits_disabled_provider_from_refresh_and_output(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """
+    @brief Verify disabled providers are omitted from refresh, text, and JSON output.
+    @details Persists cached payload for enabled OpenRouter and disabled OpenAI.
+    Runtime config marks OpenAI disabled, then `show --json` and `show` are
+    executed. OpenAI refresh MUST remain skipped, OpenAI sections MUST be absent
+    from output payloads, and `enabled_providers.openai` MUST be `False`.
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @param tmp_path {Path} Temporary path fixture.
+    @return {None} Function return value.
+    @satisfies REQ-124
+    @satisfies REQ-125
+    @satisfies REQ-126
+    @satisfies TST-056
+    """
+    _patch_config_paths(monkeypatch, tmp_path)
+    cached_openrouter = ProviderResult(
+        provider=ProviderName.OPENROUTER,
+        window=WindowPeriod.DAY_30,
+        metrics=UsageMetrics(cost=1.75, remaining=72.0, limit=100.0),
+        raw={"status_code": 200, "source": "cached-openrouter"},
+    )
+    cached_openai = ProviderResult(
+        provider=ProviderName.OPENAI,
+        window=WindowPeriod.DAY_30,
+        metrics=UsageMetrics(cost=0.25, remaining=95.0, limit=100.0),
+        raw={"status_code": 200, "source": "cached-openai"},
+    )
+    config_module.save_cli_cache(
+        {
+            "payload": {
+                "openrouter": cached_openrouter.model_dump(mode="json"),
+                "openai": cached_openai.model_dump(mode="json"),
+            },
+            "status": {},
+        }
+    )
+    config_module.save_runtime_config(
+        config_module.RuntimeConfig(
+            enabled_providers={
+                "claude": True,
+                "openrouter": True,
+                "copilot": True,
+                "codex": True,
+                "openai": False,
+                "geminiai": True,
+            }
+        )
+    )
+    now_utc = datetime.now(timezone.utc)
+    config_module.save_idle_time(
+        {
+            ProviderName.OPENROUTER.value: config_module.build_idle_time_state(
+                last_success_at=now_utc,
+                idle_until=now_utc + timedelta(minutes=30),
+            )
+        }
+    )
+
+    openrouter_provider = MagicMock()
+    openrouter_provider.is_configured.return_value = True
+    openrouter_provider.fetch = AsyncMock(return_value=cached_openrouter)
+
+    openai_provider = MagicMock()
+    openai_provider.is_configured.return_value = True
+    openai_provider.fetch = AsyncMock(return_value=cached_openai)
+
+    monkeypatch.setattr(
+        "aibar.cli.get_providers",
+        lambda: {
+            ProviderName.OPENROUTER: openrouter_provider,
+            ProviderName.OPENAI: openai_provider,
+        },
+    )
+    monkeypatch.setattr("aibar.cli._apply_api_call_delay", lambda state: None)
+
+    runner = CliRunner()
+    json_result = runner.invoke(main, ["show", "--json"])
+    assert json_result.exit_code == 0, json_result.output
+    openrouter_provider.fetch.assert_not_awaited()
+    openai_provider.fetch.assert_not_awaited()
+
+    output_doc = json.loads(json_result.output)
+    assert "openrouter" in output_doc["payload"]
+    assert "openai" not in output_doc["payload"]
+    assert output_doc["enabled_providers"]["openai"] is False
+    assert output_doc["extension"]["window_labels"] == {
+        "copilot": "30d",
+        "openrouter": "30d",
+        "geminiai": "30d",
+    }
+
+    text_result = runner.invoke(main, ["show"])
+    assert text_result.exit_code == 0, text_result.output
+    assert "OPENAI" not in text_result.output
+    assert "OPENROUTER" in text_result.output
+
+    persisted_idle_state = json.loads(
+        config_module.IDLE_TIME_PATH.read_text(encoding="utf-8")
+    )
+    assert ProviderName.OPENROUTER.value in persisted_idle_state
+    assert ProviderName.OPENAI.value not in persisted_idle_state

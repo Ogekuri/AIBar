@@ -731,3 +731,30 @@ def test_over_limit_styles_use_visible_neutral_contrast() -> None:
     assert "background-color: #000;" not in stylesheet_source
     assert "rgba(255, 255, 255, 0.35)" not in stylesheet_source
 
+
+def test_extension_filters_disabled_providers_before_ui_projection() -> None:
+    """
+    @brief Verify extension parses `enabled_providers` before provider extraction and hides disabled-provider UI.
+    @details Asserts extension source defines normalization/filter helpers for
+    `enabled_providers`, applies them before assigning `json.payload`, and hides
+    tab buttons plus provider cards when `this._enabledProviders[providerName]`
+    is `false`.
+    @return {None} Function return value.
+    @satisfies REQ-127
+    @satisfies TST-057
+    """
+    source = EXTENSION_PATH.read_text(encoding="utf-8")
+    assert "const DEFAULT_ENABLED_PROVIDERS = Object.freeze({" in source
+    assert "function _normalizeEnabledProvidersSection(enabledProviders)" in source
+    assert (
+        "function _filterProviderObjectByEnabledProviders(providerData, enabledProviders)"
+        in source
+    )
+    assert "json.enabled_providers" in source
+    assert "this._enabledProviders = _normalizeEnabledProvidersSection(" in source
+    assert "this._usageData = _filterProviderObjectByEnabledProviders(" in source
+    assert source.index("json.enabled_providers") < source.index("this._usageData = _filterProviderObjectByEnabledProviders(")
+    assert "if (this._enabledProviders[providerName] === false)" in source
+    assert "tabData.button.hide();" in source
+    assert "card.container.hide();" in source
+
