@@ -465,8 +465,9 @@ function _isDisplayedFullPercent(pct) {
 
 /**
  * @brief Attach over-limit visualization actors to one progress background.
- * @details Appends one black 100%-boundary marker actor and one neutral over-limit
- * fill actor to the same horizontal background container used by the provider fill.
+ * @details Appends one bright-neutral 100%-boundary marker actor and one opaque
+ * neutral over-limit fill actor to the same horizontal background container used
+ * by the provider fill.
  * Stores actor references on `fillActor` so shared geometry updates require only the
  * existing `_applyProgressFillGeometry(...)` call sites. Time complexity O(1). Space
  * complexity O(1).

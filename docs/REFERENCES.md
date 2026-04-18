@@ -2059,7 +2059,7 @@ Invalid map entries are skipped.
 
 ---
 
-# extension.js | JavaScript | 2172L | 42 symbols | 9 imports | 48 comments
+# extension.js | JavaScript | 2173L | 42 symbols | 9 imports | 48 comments
 > Path: `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`
 - @brief GNOME Shell panel extension for aibar metrics.
 - @details Collects usage JSON from the aibar CLI and renders provider-specific quota/cost cards in the GNOME panel popup.
@@ -2229,10 +2229,11 @@ full usage for limit-reached warning rendering.
 - @param {number} pct Usage percentage candidate.
 - @return s {boolean} True when value is finite and rounds to `100.0`.
 
-### fn `function _attachOverLimitActors(backgroundActor, fillActor)` (L478-492)
+### fn `function _attachOverLimitActors(backgroundActor, fillActor)` (L479-493)
 - @brief Attach over-limit visualization actors to one progress background.
-- @details Appends one black 100%-boundary marker actor and one neutral over-limit
-fill actor to the same horizontal background container used by the provider fill.
+- @details Appends one bright-neutral 100%-boundary marker actor and one opaque
+neutral over-limit fill actor to the same horizontal background container used
+by the provider fill.
 Stores actor references on `fillActor` so shared geometry updates require only the
 existing `_applyProgressFillGeometry(...)` call sites. Time complexity O(1). Space
 complexity O(1).
@@ -2241,7 +2242,7 @@ complexity O(1).
 - @return s {void} No return value.
 - @satisfies REQ-121
 
-### fn `function _applyProgressFillGeometry(fillActor, backgroundActor, pct)` (L509-548)
+### fn `function _applyProgressFillGeometry(fillActor, backgroundActor, pct)` (L510-549)
 - @brief Apply deterministic progress-fill geometry with over-limit segment support.
 - @details Computes fixed-width progress geometry from percentage and current
 background width. Percentages up to `100` render provider-color fill plus background.
@@ -2256,19 +2257,19 @@ never exceeding the background width. Time complexity O(1). Space complexity O(1
 - @satisfies REQ-119
 - @satisfies REQ-121
 
-### class `class AIBarIndicator extends PanelMenu.Button` : PanelMenu.Button (L552-851)
+### class `class AIBarIndicator extends PanelMenu.Button` : PanelMenu.Button (L553-852)
 - @brief Panel indicator widget that manages popup rendering and refresh lifecycle. */
 - @brief Execute init.
 - @details Applies init logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @return s {any} Function return value.
 
-### fn `const createWindowBar = (labelText) =>` (L995-1041)
+### fn `const createWindowBar = (labelText) =>` (L996-1042)
 - @brief Execute create provider card.
 - @details Applies create provider card logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @param {any} providerName Input parameter `providerName`.
 - @return s {any} Function return value.
 
-### fn `const updateWindowBar = (bar, pct, resetTime, useDays, allowResetPendingHint = true) =>` (L1227-1291)
+### fn `const updateWindowBar = (bar, pct, resetTime, useDays, allowResetPendingHint = true) =>` (L1228-1292)
 - @brief Execute populate provider card.
 - @details Projects provider payload and cached status into one card surface.
 Failed states render a strict block with `Status: FAIL` and `Reason: ...`
@@ -2285,11 +2286,11 @@ existing provider-specific card rules, including Copilot
 - @satisfies REQ-017
 - @satisfies REQ-117
 
-### fn `const setResetLabel = (baseText) =>` (L1233-1239)
+### fn `const setResetLabel = (baseText) =>` (L1234-1240)
 
-### fn `const showResetPendingHint = () =>` (L1246-1248)
+### fn `const showResetPendingHint = () =>` (L1247-1249)
 
-### fn `const toPercent = (value) =>` (L1856-1861)
+### fn `const toPercent = (value) =>` (L1857-1862)
 - @brief Execute update u i.
 - @details Applies update u i logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 Resolves provider-window failure metadata from cache `status` section and forwards it
@@ -2302,9 +2303,9 @@ After card refresh, re-sizes the popup provider viewport to the visible card hei
 - @satisfies REQ-118
 - @satisfies REQ-120
 
-### fn `const getPanelUsageValues = (providerName, data) =>` (L1862-1919)
+### fn `const getPanelUsageValues = (providerName, data) =>` (L1863-1920)
 
-### class `export default class AIBarExtension extends Extension` : Extension (L2146-2172)
+### class `export default class AIBarExtension extends Extension` : Extension (L2147-2173)
 - @brief GNOME extension lifecycle adapter for AIBarIndicator registration.
 - @brief Execute enable.
 - @details Extends Extension (GNOME Shell 45+ API) to integrate with the extension lifecycle.
@@ -2348,16 +2349,16 @@ Uses this.uuid (provided by the Extension base class) as the status-area key.
 |`_getProviderProgressClass`|fn||432-434|function _getProviderProgressClass(providerName)|
 |`_isDisplayedZeroPercent`|fn||443-450|function _isDisplayedZeroPercent(pct)|
 |`_isDisplayedFullPercent`|fn||459-464|function _isDisplayedFullPercent(pct)|
-|`_attachOverLimitActors`|fn||478-492|function _attachOverLimitActors(backgroundActor, fillActor)|
-|`_applyProgressFillGeometry`|fn||509-548|function _applyProgressFillGeometry(fillActor, background...|
-|`AIBarIndicator`|class||552-851|class AIBarIndicator extends PanelMenu.Button|
-|`createWindowBar`|fn||995-1041|const createWindowBar = (labelText) =>|
-|`updateWindowBar`|fn||1227-1291|const updateWindowBar = (bar, pct, resetTime, useDays, al...|
-|`setResetLabel`|fn||1233-1239|const setResetLabel = (baseText) =>|
-|`showResetPendingHint`|fn||1246-1248|const showResetPendingHint = () =>|
-|`toPercent`|fn||1856-1861|const toPercent = (value) =>|
-|`getPanelUsageValues`|fn||1862-1919|const getPanelUsageValues = (providerName, data) =>|
-|`AIBarExtension`|class||2146-2172|export default class AIBarExtension extends Extension|
+|`_attachOverLimitActors`|fn||479-493|function _attachOverLimitActors(backgroundActor, fillActor)|
+|`_applyProgressFillGeometry`|fn||510-549|function _applyProgressFillGeometry(fillActor, background...|
+|`AIBarIndicator`|class||553-852|class AIBarIndicator extends PanelMenu.Button|
+|`createWindowBar`|fn||996-1042|const createWindowBar = (labelText) =>|
+|`updateWindowBar`|fn||1228-1292|const updateWindowBar = (bar, pct, resetTime, useDays, al...|
+|`setResetLabel`|fn||1234-1240|const setResetLabel = (baseText) =>|
+|`showResetPendingHint`|fn||1247-1249|const showResetPendingHint = () =>|
+|`toPercent`|fn||1857-1862|const toPercent = (value) =>|
+|`getPanelUsageValues`|fn||1863-1920|const getPanelUsageValues = (providerName, data) =>|
+|`AIBarExtension`|class||2147-2173|export default class AIBarExtension extends Extension|
 
 
 ---

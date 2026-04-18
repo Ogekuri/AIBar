@@ -654,7 +654,7 @@ def test_progress_bar_handles_percentages_over_100() -> None:
     @brief Verify GNOME over-limit progress bars expose a dedicated extra-quota segment.
     @details Asserts one shared geometry helper is used by single-window bars,
     dual-window bars, and fallback progress rows so percentages above 100 render
-    a neutral over-limit segment plus a black 100% marker without widening label slots.
+    a neutral over-limit segment plus a fixed 100% marker without widening label slots.
     @satisfies REQ-121
     @satisfies TST-052
     """
@@ -670,9 +670,27 @@ def test_progress_bar_handles_percentages_over_100() -> None:
 
     stylesheet_source = STYLESHEET_PATH.read_text(encoding="utf-8")
     assert ".aibar-progress-marker {" in stylesheet_source
-    assert "background-color: #000;" in stylesheet_source
     assert ".aibar-progress-over-limit-fill {" in stylesheet_source
-    assert "rgba(255, 255, 255, 0.35)" in stylesheet_source
     assert "width: 34px;" in stylesheet_source
     assert "width: 56px;" in stylesheet_source
+
+
+def test_over_limit_styles_use_visible_neutral_contrast() -> None:
+    """
+    @brief Verify GNOME overflow styles stay visible against the dark popup background.
+    @details Reproduces the screenshot-reported defect where percentages above
+    `100` were geometrically present but visually blended into the popup because
+    the marker used a dark fill and the excess segment used a low-contrast alpha
+    color. Requires a bright-neutral boundary marker and an opaque neutral excess
+    segment so the over-limit quota remains visible without reusing provider hue.
+    @satisfies REQ-121
+    @satisfies TST-052
+    """
+    stylesheet_source = STYLESHEET_PATH.read_text(encoding="utf-8")
+    assert ".aibar-progress-marker {" in stylesheet_source
+    assert "background-color: #f2f2f2;" in stylesheet_source
+    assert ".aibar-progress-over-limit-fill {" in stylesheet_source
+    assert "background-color: #8c8c8c;" in stylesheet_source
+    assert "background-color: #000;" not in stylesheet_source
+    assert "rgba(255, 255, 255, 0.35)" not in stylesheet_source
 

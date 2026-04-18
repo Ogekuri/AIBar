@@ -191,13 +191,29 @@
     height: 6px;
 }
 
+/**
+ * @brief Style the fixed 100%-boundary marker for GNOME over-limit bars.
+ * @details Uses a bright neutral separator so percentages above `100` remain
+ * visually distinct against the dark popup background while preserving the
+ * existing runtime-controlled width from `_applyProgressFillGeometry(...)`.
+ * @satisfies REQ-121
+ * @satisfies TST-052
+ */
 .aibar-progress-marker {
-    background-color: #000;
+    background-color: #f2f2f2;
     height: 6px;
 }
 
+/**
+ * @brief Style the neutral excess-quota segment for GNOME over-limit bars.
+ * @details Uses an opaque medium-gray fill so the quota portion above `100`
+ * remains visible without reusing the provider hue and without relying on
+ * theme-dependent alpha blending against the popup background.
+ * @satisfies REQ-121
+ * @satisfies TST-052
+ */
 .aibar-progress-over-limit-fill {
-    background-color: rgba(255, 255, 255, 0.35);
+    background-color: #8c8c8c;
     height: 6px;
 }
 
