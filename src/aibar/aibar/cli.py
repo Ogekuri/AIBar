@@ -3940,6 +3940,24 @@ def _format_billing_service_descriptions(services: list[object]) -> str | None:
     return ", ".join(service_names)
 
 
+def _build_dual_window_section(
+    window_label: str,
+    detail_lines: list[str],
+) -> list[str]:
+    """
+    @brief Build one labeled dual-window CLI section.
+    @details Prepends the raw window label (`5h` or `7d`) to the ordered detail
+    lines for one Claude/Codex section. The helper intentionally preserves
+    duplicate metric text across sections so identical `Usage` or `Resets in`
+    rows remain visible in both windows.
+    @param window_label {str} Window label text rendered as the section heading.
+    @param detail_lines {list[str]} Ordered non-empty detail lines for one window.
+    @return {list[str]} Section heading followed by the provided detail lines.
+    @satisfies REQ-002
+    """
+    return [window_label, *detail_lines]
+
+
 def _build_dual_window_panel(
     name: ProviderName,
     result_5h: ProviderResult,
@@ -3949,10 +3967,12 @@ def _build_dual_window_panel(
     """
     @brief Build one grouped CLI panel for dual-window providers.
     @details Produces one provider panel from `5h` and `7d` results while
-    deduplicating shared lines. `FAIL` states emit `Status: FAIL`,
-    `Reason: <reason>`, and `Updated/Next` separated by blank lines. `OK` states
-    emit `Status: OK` first, avoid `Window <window>` headings, and append one
-    trailing right-aligned freshness line.
+    keeping explicit `5h` and `7d` section labels and preserving duplicate
+    section content when both windows render identical metric text. `FAIL`
+    states emit `Status: FAIL`, `Reason: <reason>`, and `Updated/Next`
+    separated by blank lines. `OK` states emit `Status: OK` first, avoid
+    `Window <window>` headings, and append one trailing right-aligned freshness
+    line.
     @param name {ProviderName} Provider enum value.
     @param result_5h {ProviderResult} Five-hour provider result.
     @param result_7d {ProviderResult} Seven-day provider result.
@@ -4031,22 +4051,12 @@ def _build_dual_window_panel(
         details_7d = [
             line for line in details_7d if not line.startswith(metric_prefixes)
         ]
-    details_7d_set = set(details_7d)
-    shared_lines = [line for line in details_5h if line in details_7d_set]
-    shared_line_set = set(shared_lines)
-    section_5h = [line for line in details_5h if line not in shared_line_set]
-    section_7d = [line for line in details_7d if line not in shared_line_set]
-    status_line = (
-        "Status: FAIL" if (result_5h.is_error or result_7d.is_error) else "Status: OK"
-    )
+    section_5h = _build_dual_window_section("5h", details_5h)
+    section_7d = _build_dual_window_section("7d", details_7d)
     freshness_line = _build_freshness_line(
         result=result_7d, freshness_state=freshness_state
     )
-    body_lines = [status_line, ""]
-    if shared_lines:
-        body_lines.extend(shared_lines)
-        body_lines.append("")
-    body_lines.extend([*section_5h, "", *section_7d])
+    body_lines = ["Status: OK", "", *section_5h, "", *section_7d]
     if shared_remaining_line is not None:
         body_lines.extend(["", shared_remaining_line])
     if footer_lines:

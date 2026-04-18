@@ -14,6 +14,7 @@ from click.testing import CliRunner
 
 from aibar.cli import RetrievalPipelineOutput, main
 from aibar.cli import _print_result
+from aibar.config import RuntimeConfig
 from aibar.providers.base import (
     ProviderName,
     ProviderResult,
@@ -385,6 +386,125 @@ def test_show_default_window_groups_dual_windows_into_one_panel_per_provider(
     )
     assert normalized_codex_body[idx_cost - 1] == ""
     assert idx_cost < idx_requests < idx_tokens
+
+
+def test_show_default_window_keeps_dual_section_labels_when_other_providers_are_disabled(
+    monkeypatch,
+) -> None:
+    """
+    @brief Verify disabled single-window providers do not remove Claude/Codex `5h` and `7d` section labels.
+    @details Reproduces the user-reported surface where `openrouter` and `openai`
+    are disabled and Claude/Codex are the only rendered providers. Both dual-window
+    providers return identical `5h` and `7d` usage values so panel assembly MUST
+    preserve explicit `5h`/`7d` section labels and two usage rows instead of
+    collapsing one row away.
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @return {None} Function return value.
+    @satisfies REQ-002
+    @satisfies REQ-125
+    @satisfies TST-030
+    @satisfies TST-056
+    """
+    shared_updated_at = datetime(2026, 3, 18, 9, 0, tzinfo=timezone.utc)
+
+    def _build_equal_dual_parser(provider_name: ProviderName):
+        def _parse(_raw: dict, window: WindowPeriod) -> ProviderResult:
+            metrics = UsageMetrics(
+                remaining=50.0,
+                limit=100.0,
+                reset_at=datetime(2026, 3, 25, 12, 0, tzinfo=timezone.utc),
+            )
+            if provider_name == ProviderName.CODEX:
+                metrics = UsageMetrics(
+                    remaining=50.0,
+                    limit=100.0,
+                    reset_at=datetime(2026, 3, 25, 12, 0, tzinfo=timezone.utc),
+                    cost=1.2345,
+                    requests=42,
+                    input_tokens=420,
+                    output_tokens=42,
+                )
+            return ProviderResult(
+                provider=provider_name,
+                window=window,
+                metrics=metrics,
+                updated_at=shared_updated_at,
+                raw={"status_code": 200},
+            )
+
+        return _parse
+
+    claude_provider = MagicMock()
+    claude_provider.is_configured.return_value = True
+    claude_provider._parse_response = _build_equal_dual_parser(ProviderName.CLAUDE)
+
+    codex_provider = MagicMock()
+    codex_provider.is_configured.return_value = True
+    codex_provider._parse_response = _build_equal_dual_parser(ProviderName.CODEX)
+
+    monkeypatch.setattr(
+        "aibar.cli.get_providers",
+        lambda: {
+            ProviderName.CLAUDE: claude_provider,
+            ProviderName.CODEX: codex_provider,
+        },
+    )
+    monkeypatch.setattr(
+        "aibar.cli.load_runtime_config",
+        lambda: RuntimeConfig(
+            enabled_providers={
+                "claude": True,
+                "openrouter": False,
+                "copilot": False,
+                "codex": True,
+                "openai": False,
+                "geminiai": False,
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        "aibar.cli.retrieve_results_via_cache_pipeline",
+        lambda **_: RetrievalPipelineOutput(
+            payload={},
+            results={
+                ProviderName.CLAUDE.value: ProviderResult(
+                    provider=ProviderName.CLAUDE,
+                    window=WindowPeriod.DAY_7,
+                    metrics=UsageMetrics(remaining=50.0, limit=100.0),
+                    updated_at=shared_updated_at,
+                    raw={"status_code": 200},
+                ),
+                ProviderName.CODEX.value: ProviderResult(
+                    provider=ProviderName.CODEX,
+                    window=WindowPeriod.DAY_7,
+                    metrics=UsageMetrics(remaining=50.0, limit=100.0),
+                    updated_at=shared_updated_at,
+                    raw={"status_code": 200},
+                ),
+            },
+            idle_time_by_provider={},
+            idle_active=False,
+            cache_available=True,
+        ),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["show"])
+    assert result.exit_code == 0
+    assert "OPENROUTER" not in result.output
+    assert "OPENAI" not in result.output
+
+    panel_data = _extract_panel_titles_and_bodies(result.output)
+    assert [title for title, _body in panel_data] == ["CLAUDE", "CODEX"]
+    codex_body = [line.strip() for title, body in panel_data if title == "CODEX" for line in body]
+    claude_body = [line.strip() for title, body in panel_data if title == "CLAUDE" for line in body]
+
+    assert codex_body.count("5h") == 1
+    assert codex_body.count("7d") == 1
+    assert claude_body.count("5h") == 1
+    assert claude_body.count("7d") == 1
+    assert sum(line.startswith("Usage:") for line in codex_body) == 2
+    assert sum(line.startswith("Usage:") for line in claude_body) == 2
 
 
 def test_show_fail_panel_uses_status_reason_updated_layout(monkeypatch) -> None:
