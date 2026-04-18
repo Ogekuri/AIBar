@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.32.0](https://github.com/Ogekuri/AIBar/compare/v0.31.0..v0.32.0) - 2026-04-18
+### 🐛  Bug Fixes
+- restore rounded >100 progress caps [useReq] *(gnome-extension)*
+  - add a reproducer for slight and large over-limit rounding
+  - absorb too-thin overflow into the 100% marker for rounded caps
+  - let neutral marker and overflow actors honor shape-class radii
+  - refresh WORKFLOW.md and REFERENCES.md
+
 ## [0.31.0](https://github.com/Ogekuri/AIBar/compare/v0.30.0..v0.31.0) - 2026-04-18
 ### 🐛  Bug Fixes
 - Fix staus bar borders.
@@ -1094,6 +1102,7 @@
 - \[0.29.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.29.0
 - \[0.30.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.30.0
 - \[0.31.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.31.0
+- \[0.32.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.32.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1126,3 +1135,4 @@
 [0.29.0]: https://github.com/Ogekuri/AIBar/compare/v0.28.0..v0.29.0
 [0.30.0]: https://github.com/Ogekuri/AIBar/compare/v0.29.0..v0.30.0
 [0.31.0]: https://github.com/Ogekuri/AIBar/compare/v0.30.0..v0.31.0
+[0.32.0]: https://github.com/Ogekuri/AIBar/compare/v0.31.0..v0.32.0
