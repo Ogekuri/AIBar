@@ -4,4 +4,4 @@
 @details Exposes the package version for the multi-provider usage monitoring application.
 """
 
-__version__ = "0.32.0"
+__version__ = "0.33.0"

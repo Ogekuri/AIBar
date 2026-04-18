@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.33.0](https://github.com/Ogekuri/AIBar/compare/v0.32.0..v0.33.0) - 2026-04-18
+### ⛰️  Features
+- add provider enable flags for show and GNOME [useReq] *(cli)*
+  - add enabled_providers requirements and runtime config
+  - gate show refresh/json/text output by provider flags
+  - hide disabled providers in GNOME extension
+  - extend setup and targeted tests for provider toggles
+
 ## [0.32.0](https://github.com/Ogekuri/AIBar/compare/v0.31.0..v0.32.0) - 2026-04-18
 ### 🐛  Bug Fixes
 - restore rounded >100 progress caps [useReq] *(gnome-extension)*
@@ -1103,6 +1111,7 @@
 - \[0.30.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.30.0
 - \[0.31.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.31.0
 - \[0.32.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.32.0
+- \[0.33.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.33.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1136,3 +1145,4 @@
 [0.30.0]: https://github.com/Ogekuri/AIBar/compare/v0.29.0..v0.30.0
 [0.31.0]: https://github.com/Ogekuri/AIBar/compare/v0.30.0..v0.31.0
 [0.32.0]: https://github.com/Ogekuri/AIBar/compare/v0.31.0..v0.32.0
+[0.33.0]: https://github.com/Ogekuri/AIBar/compare/v0.32.0..v0.33.0
