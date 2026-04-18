@@ -1265,7 +1265,9 @@ class AIBarIndicator extends PanelMenu.Button {
      * while keeping `Updated: ..., Next: ...` freshness output and suppressing
      * usage/reset/quota/cost rows. Successful states render metrics using
      * existing provider-specific card rules, including Copilot
-     * `Cost: <currency_symbol><value>` row.
+     * `Cost: <currency_symbol><value>` row. Dual-window providers preserve
+     * fixed left labels `5h` and `7d`; progress-width geometry recalculation
+     * must not blank those labels.
      * @param {any} card Input parameter `card`.
      * @param {any} providerName Input parameter `providerName`.
      * @param {any} data Input parameter `data`.
@@ -1473,7 +1475,7 @@ class AIBarIndicator extends PanelMenu.Button {
             card.sevenDayBar.container.hide();
             hasWindowBars = true;
         } else {
-            card.fiveHourBar.label.text = '';
+            card.fiveHourBar.label.text = '5h';
             if (fiveHourUtil !== null) {
                 card._barData.fiveHour = {pct: fiveHourUtil, resetTime: fiveHourReset};
                 updateWindowBar(card.fiveHourBar, fiveHourUtil, fiveHourReset, false);
@@ -1485,7 +1487,7 @@ class AIBarIndicator extends PanelMenu.Button {
 
             if (sevenDayUtil !== null) {
                 card._barData.sevenDay = {pct: sevenDayUtil, resetTime: sevenDayReset};
-                card.sevenDayBar.label.text = '';
+                card.sevenDayBar.label.text = '7d';
                 updateWindowBar(card.sevenDayBar, sevenDayUtil, sevenDayReset, true);
                 hasWindowBars = true;
             } else {

@@ -119,6 +119,26 @@ def test_quota_providers_use_30d_window_bar_with_reset_before_credits() -> None:
     assert "card.sevenDayBar.container.hide();" in source
 
 
+def test_dual_window_providers_keep_visible_5h_and_7d_labels() -> None:
+    """
+    @brief Verify Claude and Codex bars keep fixed dual-window side labels.
+    @details Guards the regression where dual-window providers blanked the left
+    label text after card creation, causing `5h` and `7d` to disappear from the
+    popup beside the progress bars. The bar-width geometry helper must not erase
+    the dual-window labels because those labels are independent from fixed-window
+    provider label overrides.
+    @return {None} No return value.
+    @satisfies REQ-017
+    """
+    source = EXTENSION_PATH.read_text(encoding="utf-8")
+    assert "let fiveHourBar = createWindowBar('5h');" in source
+    assert "let sevenDayBar = createWindowBar('7d');" in source
+    assert "card.fiveHourBar.label.text = '5h';" in source
+    assert "card.sevenDayBar.label.text = '7d';" in source
+    assert "card.fiveHourBar.label.text = '';" not in source
+    assert "card.sevenDayBar.label.text = '';" not in source
+
+
 def test_provider_card_cost_rows_use_costs_prefix_style_parity_and_no_empty_row() -> (
     None
 ):

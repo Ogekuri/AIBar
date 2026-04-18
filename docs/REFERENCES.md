@@ -2120,7 +2120,7 @@ Invalid map entries are skipped.
 
 ---
 
-# extension.js | JavaScript | 2352L | 49 symbols | 9 imports | 52 comments
+# extension.js | JavaScript | 2354L | 49 symbols | 9 imports | 52 comments
 > Path: `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`
 - @brief GNOME Shell panel extension for aibar metrics.
 - @details Collects usage JSON from the aibar CLI and renders provider-specific quota/cost cards in the GNOME panel popup.
@@ -2378,14 +2378,16 @@ Space complexity O(1).
 - @param {any} providerName Input parameter `providerName`.
 - @return s {any} Function return value.
 
-### fn `const updateWindowBar = (bar, pct, resetTime, useDays, allowResetPendingHint = true) =>` (L1365-1429)
+### fn `const updateWindowBar = (bar, pct, resetTime, useDays, allowResetPendingHint = true) =>` (L1367-1431)
 - @brief Execute populate provider card.
 - @details Projects provider payload and cached status into one card surface.
 Failed states render a strict block with `Status: FAIL` and `Reason: ...`
 while keeping `Updated: ..., Next: ...` freshness output and suppressing
 usage/reset/quota/cost rows. Successful states render metrics using
 existing provider-specific card rules, including Copilot
-`Cost: <currency_symbol><value>` row.
+`Cost: <currency_symbol><value>` row. Dual-window providers preserve
+fixed left labels `5h` and `7d`; progress-width geometry recalculation
+must not blank those labels.
 - @param {any} card Input parameter `card`.
 - @param {any} providerName Input parameter `providerName`.
 - @param {any} data Input parameter `data`.
@@ -2395,11 +2397,11 @@ existing provider-specific card rules, including Copilot
 - @satisfies REQ-017
 - @satisfies REQ-117
 
-### fn `const setResetLabel = (baseText) =>` (L1371-1377)
+### fn `const setResetLabel = (baseText) =>` (L1373-1379)
 
-### fn `const showResetPendingHint = () =>` (L1384-1386)
+### fn `const showResetPendingHint = () =>` (L1386-1388)
 
-### fn `const toPercent = (value) =>` (L2018-2023)
+### fn `const toPercent = (value) =>` (L2020-2025)
 - @brief Execute update u i.
 - @details Applies update u i logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 Resolves provider-window failure metadata from cache `status` section and forwards it
@@ -2413,9 +2415,9 @@ After card refresh, re-sizes the popup provider viewport to the visible card hei
 - @satisfies REQ-120
 - @satisfies REQ-127
 
-### fn `const getPanelUsageValues = (providerName, data) =>` (L2024-2081)
+### fn `const getPanelUsageValues = (providerName, data) =>` (L2026-2083)
 
-### class `export default class AIBarExtension extends Extension` : Extension (L2326-2352)
+### class `export default class AIBarExtension extends Extension` : Extension (L2328-2354)
 - @brief GNOME extension lifecycle adapter for AIBarIndicator registration.
 - @brief Execute enable.
 - @details Extends Extension (GNOME Shell 45+ API) to integrate with the extension lifecycle.
@@ -2470,12 +2472,12 @@ Uses this.uuid (provided by the Extension base class) as the status-area key.
 |`_applyProgressFillGeometry`|fn||634-682|function _applyProgressFillGeometry(fillActor, background...|
 |`AIBarIndicator`|class||686-985|class AIBarIndicator extends PanelMenu.Button|
 |`createWindowBar`|fn||1133-1179|const createWindowBar = (labelText) =>|
-|`updateWindowBar`|fn||1365-1429|const updateWindowBar = (bar, pct, resetTime, useDays, al...|
-|`setResetLabel`|fn||1371-1377|const setResetLabel = (baseText) =>|
-|`showResetPendingHint`|fn||1384-1386|const showResetPendingHint = () =>|
-|`toPercent`|fn||2018-2023|const toPercent = (value) =>|
-|`getPanelUsageValues`|fn||2024-2081|const getPanelUsageValues = (providerName, data) =>|
-|`AIBarExtension`|class||2326-2352|export default class AIBarExtension extends Extension|
+|`updateWindowBar`|fn||1367-1431|const updateWindowBar = (bar, pct, resetTime, useDays, al...|
+|`setResetLabel`|fn||1373-1379|const setResetLabel = (baseText) =>|
+|`showResetPendingHint`|fn||1386-1388|const showResetPendingHint = () =>|
+|`toPercent`|fn||2020-2025|const toPercent = (value) =>|
+|`getPanelUsageValues`|fn||2026-2083|const getPanelUsageValues = (providerName, data) =>|
+|`AIBarExtension`|class||2328-2354|export default class AIBarExtension extends Extension|
 
 
 ---
