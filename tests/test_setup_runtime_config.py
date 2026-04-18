@@ -1,11 +1,12 @@
 """
 @file
 @brief Setup runtime-config prompt and persistence tests.
-@details Verifies setup prompt order for idle-delay, API-call delay milliseconds,
-API-call timeout milliseconds, default Retry-After seconds, gnome-refresh-interval,
-billing dataset, provider activation flags, Copilot extra premium-request unit
-cost, and per-provider currency symbol fields, then final logging mode fields;
-persists selected values to `~/.config/aibar/config.json`.
+@details Verifies setup prompt order for provider activation flags first, then
+idle-delay, API-call delay milliseconds, API-call timeout milliseconds, default
+Retry-After seconds, gnome-refresh-interval, billing dataset, Copilot extra
+premium-request unit cost, and per-provider currency symbol fields, then final
+logging mode fields; persists selected values to
+`~/.config/aibar/config.json`.
 @satisfies REQ-005
 @satisfies REQ-049
 @satisfies REQ-123
@@ -63,14 +64,14 @@ def test_setup_prompts_runtime_config_before_credentials(
 ) -> None:
     """
     @brief Verify setup prompt order and runtime-config persistence.
-    @details Ensures setup asks `idle-delay` first, `api-call delay` second,
-    `api-call timeout` third, `default-retry-after` fourth,
-    `gnome-refresh-interval` fifth, `billing_data` sixth, provider activation
-    toggles seventh through twelfth in order `claude`, `openrouter`,
-    `copilot`, `codex`, `openai`, `geminiai`, Copilot extra premium-request
-    unit cost thirteenth, then per-provider currency symbols, then GeminiAI
-    OAuth source prompt, provider credential prompts, final logging prompts,
-    then writes all selected values to runtime config JSON.
+    @details Ensures setup asks provider activation toggles first through sixth
+    in order `claude`, `openrouter`, `copilot`, `codex`, `openai`,
+    `geminiai`, then asks `idle-delay` seventh, `api-call delay` eighth,
+    `api-call timeout` ninth, `default-retry-after` tenth,
+    `gnome-refresh-interval` eleventh, `billing_data` twelfth, Copilot extra
+    premium-request unit cost thirteenth, then per-provider currency symbols,
+    then GeminiAI OAuth source prompt, provider credential prompts, final
+    logging prompts, then writes all selected values to runtime config JSON.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
     @param tmp_path {Path} Temporary path fixture.
     @return {None} Function return value.
@@ -82,22 +83,22 @@ def test_setup_prompts_runtime_config_before_credentials(
     """
     config_dir = _patch_config_paths(monkeypatch, tmp_path)
     prompts: list[str] = []
-    # 6 runtime values + 6 provider toggles + Copilot overage + 6 currency
+    # 6 provider toggles + 6 runtime values + Copilot overage + 6 currency
     # symbols + OAuth source + empty credentials + 2 logging modes
     responses = iter(
         [
+            "enable",
+            "enable",
+            "enable",
+            "enable",
+            "enable",
+            "enable",
             450,
             2500,
             5200,
             3600,
             90,
             "billing_data",
-            "enable",
-            "enable",
-            "enable",
-            "enable",
-            "enable",
-            "enable",
             0.04,
             "$",
             "$",
@@ -138,18 +139,18 @@ def test_setup_prompts_runtime_config_before_credentials(
     result = runner.invoke(main, ["setup"])
 
     assert result.exit_code == 0
-    assert prompts[0] == "  idle-delay seconds"
-    assert prompts[1] == "  api-call delay milliseconds"
-    assert prompts[2] == "  api-call timeout milliseconds"
-    assert prompts[3] == "  default-retry-after seconds"
-    assert prompts[4] == "  gnome-refresh-interval seconds"
-    assert prompts[5] == "  billing_data"
-    assert prompts[6] == "  claude statistics mode"
-    assert prompts[7] == "  openrouter statistics mode"
-    assert prompts[8] == "  copilot statistics mode"
-    assert prompts[9] == "  codex statistics mode"
-    assert prompts[10] == "  openai statistics mode"
-    assert prompts[11] == "  geminiai statistics mode"
+    assert prompts[0] == "  claude statistics mode"
+    assert prompts[1] == "  openrouter statistics mode"
+    assert prompts[2] == "  copilot statistics mode"
+    assert prompts[3] == "  codex statistics mode"
+    assert prompts[4] == "  openai statistics mode"
+    assert prompts[5] == "  geminiai statistics mode"
+    assert prompts[6] == "  idle-delay seconds"
+    assert prompts[7] == "  api-call delay milliseconds"
+    assert prompts[8] == "  api-call timeout milliseconds"
+    assert prompts[9] == "  default-retry-after seconds"
+    assert prompts[10] == "  gnome-refresh-interval seconds"
+    assert prompts[11] == "  billing_data"
     assert prompts[12] == "  copilot extra premium request cost (USD/request)"
     assert prompts[13] == "  claude currency symbol"
     assert prompts[14] == "  openai currency symbol"
@@ -235,18 +236,18 @@ def test_setup_accepts_geminiai_oauth_json_paste_and_persists_runtime_fields(
 
     responses = iter(
         [
+            "enable",
+            "enable",
+            "enable",
+            "enable",
+            "enable",
+            "enable",
             300,
             1000,
             5000,
             3600,
             60,
             "billing_data",
-            "enable",
-            "enable",
-            "enable",
-            "enable",
-            "enable",
-            "enable",
             0.04,
             "$",
             "$",
@@ -377,18 +378,18 @@ def test_setup_geminiai_oauth_login_source_reauthorizes_with_current_scopes(
 
     responses = iter(
         [
+            "enable",
+            "enable",
+            "enable",
+            "enable",
+            "enable",
+            "enable",
             300,
             1000,
             5000,
             3600,
             60,
             "billing_data",
-            "enable",
-            "enable",
-            "enable",
-            "enable",
-            "enable",
-            "enable",
             0.04,
             "$",
             "$",

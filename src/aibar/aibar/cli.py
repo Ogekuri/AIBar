@@ -4264,10 +4264,10 @@ def env() -> None:
 def setup() -> None:
     """
     @brief Execute setup.
-    @details Prompts for `idle_delay_seconds`, `api_call_delay_milliseconds`,
+    @details Prompts dedicated provider-activation section first, then prompts
+    `idle_delay_seconds`, `api_call_delay_milliseconds`,
     `api_call_timeout_milliseconds`, `default_retry_after_seconds`,
     `gnome_refresh_interval_seconds`, and `billing_data` in order, then prompts
-    dedicated provider-activation section after `billing_data`, then prompts
     dedicated Copilot overage pricing field `copilot_extra_premium_request_cost`
     (USD/request), then prompts provider currency symbols including `geminiai`
     (choices: `$`, `£`, `€`, default `$`), then persists all values to
@@ -4307,6 +4307,32 @@ def setup() -> None:
     click.echo()
 
     runtime_config = load_runtime_config()
+    click.echo(click.style("Provider activation", bold=True))
+    click.echo("  Configure whether each provider participates in refresh and UI output.")
+    configured_enabled_providers = resolve_enabled_providers(runtime_config)
+    activation_provider_order = [
+        ProviderName.CLAUDE,
+        ProviderName.OPENROUTER,
+        ProviderName.COPILOT,
+        ProviderName.CODEX,
+        ProviderName.OPENAI,
+        ProviderName.GEMINIAI,
+    ]
+    enabled_providers: dict[str, bool] = {}
+    for activation_provider in activation_provider_order:
+        activation_default = (
+            "enable"
+            if configured_enabled_providers.get(activation_provider.value, True)
+            else "disable"
+        )
+        activation_mode = click.prompt(
+            f"  {activation_provider.value} statistics mode",
+            type=click.Choice(["enable", "disable"]),
+            default=activation_default,
+            show_choices=True,
+        )
+        enabled_providers[activation_provider.value] = activation_mode == "enable"
+    click.echo()
     click.echo(click.style("Runtime throttling", bold=True))
     click.echo(
         "  idle-delay controls cache-only mode duration after successful refresh."
@@ -4354,32 +4380,6 @@ def setup() -> None:
         ).strip()
         or runtime_config.billing_data
     )
-    click.echo()
-    click.echo(click.style("Provider activation", bold=True))
-    click.echo("  Configure whether each provider participates in refresh and UI output.")
-    configured_enabled_providers = resolve_enabled_providers(runtime_config)
-    activation_provider_order = [
-        ProviderName.CLAUDE,
-        ProviderName.OPENROUTER,
-        ProviderName.COPILOT,
-        ProviderName.CODEX,
-        ProviderName.OPENAI,
-        ProviderName.GEMINIAI,
-    ]
-    enabled_providers: dict[str, bool] = {}
-    for activation_provider in activation_provider_order:
-        activation_default = (
-            "enable"
-            if configured_enabled_providers.get(activation_provider.value, True)
-            else "disable"
-        )
-        activation_mode = click.prompt(
-            f"  {activation_provider.value} statistics mode",
-            type=click.Choice(["enable", "disable"]),
-            default=activation_default,
-            show_choices=True,
-        )
-        enabled_providers[activation_provider.value] = activation_mode == "enable"
     click.echo()
     click.echo(click.style("Copilot premium overage", bold=True))
     click.echo(
