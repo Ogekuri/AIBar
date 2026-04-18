@@ -62,6 +62,15 @@ const PROGRESS_SEGMENT_SHAPE_CLASSES = Object.freeze([
     'aibar-progress-shape-left',
     'aibar-progress-shape-right',
 ]);
+/**
+ * @brief Minimum overflow width that can render its own rounded right cap.
+ * @details Overflow widths below this threshold are absorbed into the fixed
+ * 100%-boundary marker so slightly-over-limit bars keep a visible rounded end
+ * without forcing a 1px neutral segment to carry the right-edge radius. Time
+ * complexity O(1). Space complexity O(1).
+ * @satisfies REQ-121
+ */
+const PROGRESS_ROUNDED_END_MIN_WIDTH_PX = 3;
 
 /**
  * @brief Resolve provider label text for GNOME tab/card rendering.
@@ -552,8 +561,11 @@ function _applyProgressSegmentRadii(fillActor, markerActor, overLimitActor, fill
  * background width. Percentages up to `100` render provider-color fill plus background.
  * Percentages above `100` render a provider-color base segment, a fixed 2px 100%
  * boundary marker, and a neutral over-limit segment scaled across the extra `0..100`
- * range and clamped for larger values. The helper preserves side-label layout by
- * never exceeding the background width. Time complexity O(1). Space complexity O(1).
+ * range and clamped for larger values. When the neutral overflow segment is too
+ * thin to render a visible rounded end cap, its width is absorbed into the marker
+ * so the right edge stays rounded without widening the bar. The helper preserves
+ * side-label layout by never exceeding the background width. Time complexity O(1).
+ * Space complexity O(1).
  * @param {St.Widget} fillActor Progress fill widget receiving width updates.
  * @param {St.Widget} backgroundActor Progress background widget providing max width.
  * @param {number} pct Usage percentage value.
@@ -572,6 +584,7 @@ function _applyProgressFillGeometry(fillActor, backgroundActor, pct) {
     const normalizedPct = Number.isFinite(numericPct) ? Math.max(0, numericPct) : 0;
     const isOverLimit = normalizedPct > 100;
     const markerWidth = isOverLimit ? Math.min(2, bgWidth) : 0;
+    let effectiveMarkerWidth = markerWidth;
     let fillWidth = Math.round((Math.min(normalizedPct, 100) / 100) * bgWidth);
     let overLimitWidth = 0;
 
@@ -583,13 +596,20 @@ function _applyProgressFillGeometry(fillActor, backgroundActor, pct) {
             overLimitWidth = Math.max(1, overLimitWidth);
         overLimitWidth = Math.min(availableWidth, overLimitWidth);
         fillWidth = Math.max(0, availableWidth - overLimitWidth);
+        if (
+            overLimitWidth > 0 &&
+            overLimitWidth < PROGRESS_ROUNDED_END_MIN_WIDTH_PX
+        ) {
+            effectiveMarkerWidth = Math.min(bgWidth, markerWidth + overLimitWidth);
+            overLimitWidth = 0;
+        }
     }
 
-    _applyProgressSegmentRadii(fillActor, markerActor, overLimitActor, fillWidth, markerWidth, overLimitWidth);
+    _applyProgressSegmentRadii(fillActor, markerActor, overLimitActor, fillWidth, effectiveMarkerWidth, overLimitWidth);
     fillActor.set_width(Math.max(0, fillWidth));
     if (markerActor) {
-        markerActor.set_width(markerWidth);
-        if (markerWidth > 0)
+        markerActor.set_width(effectiveMarkerWidth);
+        if (effectiveMarkerWidth > 0)
             markerActor.show();
         else
             markerActor.hide();

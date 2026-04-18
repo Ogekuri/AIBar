@@ -670,7 +670,7 @@ def test_progress_bar_handles_percentages_over_100() -> None:
     assert "firstVisible.add_style_class_name('aibar-progress-shape-left');" in source
     assert "lastVisible.add_style_class_name('aibar-progress-shape-right');" in source
     assert "visibleSegments[0].actor.add_style_class_name('aibar-progress-shape-full');" in source
-    assert "_applyProgressSegmentRadii(fillActor, markerActor, overLimitActor, fillWidth, markerWidth, overLimitWidth);" in source
+    assert "_applyProgressSegmentRadii(fillActor, markerActor, overLimitActor, fillWidth, effectiveMarkerWidth, overLimitWidth);" in source
     assert "_applyProgressFillGeometry(bar.barFill, bar.barBg, pct);" in source
     assert "_applyProgressFillGeometry(card.progressFill, card.progressBg, pct);" in source
 
@@ -685,6 +685,31 @@ def test_progress_bar_handles_percentages_over_100() -> None:
     assert "border-radius: 0 3px 3px 0;" in stylesheet_source
     assert "width: 34px;" in stylesheet_source
     assert "width: 56px;" in stylesheet_source
+
+
+def test_progress_bar_rounding_handles_small_and_large_overflow_segments() -> None:
+    """
+    @brief Verify GNOME over-limit rounding keeps a visible rounded right cap.
+    @details Reproduces the status-bar defect where percentages slightly above
+    `100` assigned the right edge to a too-thin neutral overflow segment while
+    the neutral actor stylesheet forced that segment back to square corners.
+    Requires runtime geometry logic that absorbs sub-roundable overflow into the
+    100%-boundary marker and stylesheet selectors that allow marker and neutral
+    overflow actors to honor right-edge shape classes.
+    @satisfies REQ-121
+    @satisfies TST-052
+    """
+    source = EXTENSION_PATH.read_text(encoding="utf-8")
+    assert "const PROGRESS_ROUNDED_END_MIN_WIDTH_PX = 3;" in source
+    assert "let effectiveMarkerWidth = markerWidth;" in source
+    assert "overLimitWidth > 0 &&" in source
+    assert "overLimitWidth < PROGRESS_ROUNDED_END_MIN_WIDTH_PX" in source
+    assert "effectiveMarkerWidth = Math.min(bgWidth, markerWidth + overLimitWidth);" in source
+    assert "overLimitWidth = 0;" in source
+
+    stylesheet_source = STYLESHEET_PATH.read_text(encoding="utf-8")
+    assert ".aibar-progress-marker.aibar-progress-shape-right," in stylesheet_source
+    assert ".aibar-progress-over-limit-fill.aibar-progress-shape-right {" in stylesheet_source
 
 
 def test_over_limit_styles_use_visible_neutral_contrast() -> None:

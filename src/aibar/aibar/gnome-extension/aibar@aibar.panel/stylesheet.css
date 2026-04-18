@@ -235,6 +235,35 @@
     height: 6px;
 }
 
+/**
+ * @brief Re-enable shape-class radii for neutral over-limit progress actors.
+ * @details Marker and overflow actors keep square defaults in their base rules,
+ * so these higher-specificity selectors restore the intended rounded caps when
+ * runtime geometry assigns `aibar-progress-shape-*` classes. This preserves a
+ * rounded right edge for both slight-overflow marker absorption and larger
+ * neutral overflow segments.
+ * @satisfies REQ-121
+ */
+.aibar-progress-marker.aibar-progress-shape-none,
+.aibar-progress-over-limit-fill.aibar-progress-shape-none {
+    border-radius: 0;
+}
+
+.aibar-progress-marker.aibar-progress-shape-full,
+.aibar-progress-over-limit-fill.aibar-progress-shape-full {
+    border-radius: 3px;
+}
+
+.aibar-progress-marker.aibar-progress-shape-left,
+.aibar-progress-over-limit-fill.aibar-progress-shape-left {
+    border-radius: 3px 0 0 3px;
+}
+
+.aibar-progress-marker.aibar-progress-shape-right,
+.aibar-progress-over-limit-fill.aibar-progress-shape-right {
+    border-radius: 0 3px 3px 0;
+}
+
 .aibar-progress-provider-claude {
     background-color: #FF3B30;
 }
