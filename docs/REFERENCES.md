@@ -1480,9 +1480,9 @@ freshness line (`Updated: ..., Next: ...`) using provider freshness state.
 - @satisfies REQ-131
 - @satisfies REQ-132
 
-### fn `def _build_result_panel(` `priv` (L3785-3968)
+### fn `def _build_result_panel(` `priv` (L3785-3974)
 - @brief Build one provider panel title/body payload for CLI text rendering.
-- @details Formats deterministic panel lines for one provider/window result and preserves provider-specific metrics/error rendering rules used by `show`. `FAIL` states emit `Status: FAIL`, `Reason: <reason>`, and `Updated/Next` separated by blank lines. `OK` states emit `Status: OK` first, render `claude/openrouter/copilot/codex` usage rows as `Usage: <window> <progress_bar> <percent>%`, render `openai/geminiai` usage rows as `Usage: <window> <percent>%`, do not emit `Window <window>` headings, insert one blank separator between Copilot `Remaining credits` and `Cost` rows, and end with one right-aligned freshness line.
+- @details Formats deterministic panel lines for one provider/window result and preserves provider-specific metrics/error rendering rules used by `show`. `FAIL` states emit `Status: FAIL`, `Reason: <reason>`, and `Updated/Next` separated by blank lines. `OK` states emit `Status: OK` first, render `claude/openrouter/copilot/codex` usage rows as `Usage: <window> <progress_bar> <percent>%`, render `openai/geminiai` usage rows as `Usage: <window> <percent>%`, default OpenRouter usage display to `0.0%` when quota inputs are unavailable so the CLI stays aligned with GNOME single-window progress-bar behavior, do not emit `Window <window>` headings, insert one blank separator between Copilot `Remaining credits` and `Cost` rows, and end with one right-aligned freshness line.
 - @param name {ProviderName} Provider name enum value.
 - @param result {ProviderResult} Provider result to render.
 - @param label {str | None} Optional window label suffix (e.g. `"5h"`, `"7d"`).
@@ -1500,14 +1500,14 @@ freshness line (`Updated: ..., Next: ...`) using provider freshness state.
 - @satisfies REQ-131
 - @satisfies REQ-132
 
-### fn `def _format_billing_service_descriptions(services: list[object]) -> str | None` `priv` (L3969-3996)
+### fn `def _format_billing_service_descriptions(services: list[object]) -> str | None` `priv` (L3975-4002)
 - @brief Build human-readable GeminiAI billing service summary.
 - @details Extracts ordered `service_description` values from billing service entries and returns all valid names in source order as one comma-separated summary string.
 - @param services {list[object]} Billing service entries from GeminiAI raw billing payload.
 - @return {str | None} Comma-separated service names summary without surrounding parentheses, or `None` when no valid names exist.
 - @satisfies REQ-106
 
-### fn `def _build_dual_window_section(` `priv` (L3997-4014)
+### fn `def _build_dual_window_section(` `priv` (L4003-4020)
 - @brief Build one labeled dual-window CLI section.
 - @details Prepends the raw window label (`5h` or `7d`) to the ordered detail lines for one Claude/Codex section. The helper intentionally preserves duplicate metric text across sections so identical `Usage` or `Resets in` rows remain visible in both windows.
 - @param window_label {str} Window label text rendered as the section heading.
@@ -1515,7 +1515,7 @@ freshness line (`Updated: ..., Next: ...`) using provider freshness state.
 - @return {list[str]} Section heading followed by the provided detail lines.
 - @satisfies REQ-002
 
-### fn `def _build_dual_window_panel(` `priv` (L4015-4124)
+### fn `def _build_dual_window_panel(` `priv` (L4021-4130)
 - @brief Build one grouped CLI panel for dual-window providers.
 - @details Produces one provider panel from `5h` and `7d` results while keeping explicit `5h` and `7d` section labels and preserving duplicate section content when both windows render identical metric text. `FAIL` states emit `Status: FAIL`, `Reason: <reason>`, and `Updated/Next` separated by blank lines. `OK` states emit `Status: OK` first, preserve usage rows formatted as `Usage: <window> <progress_bar> <percent>%`, avoid `Window <window>` headings, and append one trailing right-aligned freshness line.
 - @param name {ProviderName} Provider enum value.
@@ -1530,7 +1530,7 @@ freshness line (`Updated: ..., Next: ...`) using provider freshness state.
 - @satisfies REQ-128
 - @satisfies REQ-129
 
-### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L4125-4149)
+### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L4131-4155)
 - @brief Render CLI text output for one provider result.
 - @details Formats provider-specific usage text, reset countdown, remaining credits, cost, requests, and token counts for one provider/window result. `openai/geminiai` usage rows omit progress bars while other providers keep existing bar rendering. Cost is formatted using `metrics.currency_symbol` (never hardcoded `$`).
 - @param name {ProviderName} Provider name enum value.
@@ -1546,15 +1546,15 @@ freshness line (`Updated: ..., Next: ...`) using provider freshness state.
 - @satisfies REQ-131
 - @satisfies REQ-132
 
-### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L4150-4165)
+### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L4156-4171)
 - @brief Execute format reset duration.
 - @details Applies format reset duration logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param seconds {float} Input parameter `seconds`.
 - @return {str} Function return value.
 
-### fn `def _should_print_claude_reset_pending_hint(` `priv` (L4166-4187)
+### fn `def _should_print_claude_reset_pending_hint(` `priv` (L4172-4193)
 
-### fn `def _is_displayed_zero_percent(percent: float | None) -> bool` `priv` (L4188-4204)
+### fn `def _is_displayed_zero_percent(percent: float | None) -> bool` `priv` (L4194-4210)
 - @brief Determine whether CLI output must render the reset-pending fallback hint.
 - @brief Check whether a percentage renders as `0.0%` in one-decimal UI output.
 - @details The hint is only valid for Claude windows when no reset timestamp is
@@ -1570,7 +1570,7 @@ providers other than Claude.
 - @satisfies REQ-002
 - @satisfies REQ-002
 
-### fn `def _progress_bar_layout(percent: float, width: int) -> tuple[int, int, int]` `priv` (L4205-4237)
+### fn `def _progress_bar_layout(percent: float, width: int) -> tuple[int, int, int]` `priv` (L4211-4243)
 - @brief Compute fixed-width CLI progress-bar segment widths.
 - @details Normalizes `percent` to a non-negative finite value. Percentages up to `100` allocate provider-color fill plus empty cells. Percentages above `100` allocate one 100%-boundary marker cell and one over-limit segment scaled across the extra `0..100` range, clamped for larger values, and forced visible for any positive over-limit usage. Time complexity O(1). Space complexity O(1).
 - @param percent {float} Raw usage percentage.
@@ -1578,7 +1578,7 @@ providers other than Claude.
 - @return {tuple[int, int, int]} Tuple `(base_width, over_limit_width, marker_width)`.
 - @satisfies REQ-122
 
-### fn `def _progress_bar(percent: float, provider_name: ProviderName, width: int = 20) -> str` `priv` (L4238-4262)
+### fn `def _progress_bar(percent: float, provider_name: ProviderName, width: int = 20) -> str` `priv` (L4244-4268)
 - @brief Render one fixed-width CLI usage bar.
 - @details Uses provider-color fill for in-limit usage. Percentages above `100` preserve fixed bar width by rendering a bright-white `|` marker at the 100% boundary and a neutral shaded over-limit segment (`▓`) inside the same bar. Time complexity O(width). Space complexity O(width).
 - @param percent {float} Raw usage percentage.
@@ -1773,26 +1773,26 @@ providers other than Claude.
 |`_build_copilot_extra_premium_cost_line`|fn|priv|3769-3784|def _build_copilot_extra_premium_cost_line(result: Provid...|
 |`_should_render_cli_progress_bar`|fn|priv|3425-3446|def _should_render_cli_progress_bar(provider_name: Provid...|
 |`_build_cli_usage_line`|fn|priv|3447-3471|def _build_cli_usage_line(|
-|`_build_result_panel`|fn|priv|3785-3968|def _build_result_panel(|
-|`_format_billing_service_descriptions`|fn|priv|3969-3996|def _format_billing_service_descriptions(services: list[o...|
-|`_build_dual_window_section`|fn|priv|3997-4014|def _build_dual_window_section(|
-|`_build_dual_window_panel`|fn|priv|4015-4124|def _build_dual_window_panel(|
-|`_print_result`|fn|priv|4125-4149|def _print_result(name: ProviderName, result, label: str ...|
-|`_format_reset_duration`|fn|priv|4150-4165|def _format_reset_duration(seconds: float) -> str|
-|`_should_print_claude_reset_pending_hint`|fn|priv|4166-4187|def _should_print_claude_reset_pending_hint(|
-|`_is_displayed_zero_percent`|fn|priv|4188-4204|def _is_displayed_zero_percent(percent: float | None) -> ...|
-|`_progress_bar_layout`|fn|priv|4205-4237|def _progress_bar_layout(percent: float, width: int) -> t...|
-|`_progress_bar`|fn|priv|4238-4262|def _progress_bar(percent: float, provider_name: Provider...|
-|`doctor`|fn|pub|4267-4319|def doctor() -> None|
-|`env`|fn|pub|4324-4332|def env() -> None|
-|`setup`|fn|pub|4337-4536|def setup() -> None|
-|`login`|fn|pub|4709-4727|def login(provider: str) -> None|
-|`_login_claude`|fn|priv|4728-4776|def _login_claude() -> None|
-|`_login_copilot`|fn|priv|4777-4804|def _login_copilot() -> None|
-|`_login_geminiai`|fn|priv|4805-4843|def _login_geminiai() -> None|
-|`_resolve_extension_source_dir`|fn|priv|4844-4856|def _resolve_extension_source_dir() -> Path|
-|`gnome_install`|fn|pub|4867-4993|def gnome_install() -> None|
-|`gnome_uninstall`|fn|pub|5003-5072|def gnome_uninstall() -> None|
+|`_build_result_panel`|fn|priv|3785-3974|def _build_result_panel(|
+|`_format_billing_service_descriptions`|fn|priv|3975-4002|def _format_billing_service_descriptions(services: list[o...|
+|`_build_dual_window_section`|fn|priv|4003-4020|def _build_dual_window_section(|
+|`_build_dual_window_panel`|fn|priv|4021-4130|def _build_dual_window_panel(|
+|`_print_result`|fn|priv|4131-4155|def _print_result(name: ProviderName, result, label: str ...|
+|`_format_reset_duration`|fn|priv|4156-4171|def _format_reset_duration(seconds: float) -> str|
+|`_should_print_claude_reset_pending_hint`|fn|priv|4172-4193|def _should_print_claude_reset_pending_hint(|
+|`_is_displayed_zero_percent`|fn|priv|4194-4210|def _is_displayed_zero_percent(percent: float | None) -> ...|
+|`_progress_bar_layout`|fn|priv|4211-4243|def _progress_bar_layout(percent: float, width: int) -> t...|
+|`_progress_bar`|fn|priv|4244-4268|def _progress_bar(percent: float, provider_name: Provider...|
+|`doctor`|fn|pub|4273-4325|def doctor() -> None|
+|`env`|fn|pub|4330-4338|def env() -> None|
+|`setup`|fn|pub|4343-4542|def setup() -> None|
+|`login`|fn|pub|4715-4733|def login(provider: str) -> None|
+|`_login_claude`|fn|priv|4734-4782|def _login_claude() -> None|
+|`_login_copilot`|fn|priv|4783-4810|def _login_copilot() -> None|
+|`_login_geminiai`|fn|priv|4811-4849|def _login_geminiai() -> None|
+|`_resolve_extension_source_dir`|fn|priv|4850-4862|def _resolve_extension_source_dir() -> Path|
+|`gnome_install`|fn|pub|4873-4999|def gnome_install() -> None|
+|`gnome_uninstall`|fn|pub|5009-5078|def gnome_uninstall() -> None|
 
 
 ---

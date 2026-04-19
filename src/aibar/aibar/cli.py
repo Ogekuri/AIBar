@@ -3796,7 +3796,9 @@ def _build_result_panel(
     separated by blank lines. `OK` states emit `Status: OK` first, render
     `claude/openrouter/copilot/codex` usage rows as
     `Usage: <window> <progress_bar> <percent>%`, render `openai/geminiai`
-    usage rows as `Usage: <window> <percent>%`, do not emit `Window <window>`
+    usage rows as `Usage: <window> <percent>%`, default OpenRouter usage display
+    to `0.0%` when quota inputs are unavailable so the CLI stays aligned with
+    GNOME single-window progress-bar behavior, do not emit `Window <window>`
     headings, insert one blank separator between Copilot `Remaining credits`
     and `Cost` rows, and end with one right-aligned freshness line.
     @param name {ProviderName} Provider name enum value.
@@ -3837,10 +3839,14 @@ def _build_result_panel(
     )
 
     m = result.metrics
-    if m.usage_percent is not None:
-        pct = m.usage_percent
+    usage_percent = m.usage_percent
+    if usage_percent is None and name == ProviderName.OPENROUTER:
+        usage_percent = 0.0
+    if usage_percent is not None:
         usage_window_label = label or result.window.value
-        detail_lines.append(_build_cli_usage_line(name, usage_window_label, pct))
+        detail_lines.append(
+            _build_cli_usage_line(name, usage_window_label, usage_percent)
+        )
 
     if m.reset_at:
         delta = m.reset_at - datetime.now(timezone.utc)

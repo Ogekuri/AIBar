@@ -405,6 +405,31 @@ def test_build_result_panel_renders_progress_bar_usage_for_openrouter() -> None:
     assert "▓" not in usage_line
 
 
+def test_build_result_panel_defaults_openrouter_usage_to_zero_percent() -> None:
+    """
+    @brief Verify OpenRouter CLI output preserves the GNOME-aligned zero-percent fallback.
+    @details Builds an OK-state OpenRouter panel with missing quota inputs so
+    `metrics.usage_percent` resolves to `None`. Asserts CLI rendering still emits
+    `Usage: 30d <progress_bar> 0.0%`, matching the GNOME provider-card fallback
+    used for single-window bar providers.
+    @return {None} Function return value.
+    @satisfies REQ-132
+    @satisfies TST-059
+    """
+    result_payload = ProviderResult(
+        provider=ProviderName.OPENROUTER,
+        window=WindowPeriod.DAY_30,
+        metrics=UsageMetrics(cost=0.0, requests=0, input_tokens=0, output_tokens=0),
+        raw={"status_code": 200},
+    )
+    _title, lines = _build_result_panel(ProviderName.OPENROUTER, result_payload)
+    usage_line = next(line for line in lines if line.startswith("Usage:"))
+    assert usage_line.startswith("Usage: 30d [")
+    assert usage_line.endswith(" 0.0%")
+    assert "█" not in usage_line
+    assert "░" in usage_line
+
+
 def test_build_result_panel_renders_text_only_usage_for_openai_and_geminiai() -> None:
     """
     @brief Verify OpenAI and GeminiAI usage rows omit CLI progress bars.
