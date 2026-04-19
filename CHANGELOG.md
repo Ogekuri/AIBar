@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.36.0](https://github.com/Ogekuri/AIBar/compare/v0.35.0..v0.36.0) - 2026-04-19
+### ⛰️  Features
+- preserve canonical provider order across surfaces [useReq] *(cli)*
+  - add REQ-133 for stable provider ordering after disabled-provider filtering
+  - keep CLI panels and GNOME tabs/status labels on the canonical provider sequence
+  - refresh workflow and references traceability for the new ordering helpers
+
 ## [0.35.0](https://github.com/Ogekuri/AIBar/compare/v0.34.0..v0.35.0) - 2026-04-19
 ### 🐛  Bug Fixes
 - restore openrouter reset spacing in show output [useReq] *(cli)*
@@ -1159,6 +1166,7 @@
 - \[0.33.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.33.0
 - \[0.34.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.34.0
 - \[0.35.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.35.0
+- \[0.36.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.36.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1195,3 +1203,4 @@
 [0.33.0]: https://github.com/Ogekuri/AIBar/compare/v0.32.0..v0.33.0
 [0.34.0]: https://github.com/Ogekuri/AIBar/compare/v0.33.0..v0.34.0
 [0.35.0]: https://github.com/Ogekuri/AIBar/compare/v0.34.0..v0.35.0
+[0.36.0]: https://github.com/Ogekuri/AIBar/compare/v0.35.0..v0.36.0
