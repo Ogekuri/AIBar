@@ -3422,14 +3422,37 @@ def _provider_supports_api_counters(provider_name: ProviderName) -> bool:
     return provider_name in _API_COUNTER_PROVIDERS
 
 
+def _should_render_cli_progress_bar(provider_name: ProviderName) -> bool:
+    """
+    @brief Determine whether one CLI usage row must include a progress bar.
+    @details Returns true only for providers whose CLI `show` rows use the
+    fixed-width bracketed progress-bar surface: `claude`, `openrouter`,
+    `copilot`, and `codex`. Returns false for `openai` and `geminiai`, which
+    render text-only usage rows. Time complexity O(1). Space complexity O(1).
+    @param provider_name {ProviderName} Provider enum key.
+    @return {bool} True when CLI usage rendering must include bar glyphs.
+    @satisfies REQ-122
+    @satisfies REQ-128
+    @satisfies REQ-131
+    @satisfies REQ-132
+    """
+    return provider_name in (
+        ProviderName.CLAUDE,
+        ProviderName.OPENROUTER,
+        ProviderName.COPILOT,
+        ProviderName.CODEX,
+    )
+
+
 def _build_cli_usage_line(
     provider_name: ProviderName, window_label: str, percent: float
 ) -> str:
     """
     @brief Build one CLI usage row with provider-specific progress-bar policy.
-    @details Returns `Usage: <window> <progress_bar> <percent>%` for
-    `claude/openrouter/copilot/codex`. Returns `Usage: <window> <percent>%`
-    for `openai/geminiai` so those providers omit progress-bar glyphs while
+    @details Uses `_should_render_cli_progress_bar(...)` to emit
+    `Usage: <window> <progress_bar> <percent>%` for `claude`, `openrouter`,
+    `copilot`, and `codex`. Returns `Usage: <window> <percent>%` for
+    `openai/geminiai` so those providers omit progress-bar glyphs while
     preserving explicit window and percentage text. Time complexity O(W) when a
     progress bar is rendered and O(1) otherwise. Space complexity O(W) when a
     progress bar is rendered and O(1) otherwise.
@@ -3439,8 +3462,9 @@ def _build_cli_usage_line(
     @return {str} Rendered CLI usage row.
     @satisfies REQ-128
     @satisfies REQ-131
+    @satisfies REQ-132
     """
-    if provider_name in (ProviderName.OPENAI, ProviderName.GEMINIAI):
+    if not _should_render_cli_progress_bar(provider_name):
         return f"Usage: {window_label} {percent:.1f}%"
     return f"Usage: {window_label} {_progress_bar(percent, provider_name)} {percent:.1f}%"
 
@@ -3793,6 +3817,7 @@ def _build_result_panel(
     @satisfies REQ-128
     @satisfies REQ-129
     @satisfies REQ-131
+    @satisfies REQ-132
     """
     title = _provider_display_name(name)
     if label:
@@ -4116,6 +4141,7 @@ def _print_result(name: ProviderName, result, label: str | None = None) -> None:
     @satisfies REQ-128
     @satisfies REQ-129
     @satisfies REQ-131
+    @satisfies REQ-132
     """
     title, lines = _build_result_panel(name, result, label)
     _emit_provider_panel(provider_name=name, title=title, body_lines=lines)

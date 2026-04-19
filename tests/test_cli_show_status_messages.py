@@ -378,6 +378,33 @@ def test_build_result_panel_renders_zero_api_counters_for_null_metrics() -> None
         assert "Tokens: 0 (0 in / 0 out)" in lines
 
 
+def test_build_result_panel_renders_progress_bar_usage_for_openrouter() -> None:
+    """
+    @brief Verify OpenRouter usage rows keep the standard CLI progress-bar format.
+    @details Builds an OK-state OpenRouter panel with explicit quota metrics and
+    asserts output keeps `Usage: <window> <progress_bar> <percent>%` with the
+    same bracketed glyph surface used by other CLI bar-enabled providers.
+    @return {None} Function return value.
+    @satisfies REQ-132
+    @satisfies TST-059
+    """
+    result_payload = ProviderResult(
+        provider=ProviderName.OPENROUTER,
+        window=WindowPeriod.DAY_30,
+        metrics=UsageMetrics(remaining=57.5, limit=100.0),
+        raw={"status_code": 200},
+    )
+    _title, lines = _build_result_panel(ProviderName.OPENROUTER, result_payload)
+    usage_line = next(line for line in lines if line.startswith("Usage:"))
+    assert usage_line.startswith("Usage: 30d [")
+    assert usage_line.endswith(" 42.5%")
+    assert "[" in usage_line
+    assert "]" in usage_line
+    assert "█" in usage_line
+    assert "░" in usage_line
+    assert "▓" not in usage_line
+
+
 def test_build_result_panel_renders_text_only_usage_for_openai_and_geminiai() -> None:
     """
     @brief Verify OpenAI and GeminiAI usage rows omit CLI progress bars.
