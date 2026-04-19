@@ -288,7 +288,7 @@ from typing import Any
 
 ---
 
-# cli.py | Python | 5150L | 137 symbols | 31 imports | 154 comments
+# cli.py | Python | 5167L | 138 symbols | 31 imports | 155 comments
 > Path: `src/aibar/aibar/cli.py`
 - @brief Command-line interface for aibar.
 - @details Defines command parsing, provider dispatch, formatted output, setup helpers, login flows, and UI launch hooks.
@@ -1284,20 +1284,28 @@ After refresh, the in-memory cache document is used directly without a second re
 - @satisfies REQ-067
 - @satisfies TST-030
 
-### fn `def _provider_panel_color_code(provider_name: ProviderName) -> str` `priv` (L3433-3442)
+### fn `def _ordered_rendered_panels(` `priv` (L3433-3448)
+- @brief Order rendered CLI provider panels by canonical provider sequence.
+- @details Sorts the already-filtered CLI render queue with `_provider_panel_sort_key(...)` so visible panels keep stable `claude/openrouter/copilot/codex/openai/geminiai` ordering regardless of which disabled providers were removed earlier. Time complexity O(P log P). Space complexity O(P).
+- @param rendered_panels {list[tuple[ProviderName, str, list[str]]]} CLI render queue after provider filtering.
+- @return {list[tuple[ProviderName, str, list[str]]]} New render queue in canonical provider order.
+- @satisfies REQ-067
+- @satisfies REQ-133
+
+### fn `def _provider_panel_color_code(provider_name: ProviderName) -> str` `priv` (L3450-3459)
 - @brief Resolve ANSI color code for one provider output surface.
 - @param provider_name {ProviderName} Provider enum key.
 - @return {str} ANSI foreground color code.
 - @satisfies REQ-067
 
-### fn `def _provider_supports_api_counters(provider_name: ProviderName) -> bool` `priv` (L3443-3454)
+### fn `def _provider_supports_api_counters(provider_name: ProviderName) -> bool` `priv` (L3460-3471)
 - @brief Determine whether provider panels always render API counter lines.
 - @details Returns true for providers that expose requests/token counters in CLI and GNOME output surfaces, enforcing null-to-zero normalization.
 - @param provider_name {ProviderName} Provider enum key.
 - @return {bool} True when requests/tokens lines must render on OK state.
 - @satisfies REQ-036
 
-### fn `def _should_render_cli_progress_bar(provider_name: ProviderName) -> bool` `priv` (L3455-3476)
+### fn `def _should_render_cli_progress_bar(provider_name: ProviderName) -> bool` `priv` (L3472-3493)
 - @brief Determine whether one CLI usage row must include a progress bar.
 - @details Returns true only for providers whose CLI `show` rows use the fixed-width bracketed progress-bar surface: `claude`, `openrouter`, `copilot`, and `codex`. Returns false for `openai` and `geminiai`, which render text-only usage rows. Time complexity O(1). Space complexity O(1).
 - @param provider_name {ProviderName} Provider enum key.
@@ -1741,12 +1749,13 @@ providers other than Claude.
 |`show`|fn|pub|3192-3391|def show(provider: str, window: str, output_json: bool, f...|
 |`_provider_display_name`|fn|priv|3402-3416|def _provider_display_name(provider_name: ProviderName) -...|
 |`_provider_panel_sort_key`|fn|priv|3417-3432|def _provider_panel_sort_key(provider_name: ProviderName)...|
-|`_provider_panel_color_code`|fn|priv|3433-3442|def _provider_panel_color_code(provider_name: ProviderNam...|
-|`_provider_supports_api_counters`|fn|priv|3443-3454|def _provider_supports_api_counters(provider_name: Provid...|
-|`_should_render_cli_progress_bar`|fn|priv|3455-3476|def _should_render_cli_progress_bar(provider_name: Provid...|
-|`_build_cli_usage_line`|fn|priv|3477-3478|def _build_cli_usage_line(|
-|`_strip_ansi_sequences`|fn|priv|3502-3513|def _strip_ansi_sequences(value: str) -> str|
-|`_visible_text_length`|fn|priv|3514-3525|def _visible_text_length(value: str) -> int|
+|`_ordered_rendered_panels`|fn|priv|3433-3448|def _ordered_rendered_panels(|
+|`_provider_panel_color_code`|fn|priv|3450-3459|def _provider_panel_color_code(provider_name: ProviderNam...|
+|`_provider_supports_api_counters`|fn|priv|3460-3471|def _provider_supports_api_counters(provider_name: Provid...|
+|`_should_render_cli_progress_bar`|fn|priv|3472-3493|def _should_render_cli_progress_bar(provider_name: Provid...|
+|`_build_cli_usage_line`|fn|priv|3494-3518|def _build_cli_usage_line(|
+|`_strip_ansi_sequences`|fn|priv|3519-3530|def _strip_ansi_sequences(value: str) -> str|
+|`_visible_text_length`|fn|priv|3531-3542|def _visible_text_length(value: str) -> int|
 |`_ansi_ljust`|fn|priv|3526-3538|def _ansi_ljust(value: str, width: int) -> str|
 |`_ansi_rjust`|fn|priv|3539-3551|def _ansi_rjust(value: str, width: int) -> str|
 |`_is_right_aligned_panel_line`|fn|priv|3552-3564|def _is_right_aligned_panel_line(value: str) -> bool|
@@ -2135,7 +2144,7 @@ Invalid map entries are skipped.
 
 ---
 
-# extension.js | JavaScript | 2387L | 51 symbols | 9 imports | 52 comments
+# extension.js | JavaScript | 2417L | 52 symbols | 9 imports | 53 comments
 > Path: `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`
 - @brief GNOME Shell panel extension for aibar metrics.
 - @details Collects usage JSON from the aibar CLI and renders provider-specific quota/cost cards in the GNOME panel popup.
@@ -2211,7 +2220,17 @@ deterministic.
 - @return s {Object<string, any>} Filtered provider-keyed object.
 - @satisfies REQ-127
 
-### fn `function _resetMenuItemFocusVisualState(menuItem)` (L155-161)
+### fn `function _orderedEnabledProviderNames(providerOrder, enabledProviders, providerData)` (L159-176)
+- @brief Order visible provider names by canonical extension surface sequence.
+- @details Returns provider keys present in `providerData`, excludes keys whose normalized enable-state is `false`, preserves canonical order `claude/openrouter/copilot/codex/openai/geminiai`, and appends unknown keys in lexical order. Time complexity O(P log P). Space complexity O(P).
+- @param {string[]} providerOrder Canonical provider order array.
+- @param {Object<string, boolean>} enabledProviders Normalized provider-enabled mapping.
+- @param {Object<string, any> | null} providerData Provider-keyed data source.
+- @return s {string[]} Ordered visible provider keys.
+- @satisfies REQ-019
+- @satisfies REQ-133
+
+### fn `function _resetMenuItemFocusVisualState(menuItem)` (L187-193)
 - @brief Reset popup menu item pseudo-class state to base visual style.
 - @details Removes `focus` and `active` pseudo classes from the menu item actor so
 focus-loss transitions always return to the original color surface.
@@ -2220,7 +2239,7 @@ Time complexity O(1). Space complexity O(1).
 - @return s {boolean} True when pseudo-class removal API is available and executed.
 - @satisfies DES-006
 
-### fn `function _providerSupportsApiCounters(providerName)` (L171-173)
+### fn `function _providerSupportsApiCounters(providerName)` (L203-205)
 - @brief Check whether provider cards must render API counter labels.
 - @details API-counter providers render `requests` and `tokens` labels on OK states
 with null/undefined counters normalized to zero.
@@ -2472,11 +2491,12 @@ Uses this.uuid (provided by the Extension base class) as the status-area key.
 |`_getProviderDisplayName`|fn||98-102|function _getProviderDisplayName(providerName)|
 |`_normalizeEnabledProvidersSection`|fn||113-122|function _normalizeEnabledProvidersSection(enabledProviders)|
 |`_filterProviderObjectByEnabledProviders`|fn||134-144|function _filterProviderObjectByEnabledProviders(provider...|
-|`_resetMenuItemFocusVisualState`|fn||155-161|function _resetMenuItemFocusVisualState(menuItem)|
-|`_providerSupportsApiCounters`|fn||171-173|function _providerSupportsApiCounters(providerName)|
-|`_resolveCopilotExtraPremiumCost`|fn||188-228|function _resolveCopilotExtraPremiumCost(data, configured...|
-|`_formatLocalDateTime`|fn||236-247|function _formatLocalDateTime(value)|
-|`_coerceRetryAfterSeconds`|fn||254-264|function _coerceRetryAfterSeconds(value)|
+|`_orderedEnabledProviderNames`|fn||159-176|function _orderedEnabledProviderNames(providerOrder, enab...|
+|`_resetMenuItemFocusVisualState`|fn||187-193|function _resetMenuItemFocusVisualState(menuItem)|
+|`_providerSupportsApiCounters`|fn||203-205|function _providerSupportsApiCounters(providerName)|
+|`_resolveCopilotExtraPremiumCost`|fn||220-260|function _resolveCopilotExtraPremiumCost(data, configured...|
+|`_formatLocalDateTime`|fn||268-279|function _formatLocalDateTime(value)|
+|`_coerceRetryAfterSeconds`|fn||286-296|function _coerceRetryAfterSeconds(value)|
 |`_classifyPanelFailureCategory`|fn||273-287|function _classifyPanelFailureCategory(statusEntry)|
 |`_panelProviderFailureState`|fn||298-321|function _panelProviderFailureState(statusData, providerN...|
 |`_buildHttpStatusRetryLabel`|fn||330-340|function _buildHttpStatusRetryLabel(statusCodeRaw, retryA...|

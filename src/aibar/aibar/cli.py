@@ -3388,9 +3388,9 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
             )
         )
 
-    rendered_panels.sort(key=lambda panel: _provider_panel_sort_key(panel[0]))
-    shared_content_width = _resolve_shared_panel_content_width(rendered_panels)
-    for provider_name, title, body_lines in rendered_panels:
+    ordered_panels = _ordered_rendered_panels(rendered_panels)
+    shared_content_width = _resolve_shared_panel_content_width(ordered_panels)
+    for provider_name, title, body_lines in ordered_panels:
         _emit_provider_panel(
             provider_name=provider_name,
             title=title,
@@ -3428,6 +3428,23 @@ def _provider_panel_sort_key(provider_name: ProviderName) -> tuple[int, str]:
         return (_SHOW_PROVIDER_ORDER.index(provider_name), provider_name.value)
     except ValueError:
         return (len(_SHOW_PROVIDER_ORDER), provider_name.value)
+
+
+def _ordered_rendered_panels(
+    rendered_panels: list[tuple[ProviderName, str, list[str]]],
+) -> list[tuple[ProviderName, str, list[str]]]:
+    """
+    @brief Order rendered CLI provider panels by canonical provider sequence.
+    @details Sorts the already-filtered CLI render queue with `_provider_panel_sort_key(...)`
+    so visible panels keep stable `claude/openrouter/copilot/codex/openai/geminiai`
+    ordering regardless of which disabled providers were removed earlier. Time
+    complexity O(P log P). Space complexity O(P).
+    @param rendered_panels {list[tuple[ProviderName, str, list[str]]]} CLI render queue after provider filtering.
+    @return {list[tuple[ProviderName, str, list[str]]]} New render queue in canonical provider order.
+    @satisfies REQ-067
+    @satisfies REQ-133
+    """
+    return sorted(rendered_panels, key=lambda panel: _provider_panel_sort_key(panel[0]))
 
 
 def _provider_panel_color_code(provider_name: ProviderName) -> str:

@@ -254,6 +254,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-105**: MUST clear `claude.oauth_refresh_blocked` when `show --force` is used and MUST auto-clear it when current epoch exceeds `last_success_timestamp + 86400`.
 - **REQ-086**: `scripts/aibar.sh` MUST execute CLI via `uv run python -m aibar.cli` and MUST NOT create, activate, or install dependencies into repository-local or system virtual environments.
 - **REQ-087**: Repository root MUST track `uv.lock`, MUST NOT track `requirements.txt`, and MUST keep `README.md` instructions for optional export command `uv export --format requirements-txt > requirements.txt`.
+- **REQ-133**: CLI `show` panels, GNOME tabs/cards, and GNOME panel status labels MUST preserve canonical order `claude`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai` after disabled providers are filtered out.
 
 ## 4. Test Requirements
 
@@ -435,6 +436,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-128 | `src/aibar/aibar/cli.py` + `_should_render_cli_progress_bar/_build_cli_usage_line/_build_result_panel` + usage rows render `Usage: <window> <progress_bar> <percent>%` for `claude/copilot/codex`. |
 | REQ-132 | `src/aibar/aibar/cli.py` + `_should_render_cli_progress_bar/_build_cli_usage_line/_build_result_panel` + `openrouter` usage rows render the standard fixed-width CLI progress-bar format. |
 | REQ-131 | `src/aibar/aibar/cli.py` + `_should_render_cli_progress_bar/_build_cli_usage_line/_build_result_panel` + `openai/geminiai` usage rows render `Usage: <window> <percent>%` without progress bars. |
+| REQ-133 | `src/aibar/aibar/cli.py` + `_ordered_rendered_panels/_provider_panel_sort_key` and `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_orderedEnabledProviderNames/_updateUI` + all visible provider surfaces keep canonical order after disabled-provider filtering. |
 | REQ-129 | `src/aibar/aibar/cli.py` + `_build_result_panel` + Copilot cost line stays one blank line after `Remaining credits`, and `_build_dual_window_panel` strips `Window <window>` headings from CLI panels. |
 | REQ-084 | `src/aibar/aibar/cli.py` + `_build_result_panel/_emit_provider_panel/show` + per-provider freshness line renders `Updated: <datetime>, Next: <datetime>` from provider `idle_time` timestamps with local-timezone `%Y-%m-%d %H:%M` and right-aligned panel layout; `show --json` exports equivalent provider freshness under top-level `freshness` for extension alignment. |
 | REQ-085 | `src/aibar/aibar/cli.py` + text renderer surfaces cached authentication/rate-limit failures and suppresses statistics lines for `FAIL` states. |

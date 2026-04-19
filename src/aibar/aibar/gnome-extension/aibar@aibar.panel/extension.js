@@ -144,6 +144,38 @@ function _filterProviderObjectByEnabledProviders(providerData, enabledProviders)
 }
 
 /**
+ * @brief Order visible provider names by canonical extension surface sequence.
+ * @details Returns provider keys present in `providerData`, excludes keys whose
+ * normalized enable-state is `false`, preserves canonical order
+ * `claude/openrouter/copilot/codex/openai/geminiai`, and appends unknown keys
+ * in lexical order. Time complexity O(P log P). Space complexity O(P).
+ * @param {string[]} providerOrder Canonical provider order array.
+ * @param {Object<string, boolean>} enabledProviders Normalized provider-enabled mapping.
+ * @param {Object<string, any> | null} providerData Provider-keyed data source.
+ * @returns {string[]} Ordered visible provider keys.
+ * @satisfies REQ-019
+ * @satisfies REQ-133
+ */
+function _orderedEnabledProviderNames(providerOrder, enabledProviders, providerData) {
+    if (!providerData || typeof providerData !== 'object' || Array.isArray(providerData))
+        return [];
+    const remaining = new Set();
+    for (const providerName of Object.keys(providerData)) {
+        if (enabledProviders[providerName] === false)
+            continue;
+        remaining.add(providerName);
+    }
+    const ordered = [];
+    for (const providerName of providerOrder) {
+        if (!remaining.has(providerName))
+            continue;
+        ordered.push(providerName);
+        remaining.delete(providerName);
+    }
+    return ordered.concat([...remaining].sort((a, b) => a.localeCompare(b)));
+}
+
+/**
  * @brief Reset popup menu item pseudo-class state to base visual style.
  * @details Removes `focus` and `active` pseudo classes from the menu item actor so
  * focus-loss transitions always return to the original color surface.
@@ -2151,6 +2183,8 @@ class AIBarIndicator extends PanelMenu.Button {
         const providerErrPriority = ['claude', 'openrouter', 'copilot', 'codex', 'openai', 'geminiai'];
         const errProviders = [];
         for (const providerName of providerErrPriority) {
+            if (this._enabledProviders[providerName] === false)
+                continue;
             const state = providerFailureStates[providerName];
             if (!state || state.hasFailure !== true)
                 continue;
@@ -2223,15 +2257,11 @@ class AIBarIndicator extends PanelMenu.Button {
         const maxPanelPercent = panelPercents.length > 0 ? Math.max(...panelPercents) : 0;
         this._updateIconColor(maxPanelPercent);
 
-        const entries = Object.entries(this._usageData).sort((a, b) => {
-            const aIndex = this._providerOrder.indexOf(a[0]);
-            const bIndex = this._providerOrder.indexOf(b[0]);
-            const aRank = aIndex === -1 ? 999 : aIndex;
-            const bRank = bIndex === -1 ? 999 : bIndex;
-            if (aRank !== bRank)
-                return aRank - bRank;
-            return a[0].localeCompare(b[0]);
-        });
+        const entries = _orderedEnabledProviderNames(
+            this._providerOrder,
+            this._enabledProviders,
+            this._usageData,
+        ).map(providerName => [providerName, this._usageData[providerName]]);
 
         for (let [providerName] of entries) {
             if (!this._providerTabs[providerName]) {
