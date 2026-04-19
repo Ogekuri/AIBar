@@ -40,7 +40,9 @@ const PROVIDER_DISPLAY_NAMES = {
     geminiai: 'GEMINIAI',
 };
 const API_COUNTER_PROVIDERS = new Set(['openai', 'openrouter', 'codex', 'geminiai']);
-const WINDOW_BAR_30D_PROVIDERS = new Set(['copilot', 'openrouter', 'openai', 'geminiai']);
+const PROGRESS_BAR_PROVIDERS = new Set(['claude', 'openrouter', 'copilot', 'codex']);
+const TEXT_USAGE_PROVIDERS = new Set(['openai', 'geminiai']);
+const WINDOW_BAR_30D_PROVIDERS = new Set(['copilot', 'openrouter']);
 const DEFAULT_WINDOW_LABELS = Object.freeze({
     copilot: '30d',
     openrouter: '30d',
@@ -1265,9 +1267,11 @@ class AIBarIndicator extends PanelMenu.Button {
      * while keeping `Updated: ..., Next: ...` freshness output and suppressing
      * usage/reset/quota/cost rows. Successful states render metrics using
      * existing provider-specific card rules, including Copilot
-     * `Cost: <currency_symbol><value>` row. Dual-window providers preserve
-     * fixed left labels `5h` and `7d`; progress-width geometry recalculation
-     * must not blank those labels.
+     * `Cost: <currency_symbol><value>` row. `claude/openrouter/copilot/codex`
+     * keep progress bars, while `openai/geminiai` render
+     * `Usage: <window> <percent>%` text without bar widgets. Dual-window
+     * providers preserve fixed left labels `5h` and `7d`; progress-width
+     * geometry recalculation must not blank those labels.
      * @param {any} card Input parameter `card`.
      * @param {any} providerName Input parameter `providerName`.
      * @param {any} data Input parameter `data`.
@@ -1276,6 +1280,7 @@ class AIBarIndicator extends PanelMenu.Button {
      * @returns {any} Function return value.
      * @satisfies REQ-017
      * @satisfies REQ-117
+     * @satisfies REQ-130
      */
     _populateProviderCard(card, providerName, data, statusEntry = null, freshnessState = null) {
         const metrics = data.metrics || {};
@@ -1450,15 +1455,16 @@ class AIBarIndicator extends PanelMenu.Button {
             usagePercent = ((metrics.limit - metrics.remaining) / metrics.limit) * 100;
         }
 
+        const isTextUsageProvider = TEXT_USAGE_PROVIDERS.has(providerName);
+        const configuredWindowLabel = (
+            this._windowLabels &&
+            typeof this._windowLabels[providerName] === 'string' &&
+            this._windowLabels[providerName].length > 0
+        )
+            ? this._windowLabels[providerName]
+            : '30d';
         let hasWindowBars = false;
         if (WINDOW_BAR_30D_PROVIDERS.has(providerName)) {
-            const configuredWindowLabel = (
-                this._windowLabels &&
-                typeof this._windowLabels[providerName] === 'string' &&
-                this._windowLabels[providerName].length > 0
-            )
-                ? this._windowLabels[providerName]
-                : '30d';
             const singleWindowReset = metrics.reset_at || fiveHourReset || sevenDayReset || null;
             const hasUsagePercent = usagePercent !== null && usagePercent !== undefined;
             const effectiveUsagePercent = hasUsagePercent ? usagePercent : 0;
@@ -1474,7 +1480,7 @@ class AIBarIndicator extends PanelMenu.Button {
             card._barData.sevenDay = null;
             card.sevenDayBar.container.hide();
             hasWindowBars = true;
-        } else {
+        } else if (PROGRESS_BAR_PROVIDERS.has(providerName)) {
             card.fiveHourBar.label.text = '5h';
             if (fiveHourUtil !== null) {
                 card._barData.fiveHour = {pct: fiveHourUtil, resetTime: fiveHourReset};
@@ -1494,6 +1500,11 @@ class AIBarIndicator extends PanelMenu.Button {
                 card._barData.sevenDay = null;
                 card.sevenDayBar.container.hide();
             }
+        } else {
+            card._barData.fiveHour = null;
+            card._barData.sevenDay = null;
+            card.fiveHourBar.container.hide();
+            card.sevenDayBar.container.hide();
         }
 
         if (hasWindowBars) {
@@ -1507,9 +1518,30 @@ class AIBarIndicator extends PanelMenu.Button {
         }
 
         if (!hasWindowBars) {
-            if (usagePercent !== null && usagePercent !== undefined) {
+            if (isTextUsageProvider) {
+                card._barData.progress = null;
+                card.progressBg.hide();
+                card.progressFill.style_class = 'aibar-progress-fill aibar-progress-none';
+                card.progressFill.set_width(0);
+                if (card.progressFill._aibarMarkerActor) {
+                    card.progressFill._aibarMarkerActor.set_width(0);
+                    card.progressFill._aibarMarkerActor.hide();
+                }
+                if (card.progressFill._aibarOverLimitActor) {
+                    card.progressFill._aibarOverLimitActor.set_width(0);
+                    card.progressFill._aibarOverLimitActor.hide();
+                }
+                if (usagePercent !== null && usagePercent !== undefined) {
+                    card.progressLabel.text = `Usage: ${configuredWindowLabel} ${usagePercent.toFixed(1)}%`;
+                    card.progressContainer.show();
+                } else {
+                    card.progressLabel.text = '';
+                    card.progressContainer.hide();
+                }
+            } else if (usagePercent !== null && usagePercent !== undefined) {
                 let pct = usagePercent;
                 card._barData.progress = {pct};
+                card.progressBg.show();
                 card.progressLabel.text = `${pct.toFixed(1)}%`;
                 card.progressFill.style_class = `aibar-progress-fill ${_getProviderProgressClass(providerName)}`;
 
@@ -1519,6 +1551,7 @@ class AIBarIndicator extends PanelMenu.Button {
                 });
             } else {
                 card._barData.progress = null;
+                card.progressBg.show();
                 card.progressFill.style_class = 'aibar-progress-fill aibar-progress-none';
                 card.progressFill.set_width(0);
                 if (card.progressFill._aibarMarkerActor) {

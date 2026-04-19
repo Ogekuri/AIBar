@@ -1452,16 +1452,26 @@ freshness line (`Updated: ..., Next: ...`) using provider freshness state.
 - @satisfies REQ-012
 - @satisfies REQ-129
 
-### fn `def _build_copilot_extra_premium_cost_line(result: ProviderResult) -> str | None` `priv` (L3722-3737)
+### fn `def _build_copilot_extra_premium_cost_line(result: ProviderResult) -> str | None` `priv` (L3745-3760)
 - @brief Build CLI Copilot cost row from premium-request overage payload fields.
 - @details Formats fallback Copilot cost text as `Cost: <currency><value>` when `metrics.cost` is unavailable and overage fields can still be resolved from raw payload.
 - @param result {ProviderResult} Copilot provider result candidate.
 - @return {str | None} Formatted row `Cost: ...` or None.
 - @satisfies REQ-129
 
-### fn `def _build_result_panel(` `priv` (L3738-3742)
+### fn `def _build_cli_usage_line(` `priv` (L3425-3447)
+- @brief Build one CLI usage row with provider-specific progress-bar policy.
+- @details Returns `Usage: <window> <progress_bar> <percent>%` for `claude/openrouter/copilot/codex`. Returns `Usage: <window> <percent>%` for `openai/geminiai` so those providers omit progress-bar glyphs while preserving explicit window and percentage text.
+- @param provider_name {ProviderName} Provider enum key.
+- @param window_label {str} Effective usage-window label for rendered text.
+- @param percent {float} Usage percentage value.
+- @return {str} Rendered CLI usage row.
+- @satisfies REQ-128
+- @satisfies REQ-131
+
+### fn `def _build_result_panel(` `priv` (L3761-3943)
 - @brief Build one provider panel title/body payload for CLI text rendering.
-- @details Formats deterministic panel lines for one provider/window result and preserves provider-specific metrics/error rendering rules used by `show`. `FAIL` states emit `Status: FAIL`, `Reason: <reason>`, and `Updated/Next` separated by blank lines. `OK` states emit `Status: OK` first, render each usage row as `Usage: <window> <progress_bar> <percent>%`, do not emit `Window <window>` headings, insert one blank separator between Copilot `Remaining credits` and `Cost` rows, and end with one right-aligned freshness line.
+- @details Formats deterministic panel lines for one provider/window result and preserves provider-specific metrics/error rendering rules used by `show`. `FAIL` states emit `Status: FAIL`, `Reason: <reason>`, and `Updated/Next` separated by blank lines. `OK` states emit `Status: OK` first, render `claude/openrouter/copilot/codex` usage rows as `Usage: <window> <progress_bar> <percent>%`, render `openai/geminiai` usage rows as `Usage: <window> <percent>%`, do not emit `Window <window>` headings, insert one blank separator between Copilot `Remaining credits` and `Cost` rows, and end with one right-aligned freshness line.
 - @param name {ProviderName} Provider name enum value.
 - @param result {ProviderResult} Provider result to render.
 - @param label {str | None} Optional window label suffix (e.g. `"5h"`, `"7d"`).
@@ -1476,15 +1486,16 @@ freshness line (`Updated: ..., Next: ...`) using provider freshness state.
 - @satisfies REQ-084
 - @satisfies REQ-128
 - @satisfies REQ-129
+- @satisfies REQ-131
 
-### fn `def _format_billing_service_descriptions(services: list[object]) -> str | None` `priv` (L3921-3948)
+### fn `def _format_billing_service_descriptions(services: list[object]) -> str | None` `priv` (L3944-3971)
 - @brief Build human-readable GeminiAI billing service summary.
 - @details Extracts ordered `service_description` values from billing service entries and returns all valid names in source order as one comma-separated summary string.
 - @param services {list[object]} Billing service entries from GeminiAI raw billing payload.
 - @return {str | None} Comma-separated service names summary without surrounding parentheses, or `None` when no valid names exist.
 - @satisfies REQ-106
 
-### fn `def _build_dual_window_section(` `priv` (L3949-3951)
+### fn `def _build_dual_window_section(` `priv` (L3972-3989)
 - @brief Build one labeled dual-window CLI section.
 - @details Prepends the raw window label (`5h` or `7d`) to the ordered detail lines for one Claude/Codex section. The helper intentionally preserves duplicate metric text across sections so identical `Usage` or `Resets in` rows remain visible in both windows.
 - @param window_label {str} Window label text rendered as the section heading.
@@ -1492,7 +1503,7 @@ freshness line (`Updated: ..., Next: ...`) using provider freshness state.
 - @return {list[str]} Section heading followed by the provided detail lines.
 - @satisfies REQ-002
 
-### fn `def _build_dual_window_panel(` `priv` (L3967-3971)
+### fn `def _build_dual_window_panel(` `priv` (L3990-4099)
 - @brief Build one grouped CLI panel for dual-window providers.
 - @details Produces one provider panel from `5h` and `7d` results while keeping explicit `5h` and `7d` section labels and preserving duplicate section content when both windows render identical metric text. `FAIL` states emit `Status: FAIL`, `Reason: <reason>`, and `Updated/Next` separated by blank lines. `OK` states emit `Status: OK` first, preserve usage rows formatted as `Usage: <window> <progress_bar> <percent>%`, avoid `Window <window>` headings, and append one trailing right-aligned freshness line.
 - @param name {ProviderName} Provider enum value.
@@ -1507,9 +1518,9 @@ freshness line (`Updated: ..., Next: ...`) using provider freshness state.
 - @satisfies REQ-128
 - @satisfies REQ-129
 
-### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L4077-4095)
+### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L4100-4123)
 - @brief Render CLI text output for one provider result.
-- @details Formats usage percentage, reset countdown, remaining credits, cost, requests, and token counts for one provider/window result. Cost is formatted using `metrics.currency_symbol` (never hardcoded `$`).
+- @details Formats provider-specific usage text, reset countdown, remaining credits, cost, requests, and token counts for one provider/window result. `openai/geminiai` usage rows omit progress bars while other providers keep existing bar rendering. Cost is formatted using `metrics.currency_symbol` (never hardcoded `$`).
 - @param name {ProviderName} Provider name enum value.
 - @param result {ProviderResult} Provider result to render.
 - @param label {str | None} Optional window label suffix (e.g. `"5h"`, `"7d"`).
@@ -1520,8 +1531,9 @@ freshness line (`Updated: ..., Next: ...`) using provider freshness state.
 - @satisfies REQ-067
 - @satisfies REQ-128
 - @satisfies REQ-129
+- @satisfies REQ-131
 
-### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L4096-4111)
+### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L4124-4139)
 - @brief Execute format reset duration.
 - @details Applies format reset duration logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param seconds {float} Input parameter `seconds`.
@@ -1745,18 +1757,19 @@ providers other than Claude.
 |`_format_http_status_retry_line`|fn|priv|3613-3615|def _format_http_status_retry_line(|
 |`_build_fail_panel_lines`|fn|priv|3637-3640|def _build_fail_panel_lines(|
 |`_extract_copilot_extra_premium_cost`|fn|priv|3661-3721|def _extract_copilot_extra_premium_cost(result: ProviderR...|
-|`_build_copilot_extra_premium_cost_line`|fn|priv|3722-3737|def _build_copilot_extra_premium_cost_line(result: Provid...|
-|`_build_result_panel`|fn|priv|3738-3742|def _build_result_panel(|
-|`_format_billing_service_descriptions`|fn|priv|3921-3948|def _format_billing_service_descriptions(services: list[o...|
-|`_build_dual_window_section`|fn|priv|3949-3951|def _build_dual_window_section(|
-|`_build_dual_window_panel`|fn|priv|3967-3971|def _build_dual_window_panel(|
-|`_print_result`|fn|priv|4077-4095|def _print_result(name: ProviderName, result, label: str ...|
-|`_format_reset_duration`|fn|priv|4096-4111|def _format_reset_duration(seconds: float) -> str|
-|`_should_print_claude_reset_pending_hint`|fn|priv|4112-4114|def _should_print_claude_reset_pending_hint(|
-|`_is_displayed_zero_percent`|fn|priv|4134-4150|def _is_displayed_zero_percent(percent: float | None) -> ...|
-|`_progress_bar_layout`|fn|priv|4151-4183|def _progress_bar_layout(percent: float, width: int) -> t...|
-|`_progress_bar`|fn|priv|4184-4208|def _progress_bar(percent: float, provider_name: Provider...|
-|`doctor`|fn|pub|4213-4265|def doctor() -> None|
+|`_build_copilot_extra_premium_cost_line`|fn|priv|3745-3760|def _build_copilot_extra_premium_cost_line(result: Provid...|
+|`_build_cli_usage_line`|fn|priv|3425-3447|def _build_cli_usage_line(|
+|`_build_result_panel`|fn|priv|3761-3943|def _build_result_panel(|
+|`_format_billing_service_descriptions`|fn|priv|3944-3971|def _format_billing_service_descriptions(services: list[o...|
+|`_build_dual_window_section`|fn|priv|3972-3989|def _build_dual_window_section(|
+|`_build_dual_window_panel`|fn|priv|3990-4099|def _build_dual_window_panel(|
+|`_print_result`|fn|priv|4100-4123|def _print_result(name: ProviderName, result, label: str ...|
+|`_format_reset_duration`|fn|priv|4124-4139|def _format_reset_duration(seconds: float) -> str|
+|`_should_print_claude_reset_pending_hint`|fn|priv|4140-4161|def _should_print_claude_reset_pending_hint(|
+|`_is_displayed_zero_percent`|fn|priv|4162-4178|def _is_displayed_zero_percent(percent: float | None) -> ...|
+|`_progress_bar_layout`|fn|priv|4179-4211|def _progress_bar_layout(percent: float, width: int) -> t...|
+|`_progress_bar`|fn|priv|4212-4236|def _progress_bar(percent: float, provider_name: Provider...|
+|`doctor`|fn|pub|4241-4293|def doctor() -> None|
 |`env`|fn|pub|4270-4278|def env() -> None|
 |`setup`|fn|pub|4283-4482|def setup() -> None|
 |`login`|fn|pub|4655-4673|def login(provider: str) -> None|
@@ -2153,19 +2166,21 @@ import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 - const `const PANEL_ICON_COLORS = {` (L32)
 - const `const PROVIDER_DISPLAY_NAMES = {` (L39)
 - const `const API_COUNTER_PROVIDERS = new Set(['openai', 'openrouter', 'codex', 'geminiai']);` (L42)
-- const `const WINDOW_BAR_30D_PROVIDERS = new Set(['copilot', 'openrouter', 'openai', 'geminiai']);` (L43)
-- const `const DEFAULT_WINDOW_LABELS = Object.freeze({` (L44)
-- const `const ALL_PROVIDER_NAMES = Object.freeze([` (L50)
-- const `const DEFAULT_ENABLED_PROVIDERS = Object.freeze({` (L58)
-- const `const PROVIDER_VIEWPORT_MAX_HEIGHT_PX = 260;` (L73)
+- const `const PROGRESS_BAR_PROVIDERS = new Set(['claude', 'openrouter', 'copilot', 'codex']);` (L43)
+- const `const TEXT_USAGE_PROVIDERS = new Set(['openai', 'geminiai']);` (L44)
+- const `const WINDOW_BAR_30D_PROVIDERS = new Set(['copilot', 'openrouter']);` (L45)
+- const `const DEFAULT_WINDOW_LABELS = Object.freeze({` (L46)
+- const `const ALL_PROVIDER_NAMES = Object.freeze([` (L52)
+- const `const DEFAULT_ENABLED_PROVIDERS = Object.freeze({` (L60)
+- const `const PROVIDER_VIEWPORT_MAX_HEIGHT_PX = 260;` (L75)
 - @brief Maximum popup viewport height for provider cards in pixels.
 - @details Caps popup vertical growth while allowing short provider cards to
 collapse the viewport height to content size. Time complexity O(1). Space
 complexity O(1).
 - @satisfies REQ-120
-- const `const DEFAULT_COPILOT_EXTRA_PREMIUM_REQUEST_COST = 0.04;` (L74)
-- const `const PROGRESS_SEGMENT_SHAPE_CLASSES = Object.freeze([` (L75)
-- const `const PROGRESS_ROUNDED_END_MIN_WIDTH_PX = 3;` (L89)
+- const `const DEFAULT_COPILOT_EXTRA_PREMIUM_REQUEST_COST = 0.04;` (L76)
+- const `const PROGRESS_SEGMENT_SHAPE_CLASSES = Object.freeze([` (L77)
+- const `const PROGRESS_ROUNDED_END_MIN_WIDTH_PX = 3;` (L91)
 - @brief Minimum overflow width that can render its own rounded right cap.
 - @details Overflow widths below this threshold are absorbed into the fixed
 100%-boundary marker so slightly-over-limit bars keep a visible rounded end
@@ -2441,14 +2456,16 @@ Uses this.uuid (provided by the Extension base class) as the status-area key.
 |`PANEL_ICON_COLORS`|const||32||
 |`PROVIDER_DISPLAY_NAMES`|const||39||
 |`API_COUNTER_PROVIDERS`|const||42||
-|`WINDOW_BAR_30D_PROVIDERS`|const||43||
-|`DEFAULT_WINDOW_LABELS`|const||44||
-|`ALL_PROVIDER_NAMES`|const||50||
-|`DEFAULT_ENABLED_PROVIDERS`|const||58||
-|`PROVIDER_VIEWPORT_MAX_HEIGHT_PX`|const||73||
-|`DEFAULT_COPILOT_EXTRA_PREMIUM_REQUEST_COST`|const||74||
-|`PROGRESS_SEGMENT_SHAPE_CLASSES`|const||75||
-|`PROGRESS_ROUNDED_END_MIN_WIDTH_PX`|const||89||
+|`PROGRESS_BAR_PROVIDERS`|const||43||
+|`TEXT_USAGE_PROVIDERS`|const||44||
+|`WINDOW_BAR_30D_PROVIDERS`|const||45||
+|`DEFAULT_WINDOW_LABELS`|const||46||
+|`ALL_PROVIDER_NAMES`|const||52||
+|`DEFAULT_ENABLED_PROVIDERS`|const||60||
+|`PROVIDER_VIEWPORT_MAX_HEIGHT_PX`|const||75||
+|`DEFAULT_COPILOT_EXTRA_PREMIUM_REQUEST_COST`|const||76||
+|`PROGRESS_SEGMENT_SHAPE_CLASSES`|const||77||
+|`PROGRESS_ROUNDED_END_MIN_WIDTH_PX`|const||91||
 |`_getProviderDisplayName`|fn||96-100|function _getProviderDisplayName(providerName)|
 |`_normalizeEnabledProvidersSection`|fn||111-120|function _normalizeEnabledProvidersSection(enabledProviders)|
 |`_filterProviderObjectByEnabledProviders`|fn||132-142|function _filterProviderObjectByEnabledProviders(provider...|

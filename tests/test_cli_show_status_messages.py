@@ -378,6 +378,33 @@ def test_build_result_panel_renders_zero_api_counters_for_null_metrics() -> None
         assert "Tokens: 0 (0 in / 0 out)" in lines
 
 
+def test_build_result_panel_renders_text_only_usage_for_openai_and_geminiai() -> None:
+    """
+    @brief Verify OpenAI and GeminiAI usage rows omit CLI progress bars.
+    @details Builds OK-state panels for `openai` and `geminiai` with explicit
+    usage percentages and asserts output keeps `Usage: <window> <percent>%`
+    text without bracketed progress-bar glyphs.
+    @return {None} Function return value.
+    @satisfies REQ-131
+    @satisfies TST-054
+    """
+    for provider_name in (ProviderName.OPENAI, ProviderName.GEMINIAI):
+        result_payload = ProviderResult(
+            provider=provider_name,
+            window=WindowPeriod.DAY_30,
+            metrics=UsageMetrics(remaining=57.5, limit=100.0),
+            raw={"status_code": 200},
+        )
+        _title, lines = _build_result_panel(provider_name, result_payload)
+        usage_line = next(line for line in lines if line.startswith("Usage:"))
+        assert usage_line == "Usage: 30d 42.5%"
+        assert "[" not in usage_line
+        assert "]" not in usage_line
+        assert "█" not in usage_line
+        assert "░" not in usage_line
+        assert "▓" not in usage_line
+
+
 def test_build_result_panel_renders_geminiai_billing_services_human_readable() -> None:
     """
     @brief Verify GeminiAI panel renders human-readable billing service names.

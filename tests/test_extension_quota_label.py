@@ -91,13 +91,24 @@ def test_limit_reached_suffix_is_appended_to_reset_labels_at_displayed_full_usag
     assert "bar.resetLabel.text = `${baseText} ⚠️ Limit reached!`;" in source
 
 
-def test_quota_providers_use_30d_window_bar_with_reset_before_credits() -> None:
+def test_quota_providers_scope_30d_bars_and_text_only_usage_rendering() -> None:
     """
-    @brief Verify quota providers use single 30d window bar and reset label placement.
+    @brief Verify only Copilot and OpenRouter keep 30d bars while OpenAI and GeminiAI use text-only usage rows.
+    @details Asserts source limits `WINDOW_BAR_30D_PROVIDERS` to bar-enabled single-window
+    providers, defines text-only usage providers for `openai/geminiai`, and reuses
+    configured `30d` labels for both bar and text-only rendering.
+    @satisfies REQ-130
+    @satisfies TST-004
+    @satisfies TST-052
     """
     source = EXTENSION_PATH.read_text(encoding="utf-8")
     assert (
-        "const WINDOW_BAR_30D_PROVIDERS = new Set(['copilot', 'openrouter', 'openai', 'geminiai']);"
+        "const PROGRESS_BAR_PROVIDERS = new Set(['claude', 'openrouter', 'copilot', 'codex']);"
+        in source
+    )
+    assert "const TEXT_USAGE_PROVIDERS = new Set(['openai', 'geminiai']);" in source
+    assert (
+        "const WINDOW_BAR_30D_PROVIDERS = new Set(['copilot', 'openrouter']);"
         in source
     )
     assert "const DEFAULT_WINDOW_LABELS = Object.freeze({" in source
@@ -105,7 +116,9 @@ def test_quota_providers_use_30d_window_bar_with_reset_before_credits() -> None:
     assert "openai: '30d'" in source
     assert "geminiai: '30d'" in source
     assert "this._windowLabels = {...DEFAULT_WINDOW_LABELS};" in source
+    assert "const isTextUsageProvider = TEXT_USAGE_PROVIDERS.has(providerName);" in source
     assert "WINDOW_BAR_30D_PROVIDERS.has(providerName)" in source
+    assert "PROGRESS_BAR_PROVIDERS.has(providerName)" in source
     assert "const configuredWindowLabel = (" in source
     assert "this._windowLabels[providerName]" in source
     assert "card.fiveHourBar.label.text = configuredWindowLabel;" in source
@@ -114,9 +127,9 @@ def test_quota_providers_use_30d_window_bar_with_reset_before_credits() -> None:
         in source
     )
     assert "const effectiveUsagePercent = hasUsagePercent ? usagePercent : 0;" in source
-    assert "updateWindowBar(" in source
-    assert "card._barData.sevenDay = null;" in source
-    assert "card.sevenDayBar.container.hide();" in source
+    assert "card.progressLabel.text = `Usage: ${configuredWindowLabel} ${usagePercent.toFixed(1)}%`;" in source
+    assert "card.progressBg.hide();" in source
+    assert "card.progressContainer.hide();" in source
 
 
 def test_dual_window_providers_keep_visible_5h_and_7d_labels() -> None:
@@ -671,11 +684,12 @@ def test_extension_uses_cached_status_error_for_provider_cards() -> None:
 
 def test_progress_bar_handles_percentages_over_100() -> None:
     """
-    @brief Verify GNOME over-limit progress bars expose a dedicated extra-quota segment.
+    @brief Verify GNOME over-limit progress bars remain scoped to bar-enabled providers.
     @details Asserts one shared geometry helper is used by single-window bars,
-    dual-window bars, and fallback progress rows so percentages above 100 render
-    a neutral over-limit segment plus a fixed 100% marker without widening label slots.
+    dual-window bars, and fallback progress rows for `claude/openrouter/copilot/codex`,
+    while `openai/geminiai` switch to text-only usage rendering without bar geometry calls.
     @satisfies REQ-121
+    @satisfies REQ-130
     @satisfies TST-052
     """
     source = EXTENSION_PATH.read_text(encoding="utf-8")
@@ -693,6 +707,10 @@ def test_progress_bar_handles_percentages_over_100() -> None:
     assert "_applyProgressSegmentRadii(fillActor, markerActor, overLimitActor, fillWidth, effectiveMarkerWidth, overLimitWidth);" in source
     assert "_applyProgressFillGeometry(bar.barFill, bar.barBg, pct);" in source
     assert "_applyProgressFillGeometry(card.progressFill, card.progressBg, pct);" in source
+    assert "if (isTextUsageProvider) {" in source
+    assert "card._barData.progress = null;" in source
+    assert "card.progressBg.hide();" in source
+    assert "card.progressLabel.text = `Usage: ${configuredWindowLabel} ${usagePercent.toFixed(1)}%`;" in source
 
     stylesheet_source = STYLESHEET_PATH.read_text(encoding="utf-8")
     assert ".aibar-progress-shape-none {" in stylesheet_source

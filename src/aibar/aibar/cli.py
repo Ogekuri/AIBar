@@ -3422,6 +3422,29 @@ def _provider_supports_api_counters(provider_name: ProviderName) -> bool:
     return provider_name in _API_COUNTER_PROVIDERS
 
 
+def _build_cli_usage_line(
+    provider_name: ProviderName, window_label: str, percent: float
+) -> str:
+    """
+    @brief Build one CLI usage row with provider-specific progress-bar policy.
+    @details Returns `Usage: <window> <progress_bar> <percent>%` for
+    `claude/openrouter/copilot/codex`. Returns `Usage: <window> <percent>%`
+    for `openai/geminiai` so those providers omit progress-bar glyphs while
+    preserving explicit window and percentage text. Time complexity O(W) when a
+    progress bar is rendered and O(1) otherwise. Space complexity O(W) when a
+    progress bar is rendered and O(1) otherwise.
+    @param provider_name {ProviderName} Provider enum key.
+    @param window_label {str} Effective usage-window label for rendered text.
+    @param percent {float} Usage percentage value.
+    @return {str} Rendered CLI usage row.
+    @satisfies REQ-128
+    @satisfies REQ-131
+    """
+    if provider_name in (ProviderName.OPENAI, ProviderName.GEMINIAI):
+        return f"Usage: {window_label} {percent:.1f}%"
+    return f"Usage: {window_label} {_progress_bar(percent, provider_name)} {percent:.1f}%"
+
+
 def _strip_ansi_sequences(value: str) -> str:
     """
     @brief Remove ANSI SGR color escape sequences from terminal text.
@@ -3746,11 +3769,12 @@ def _build_result_panel(
     @details Formats deterministic panel lines for one provider/window result and
     preserves provider-specific metrics/error rendering rules used by `show`.
     `FAIL` states emit `Status: FAIL`, `Reason: <reason>`, and `Updated/Next`
-    separated by blank lines. `OK` states emit `Status: OK` first, render each
-    usage row as `Usage: <window> <progress_bar> <percent>%`, do not emit
-    `Window <window>` headings, insert one blank separator between Copilot
-    `Remaining credits` and `Cost` rows, and end with one right-aligned freshness
-    line.
+    separated by blank lines. `OK` states emit `Status: OK` first, render
+    `claude/openrouter/copilot/codex` usage rows as
+    `Usage: <window> <progress_bar> <percent>%`, render `openai/geminiai`
+    usage rows as `Usage: <window> <percent>%`, do not emit `Window <window>`
+    headings, insert one blank separator between Copilot `Remaining credits`
+    and `Cost` rows, and end with one right-aligned freshness line.
     @param name {ProviderName} Provider name enum value.
     @param result {ProviderResult} Provider result to render.
     @param label {str | None} Optional window label suffix (e.g. `"5h"`, `"7d"`).
@@ -3768,6 +3792,7 @@ def _build_result_panel(
     @satisfies REQ-084
     @satisfies REQ-128
     @satisfies REQ-129
+    @satisfies REQ-131
     """
     title = _provider_display_name(name)
     if label:
@@ -3790,9 +3815,7 @@ def _build_result_panel(
     if m.usage_percent is not None:
         pct = m.usage_percent
         usage_window_label = label or result.window.value
-        detail_lines.append(
-            f"Usage: {usage_window_label} {_progress_bar(pct, name)} {pct:.1f}%"
-        )
+        detail_lines.append(_build_cli_usage_line(name, usage_window_label, pct))
 
     if m.reset_at:
         delta = m.reset_at - datetime.now(timezone.utc)
@@ -4077,9 +4100,11 @@ def _build_dual_window_panel(
 def _print_result(name: ProviderName, result, label: str | None = None) -> None:
     """
     @brief Render CLI text output for one provider result.
-    @details Formats usage percentage, reset countdown, remaining credits, cost,
-    requests, and token counts for one provider/window result. Cost is formatted
-    using `metrics.currency_symbol` (never hardcoded `$`).
+    @details Formats provider-specific usage text, reset countdown, remaining
+    credits, cost, requests, and token counts for one provider/window result.
+    `openai/geminiai` usage rows omit progress bars while other providers keep
+    existing bar rendering. Cost is formatted using `metrics.currency_symbol`
+    (never hardcoded `$`).
     @param name {ProviderName} Provider name enum value.
     @param result {ProviderResult} Provider result to render.
     @param label {str | None} Optional window label suffix (e.g. `"5h"`, `"7d"`).
@@ -4090,6 +4115,7 @@ def _print_result(name: ProviderName, result, label: str | None = None) -> None:
     @satisfies REQ-067
     @satisfies REQ-128
     @satisfies REQ-129
+    @satisfies REQ-131
     """
     title, lines = _build_result_panel(name, result, label)
     _emit_provider_panel(provider_name=name, title=title, body_lines=lines)

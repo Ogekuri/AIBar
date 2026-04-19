@@ -191,12 +191,15 @@ def test_show_uses_one_shared_panel_width_for_all_rendered_providers(
 ) -> None:
     """
     @brief Verify one `show` execution renders all provider panels at one shared width.
-    @details Mocks two providers with different body lengths and asserts visible border
-    width is identical for every rendered panel in command output.
+    @details Mocks one bar-enabled provider and one text-only usage provider, then
+    asserts visible border width is identical for every rendered panel and OpenAI
+    usage text omits progress-bar glyphs.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
     @return {None} Function return value.
     @satisfies REQ-067
+    @satisfies REQ-131
     @satisfies TST-030
+    @satisfies TST-054
     """
     openrouter_result = ProviderResult(
         provider=ProviderName.OPENROUTER,
@@ -206,8 +209,13 @@ def test_show_uses_one_shared_panel_width_for_all_rendered_providers(
     )
     openai_result = ProviderResult(
         provider=ProviderName.OPENAI,
-        window=WindowPeriod.DAY_7,
-        metrics=UsageMetrics(cost=0.0, currency_symbol="€"),
+        window=WindowPeriod.DAY_30,
+        metrics=UsageMetrics(
+            remaining=57.5,
+            limit=100.0,
+            cost=0.0,
+            currency_symbol="€",
+        ),
         raw={"status_code": 200},
     )
 
@@ -245,6 +253,14 @@ def test_show_uses_one_shared_panel_width_for_all_rendered_providers(
     ]
     assert len(top_borders) == 2
     assert len({len(line) for line in top_borders}) == 1
+    openai_usage_row = next(
+        line for line in visible_lines if "Usage: 30d 42.5%" in line
+    )
+    assert "[" not in openai_usage_row
+    assert "]" not in openai_usage_row
+    assert "█" not in openai_usage_row
+    assert "░" not in openai_usage_row
+    assert "▓" not in openai_usage_row
 
 
 def test_show_default_window_groups_dual_windows_into_one_panel_per_provider(
