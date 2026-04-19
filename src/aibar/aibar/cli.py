@@ -1019,6 +1019,36 @@ def _build_freshness_line(
     )
 
 
+def _next_utc_month_boundary(reference_time: datetime | None = None) -> datetime:
+    """
+    @brief Resolve the first UTC instant of the next calendar month.
+    @details Normalizes an optional reference time to UTC, truncates it to the
+    current month boundary, and returns the next month boundary. CLI OpenRouter
+    rendering uses this helper to restore `Resets in:` output when the provider
+    payload omits `metrics.reset_at` for its monthly quota surface. Time
+    complexity O(1). Space complexity O(1).
+    @param reference_time {datetime | None} Optional source datetime. `None`
+        uses current UTC time.
+    @return {datetime} First UTC instant of the next calendar month.
+    @satisfies REQ-011
+    @satisfies REQ-034
+    """
+    if reference_time is None:
+        reference_utc = datetime.now(timezone.utc)
+    else:
+        reference_utc = _normalize_utc(reference_time)
+    month_start = reference_utc.replace(
+        day=1,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
+    )
+    if month_start.month == 12:
+        return month_start.replace(year=month_start.year + 1, month=1)
+    return month_start.replace(month=month_start.month + 1)
+
+
 def _apply_api_call_delay(throttle_state: dict[str, float | int] | None) -> None:
     """
     @brief Enforce minimum spacing between consecutive provider API calls.
@@ -3848,8 +3878,15 @@ def _build_result_panel(
             _build_cli_usage_line(name, usage_window_label, usage_percent)
         )
 
-    if m.reset_at:
-        delta = m.reset_at - datetime.now(timezone.utc)
+    reset_at = m.reset_at
+    if reset_at is None and name == ProviderName.OPENROUTER:
+        reset_at = _next_utc_month_boundary()
+    openrouter_needs_post_usage_separator = (
+        name == ProviderName.OPENROUTER and usage_percent is not None
+    )
+
+    if reset_at:
+        delta = reset_at - datetime.now(timezone.utc)
         if delta.total_seconds() > 0:
             reset_value = _format_reset_duration(delta.total_seconds())
             detail_lines.append(f"Resets in: {reset_value}")
@@ -3880,6 +3917,13 @@ def _build_result_panel(
     )
 
     if m.cost is not None:
+        if (
+            openrouter_needs_post_usage_separator
+            and detail_lines
+            and detail_lines[-1] != ""
+        ):
+            detail_lines.append("")
+            openrouter_needs_post_usage_separator = False
         if copilot_has_remaining_credits:
             detail_lines.append("")
             copilot_has_remaining_credits = False
@@ -3902,6 +3946,13 @@ def _build_result_panel(
             detail_lines.append(copilot_extra_cost_line)
 
     if _provider_supports_api_counters(name):
+        if (
+            openrouter_needs_post_usage_separator
+            and detail_lines
+            and detail_lines[-1] != ""
+        ):
+            detail_lines.append("")
+            openrouter_needs_post_usage_separator = False
         requests_count = m.requests if m.requests is not None else 0
         input_tokens = m.input_tokens if m.input_tokens is not None else 0
         output_tokens = m.output_tokens if m.output_tokens is not None else 0
@@ -3911,6 +3962,18 @@ def _build_result_panel(
             f"Tokens: {total_tokens:,} ({input_tokens:,} in / {output_tokens:,} out)"
         )
     else:
+        if (
+            openrouter_needs_post_usage_separator
+            and detail_lines
+            and detail_lines[-1] != ""
+            and (
+                m.requests is not None
+                or m.input_tokens is not None
+                or m.output_tokens is not None
+            )
+        ):
+            detail_lines.append("")
+            openrouter_needs_post_usage_separator = False
         if m.requests is not None:
             detail_lines.append(f"Requests: {m.requests:,}")
         if m.input_tokens is not None or m.output_tokens is not None:
@@ -3928,6 +3991,13 @@ def _build_result_panel(
         }
         byok_raw = raw_data.get(byok_key_map.get(result.window, "byok_usage_weekly"))
         if isinstance(byok_raw, (int, float)) and byok_raw > 0:
+            if (
+                openrouter_needs_post_usage_separator
+                and detail_lines
+                and detail_lines[-1] != ""
+            ):
+                detail_lines.append("")
+                openrouter_needs_post_usage_separator = False
             detail_lines.append(f"BYOK: {m.currency_symbol}{float(byok_raw):.4f}")
 
     if name == ProviderName.GEMINIAI:

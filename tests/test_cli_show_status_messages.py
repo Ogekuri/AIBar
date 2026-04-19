@@ -24,6 +24,7 @@ from aibar.providers.base import (
     WindowPeriod,
 )
 from aibar.providers.claude_oauth import ClaudeOAuthProvider
+from aibar.providers.openrouter import OpenRouterUsageProvider
 
 
 def _patch_config_paths(monkeypatch, tmp_path: Path) -> None:
@@ -428,6 +429,48 @@ def test_build_result_panel_defaults_openrouter_usage_to_zero_percent() -> None:
     assert usage_line.endswith(" 0.0%")
     assert "█" not in usage_line
     assert "░" in usage_line
+
+
+def test_build_result_panel_renders_openrouter_reset_and_spacing() -> None:
+    """
+    @brief Reproduce missing OpenRouter reset countdown and separator spacing.
+    @details Builds an OK-state OpenRouter payload through
+    `OpenRouterUsageProvider._parse_response(...)` so `metrics.reset_at` is absent
+    before CLI rendering. Asserts `_build_result_panel(...)` still emits a
+    `Resets in:` row directly under the usage row and inserts one blank separator
+    before the cost block.
+    @return {None} Function return value.
+    @satisfies REQ-034
+    @satisfies REQ-067
+    @satisfies REQ-132
+    """
+    provider = OpenRouterUsageProvider(api_key="test-openrouter-key")
+    result_payload = provider._parse_response(
+        {
+            "data": {
+                "usage_monthly": 42.5,
+                "limit": 100.0,
+                "limit_remaining": 57.5,
+            }
+        },
+        WindowPeriod.DAY_30,
+    )
+
+    _title, lines = _build_result_panel(ProviderName.OPENROUTER, result_payload)
+
+    usage_line_index = next(
+        index for index, line in enumerate(lines) if line.startswith("Usage:")
+    )
+    reset_line_index = next(
+        index for index, line in enumerate(lines) if line.startswith("Resets in:")
+    )
+    cost_line_index = next(
+        index for index, line in enumerate(lines) if line.startswith("Cost:")
+    )
+
+    assert reset_line_index == usage_line_index + 1
+    assert lines[reset_line_index + 1] == ""
+    assert cost_line_index == reset_line_index + 2
 
 
 def test_build_result_panel_renders_text_only_usage_for_openai_and_geminiai() -> None:
