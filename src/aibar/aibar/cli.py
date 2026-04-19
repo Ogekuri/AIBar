@@ -3669,7 +3669,7 @@ def _extract_copilot_extra_premium_cost(result: ProviderResult) -> float | None:
     @param result {ProviderResult} Copilot provider result candidate.
     @return {float | None} Non-negative overage cost value or None when unavailable.
     @satisfies REQ-012
-    @satisfies REQ-067
+    @satisfies REQ-129
     """
     if result.provider != ProviderName.COPILOT:
         return None
@@ -3726,7 +3726,7 @@ def _build_copilot_extra_premium_cost_line(result: ProviderResult) -> str | None
     `metrics.cost` is unavailable and overage fields can still be resolved from raw payload.
     @param result {ProviderResult} Copilot provider result candidate.
     @return {str | None} Formatted row `Cost: ...` or None.
-    @satisfies REQ-067
+    @satisfies REQ-129
     """
     extra_cost = _extract_copilot_extra_premium_cost(result)
     if extra_cost is None:
@@ -3746,7 +3746,8 @@ def _build_result_panel(
     @details Formats deterministic panel lines for one provider/window result and
     preserves provider-specific metrics/error rendering rules used by `show`.
     `FAIL` states emit `Status: FAIL`, `Reason: <reason>`, and `Updated/Next`
-    separated by blank lines. `OK` states emit `Status: OK` first, do not emit
+    separated by blank lines. `OK` states emit `Status: OK` first, render each
+    usage row as `Usage: <window> <progress_bar> <percent>%`, do not emit
     `Window <window>` headings, insert one blank separator between Copilot
     `Remaining credits` and `Cost` rows, and end with one right-aligned freshness
     line.
@@ -3765,6 +3766,8 @@ def _build_result_panel(
     @satisfies REQ-060
     @satisfies REQ-067
     @satisfies REQ-084
+    @satisfies REQ-128
+    @satisfies REQ-129
     """
     title = _provider_display_name(name)
     if label:
@@ -3786,7 +3789,10 @@ def _build_result_panel(
     m = result.metrics
     if m.usage_percent is not None:
         pct = m.usage_percent
-        detail_lines.append(f"Usage: {pct:.1f}% {_progress_bar(pct, name)}")
+        usage_window_label = label or result.window.value
+        detail_lines.append(
+            f"Usage: {usage_window_label} {_progress_bar(pct, name)} {pct:.1f}%"
+        )
 
     if m.reset_at:
         delta = m.reset_at - datetime.now(timezone.utc)
@@ -3970,7 +3976,8 @@ def _build_dual_window_panel(
     keeping explicit `5h` and `7d` section labels and preserving duplicate
     section content when both windows render identical metric text. `FAIL`
     states emit `Status: FAIL`, `Reason: <reason>`, and `Updated/Next`
-    separated by blank lines. `OK` states emit `Status: OK` first, avoid
+    separated by blank lines. `OK` states emit `Status: OK` first, preserve
+    usage rows formatted as `Usage: <window> <progress_bar> <percent>%`, avoid
     `Window <window>` headings, and append one trailing right-aligned freshness
     line.
     @param name {ProviderName} Provider enum value.
@@ -3982,6 +3989,8 @@ def _build_dual_window_panel(
     @satisfies REQ-035
     @satisfies REQ-067
     @satisfies REQ-084
+    @satisfies REQ-128
+    @satisfies REQ-129
     """
     title = _provider_display_name(name)
     if result_5h.is_error or result_7d.is_error:
@@ -4079,6 +4088,8 @@ def _print_result(name: ProviderName, result, label: str | None = None) -> None:
     @satisfies REQ-035
     @satisfies REQ-051
     @satisfies REQ-067
+    @satisfies REQ-128
+    @satisfies REQ-129
     """
     title, lines = _build_result_panel(name, result, label)
     _emit_provider_panel(provider_name=name, title=title, body_lines=lines)
@@ -4183,8 +4194,8 @@ def _progress_bar(percent: float, provider_name: ProviderName, width: int = 20) 
     @param provider_name {ProviderName} Provider enum key for base-fill color mapping.
     @param width {int} Total cell width inside the surrounding brackets.
     @return {str} ANSI-colored progress bar string.
-    @satisfies REQ-067
     @satisfies REQ-122
+    @satisfies REQ-128
     """
     base_width, over_limit_width, marker_width = _progress_bar_layout(percent, width)
     color_code = _provider_panel_color_code(provider_name)
