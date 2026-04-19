@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.35.0](https://github.com/Ogekuri/AIBar/compare/v0.34.0..v0.35.0) - 2026-04-19
+### 🐛  Bug Fixes
+- restore openrouter reset spacing in show output [useReq] *(cli)*
+  - Ref: useReq-AIBar-work-20260419143702
+  - restore OpenRouter CLI reset countdown fallback
+  - preserve blank separator before cost rows
+  - add reproducer coverage for show panel rendering
+  - update WORKFLOW.md and regenerate REFERENCES.md
+- render openrouter zero-usage bar in show [useReq] *(cli)*
+  - align CLI OpenRouter fallback with GNOME single-window bar behavior
+  - add regression coverage for zero-percent OpenRouter usage rendering
+  - update WORKFLOW.md and REFERENCES.md
+- preserve dual-window sections in show output [useReq] *(cli)*
+  - retain 5h/7d labels in Claude/Codex panels
+  - stop collapsing identical dual-window usage rows
+  - add regression coverage for disabled-provider scenario
+
+### 🚜  Changes
+- keep OpenRouter progress bar in show [useReq] *(show)*
+  - split CLI usage requirements to make OpenRouter bar rendering explicit
+  - route CLI usage-row policy through a dedicated OpenRouter-aware helper
+  - add OpenRouter regression coverage and refresh workflow/reference docs
+- remove OpenAI and GeminiAI progress bars [useReq] *(show)*
+  - update requirements, workflow, and references for text-only usage rows
+  - remove OpenAI and GeminiAI progress bars from CLI and GNOME cards
+  - extend regression tests for CLI and GNOME rendering
+- align usage row window labels [useReq] *(cli)*
+  - Update REQ-067 with split CLI layout requirements.
+  - Implement Usage rows as window-left bar percent-right.
+  - Keep Copilot cost spacing and refresh references/workflow docs.
+
 ## [0.34.0](https://github.com/Ogekuri/AIBar/compare/v0.33.0..v0.34.0) - 2026-04-18
 ### 🐛  Bug Fixes
 - restore Claude/Codex bar labels [useReq] *(gnome-extension)*
@@ -1127,6 +1158,7 @@
 - \[0.32.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.32.0
 - \[0.33.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.33.0
 - \[0.34.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.34.0
+- \[0.35.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.35.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1162,3 +1194,4 @@
 [0.32.0]: https://github.com/Ogekuri/AIBar/compare/v0.31.0..v0.32.0
 [0.33.0]: https://github.com/Ogekuri/AIBar/compare/v0.32.0..v0.33.0
 [0.34.0]: https://github.com/Ogekuri/AIBar/compare/v0.33.0..v0.34.0
+[0.35.0]: https://github.com/Ogekuri/AIBar/compare/v0.34.0..v0.35.0
