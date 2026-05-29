@@ -2,7 +2,7 @@
 @file
 @brief Regression test for static-check configuration reliability.
 @details Verifies repository-level Pyright configuration exists and encodes
-first-party source path resolution required by `req --here --static-check`.
+first-party source path resolution required by `pi-usereq tool static-check`.
 """
 
 import json
