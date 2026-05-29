@@ -28,6 +28,8 @@
 !pyrightconfig.json
 !uv.lock
 !.g.conf
+!package-lock.json
+!package.json
 !src/
 !src/**/*
 !docs/
@@ -39,7 +41,17 @@
 !other-stuff/
 !other-stuff/**/*
 !scripts/
+!scripts/lib/
 !scripts/**/*.sh
+!scripts/**/*.ts
+!req/
+!req/docs/
+!req/docs/**/*.md
+!pi-usereq/
+!pi-usereq/docs/
+!pi-usereq/docs/**/*.md
+!pi.dev-src/
+!pi.dev-src/**/*
 !images/
 !images/**/*
 
@@ -50,6 +62,7 @@
 # Exlude github agents and prompts
 .github/agents/
 .github/prompts/
+.github/skills/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
