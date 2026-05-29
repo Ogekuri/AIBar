@@ -46,9 +46,11 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 ├── .github/
 │   └── workflows/
 │       └── .place-holder
-├── docs/
-│   ├── .place-holder
-│   └── REQUIREMENTS.md
+├── pi-usereq/
+│   └── docs/
+│       ├── REFERENCES.md
+│       ├── REQUIREMENTS.md
+│       └── WORKFLOW.md
 ├── pyproject.toml
 ├── scripts/
 │   ├── aibar.sh
@@ -83,14 +85,14 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 ### 2.1 Project Functions
 - **PRJ-001**: MUST expose CLI subcommands `show`, `doctor`, `env`, `setup`, `login`, `gnome-install`, and `gnome-uninstall` under one Click command group.
 - **PRJ-002**: MUST aggregate provider metrics through a normalized provider contract for `claude`, `openai`, `openrouter`, `copilot`, and `codex`.
-- **PRJ-004**: MUST provide a GNOME Shell panel extension named `AIBar Monitor` that executes `aibar show --json`, renders provider-specific cards, sets metadata owner identifiers (`url`, `github`) to `Ogekuri`, and forces `scripts/test-gnome-extension.sh` nested-shell resolution to `1024x800` via `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800`.
-- **PRJ-005**: MUST maintain a machine-readable symbol inventory for repository code documentation under `docs/REFERENCES.md`.
+- **PRJ-004**: MUST provide GNOME Shell extension `AIBar Monitor` that executes `aibar show --json`, renders provider-specific cards, exposes owner metadata `url=https://github.com/Ogekuri/AIBar` and `donations.github=Ogekuri`, and forces `scripts/test-gnome-extension.sh` resolution to `1280x720` via `MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720`.
+- **PRJ-005**: MUST maintain a machine-readable symbol inventory in `pi-usereq/docs/REFERENCES.md` for symbols discovered from configured source directories.
 - **PRJ-006**: MUST provide a PEP 621-compliant `pyproject.toml` at repository root enabling `uv tool install` distribution execution and `uv run`/`uvx` live execution without external virtualenv bootstrap scripts.
 - **PRJ-007**: MUST document in `README.md` dedicated sections for `uv`-based requirements, installation/removal, `uv run`/`uvx` execution, and optional `requirements.txt` export command, plus GeminiAI prerequisites.
 - **PRJ-008**: MUST provide `aibar gnome-install` CLI command that detects install/update mode for `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/`, copies package extension files, disables extension before update copy, and enables extension after copy.
 - **PRJ-009**: MUST execute startup update checks and lifecycle flags `--upgrade`, `--uninstall`, `--version`, `--ver`, `--enable-log`, `--disable-log`, `--enable-debug`, and `--disable-debug` for program `aibar`.
 - **PRJ-010**: MUST package all runtime files required by `aibar` so local execution and `uv tool install` execution remain behaviorally equivalent.
-- **PRJ-011**: MUST keep GNOME extension contract documentation in `docs/REQUIREMENTS.md`, `docs/WORKFLOW.md`, and `docs/REFERENCES.md`; repository source tree MUST NOT contain `src/aibar/plans/Gnome.plan.md`.
+- **PRJ-011**: MUST keep GNOME extension contract documentation in `pi-usereq/docs/REQUIREMENTS.md`, `pi-usereq/docs/WORKFLOW.md`, and `pi-usereq/docs/REFERENCES.md`; repository source tree MUST NOT contain `src/aibar/plans/Gnome.plan.md`.
 
 ### 2.2 Project Constraints
 - **CTN-001**: MUST resolve provider credentials with precedence: environment variable, then `~/.config/aibar/env`, then provider-specific local credential stores.
@@ -98,7 +100,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **CTN-003**: MUST perform external HTTP API calls with `httpx.AsyncClient(timeout=<api_call_timeout_milliseconds>/1000.0)` using `RuntimeConfig.api_call_timeout_milliseconds` for provider integrations.
 - **CTN-004**: MUST persist `~/.cache/aibar/cache.json` as the canonical store for per-provider, per-window last-success payload snapshots and last-attempt status metadata.
 - **CTN-005**: MAY depend on unofficial/internal endpoints when official usage APIs are unavailable for Claude, Copilot, or Codex integrations.
-- **CTN-006**: MUST keep `docs/REFERENCES.md` synchronized with symbols defined under `src/` and `.github/workflows/`.
+- **CTN-006**: MUST keep `pi-usereq/docs/REFERENCES.md` synchronized with symbols discovered from configured source directories.
 - **CTN-007**: MUST declare `hatchling` as `[build-system]` backend in `pyproject.toml` with `[project]` metadata including `name`, `version`, `requires-python`, `[project.scripts]`, and `dependencies` containing `pytest`.
 - **CTN-008**: MUST persist runtime configuration in `~/.config/aibar/config.json` with keys `idle_delay_seconds`, `api_call_delay_milliseconds`, `api_call_timeout_milliseconds`, `gnome_refresh_interval_seconds`, `billing_data`, `copilot_extra_premium_request_cost`, `currency_symbols`, `log_enabled`, and `debug_enabled`.
 - **CTN-009**: MUST persist provider-scoped idle-time state in `~/.cache/aibar/idle-time.json` with `last_success_timestamp` and `idle_until_timestamp` (epoch seconds) and `last_success_human` and `idle_until_human` (local-timezone ISO-8601).
@@ -146,7 +148,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-017**: GNOME provider cards MUST render `FAIL` blocks as `Status: FAIL`, blank line, `Reason: <reason>`, blank line, and `Updated: <datetime>, Next: <datetime>`, and MUST NOT render `Window 5h:`, `Window 7d:`, or `Window 30d:` text.
 - **REQ-018**: MUST set GNOME panel label to `Err` and truncate popup error text to 40 characters when command execution or JSON parsing fails.
 - **REQ-019**: SHOULD order extension provider tabs/cards by `claude`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, with providers not listed in ordering array appended alphabetically.
-- **REQ-020**: MUST include each discovered source symbol in `docs/REFERENCES.md` with file path, symbol kind, line-range evidence, and parsed Doxygen fields (`@brief`, `@param`, `@return`, `@raises`) when present in source declarations.
+- **REQ-020**: MUST include each discovered configured-source symbol in `pi-usereq/docs/REFERENCES.md` with file path, symbol kind, line-range evidence, and parsed Doxygen fields (`@brief`, `@param`, `@return`, `@throws`) when present in source declarations.
 - **REQ-021**: GNOME panel status labels MUST render `Err` only for providers whose `status.result=FAIL` category is OAuth or rate-limit, while providers without those failures MUST keep normal percentage/cost labels.
 - **REQ-022**: MUST style GNOME panel tab and label fonts with provider classes and bright colors: Claude red, OpenRouter orange, Copilot yellow, Codex green, OpenAI blue, GeminiAI purple; cost labels MUST use the same font family, render when numeric value is `0`, and hide only when cost metric is unavailable.
 - **REQ-023**: MUST declare a `[project.scripts]` entry `aibar = "aibar.cli:main"` in `pyproject.toml` so that `uv pip install` and `uvx` resolve the `aibar` console command.
@@ -158,10 +160,10 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-028**: MUST produce colored, formatted terminal output via Click styling for status, success, error, and informational messages in `gnome-install` and `gnome-uninstall` commands.
 - **REQ-029**: MUST copy all files from the package extension source directory to target directory, replacing any existing files, in `gnome-install`.
 - **REQ-030**: MUST exit with non-zero status and descriptive error message when any prerequisite check fails in `gnome-install`.
-- **REQ-031**: `scripts/test-gnome-extension.sh` MUST launch only the nested GNOME Shell interface and MUST NOT invoke `aibar gnome-install` or any extension-update command.
+- **REQ-031**: `scripts/test-gnome-extension.sh` MUST execute `scripts/aibar.sh gnome-install` before launching the nested Wayland GNOME Shell test session.
 - **REQ-032**: `gnome-install` MUST execute install and update flows with colored status output: install flow copies extension files then enables `aibar@aibar.panel`; update flow disables `aibar@aibar.panel`, copies files, then enables `aibar@aibar.panel`.
 - **REQ-099**: `gnome-install` update flow MUST mask non-zero disable outcomes caused by extension absence and continue copy/enable without exposing raw disable errors.
-- **REQ-033**: `scripts/test-gnome-extension.sh` MUST NOT accept any subcommand parameter; it MUST execute the nested-shell launch directly on invocation without arguments.
+- **REQ-033**: `scripts/test-gnome-extension.sh` MUST NOT accept subcommand parameters and MUST execute its install-and-launch flow immediately on invocation without arguments.
 - **REQ-034**: MUST render reset countdown as `Resets in: <d>d <h>h <m>m` for durations >= 24 hours in CLI text output.
 - **REQ-035**: MUST print `Remaining credits: <remaining> / <limit>` for Claude, Codex, and Copilot only when rendered status is `OK` and both values exist; line MUST follow `Resets in` after one blank line and `<remaining>` MUST be bold bright white.
 - **REQ-036**: CLI text `show` MUST render `FAIL` provider/window blocks as `Status: FAIL`, blank line, `Reason: <reason>`, blank line, and `Updated: <datetime>, Next: <datetime>`, while `openai`, `openrouter`, `codex`, `geminiai` `OK` blocks MUST normalize null API counters to `0`.
@@ -265,7 +267,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-003**: MUST verify successful refresh writes `~/.cache/aibar/cache.json` with payload and last-attempt status sections used by `show --json`, and writes provider-keyed `last_success_at`/`idle_until` epoch and human-readable fields in `~/.cache/aibar/idle-time.json`.
 - **TST-004**: MUST verify GNOME extension `FAIL` cards render `Status: FAIL`, blank line, `Reason: <reason>`, blank line, and `Updated/Next`, MUST not render usage/reset/quota/cost rows, MUST not render `Window 5h:/7d:/30d:` text, and MUST keep popup refresh/header behavior.
 - **TST-005**: MUST verify Copilot provider always returns effective `window=30d` and computes `premium_requests_extra_cost = max(premium_requests - premium_requests_included, 0) * copilot_extra_premium_request_cost` in payload, CLI text, and `show --json`.
-- **TST-006**: MUST verify `req --here --references` reproduces `docs/REFERENCES.md` without missing symbol entries and preserves Doxygen field extraction for documented symbols.
+- **TST-006**: MUST verify `pi-usereq/docs/REFERENCES.md` covers configured-source symbols and preserves extracted Doxygen fields for documented declarations.
 - **TST-007**: MUST verify GNOME panel status labels render exactly one provider-colored bold `Err` for OAuth/rate-limit failures, hide normal percentage/cost labels in that state, keep provider order styling, verify icon thresholds, preserve zero-cost currency rendering, and place Copilot cost between Copilot percentages and Codex labels.
 - **TST-008**: MUST verify `pyproject.toml` declares `[build-system]` with `hatchling`, `[project.scripts]` entry `aibar = "aibar.cli:main"`, `requires-python`, and `dependencies` list containing `pytest`.
 - **TST-009**: MUST verify `gnome-install` resolves package source, validates source directory, branches install/update by target-directory presence, executes update disable→copy→enable ordering, masks extension-absence disable failures, and exits non-zero on missing source; MUST verify `gnome-uninstall` disables extension then removes directory and exits non-zero when directory is missing.
@@ -325,17 +327,17 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 |---|---|
 | PRJ-001 | `src/aibar/aibar/cli.py` + `main/show/doctor/env/setup/login/gnome_install/gnome_uninstall` + `@main.command()` declarations for all subcommands. |
 | PRJ-002 | `src/aibar/aibar/cli.py` + `get_providers` + returns Claude/OpenAI/OpenRouter/Copilot/Codex provider instances keyed by `ProviderName`. |
-| PRJ-004 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/metadata.json` + `name` set to `AIBar Monitor` and `url/github` owner `Ogekuri`, `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_refreshData/_updateProviderCard` provider-card rendering behavior, and `scripts/test-gnome-extension.sh` exports `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800`. |
-| PRJ-005 | `docs/REFERENCES.md` + repository-wide symbol sections + machine-readable file/symbol index entries. |
+| PRJ-004 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/metadata.json` + `name = AIBar Monitor`, `url = https://github.com/Ogekuri/AIBar`, and `donations.github = Ogekuri`; `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + provider-card rendering path; `scripts/test-gnome-extension.sh` + `MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720`. |
+| PRJ-005 | `pi-usereq/docs/REFERENCES.md` + machine-readable symbol sections for configured-source files. |
 | PRJ-006 | `pyproject.toml` + `[build-system]`/`[project]`/`[project.scripts]` sections + `aibar = "aibar.cli:main"` console entry point used by `uv tool install`, `uv run`, and `uvx` execution without external virtualenv bootstrap. |
 | PRJ-007 | `README.md` + dedicated `Requirements (uv)` and `Installation (uv)` sections + `uv tool`/`uv run`/`uvx` instructions and optional `uv export --format requirements-txt > requirements.txt` snippet. |
-| PRJ-011 | `docs/REQUIREMENTS.md`, `docs/WORKFLOW.md`, and `docs/REFERENCES.md` + GNOME contract documentation sources; repository tree excludes `src/aibar/plans/Gnome.plan.md`. |
+| PRJ-011 | `pi-usereq/docs/REQUIREMENTS.md`, `pi-usereq/docs/WORKFLOW.md`, and `pi-usereq/docs/REFERENCES.md` + GNOME contract documentation sources; repository tree excludes `src/aibar/plans/Gnome.plan.md`. |
 | CTN-001 | `src/aibar/aibar/config.py` + `Config.get_token` + env var -> env file -> provider-specific stores (`ClaudeCLIAuth`, `CodexCredentialStore`, `CopilotCredentialStore`). |
 | CTN-002 | `src/aibar/aibar/providers/base.py` + `ProviderResult` model + fields `provider/window/metrics/updated_at/raw/error`; `UsageMetrics` + `currency_symbol` field. |
 | CTN-003 | `src/aibar/aibar/providers/*.py` + `fetch` methods + `httpx.AsyncClient(timeout=api_call_timeout_milliseconds/1000.0)` in all providers using `RuntimeConfig.api_call_timeout_milliseconds`. |
 | CTN-004 | `src/aibar/aibar/cache.py` + cache schema helpers and `src/aibar/aibar/cli.py` + `cache.json` as canonical store for payload snapshots and attempt statuses. |
 | CTN-005 | `src/aibar/aibar/config.py` + `PROVIDER_INFO` notes + entries describing unofficial/internal usage for Claude, Copilot, and Codex. |
-| CTN-006 | `docs/REFERENCES.md` + full symbol index grouped by source file, regenerated from repository code. |
+| CTN-006 | `pi-usereq/docs/REFERENCES.md` + configured-source symbol index regenerated from repository source files. |
 | CTN-007 | `pyproject.toml` + `[build-system] requires = ["hatchling"]` + `[project]` metadata fields `name`, `version`, `requires-python`, `dependencies` (including `pytest`), and `[project.scripts]`. |
 | CTN-008 | `src/aibar/aibar/config.py` + `RuntimeConfig` model + `idle_delay_seconds`, `api_call_delay_milliseconds`, `api_call_timeout_milliseconds`, `gnome_refresh_interval_seconds`, and `currency_symbols` fields persisted in `~/.config/aibar/config.json`. |
 | CTN-009 | `src/aibar/aibar/config.py` + `build_idle_time_state/load_idle_time/save_idle_time` + provider-scoped idle-time epoch fields and local-timezone `*_human` serialization in `~/.cache/aibar/idle-time.json`. |
@@ -370,7 +372,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-017 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_buildPopupMenu/_parseOutput/_updateUI/_populateProviderCard` + popup removes `Open AIBar Report`, `copilot/openrouter` render single `30d` window bars with labels sourced from JSON `extension.window_labels` (fallback `30d`), `openai/geminiai` render `Usage: <window> <percent>%` text without progress bars, freshness uses `freshness` data with status+`extension.idle_delay_seconds` fallback, and cost/API-counter rows stay normalized. |
 | REQ-018 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_handleError` + `this._panelLabel.set_text('Err')` and `message.substring(0, 40)`. |
 | REQ-019 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_providerOrder` and `_updateUI` sorting enforce `claude/openrouter/copilot/codex/openai/geminiai`; unknown providers rank `999` then lexical order. |
-| REQ-020 | `docs/REFERENCES.md` + per-symbol entries containing symbol identifier, file path, and line-range spans. |
+| REQ-020 | `pi-usereq/docs/REFERENCES.md` + per-symbol entries containing symbol identifier, file path, line-range spans, and parsed `@brief/@param/@return/@throws` fields. |
 | REQ-021 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_buildPanelButton/_updateUI` + panel labels preserve fixed order for normal state and collapse to one provider-colored bold `Err` token for OAuth/rate-limit failure states. |
 | REQ-022 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_buildPanelButton/_updateUI` + panel labels use provider classes/colors; cost labels render provider currency for numeric `0` values and hide only when cost metric is unavailable. |
 | REQ-023 | `pyproject.toml` + `[project.scripts]` + `aibar = "aibar.cli:main"` declaration. |
@@ -394,7 +396,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | TST-003 | `tests/test_cli_idle_cache.py` and `tests/test_cli_idle_force.py` + assertions for cache schema parity with `show --json` and provider-keyed idle-time epoch/human-readable field persistence under `~/.cache/aibar/`. |
 | TST-004 | `tests/test_extension_quota_label.py` + popup-header/remove-action assertions, failed-state metric-row suppression, `extension.window_labels`-driven 30d usage rendering assertions for `copilot/openrouter` bars plus `openai/geminiai` text-only usage, freshness fallback assertions via `extension.idle_delay_seconds`, bottom-right `Updated/Next` assertions, bold-bright-white `Costs:` numeric/no-spacer assertions, and API-counter format assertions for `openai/openrouter/codex/geminiai`. |
 | TST-005 | `src/aibar/aibar/providers/copilot.py` + `fetch` hard-codes `effective_window` to `WindowPeriod.DAY_30`. |
-| TST-006 | `docs/REFERENCES.md` + generated symbol coverage for tracked `src/` files validates documentation inventory completeness. |
+| TST-006 | `pi-usereq/docs/REFERENCES.md` + generated configured-source symbol coverage validates documentation inventory completeness. |
 | TST-007 | `tests/test_extension_quota_label.py` + single `Err` projection assertions for OAuth/rate-limit failures, provider-color bold-style assertions, normal-state order/style assertions, and zero-cost/missing-metric behavior checks. |
 | TST-008 | `tests/test_pyproject_metadata.py` + assertions for `[build-system]` backend, `[project.scripts]` entry, `requires-python`, and `dependencies` list containing `pytest` in `pyproject.toml`. |
 | TST-010 | `tests/test_reset_pending_message.py` and `src/aibar/aibar/cli.py` + verify remaining-credits rendering path appears only for successful quota-provider states. |
@@ -415,10 +417,10 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-028 | `src/aibar/aibar/cli.py` + `gnome_install/gnome_uninstall` + `click.style` colored output for status, success, error, and informational messages. |
 | REQ-029 | `src/aibar/aibar/cli.py` + `gnome_install` + `shutil.copy2` copies files from package source to target directory replacing existing files. |
 | REQ-030 | `src/aibar/aibar/cli.py` + `gnome_install` + `sys.exit(1)` on prerequisite failure with descriptive error message. |
-| REQ-031 | `scripts/test-gnome-extension.sh` + launches nested-shell UI directly and contains no `aibar gnome-install` invocation. |
+| REQ-031 | `scripts/test-gnome-extension.sh` + invokes `scripts/aibar.sh gnome-install` before nested-shell launch. |
 | REQ-032 | `src/aibar/aibar/cli.py` + `gnome_install` + install/update branch execution with install copy→enable and update disable→copy→enable ordering plus colored status output. |
 | REQ-099 | `src/aibar/aibar/cli.py` + `gnome_install` update path + non-zero disable outcomes from missing extension treated as masked warnings and flow continues to copy/enable. |
-| REQ-033 | `scripts/test-gnome-extension.sh` + no subcommand parameter; executes nested-shell launch directly on invocation. |
+| REQ-033 | `scripts/test-gnome-extension.sh` + no subcommand parameter; executes install-and-launch flow on invocation without arguments. |
 | REQ-080 | `src/aibar/aibar/cli.py` + `gnome_uninstall` + `subprocess.run(["gnome-extensions", "disable", "aibar@aibar.panel"])` before removal with colored status output. |
 | REQ-081 | `src/aibar/aibar/cli.py` + `gnome_uninstall` + `shutil.rmtree` removes extension directory and all contents. |
 | REQ-082 | `src/aibar/aibar/cli.py` + `gnome_uninstall` + `sys.exit(1)` when extension directory does not exist with descriptive error message. |

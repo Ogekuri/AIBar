@@ -27,7 +27,7 @@
 - `id: PROC:test-ext`
   - `type: Process`
   - `parent_process: null`
-  - `role: GNOME extension nested-shell test launcher (no subcommand)`
+  - `role: GNOME extension install-and-launch nested-shell test helper`
   - `entrypoint_symbols: main script body`
   - `defining_files: scripts/test-gnome-extension.sh`
   - `thread_model: no explicit threads detected`
@@ -70,12 +70,17 @@
   - main script body: direct execution [`scripts/test-gnome-extension.sh`]
 - `Lifecycle/Trigger`
   - Starts when user invokes `scripts/test-gnome-extension.sh` (no arguments required).
-  - Launches nested shell directly without extension-update subprocesses.
+  - Synchronizes the installed extension through `scripts/aibar.sh gnome-install`, then launches a nested Wayland GNOME Shell at `1280x720`.
 - `Internal Call-Trace Tree`
   - main script body: direct execution [`scripts/test-gnome-extension.sh`]
-    - nested shell launch: `MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800 dbus-run-session -- gnome-shell --nested --wayland` [`scripts/test-gnome-extension.sh`]
+    - path resolution block: derive `full_path`, `script_dir`, and `project_root` [`scripts/test-gnome-extension.sh`]
+    - project-root switch: `cd "$project_root"` [`scripts/test-gnome-extension.sh`]
+    - extension sync step: `scripts/aibar.sh gnome-install` [`scripts/test-gnome-extension.sh`]
+      - External boundary: subprocess launch of repository launcher (`PROC:aibar-launcher`).
+    - nested shell launch: `MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720 dbus-run-session -- gnome-shell --nested --wayland` [`scripts/test-gnome-extension.sh`]
       - External boundary: `dbus-run-session -- gnome-shell --nested --wayland`.
 - `External Boundaries`
+  - `scripts/aibar.sh` subprocess delegation for extension synchronization.
   - `dbus-run-session` and `gnome-shell` for nested shell.
 
 ### PROC:main
@@ -420,6 +425,15 @@
   - `endpoint_or_channel: argv [uv, run, --project, <repo-root>, python, -m, aibar.cli, ...]`
   - `payload_data_shape: forwarded CLI argv tokens and inherited environment`
   - `declaration_files: scripts/aibar.sh, src/aibar/aibar/cli.py`
+
+- `id: EDGE-006`
+  - `source: PROC:test-ext`
+  - `destination: PROC:aibar-launcher`
+  - `direction: launch-trigger`
+  - `mechanism: subprocess spawn`
+  - `endpoint_or_channel: argv [scripts/aibar.sh, gnome-install]`
+  - `payload_data_shape: forwarded extension-install command tokens`
+  - `declaration_files: scripts/test-gnome-extension.sh, scripts/aibar.sh`
 
 - `id: EDGE-001`
   - `source: PROC:gnome-shell`
