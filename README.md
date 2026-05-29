@@ -32,11 +32,12 @@ AIBar aggregates usage metrics for Claude, OpenAI, OpenRouter, GitHub Copilot, C
 
 ## Feature Highlights
 - Unified `show` command for multiple providers (`claude`, `openai`, `openrouter`, `copilot`, `codex`, `geminiai`).
-- Text output and machine output (`show --json`) with stable top-level sections (`payload`, `status`, `idle_time`, `freshness`, `extension`).
+- Text output and machine output (`show --json`) with stable top-level sections (`payload`, `status`, `idle_time`, `freshness`, `extension`, `enabled_providers`).
 - Per-run refresh override with `show --force` (bypasses idle-time gating for that execution).
-- Interactive setup (`setup`) for runtime controls, credentials, GeminiAI OAuth, provider currency symbols, and logging flags.
+- Interactive `setup` for provider enable/disable state, runtime throttling, Copilot overage pricing, provider currency symbols, GeminiAI OAuth/project settings, and logging flags.
 - Built-in lifecycle and observability flags: `--version|--ver`, `--upgrade`, `--uninstall`, `--enable-log`, `--disable-log`, `--enable-debug`, `--disable-debug`.
-- GNOME Shell extension support via `gnome-install` / `gnome-uninstall` plus JSON-driven auto-refresh metadata.
+- Startup release preflight that can emit update notices or fetch diagnostics before normal command output.
+- GNOME Shell extension support via `gnome-install` / `gnome-uninstall`, popup `Refresh Now`, and JSON-driven refresh/window metadata.
 
 ### Screenshot
 
@@ -161,11 +162,55 @@ aibar --enable-debug
 aibar --disable-debug
 ```
 
+- Startup behavior: every CLI invocation runs a latest-release preflight before command parsing. Notices and fetch diagnostics are idle-cached for about `300` seconds; `aibar --version` and `aibar --ver` still force one online check.
+- `--upgrade` and `--uninstall` execute only on Linux. On non-Linux platforms, AIBar prints the equivalent manual `uv` command.
+- Debug rows are emitted only when execution logging is enabled. For verbose API diagnostics, enable both `--enable-log` and `--enable-debug`.
+
 ### `show` window behavior
 
 - Allowed windows: `5h`, `7d`, `30d`.
-- `claude` and `codex` support dual-window rendering (`5h` and `7d`) in default text output.
+- `claude` and `codex` support dual-window rendering (`5h` and `7d`) in default text output when `--window` is not explicitly set.
 - For `copilot`, `openrouter`, `openai`, and `geminiai`, the effective window is fixed to `30d` even if another `--window` is provided.
+
+### `show --json` contract
+
+Top-level keys:
+- `payload`: normalized provider results keyed by provider id.
+- `status`: per-provider, per-window fetch outcomes (`OK` / `FAIL`) and cached error metadata.
+- `idle_time`: provider idle-time timestamps used for refresh gating.
+- `freshness`: provider `Updated` / `Next` timestamps used by CLI and GNOME views.
+- `extension`: GNOME-facing metadata (`gnome_refresh_interval_seconds`, `idle_delay_seconds`, `copilot_extra_premium_request_cost`, `window_labels`).
+- `enabled_providers`: normalized provider enable/disable map consumed by CLI and GNOME surfaces.
+
+### Setup persistence and config schema
+
+`aibar setup` writes:
+- `~/.config/aibar/env`: credentials entered during setup.
+- `~/.config/aibar/config.json`: runtime settings.
+
+User-editable `config.json` keys surfaced by setup:
+- `idle_delay_seconds` (default `300`)
+- `api_call_delay_milliseconds` (default `100`)
+- `api_call_timeout_milliseconds` (default `5000`)
+- `default_retry_after_seconds` (default `3600`)
+- `gnome_refresh_interval_seconds` (default `60`)
+- `billing_data` (default `billing_data`)
+- `enabled_providers` (missing provider keys default to enabled)
+- `copilot_extra_premium_request_cost` (default `0.04`)
+- `currency_symbols`
+- `log_enabled`
+- `debug_enabled`
+- `geminiai_project_id`
+
+### GNOME extension behavior
+
+- Installed path: `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/`.
+- Supported GNOME Shell versions: `45`, `46`, `47`, `48`.
+- Scheduled refreshes run `aibar show --json`.
+- Popup `Refresh Now` runs `aibar show --json --force`.
+- Disabled providers from `aibar setup` are hidden from panel labels, tabs, and cards.
+- Provider cards show `Updated: ..., Next: ...` freshness labels.
+- Auto-refresh interval follows `gnome_refresh_interval_seconds` from `aibar setup` / `config.json`.
 
 ### Repository helper scripts
 
@@ -175,6 +220,13 @@ scripts/aibar.sh --help
 
 # Claude token refresh helper
 scripts/claude_token_refresh.sh {start|stop|status|once|loop}
+
+# Override refresh interval (seconds; default: 1800)
+AIBAR_CLAUDE_REFRESH_INTERVAL_SECONDS=900 scripts/claude_token_refresh.sh start
+
+# Helper state files
+# log: ~/.config/aibar/claude_token_refresh.log
+# pid: ~/.config/aibar/claude_token_refresh.pid
 
 # GNOME nested-shell test helper
 # runs gnome-install, then starts a nested Wayland GNOME Shell (1280x720)
@@ -186,7 +238,7 @@ scripts/test-gnome-extension.sh
 To enable GeminiAI features, configure Google Cloud before running `aibar setup`:
 
 1. Create **Desktop Client OAuth 2.0** credentials in the target Google Cloud project.
-2. In `aibar setup`, configure GeminiAI OAuth client JSON (`file` or `paste`) and authorize requested scopes:
+2. In `aibar setup`, configure GeminiAI OAuth client JSON (`file` or `paste`) or re-authorize with `login`, then authorize requested scopes:
    - `https://www.googleapis.com/auth/bigquery.readonly`
    - `https://www.googleapis.com/auth/monitoring.read`
    - `https://www.googleapis.com/auth/cloud-platform`
