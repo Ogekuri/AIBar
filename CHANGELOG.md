@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.37.0](https://github.com/Ogekuri/AIBar/compare/v0.36.0..v0.37.0) - 2026-06-08
+### ⛰️  Features
+- Update pi-usereq files position.
+
+### 🐛  Bug Fixes
+- Edit comments.
+- Update references.
+
+### 🚜  Changes
+- align SRS with current docs and GNOME test runtime [useReq] *(docs)*
+  - update requirement paths to the active pi-usereq/docs surface
+  - align GNOME test-helper requirements with the install-and-launch 1280x720 flow
+  - refresh WORKFLOW.md for PROC:test-ext and launcher edge
+
 ## [0.36.0](https://github.com/Ogekuri/AIBar/compare/v0.35.0..v0.36.0) - 2026-04-19
 ### ⛰️  Features
 - preserve canonical provider order across surfaces [useReq] *(cli)*
@@ -1167,6 +1181,7 @@
 - \[0.34.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.34.0
 - \[0.35.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.35.0
 - \[0.36.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.36.0
+- \[0.37.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.37.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1204,3 +1219,4 @@
 [0.34.0]: https://github.com/Ogekuri/AIBar/compare/v0.33.0..v0.34.0
 [0.35.0]: https://github.com/Ogekuri/AIBar/compare/v0.34.0..v0.35.0
 [0.36.0]: https://github.com/Ogekuri/AIBar/compare/v0.35.0..v0.36.0
+[0.37.0]: https://github.com/Ogekuri/AIBar/compare/v0.36.0..v0.37.0
