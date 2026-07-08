@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.38.0](https://github.com/Ogekuri/AIBar/compare/v0.37.0..v0.38.0) - 2026-07-08
+### 🐛  Bug Fixes
+- Update README.md.
+
 ## [0.37.0](https://github.com/Ogekuri/AIBar/compare/v0.36.0..v0.37.0) - 2026-06-08
 ### ⛰️  Features
 - Update pi-usereq files position.
@@ -1182,6 +1186,7 @@
 - \[0.35.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.35.0
 - \[0.36.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.36.0
 - \[0.37.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.37.0
+- \[0.38.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.38.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1220,3 +1225,4 @@
 [0.35.0]: https://github.com/Ogekuri/AIBar/compare/v0.34.0..v0.35.0
 [0.36.0]: https://github.com/Ogekuri/AIBar/compare/v0.35.0..v0.36.0
 [0.37.0]: https://github.com/Ogekuri/AIBar/compare/v0.36.0..v0.37.0
+[0.38.0]: https://github.com/Ogekuri/AIBar/compare/v0.37.0..v0.38.0
