@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.39.0](https://github.com/Ogekuri/AIBar/compare/v0.38.0..v0.39.0) - 2026-07-13
+### ⛰️  Features
+- Add Z.ai quota unit-mapping regression tests [useReq] *(tests/zai)*
+  - Add tests/test_zai_quota_mapping.py covering ZaiProvider._extract_quotas unit->quota projection (3/6/5 -> 5h/weekly/monthly), percentage/reset_at normalization, malformed-entry skipping, and _max_percentage aggregation. Satisfies TST-060, REQ-136, REQ-137. Production code unchanged.
+- add Z.ai quota provider to CLI and GNOME extension [useReq] *(provider)*
+  - Add ZAI provider fetching 5h/weekly/monthly web-search quotas from
+  - https://api.z.ai/api/monitor/usage/quota/limit via ZAI_API_KEY
+  - Register zai as last provider in CLI text, GNOME tabs/cards, and panel
+  - status bar with distinct bright-cyan color (#64D2FF / ANSI 96)
+  - Render per-quota percentages and reset times as text usage rows
+  - (no progress bars); status-bar/icon driven from max quota percentage
+  - Add ZAI_API_KEY setup prompt and zai activation/currency prompts
+  - Reuse unmodified shared cache/idle-time pipeline (REQ-134..142)
+  - Update requirements/workflow/references and provider-inventory tests
+
 ## [0.38.0](https://github.com/Ogekuri/AIBar/compare/v0.37.0..v0.38.0) - 2026-07-08
 ### 🐛  Bug Fixes
 - Update README.md.
@@ -1187,6 +1202,7 @@
 - \[0.36.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.36.0
 - \[0.37.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.37.0
 - \[0.38.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.38.0
+- \[0.39.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.39.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1226,3 +1242,4 @@
 [0.36.0]: https://github.com/Ogekuri/AIBar/compare/v0.35.0..v0.36.0
 [0.37.0]: https://github.com/Ogekuri/AIBar/compare/v0.36.0..v0.37.0
 [0.38.0]: https://github.com/Ogekuri/AIBar/compare/v0.37.0..v0.38.0
+[0.39.0]: https://github.com/Ogekuri/AIBar/compare/v0.38.0..v0.39.0
