@@ -35,6 +35,7 @@ class ProviderName(str, Enum):
     COPILOT = "copilot"
     CODEX = "codex"
     GEMINIAI = "geminiai"
+    ZAI = "zai"
 
 
 class UsageMetrics(BaseModel):

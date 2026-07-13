@@ -222,6 +222,7 @@ def test_show_omits_disabled_provider_from_refresh_and_output(
         "copilot": "30d",
         "openrouter": "30d",
         "geminiai": "30d",
+        "zai": "30d",
     }
 
     text_result = runner.invoke(main, ["show"])

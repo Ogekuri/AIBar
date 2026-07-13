@@ -53,6 +53,7 @@ from aibar.providers import (
     CopilotProvider,
     CodexProvider,
     GeminiAIProvider,
+    ZaiProvider,
 )
 from aibar.providers.base import (
     BaseProvider,
@@ -93,6 +94,7 @@ _PROVIDER_PANEL_COLOR_CODES: dict[ProviderName, str] = {
     ProviderName.CODEX: "\033[92m",
     ProviderName.OPENAI: "\033[94m",
     ProviderName.GEMINIAI: "\033[95m",
+    ProviderName.ZAI: "\033[96m",
 }
 _API_COUNTER_PROVIDERS: frozenset[ProviderName] = frozenset(
     {
@@ -109,12 +111,14 @@ _SHOW_PROVIDER_ORDER: tuple[ProviderName, ...] = (
     ProviderName.CODEX,
     ProviderName.OPENAI,
     ProviderName.GEMINIAI,
+    ProviderName.ZAI,
 )
 _FIXED_WINDOW_BY_PROVIDER: dict[ProviderName, WindowPeriod] = {
     ProviderName.COPILOT: WindowPeriod.DAY_30,
     ProviderName.OPENROUTER: WindowPeriod.DAY_30,
     ProviderName.OPENAI: WindowPeriod.DAY_30,
     ProviderName.GEMINIAI: WindowPeriod.DAY_30,
+    ProviderName.ZAI: WindowPeriod.DAY_30,
 }
 _STARTUP_UPDATE_PROGRAM = "aibar"
 _STARTUP_UPDATE_URL = "https://api.github.com/repos/Ogekuri/AIBar/releases/latest"
@@ -2271,6 +2275,7 @@ def get_providers() -> dict[ProviderName, BaseProvider]:
         ProviderName.COPILOT: CopilotProvider(),
         ProviderName.CODEX: CodexProvider(),
         ProviderName.GEMINIAI: GeminiAIProvider(),
+        ProviderName.ZAI: ZaiProvider(),
     }
 
 
@@ -3169,7 +3174,7 @@ def main(ctx: click.Context) -> None:
     "--provider",
     "-p",
     default="all",
-    help="Provider to query (claude, openai, openrouter, copilot, codex, geminiai, all)",
+    help="Provider to query (claude, openai, openrouter, copilot, codex, geminiai, zai, all)",
 )
 @click.option(
     "--window",
@@ -3411,6 +3416,8 @@ def _provider_display_name(provider_name: ProviderName) -> str:
     """
     if provider_name == ProviderName.GEMINIAI:
         return "GEMINIAI"
+    if provider_name == ProviderName.ZAI:
+        return "Z.AI"
     return provider_name.value.upper()
 
 
@@ -3829,6 +3836,42 @@ def _build_copilot_extra_premium_cost_line(result: ProviderResult) -> str | None
     return "Cost: " + _format_bright_white_bold(f"{currency_symbol}{extra_cost:.4f}")
 
 
+def _build_zai_quota_lines(result: ProviderResult) -> list[str]:
+    """
+    @brief Build Z.ai per-quota usage and reset rows for CLI text panels.
+    @details Projects the normalized `raw.zai_quotas` array into one
+    `Usage: <label> <percent>%` row followed by one `Resets in: <duration>` row
+    per quota when a reset timestamp is available. Quotas without a parseable
+    percentage normalize to `0.0%`; quotas without a future reset time omit the
+    reset row. No progress-bar glyphs are emitted so Z.ai stays aligned with
+    text-usage providers.
+    @param result {ProviderResult} Z.ai provider result.
+    @return {list[str]} Ordered quota usage/reset detail lines.
+    @satisfies REQ-137
+    @satisfies REQ-140
+    """
+    lines: list[str] = []
+    quotas = result.raw.get("zai_quotas") if isinstance(result.raw, dict) else None
+    if not isinstance(quotas, list):
+        return lines
+    for quota in quotas:
+        if not isinstance(quota, dict):
+            continue
+        label = quota.get("label") or quota.get("key") or "Quota"
+        percentage = quota.get("percentage")
+        percentage_value = (
+            float(percentage) if isinstance(percentage, (int, float)) else 0.0
+        )
+        lines.append(f"Usage: {label} {percentage_value:.1f}%")
+        reset_at = quota.get("reset_at")
+        if isinstance(reset_at, datetime):
+            delta = reset_at - datetime.now(timezone.utc)
+            if delta.total_seconds() > 0:
+                lines.append(
+                    f"Resets in: {_format_reset_duration(delta.total_seconds())}"
+                )
+    return lines
+
 def _build_result_panel(
     name: ProviderName,
     result: ProviderResult,
@@ -3884,6 +3927,15 @@ def _build_result_panel(
     freshness_line = _build_freshness_line(
         result=result, freshness_state=freshness_state
     )
+
+    if name == ProviderName.ZAI:
+        return title, [
+            "Status: OK",
+            "",
+            *_build_zai_quota_lines(result),
+            "",
+            freshness_line,
+        ]
 
     m = result.metrics
     usage_percent = m.usage_percent
@@ -4483,6 +4535,7 @@ def setup() -> None:
         ProviderName.CODEX,
         ProviderName.OPENAI,
         ProviderName.GEMINIAI,
+        ProviderName.ZAI,
     ]
     enabled_providers: dict[str, bool] = {}
     for activation_provider in activation_provider_order:
@@ -4715,6 +4768,19 @@ def setup() -> None:
     ).strip()
     if github_token:
         updates["GITHUB_TOKEN"] = github_token
+        click.echo("  -> Set")
+    else:
+        click.echo("  -> Skipped")
+    click.echo()
+
+    # Z.ai API key
+    click.echo(click.style("Z.ai", bold=True))
+    click.echo("  Get your API key from the Z.ai account/monitor dashboard.")
+    zai_key = click.prompt(
+        "  ZAI_API_KEY", default="", show_default=False
+    ).strip()
+    if zai_key:
+        updates["ZAI_API_KEY"] = zai_key
         click.echo("  -> Set")
     else:
         click.echo("  -> Skipped")

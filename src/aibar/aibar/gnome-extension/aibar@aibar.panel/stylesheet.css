@@ -83,6 +83,10 @@
     border-bottom: 2px solid #BF5AF2;
 }
 
+.aibar-tab-active-zai {
+    border-bottom: 2px solid #64D2FF;
+}
+
 /* Tab label (base + per-provider color) */
 .aibar-tab-label {
     font-size: 0.8em;
@@ -114,6 +118,10 @@
 
 .aibar-tab-label-geminiai {
     color: #BF5AF2;
+}
+
+.aibar-tab-label-zai {
+    color: #64D2FF;
 }
 
 /* Separator */
@@ -170,6 +178,10 @@
 
 .aibar-provider-geminiai {
     border-left: 3px solid #BF5AF2;
+}
+
+.aibar-provider-zai {
+    border-left: 3px solid #64D2FF;
 }
 
 /* Progress bars */
@@ -286,6 +298,10 @@
 
 .aibar-progress-provider-geminiai {
     background-color: #BF5AF2;
+}
+
+.aibar-progress-provider-zai {
+    background-color: #64D2FF;
 }
 
 .aibar-progress-danger {

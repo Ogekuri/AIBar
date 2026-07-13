@@ -679,6 +679,7 @@ class Config:
         ProviderName.COPILOT: "GITHUB_TOKEN",
         ProviderName.CODEX: "CODEX_ACCESS_TOKEN",
         ProviderName.GEMINIAI: "GEMINIAI_OAUTH_ACCESS_TOKEN",
+        ProviderName.ZAI: "ZAI_API_KEY",
     }
 
     # Provider descriptions
@@ -718,6 +719,12 @@ class Config:
             "description": "Google Gemini API usage via OAuth",
             "official": True,
             "note": "Uses Google Cloud Monitoring API",
+        },
+        ProviderName.ZAI: {
+            "name": "Z.ai",
+            "description": "Z.ai account quota usage via monitor API",
+            "official": True,
+            "note": "Uses Z.ai monitor quota-limit endpoint",
         },
     }
 
@@ -780,6 +787,7 @@ class Config:
             CopilotProvider,
             CodexProvider,
             GeminiAIProvider,
+            ZaiProvider,
         )
 
         provider_map = {
@@ -789,6 +797,7 @@ class Config:
             ProviderName.COPILOT: CopilotProvider,
             ProviderName.CODEX: CodexProvider,
             ProviderName.GEMINIAI: GeminiAIProvider,
+            ProviderName.ZAI: ZaiProvider,
         }
 
         provider_class = provider_map.get(provider)

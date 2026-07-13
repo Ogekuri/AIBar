@@ -97,6 +97,7 @@ def test_show_json_emits_extension_section_with_default_gnome_refresh_interval(
         "openrouter": "30d",
         "openai": "30d",
         "geminiai": "30d",
+        "zai": "30d",
     }
     assert doc["enabled_providers"] == {
         "claude": True,
@@ -105,6 +106,7 @@ def test_show_json_emits_extension_section_with_default_gnome_refresh_interval(
         "copilot": True,
         "codex": True,
         "geminiai": True,
+        "zai": True,
     }
 
 
@@ -173,6 +175,7 @@ def test_show_json_emits_extension_section_with_configured_gnome_refresh_interva
     assert doc["extension"]["window_labels"] == {
         "copilot": "30d",
         "geminiai": "30d",
+        "zai": "30d",
     }
     assert doc["enabled_providers"] == {
         "claude": True,
@@ -181,6 +184,7 @@ def test_show_json_emits_extension_section_with_configured_gnome_refresh_interva
         "codex": True,
         "openai": False,
         "geminiai": True,
+        "zai": True,
     }
 
 
@@ -233,6 +237,7 @@ def test_show_json_extension_section_does_not_appear_in_cache_payload(
         "openrouter": "30d",
         "openai": "30d",
         "geminiai": "30d",
+        "zai": "30d",
     }
 
     cache_file = cache_dir / "cache.json"

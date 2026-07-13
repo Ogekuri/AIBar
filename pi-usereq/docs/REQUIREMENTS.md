@@ -111,13 +111,13 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **CTN-014**: MUST perform at most one startup update HTTP check per 300 seconds unless `~/.cache/aibar/check_version_idle-time.json` is missing or expired.
 - **CTN-015**: MUST use lifecycle command strings exactly as `uv tool install aibar --force --from git+https://github.com/Ogekuri/AIBar.git` and `uv tool uninstall aibar`.
 - **CTN-016**: MUST allow `~/.cache/aibar/idle-time.json` provider entries to include optional boolean field `oauth_refresh_blocked` for Claude authentication-retry suppression state.
-- **CTN-017**: MUST persist `enabled_providers` in `~/.config/aibar/config.json` as provider-keyed booleans for `claude`, `openrouter`, `copilot`, `codex`, `openai`, and `geminiai`; missing keys MUST default to `true`.
+- **CTN-017**: MUST persist `enabled_providers` in `~/.config/aibar/config.json` as provider-keyed booleans for `claude`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, and `zai`; missing keys MUST default to `true`.
 
 ## 3. Requirements
 
 ### 3.1 Design and Implementation
 - **DES-001**: MUST define `BaseProvider` as an abstract interface with `fetch`, `is_configured`, and `get_config_help`.
-- **DES-002**: MUST encode supported windows as `5h`, `7d`, `30d`, and `code_review` and provider names as `claude`, `openai`, `openrouter`, `copilot`, and `codex`.
+- **DES-002**: MUST encode supported windows as `5h`, `7d`, `30d`, and `code_review` and provider names as `claude`, `openai`, `openrouter`, `copilot`, `codex`, `geminiai`, and `zai`.
 - **DES-003**: MUST reject invalid CLI window values and provider values using Click `BadParameter`.
 - **DES-004**: MUST sanitize sensitive keys (`token`, `key`, `secret`, `password`, `authorization`) from cached raw payloads before disk writes.
 - **DES-005**: MUST parse env-file assignments with optional `export`, quoted values, and inline comments in GNOME extension env loading.
@@ -131,7 +131,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-003**: MUST emit pretty-printed JSON (`indent=2`) for `show --json` with top-level sections `payload`, `status`, `idle_time`, `freshness`, and `extension`; `freshness` MUST expose provider-keyed `last_success_timestamp`/`idle_until_timestamp` plus local-time `%Y-%m-%d %H:%M` strings, and `extension` MUST expose `gnome_refresh_interval_seconds`, `idle_delay_seconds`, `copilot_extra_premium_request_cost`, and provider-keyed `window_labels` values consumed by GNOME provider bars.
 - **REQ-004**: MUST run provider health checks in `doctor` using the 5-hour window and report per-provider configuration and test status.
 - **REQ-005**: MUST prompt `setup` for `idle_delay_seconds` (`300`) first, `api_call_delay_milliseconds` (`100`) second, `api_call_timeout_milliseconds` (`5000`) third, `default_retry_after_seconds` (`3600`) fourth, `gnome_refresh_interval_seconds` (`60`) fifth, and `billing_data` (`billing_data`) sixth, then persist values in `~/.config/aibar/config.json`.
-- **REQ-123**: `setup` MUST present a dedicated provider activation section before all other setup sections and prompt toggleable `enable`/`disable` values for `claude`, `openrouter`, `copilot`, `codex`, `openai`, and `geminiai`.
+- **REQ-123**: `setup` MUST present a dedicated provider activation section before all other setup sections and prompt toggleable `enable`/`disable` values for `claude`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, and `zai`.
 - **REQ-006**: MUST fail Claude login when CLI credentials are missing or expired and MUST print `claude setup-token` remediation guidance.
 - **REQ-007**: MUST execute GitHub device-flow login for Copilot and save the token in `~/.config/aibar/copilot.json`.
 - **REQ-009**: MUST execute provider retrieval for `show` in this order: force-flag handling, per-provider idle-time evaluation, per-provider conditional refresh to `~/.cache/aibar/cache.json`, then data load from `~/.cache/aibar/cache.json`.
@@ -147,10 +147,10 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-016**: MUST load `~/.config/aibar/env` into subprocess environment before GNOME extension executes `aibar show --json` and before popup `Refresh Now` executes `aibar show --json --force`.
 - **REQ-017**: GNOME provider cards MUST render `FAIL` blocks as `Status: FAIL`, blank line, `Reason: <reason>`, blank line, and `Updated: <datetime>, Next: <datetime>`, and MUST NOT render `Window 5h:`, `Window 7d:`, or `Window 30d:` text.
 - **REQ-018**: MUST set GNOME panel label to `Err` and truncate popup error text to 40 characters when command execution or JSON parsing fails.
-- **REQ-019**: SHOULD order extension provider tabs/cards by `claude`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, with providers not listed in ordering array appended alphabetically.
+- **REQ-019**: SHOULD order extension provider tabs/cards by `claude`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, `zai`, with providers not listed in ordering array appended alphabetically.
 - **REQ-020**: MUST include each discovered configured-source symbol in `pi-usereq/docs/REFERENCES.md` with file path, symbol kind, line-range evidence, and parsed Doxygen fields (`@brief`, `@param`, `@return`, `@throws`) when present in source declarations.
 - **REQ-021**: GNOME panel status labels MUST render `Err` only for providers whose `status.result=FAIL` category is OAuth or rate-limit, while providers without those failures MUST keep normal percentage/cost labels.
-- **REQ-022**: MUST style GNOME panel tab and label fonts with provider classes and bright colors: Claude red, OpenRouter orange, Copilot yellow, Codex green, OpenAI blue, GeminiAI purple; cost labels MUST use the same font family, render when numeric value is `0`, and hide only when cost metric is unavailable.
+- **REQ-022**: MUST style GNOME panel tab and label fonts with provider classes and bright colors: Claude red, OpenRouter orange, Copilot yellow, Codex green, OpenAI blue, GeminiAI purple, Z.ai cyan; cost labels MUST use the same font family, render when numeric value is `0`, and hide only when cost metric is unavailable.
 - **REQ-023**: MUST declare a `[project.scripts]` entry `aibar = "aibar.cli:main"` in `pyproject.toml` so that `uv pip install` and `uvx` resolve the `aibar` console command.
 - **REQ-024**: MUST provide `src/aibar/aibar/__main__.py` that delegates to `aibar.cli:main` to enable `python -m aibar` execution.
 - **REQ-025**: MUST resolve GNOME extension source files from within the `aibar` Python package directory via module-relative path resolution (`Path(__file__).resolve().parent / "gnome-extension" / <UUID>`) in `gnome-install`, independent of git repository, working directory, or installation method (editable, wheel, `uv tool`).
@@ -256,7 +256,18 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-105**: MUST clear `claude.oauth_refresh_blocked` when `show --force` is used and MUST auto-clear it when current epoch exceeds `last_success_timestamp + 86400`.
 - **REQ-086**: `scripts/aibar.sh` MUST execute CLI via `uv run python -m aibar.cli` and MUST NOT create, activate, or install dependencies into repository-local or system virtual environments.
 - **REQ-087**: Repository root MUST track `uv.lock`, MUST NOT track `requirements.txt`, and MUST keep `README.md` instructions for optional export command `uv export --format requirements-txt > requirements.txt`.
-- **REQ-133**: CLI `show` panels, GNOME tabs/cards, and GNOME panel status labels MUST preserve canonical order `claude`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai` after disabled providers are filtered out.
+- **REQ-133**: CLI `show` panels, GNOME tabs/cards, and GNOME panel status labels MUST preserve canonical order `claude`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, `zai` after disabled providers are filtered out.
+
+### 3.3 Z.ai Provider
+- **REQ-134**: MUST implement provider `zai` (Z.ai) that fetches quota data from `https://api.z.ai/api/monitor/usage/quota/limit` using `Authorization: Bearer <key>` and `Accept: application/json` headers.
+- **REQ-135**: MUST resolve the Z.ai API key from `ZAI_API_KEY` with env var then `~/.config/aibar/env` precedence and MUST prompt it in `setup`.
+- **REQ-136**: MUST map Z.ai `data.limits` entries by `unit`: `3`/`number=5` to 5 Hours Quota, `6`/`number=1` to Weekly Quota, `5`/`number=1`/`TIME_LIMIT` to Total Monthly Web Search/Reader/Zread Quota.
+- **REQ-137**: MUST expose each Z.ai quota `percentage` and `nextResetTime`; Weekly and Monthly Web Search reset times MUST render in CLI text and GNOME provider card.
+- **REQ-138**: MUST render Z.ai as the last provider in CLI text panels, GNOME tabs/cards, and GNOME panel status bar.
+- **REQ-139**: MUST drive Z.ai GNOME panel status bar percentage and panel icon threshold color from the maximum percentage across all Z.ai quotas.
+- **REQ-140**: MUST render Z.ai quotas as text usage rows without progress bars in CLI text and GNOME provider cards, consistent with text-usage providers.
+- **REQ-141**: MUST treat Z.ai as a single fixed-window provider with effective window `30d` that ignores the requested window and fetches all quotas in one API call.
+- **REQ-142**: MUST reuse the shared provider cache and idle-time lifecycle for Z.ai without modifying cache, idle-time, retry, or throttling logic.
 
 ## 4. Test Requirements
 
@@ -314,6 +325,8 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-052**: MUST verify GNOME cards render >100 progress bars only for `claude`, `openrouter`, `copilot`, and `codex`, and render `openai`/`geminiai` usage as text without bars.
 - **TST-054**: MUST verify CLI text `show` renders progress bars only for `claude`, `openrouter`, `copilot`, and `codex`, and renders `openai`/`geminiai` usage rows without bars.
 - **TST-059**: MUST verify CLI text `show` renders `openrouter` OK-state usage as `Usage: <window> <progress_bar> <percent>%` using the standard fixed-width CLI progress-bar format.
+- **TST-060**: MUST verify Z.ai fetch maps the three `unit` quota entries to 5 Hours, Weekly, and Monthly Web Search quotas and exposes each `percentage` and `nextResetTime`.
+- **TST-061**: MUST verify Z.ai renders last with cyan color in CLI text and GNOME extension and that the GNOME panel status bar shows the maximum Z.ai quota percentage.
 - **TST-036**: MUST verify `--version` and `--ver` print installed version, bypass subcommand execution, and force one online startup release check even when `check_version_idle-time.json` contains future `idle_until`.
 - **TST-038**: MUST verify CLI text `show` renders `FAIL` blocks as `Status: FAIL`, blank line, `Reason: <reason>`, blank line, and right-aligned `Updated/Next`, never renders `Window 5h:/7d:/30d:` headings, and preserves `show --json` freshness, API-counter, cost, and GeminiAI effective-window behaviors.
 - **TST-042**: MUST verify CLI `show` and GNOME provider cards render equivalent failed-provider blocks formatted as `Status: FAIL`, blank line, `Reason: <reason>`, blank line, and `Updated/Next`, without `Window 5h:/7d:/30d:` headings.
@@ -466,3 +479,14 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-078 | `src/aibar/aibar/cli.py` + `_handle_version_option` prints installed version and exits; `StartupPreflightGroup.main` forces one online startup release check for `--version`/`--ver` even with future `check_version_idle-time.json` `idle_until`. |
 | TST-032 | `tests/test_cli_startup_update_preflight.py` + idle-gating test for normal invocations plus `test_version_flags_force_startup_online_check_bypassing_idle_gate` asserting `--version`/`--ver` ignore startup idle-time gate. |
 | TST-036 | `tests/test_cli_startup_update_preflight.py` + `test_version_and_ver_print_installed_version_without_dispatch` and version-idle-bypass test verify version output/dispatch bypass plus forced online startup check behavior. |
+| REQ-134 | `src/aibar/aibar/providers/zai.py` + `ZaiProvider.fetch` + `QUOTA_URL = "https://api.z.ai/api/monitor/usage/quota/limit"` with `Authorization: Bearer <key>` and `Accept: application/json` headers. |
+| REQ-135 | `src/aibar/aibar/config.py` + `Config.ENV_VARS[ProviderName.ZAI] = "ZAI_API_KEY"` and `src/aibar/aibar/cli.py` + `setup` Z.ai API key prompt writing `ZAI_API_KEY` to `~/.config/aibar/env`. |
+| REQ-136 | `src/aibar/aibar/providers/zai.py` + `_parse_response`/`_extract_quotas` mapping `unit` 3/6/5 to 5 Hours, Weekly, and Monthly Web Search quotas. |
+| REQ-137 | `src/aibar/aibar/providers/zai.py` + per-quota `percentage`/`reset_at`; `src/aibar/aibar/cli.py` + `_build_zai_quota_lines`; `src/aibar/aibar/gnome-extension/.../extension.js` + Z.ai quota/reset rendering branch. |
+| REQ-138 | `src/aibar/aibar/cli.py` + `_SHOW_PROVIDER_ORDER` trailing `zai`; `src/aibar/aibar/gnome-extension/.../extension.js` + `_providerOrder`/`providerErrPriority` trailing `zai`. |
+| REQ-139 | `src/aibar/aibar/gnome-extension/.../extension.js` + `_updateUI` Z.ai panel percentage from max quota percentage and `_updateIconColor` threshold input. |
+| REQ-140 | `src/aibar/aibar/providers/base.py` Z.ai text-usage treatment; `src/aibar/aibar/cli.py` + Z.ai text rows; `src/aibar/aibar/gnome-extension/.../extension.js` + `TEXT_USAGE_PROVIDERS` includes `zai`. |
+| REQ-141 | `src/aibar/aibar/cli.py` + `_FIXED_WINDOW_BY_PROVIDER[ProviderName.ZAI] = WindowPeriod.DAY_30`; `src/aibar/aibar/providers/zai.py` single-call fetch. |
+| REQ-142 | `src/aibar/aibar/providers/zai.py` returns `ProviderResult` consumed by unmodified `retrieve_results_via_cache_pipeline`, `_record_attempt_status`, and idle-time lifecycle helpers. |
+| TST-060 | `src/aibar/aibar/providers/zai.py` + `_extract_quotas`/`_build_quota` map `unit` 3/6/5 to 5 Hours, Weekly, and Monthly Web Search quotas with per-quota `percentage`/`reset_at`; dedicated standalone test pending (no existing test maps to this module). |
+| TST-061 | `tests/test_geminiai_surface_integration.py` + `tests/test_extension_quota_label.py` + Z.ai last-position, cyan `aibar-tab-label-zai`/`aibar-progress-provider-zai`, `TEXT_USAGE_PROVIDERS` includes `zai`, and `src/aibar/aibar/cli.py` + `_SHOW_PROVIDER_ORDER`/`_PROVIDER_PANEL_COLOR_CODES` trailing `zai`; `src/aibar/aibar/gnome-extension/.../extension.js` + `_updateUI` zai max-percentage panel label. |
