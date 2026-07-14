@@ -3481,20 +3481,22 @@ def _should_render_cli_progress_bar(provider_name: ProviderName) -> bool:
     @brief Determine whether one CLI usage row must include a progress bar.
     @details Returns true only for providers whose CLI `show` rows use the
     fixed-width bracketed progress-bar surface: `claude`, `openrouter`,
-    `copilot`, and `codex`. Returns false for `openai` and `geminiai`, which
-    render text-only usage rows. Time complexity O(1). Space complexity O(1).
+    `copilot`, `codex`, and `zai`. Returns false for `openai` and `geminiai`,
+    which render text-only usage rows. Time complexity O(1). Space complexity O(1).
     @param provider_name {ProviderName} Provider enum key.
     @return {bool} True when CLI usage rendering must include bar glyphs.
     @satisfies REQ-122
     @satisfies REQ-128
     @satisfies REQ-131
     @satisfies REQ-132
+    @satisfies REQ-140
     """
     return provider_name in (
         ProviderName.CLAUDE,
         ProviderName.OPENROUTER,
         ProviderName.COPILOT,
         ProviderName.CODEX,
+        ProviderName.ZAI,
     )
 
 
@@ -3876,15 +3878,16 @@ def _build_zai_quota_lines(result: ProviderResult) -> list[str]:
     """
     @brief Build Z.ai per-quota usage and reset rows for CLI text panels.
     @details Projects the normalized `raw.zai_quotas` array into one
-    `Usage: <label> <percent>%` row followed by one `Resets in: <duration>` row
-    per quota when a reset timestamp is available. Quotas without a parseable
-    percentage normalize to `0.0%`; quotas without a future reset time omit the
-    reset row. Reset datetimes are resolved via `_coerce_zai_quota_reset_at`
-    from the round-trip-safe `reset_at_epoch_ms` field (with `datetime`/ISO-string
+    `Usage: <label> <progress_bar> <percent>%` row followed by one
+    `Resets in: <duration>` row per quota when a reset timestamp is available.
+    Quotas without a parseable percentage normalize to `0.0%`; quotas without a
+    future reset time omit the reset row. Usage rows delegate to
+    `_build_cli_usage_line(ProviderName.ZAI, ...)` so Z.ai renders the standard
+    fixed-width bracketed progress bar like `claude/openrouter/copilot/codex`.
+    Reset datetimes are resolved via `_coerce_zai_quota_reset_at` from the
+    round-trip-safe `reset_at_epoch_ms` field (with `datetime`/ISO-string
     `reset_at` fallback) so cached `show` executions render `Resets in:` rows
-    after the `model_dump(mode="json")` -> `model_validate` cache round-trip. No
-    progress-bar glyphs are emitted so Z.ai stays aligned with text-usage
-    providers.
+    after the `model_dump(mode="json")` -> `model_validate` cache round-trip.
     @param result {ProviderResult} Z.ai provider result.
     @return {list[str]} Ordered quota usage/reset detail lines.
     @satisfies REQ-137
@@ -3902,7 +3905,7 @@ def _build_zai_quota_lines(result: ProviderResult) -> list[str]:
         percentage_value = (
             float(percentage) if isinstance(percentage, (int, float)) else 0.0
         )
-        lines.append(f"Usage: {label} {percentage_value:.1f}%")
+        lines.append(_build_cli_usage_line(ProviderName.ZAI, label, percentage_value))
         reset_at = _coerce_zai_quota_reset_at(quota)
         if reset_at is not None:
             delta = reset_at - datetime.now(timezone.utc)

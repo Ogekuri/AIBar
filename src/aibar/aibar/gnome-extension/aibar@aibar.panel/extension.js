@@ -42,8 +42,8 @@ const PROVIDER_DISPLAY_NAMES = {
     zai: 'Z.AI',
 };
 const API_COUNTER_PROVIDERS = new Set(['openai', 'openrouter', 'codex', 'geminiai']);
-const PROGRESS_BAR_PROVIDERS = new Set(['claude', 'openrouter', 'copilot', 'codex']);
-const TEXT_USAGE_PROVIDERS = new Set(['openai', 'geminiai', 'zai']);
+const PROGRESS_BAR_PROVIDERS = new Set(['claude', 'openrouter', 'copilot', 'codex', 'zai']);
+const TEXT_USAGE_PROVIDERS = new Set(['openai', 'geminiai']);
 const WINDOW_BAR_30D_PROVIDERS = new Set(['copilot', 'openrouter']);
 const DEFAULT_WINDOW_LABELS = Object.freeze({
     copilot: '30d',
@@ -850,6 +850,12 @@ class AIBarIndicator extends PanelMenu.Button {
         this._panelZaiPctLabel = new St.Label({
             text: '',
             y_align: Clutter.ActorAlign.CENTER,
+            style_class: 'aibar-panel-pct aibar-panel-pct-secondary aibar-tab-label-zai',
+        });
+
+        this._panelZaiWeeklyPctLabel = new St.Label({
+            text: '',
+            y_align: Clutter.ActorAlign.CENTER,
             style_class: 'aibar-panel-pct aibar-panel-pct-primary aibar-tab-label-zai',
         });
 
@@ -865,6 +871,7 @@ class AIBarIndicator extends PanelMenu.Button {
         this._panelOpenAICostLabel.hide();
         this._panelGeminiaiCostLabel.hide();
         this._panelZaiPctLabel.hide();
+        this._panelZaiWeeklyPctLabel.hide();
         this._panelLabel.hide();
 
         this._panelPercentages.add_child(this._panelClaudePctLabel);
@@ -879,6 +886,7 @@ class AIBarIndicator extends PanelMenu.Button {
         this._panelPercentages.add_child(this._panelOpenAICostLabel);
         this._panelPercentages.add_child(this._panelGeminiaiCostLabel);
         this._panelPercentages.add_child(this._panelZaiPctLabel);
+        this._panelPercentages.add_child(this._panelZaiWeeklyPctLabel);
 
         this._panelBox.add_child(this._icon);
         this._panelBox.add_child(this._panelPercentages);
@@ -987,14 +995,21 @@ class AIBarIndicator extends PanelMenu.Button {
                 if (!card._barData)
                     continue;
 
-                if (card._barData.fiveHour)
+                if (card._barData.fiveHour && card.fiveHourBar)
                     _applyProgressFillGeometry(card.fiveHourBar.barFill, card.fiveHourBar.barBg, card._barData.fiveHour.pct);
 
-                if (card._barData.sevenDay)
+                if (card._barData.sevenDay && card.sevenDayBar)
                     _applyProgressFillGeometry(card.sevenDayBar.barFill, card.sevenDayBar.barBg, card._barData.sevenDay.pct);
 
                 if (card._barData.progress)
                     _applyProgressFillGeometry(card.progressFill, card.progressBg, card._barData.progress.pct);
+
+                if (Array.isArray(card._barData.zaiQuotas)) {
+                    for (const entry of card._barData.zaiQuotas) {
+                        if (entry && entry.bar)
+                            _applyProgressFillGeometry(entry.bar.barFill, entry.bar.barBg, entry.pct);
+                    }
+                }
             }
             return GLib.SOURCE_REMOVE;
         });
@@ -1231,11 +1246,23 @@ class AIBarIndicator extends PanelMenu.Button {
             style_class: 'aibar-window-bars',
         });
 
-        let fiveHourBar = createWindowBar('5h');
-        let sevenDayBar = createWindowBar('7d');
-
-        windowBars.add_child(fiveHourBar.container);
-        windowBars.add_child(sevenDayBar.container);
+        let fiveHourBar = null;
+        let sevenDayBar = null;
+        let zaiQuotaBars = [];
+        if (providerName === 'zai') {
+            zaiQuotaBars = [
+                createWindowBar('5 Hours'),
+                createWindowBar('Weekly'),
+                createWindowBar('Monthly Web Search'),
+            ];
+            for (const bar of zaiQuotaBars)
+                windowBars.add_child(bar.container);
+        } else {
+            fiveHourBar = createWindowBar('5h');
+            sevenDayBar = createWindowBar('7d');
+            windowBars.add_child(fiveHourBar.container);
+            windowBars.add_child(sevenDayBar.container);
+        }
         windowBars.hide();
 
         container.add_child(windowBars);
@@ -1294,6 +1321,7 @@ class AIBarIndicator extends PanelMenu.Button {
             windowBars,
             fiveHourBar,
             sevenDayBar,
+            zaiQuotaBars,
             costLabel,
             byokLabel,
             requestsLabel,
@@ -1312,9 +1340,11 @@ class AIBarIndicator extends PanelMenu.Button {
      * while keeping `Updated: ..., Next: ...` freshness output and suppressing
      * usage/reset/quota/cost rows. Successful states render metrics using
      * existing provider-specific card rules, including Copilot
-     * `Cost: <currency_symbol><value>` row. `claude/openrouter/copilot/codex`
+     * `Cost: <currency_symbol><value>` row. `claude/openrouter/copilot/codex/zai`
      * keep progress bars, while `openai/geminiai` render
-     * `Usage: <window> <percent>%` text without bar widgets. Dual-window
+     * `Usage: <window> <percent>%` text without bar widgets. Z.ai renders one
+     * per-quota progress bar with its `Reset in:` label in the same location as
+     * other providers. Dual-window
      * providers preserve fixed left labels `5h` and `7d`; progress-width
      * geometry recalculation must not blank those labels.
      * @param {any} card Input parameter `card`.
@@ -1390,8 +1420,14 @@ class AIBarIndicator extends PanelMenu.Button {
             card.progressFill.set_width(0);
             card.progressLabel.text = '';
             card.windowBars.hide();
-            card.fiveHourBar.container.hide();
-            card.sevenDayBar.container.hide();
+            if (card.fiveHourBar)
+                card.fiveHourBar.container.hide();
+            if (card.sevenDayBar)
+                card.sevenDayBar.container.hide();
+            if (card.zaiQuotaBars) {
+                for (const bar of card.zaiQuotaBars)
+                    bar.container.hide();
+            }
             card.progressContainer.hide();
             return;
         }
@@ -1403,10 +1439,7 @@ class AIBarIndicator extends PanelMenu.Button {
         else
             card.updateAtLabel.hide();
         if (providerName === 'zai') {
-            card._barData = {fiveHour: null, sevenDay: null, progress: null};
-            card.windowBars.hide();
-            card.fiveHourBar.container.hide();
-            card.sevenDayBar.container.hide();
+            card.progressContainer.hide();
             card.progressBg.hide();
             card.progressFill.style_class = 'aibar-progress-fill aibar-progress-none';
             card.progressFill.set_width(0);
@@ -1418,18 +1451,30 @@ class AIBarIndicator extends PanelMenu.Button {
                 card.progressFill._aibarOverLimitActor.set_width(0);
                 card.progressFill._aibarOverLimitActor.hide();
             }
+            if (card.fiveHourBar)
+                card.fiveHourBar.container.hide();
+            if (card.sevenDayBar)
+                card.sevenDayBar.container.hide();
             const zaiQuotas = Array.isArray(raw.zai_quotas) ? raw.zai_quotas : [];
-            const quotaLines = [];
-            const resetLines = [];
-            for (const quota of zaiQuotas) {
-                if (!quota || typeof quota !== 'object')
+            const zaiBars = Array.isArray(card.zaiQuotaBars) ? card.zaiQuotaBars : [];
+            const zaiBarData = [];
+            const progressClass = _getProviderProgressClass('zai');
+            for (let i = 0; i < zaiBars.length; i++) {
+                const bar = zaiBars[i];
+                const quota = zaiQuotas[i];
+                if (!quota || typeof quota !== 'object') {
+                    bar.container.hide();
                     continue;
+                }
                 const quotaLabel = quota.label || quota.key || 'Quota';
                 const quotaPercentage = (
                     typeof quota.percentage === 'number' &&
                     Number.isFinite(quota.percentage)
                 ) ? quota.percentage : 0;
-                quotaLines.push(`Usage: ${quotaLabel} ${quotaPercentage.toFixed(1)}%`);
+                bar.label.set_text(quotaLabel);
+                bar.pctLabel.set_text(`${quotaPercentage.toFixed(1)}%`);
+                bar.barFill.style_class = `aibar-progress-fill ${progressClass}`;
+                let resetText = '';
                 const resetMs = (
                     typeof quota.reset_at_epoch_ms === 'number' &&
                     Number.isFinite(quota.reset_at_epoch_ms)
@@ -1442,27 +1487,28 @@ class AIBarIndicator extends PanelMenu.Button {
                         const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
                         const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
                         const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-                        const resetText = days > 0
-                            ? `${days}d ${hours}h ${mins}m`
-                            : `${hours}h ${mins}m`;
-                        resetLines.push(`${quotaLabel}: Resets in: ${resetText}`);
+                        resetText = days > 0
+                            ? `Reset in: ${days}d ${hours}h ${mins}m`
+                            : `Reset in: ${hours}h ${mins}m`;
                     }
                 }
+                bar.resetLabel.set_text(resetText);
+                if (resetText.length > 0)
+                    bar.resetLabel.show();
+                else
+                    bar.resetLabel.hide();
+                const pctValue = quotaPercentage;
+                GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+                    _applyProgressFillGeometry(bar.barFill, bar.barBg, pctValue);
+                    return GLib.SOURCE_REMOVE;
+                });
+                bar.container.show();
+                zaiBarData.push({bar, pct: quotaPercentage});
             }
-            if (quotaLines.length > 0) {
-                card.progressLabel.text = quotaLines.join('\n');
-                card.progressContainer.show();
-            } else {
-                card.progressLabel.text = '';
-                card.progressContainer.hide();
-            }
-            if (resetLines.length > 0) {
-                card.resetsLabel.text = resetLines.join('\n');
-                card.resetsLabel.show();
-            } else {
-                card.resetsLabel.text = '';
-                card.resetsLabel.hide();
-            }
+            card._barData = {fiveHour: null, sevenDay: null, progress: null, zaiQuotas: zaiBarData};
+            card.windowBars.show();
+            card.resetsLabel.text = '';
+            card.resetsLabel.hide();
             card.costLabel.text = '';
             card.costLabel.hide();
             card.byokLabel.text = '';
@@ -2165,6 +2211,7 @@ class AIBarIndicator extends PanelMenu.Button {
             openaiCost: this._panelOpenAICostLabel,
             geminiaiCost: this._panelGeminiaiCostLabel,
             zai: this._panelZaiPctLabel,
+            zaiWeekly: this._panelZaiWeeklyPctLabel,
         };
 
         const toPercent = (value) => {
@@ -2185,6 +2232,8 @@ class AIBarIndicator extends PanelMenu.Button {
                 const quotas = raw.zai_quotas;
                 if (Array.isArray(quotas) && quotas.length > 0) {
                     let maxPct = null;
+                    let fiveHourPct = null;
+                    let weeklyPct = null;
                     for (const quota of quotas) {
                         if (
                             quota &&
@@ -2193,9 +2242,18 @@ class AIBarIndicator extends PanelMenu.Button {
                         ) {
                             if (maxPct === null || quota.percentage > maxPct)
                                 maxPct = quota.percentage;
+                            const quotaKey = quota.key || '';
+                            if (quotaKey === '5h' && fiveHourPct === null)
+                                fiveHourPct = quota.percentage;
+                            else if (quotaKey === 'weekly' && weeklyPct === null)
+                                weeklyPct = quota.percentage;
                         }
                     }
-                    return {primary: toPercent(maxPct), secondary: null};
+                    return {
+                        primary: toPercent(fiveHourPct),
+                        secondary: toPercent(weeklyPct),
+                        max: toPercent(maxPct),
+                    };
                 }
                 if (
                     metrics.limit !== null && metrics.limit !== undefined &&
@@ -2281,6 +2339,8 @@ class AIBarIndicator extends PanelMenu.Button {
             openaiCost: this._panelCostText(this._usageData.openai),
             geminiaiCost: this._panelCostText(this._usageData.geminiai),
             zai: zaiUsage.primary,
+            zaiWeekly: zaiUsage.secondary,
+            zaiMax: zaiUsage.max,
         };
         const providerFailureStates = {
             claude: _panelProviderFailureState(this._statusData, 'claude', ['5h', '7d']),
@@ -2366,6 +2426,10 @@ class AIBarIndicator extends PanelMenu.Button {
             this._panelCopilotExtraCostLabel.set_text('');
             this._panelCopilotExtraCostLabel.hide();
         }
+        if (errProviders.includes('zai')) {
+            this._panelZaiWeeklyPctLabel.set_text('');
+            this._panelZaiWeeklyPctLabel.hide();
+        }
 
         const panelPercents = [
             panelValues.claude5h,
@@ -2373,7 +2437,7 @@ class AIBarIndicator extends PanelMenu.Button {
             panelValues.copilot,
             panelValues.codex5h,
             panelValues.codex7d,
-            panelValues.zai,
+            panelValues.zaiMax,
         ].filter(value => typeof value === 'number' && Number.isFinite(value));
         const maxPanelPercent = panelPercents.length > 0 ? Math.max(...panelPercents) : 0;
         this._updateIconColor(maxPanelPercent);
@@ -2449,6 +2513,7 @@ class AIBarIndicator extends PanelMenu.Button {
         this._panelCodexCostLabel.set_text('');
         this._panelGeminiaiCostLabel.set_text('');
         this._panelZaiPctLabel.set_text('');
+        this._panelZaiWeeklyPctLabel.set_text('');
         this._panelClaudePctLabel.hide();
         this._panelClaude7dPctLabel.hide();
         this._panelClaudeCostLabel.hide();
@@ -2460,6 +2525,7 @@ class AIBarIndicator extends PanelMenu.Button {
         this._panelCodexCostLabel.hide();
         this._panelGeminiaiCostLabel.hide();
         this._panelZaiPctLabel.hide();
+        this._panelZaiWeeklyPctLabel.hide();
         if (this._iconBlinkTimeout) {
             GLib.source_remove(this._iconBlinkTimeout);
             this._iconBlinkTimeout = null;

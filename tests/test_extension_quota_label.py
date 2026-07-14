@@ -103,10 +103,10 @@ def test_quota_providers_scope_30d_bars_and_text_only_usage_rendering() -> None:
     """
     source = EXTENSION_PATH.read_text(encoding="utf-8")
     assert (
-        "const PROGRESS_BAR_PROVIDERS = new Set(['claude', 'openrouter', 'copilot', 'codex']);"
+        "const PROGRESS_BAR_PROVIDERS = new Set(['claude', 'openrouter', 'copilot', 'codex', 'zai']);"
         in source
     )
-    assert "const TEXT_USAGE_PROVIDERS = new Set(['openai', 'geminiai', 'zai']);" in source
+    assert "const TEXT_USAGE_PROVIDERS = new Set(['openai', 'geminiai']);" in source
     assert (
         "const WINDOW_BAR_30D_PROVIDERS = new Set(['copilot', 'openrouter']);"
         in source
@@ -144,8 +144,8 @@ def test_dual_window_providers_keep_visible_5h_and_7d_labels() -> None:
     @satisfies REQ-017
     """
     source = EXTENSION_PATH.read_text(encoding="utf-8")
-    assert "let fiveHourBar = createWindowBar('5h');" in source
-    assert "let sevenDayBar = createWindowBar('7d');" in source
+    assert "fiveHourBar = createWindowBar('5h');" in source
+    assert "sevenDayBar = createWindowBar('7d');" in source
     assert "card.fiveHourBar.label.text = '5h';" in source
     assert "card.sevenDayBar.label.text = '7d';" in source
     assert "card.fiveHourBar.label.text = '';" not in source
@@ -384,6 +384,12 @@ def test_panel_percentage_labels_use_fixed_order_provider_styles_and_primary_bol
     geminiai_cost_idx = source.index(
         "this._panelPercentages.add_child(this._panelGeminiaiCostLabel);"
     )
+    zai_idx = source.index(
+        "this._panelPercentages.add_child(this._panelZaiPctLabel);"
+    )
+    zai_weekly_idx = source.index(
+        "this._panelPercentages.add_child(this._panelZaiWeeklyPctLabel);"
+    )
     assert (
         claude_idx
         < claude_7d_idx
@@ -395,6 +401,8 @@ def test_panel_percentage_labels_use_fixed_order_provider_styles_and_primary_bol
         < codex_cost_idx
         < openai_cost_idx
         < geminiai_cost_idx
+        < zai_idx
+        < zai_weekly_idx
     )
 
     assert (
@@ -435,6 +443,14 @@ def test_panel_percentage_labels_use_fixed_order_provider_styles_and_primary_bol
     )
     assert (
         "style_class: 'aibar-panel-pct aibar-panel-cost aibar-tab-label-geminiai'"
+        in source
+    )
+    assert (
+        "style_class: 'aibar-panel-pct aibar-panel-pct-secondary aibar-tab-label-zai'"
+        in source
+    )
+    assert (
+        "style_class: 'aibar-panel-pct aibar-panel-pct-primary aibar-tab-label-zai'"
         in source
     )
 
