@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.41.0](https://github.com/Ogekuri/AIBar/compare/v0.40.0..v0.41.0) - 2026-07-14
+### 🚜  Changes
+- rename Z.ai quota labels to 5h/1w/1m and fix missing _panelOpenAICostLabel in _handleError [useReq] *(zai/gnome-extension)*
+  - Rename Z.ai GNOME tab progress-bar side labels from '5 Hours'/'Weekly'/'Monthly Web Search' to '5h'/'1w'/'1m' (REQ-137, REQ-140)
+  - Update ZaiProvider._extract_quotas label strings in zai.py
+  - Fix GNOME extension _handleError missing _panelOpenAICostLabel reset/hide (REQ-144)
+  - Update REQUIREMENTS.md with REQ-144 and revised REQ-137/REQ-140/REQ-143/TST-060/TST-061
+  - Update WORKFLOW.md and REFERENCES.md with label changes and _handleError fix
+
 ## [0.40.0](https://github.com/Ogekuri/AIBar/compare/v0.39.0..v0.40.0) - 2026-07-14
 ### 🐛  Bug Fixes
 - restore CLI Resets-in rows after cache JSON round-trip [useReq] *(zai)*
@@ -1231,6 +1240,7 @@
 - \[0.38.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.38.0
 - \[0.39.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.39.0
 - \[0.40.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.40.0
+- \[0.41.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.41.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1272,3 +1282,4 @@
 [0.38.0]: https://github.com/Ogekuri/AIBar/compare/v0.37.0..v0.38.0
 [0.39.0]: https://github.com/Ogekuri/AIBar/compare/v0.38.0..v0.39.0
 [0.40.0]: https://github.com/Ogekuri/AIBar/compare/v0.39.0..v0.40.0
+[0.41.0]: https://github.com/Ogekuri/AIBar/compare/v0.40.0..v0.41.0
