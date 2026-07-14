@@ -1241,6 +1241,7 @@
 - \[0.39.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.39.0
 - \[0.40.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.40.0
 - \[0.41.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.41.0
+- \[0.42.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.42.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1283,3 +1284,4 @@
 [0.39.0]: https://github.com/Ogekuri/AIBar/compare/v0.38.0..v0.39.0
 [0.40.0]: https://github.com/Ogekuri/AIBar/compare/v0.39.0..v0.40.0
 [0.41.0]: https://github.com/Ogekuri/AIBar/compare/v0.40.0..v0.41.0
+[0.42.0]: https://github.com/Ogekuri/AIBar/compare/v0.41.0..v0.42.0
