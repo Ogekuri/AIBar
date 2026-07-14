@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.43.0](https://github.com/Ogekuri/AIBar/compare/v0.42.0..v0.43.0) - 2026-07-14
+### 🚜  Changes
+- add reset time indicator for Z.ai 5h quota progress bar [useReq] *(zai)*
+  - Add REQ-145 and REQ-146 clarifying Z.ai quota reset time format
+  - and float-to-int coercion requirement
+  - Fix _build_quota to coerce nextResetTime float to int for
+  - consistent reset_at_epoch_ms type through cache round-trip
+  - Fix _epoch_ms_to_datetime to accept both int and float values
+  - Regenerate REFERENCES.md to reflect updated symbol documentation
+  - The fix ensures the 5h quota reset time renders correctly in both
+  - aibar show CLI output and the GNOME extension provider card.
+
 ## [0.41.0](https://github.com/Ogekuri/AIBar/compare/v0.40.0..v0.41.0) - 2026-07-14
 ### 🚜  Changes
 - rename Z.ai quota labels to 5h/1w/1m and fix missing _panelOpenAICostLabel in _handleError [useReq] *(zai/gnome-extension)*
@@ -1242,6 +1254,7 @@
 - \[0.40.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.40.0
 - \[0.41.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.41.0
 - \[0.42.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.42.0
+- \[0.43.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.43.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1285,3 +1298,4 @@
 [0.40.0]: https://github.com/Ogekuri/AIBar/compare/v0.39.0..v0.40.0
 [0.41.0]: https://github.com/Ogekuri/AIBar/compare/v0.40.0..v0.41.0
 [0.42.0]: https://github.com/Ogekuri/AIBar/compare/v0.41.0..v0.42.0
+[0.43.0]: https://github.com/Ogekuri/AIBar/compare/v0.42.0..v0.43.0
