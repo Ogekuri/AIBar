@@ -289,7 +289,7 @@ from typing import Any
 
 ---
 
-# cli.py | Python | 5233L | 139 symbols | 31 imports | 157 comments
+# cli.py | Python | 5273L | 140 symbols | 31 imports | 158 comments
 > Path: `src/aibar/aibar/cli.py`
 - @brief Command-line interface for aibar.
 - @details Defines command parsing, provider dispatch, formatted output, setup helpers, login flows, and UI launch hooks.
@@ -1454,17 +1454,24 @@ freshness line (`Updated: ..., Next: ...`) using provider freshness state.
 - @return {str | None} Formatted row `Cost: ...` or None.
 - @satisfies REQ-129
 
-### fn `def _build_zai_quota_lines(result: ProviderResult) -> list[str]` `priv` (L3839-3874)
+### fn `def _coerce_zai_quota_reset_at(quota: dict[str, object]) -> datetime | None` `priv` (L3839-3874)
+- @brief Resolve a Z.ai quota reset datetime from round-trip-safe fields.
+- @details The shared cache pipeline serializes provider results with `model_dump(mode="json")`, which converts the untyped `raw.zai_quotas[i].reset_at` datetime into an ISO-8601 string, and reloads it via `ProviderResult.model_validate` without reconverting nested raw values. This helper restores a timezone-aware UTC datetime by preferring the round-trip-safe `reset_at_epoch_ms` integer (consumed identically by the GNOME extension card) and falling back to a `datetime` or ISO-8601 string `reset_at`, so `Resets in:` rows render on both the fresh-fetch and cached `show` paths.
+- @param quota {dict[str, object]} Normalized Z.ai quota record.
+- @return {datetime | None} UTC reset datetime or None when unavailable/invalid.
+- @satisfies REQ-137
+
+### fn `def _build_zai_quota_lines(result: ProviderResult) -> list[str]` `priv` (L3875-3914)
 - @brief Build Z.ai per-quota usage and reset rows for CLI text panels.
-- @details Projects the normalized `raw.zai_quotas` array into one `Usage: <label> <percent>%` row followed by one `Resets in: <duration>` row per quota when a reset timestamp is available. Quotas without a parseable percentage normalize to `0.0%`; quotas without a future reset time omit the reset row. No progress-bar glyphs are emitted so Z.ai stays aligned with text-usage providers.
+- @details Projects the normalized `raw.zai_quotas` array into one `Usage: <label> <percent>%` row followed by one `Resets in: <duration>` row per quota when a reset timestamp is available. Quotas without a parseable percentage normalize to `0.0%`; quotas without a future reset time omit the reset row. Reset datetimes are resolved via `_coerce_zai_quota_reset_at` from the round-trip-safe `reset_at_epoch_ms` field (with `datetime`/ISO-string `reset_at` fallback) so cached `show` executions render `Resets in:` rows after the `model_dump(mode="json")` -> `model_validate` cache round-trip. No progress-bar glyphs are emitted so Z.ai stays aligned with text-usage providers.
 - @param result {ProviderResult} Z.ai provider result.
 - @return {list[str]} Ordered quota usage/reset detail lines.
 - @satisfies REQ-137
 - @satisfies REQ-140
 
-### fn `def _build_result_panel(` `priv` (L3875-3879)
+### fn `def _build_result_panel(` `priv` (L3915-3919)
 
-### fn `def _format_billing_service_descriptions(services: list[object]) -> str | None` `priv` (L4114-4141)
+### fn `def _format_billing_service_descriptions(services: list[object]) -> str | None` `priv` (L4154-4181)
 - @brief Build one provider panel title/body payload for CLI text rendering.
 - @brief Build human-readable GeminiAI billing service summary.
 - @details Formats deterministic panel lines for one provider/window result and
@@ -1502,9 +1509,9 @@ carrying `last_success_timestamp` and `idle_until_timestamp` freshness values.
 - @satisfies REQ-132
 - @satisfies REQ-106
 
-### fn `def _build_dual_window_section(` `priv` (L4142-4144)
+### fn `def _build_dual_window_section(` `priv` (L4182-4184)
 
-### fn `def _build_dual_window_panel(` `priv` (L4160-4164)
+### fn `def _build_dual_window_panel(` `priv` (L4200-4204)
 - @brief Build one labeled dual-window CLI section.
 - @details Prepends the raw window label (`5h` or `7d`) to the ordered detail
 lines for one Claude/Codex section. The helper intentionally preserves
@@ -1515,7 +1522,7 @@ rows remain visible in both windows.
 - @return {list[str]} Section heading followed by the provided detail lines.
 - @satisfies REQ-002
 
-### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L4270-4294)
+### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L4310-4334)
 - @brief Build one grouped CLI panel for dual-window providers.
 - @brief Render CLI text output for one provider result.
 - @details Produces one provider panel from `5h` and `7d` results while
@@ -1551,15 +1558,15 @@ line.
 - @satisfies REQ-131
 - @satisfies REQ-132
 
-### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L4295-4310)
+### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L4335-4350)
 - @brief Execute format reset duration.
 - @details Applies format reset duration logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param seconds {float} Input parameter `seconds`.
 - @return {str} Function return value.
 
-### fn `def _should_print_claude_reset_pending_hint(` `priv` (L4311-4313)
+### fn `def _should_print_claude_reset_pending_hint(` `priv` (L4351-4353)
 
-### fn `def _is_displayed_zero_percent(percent: float | None) -> bool` `priv` (L4333-4349)
+### fn `def _is_displayed_zero_percent(percent: float | None) -> bool` `priv` (L4373-4389)
 - @brief Determine whether CLI output must render the reset-pending fallback hint.
 - @brief Check whether a percentage renders as `0.0%` in one-decimal UI output.
 - @details The hint is only valid for Claude windows when no reset timestamp is
@@ -1575,7 +1582,7 @@ providers other than Claude.
 - @satisfies REQ-002
 - @satisfies REQ-002
 
-### fn `def _progress_bar_layout(percent: float, width: int) -> tuple[int, int, int]` `priv` (L4350-4382)
+### fn `def _progress_bar_layout(percent: float, width: int) -> tuple[int, int, int]` `priv` (L4390-4422)
 - @brief Compute fixed-width CLI progress-bar segment widths.
 - @details Normalizes `percent` to a non-negative finite value. Percentages up to `100` allocate provider-color fill plus empty cells. Percentages above `100` allocate one 100%-boundary marker cell and one over-limit segment scaled across the extra `0..100` range, clamped for larger values, and forced visible for any positive over-limit usage. Time complexity O(1). Space complexity O(1).
 - @param percent {float} Raw usage percentage.
@@ -1583,7 +1590,7 @@ providers other than Claude.
 - @return {tuple[int, int, int]} Tuple `(base_width, over_limit_width, marker_width)`.
 - @satisfies REQ-122
 
-### fn `def _progress_bar(percent: float, provider_name: ProviderName, width: int = 20) -> str` `priv` (L4383-4407)
+### fn `def _progress_bar(percent: float, provider_name: ProviderName, width: int = 20) -> str` `priv` (L4423-4447)
 - @brief Render one fixed-width CLI usage bar.
 - @details Uses provider-color fill for in-limit usage. Percentages above `100` preserve fixed bar width by rendering a bright-white `|` marker at the 100% boundary and a neutral shaded over-limit segment (`▓`) inside the same bar. Time complexity O(width). Space complexity O(width).
 - @param percent {float} Raw usage percentage.
@@ -1593,17 +1600,17 @@ providers other than Claude.
 - @satisfies REQ-122
 - @satisfies REQ-128
 
-### fn `def doctor() -> None` (L4412-4464)
+### fn `def doctor() -> None` (L4452-4504)
 - @brief Execute doctor.
 - @details Applies doctor logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def env() -> None` (L4469-4477)
+### fn `def env() -> None` (L4509-4517)
 - @brief Execute env.
 - @details Applies env logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def setup() -> None` (L4482-4681)
+### fn `def setup() -> None` (L4522-4721)
 - @brief Execute setup.
 - @details Prompts dedicated provider-activation section first, then prompts `idle_delay_seconds`, `api_call_delay_milliseconds`, `api_call_timeout_milliseconds`, `default_retry_after_seconds`, `gnome_refresh_interval_seconds`, and `billing_data` in order, then prompts dedicated Copilot overage pricing field `copilot_extra_premium_request_cost` (USD/request), then prompts provider currency symbols including `geminiai` (choices: `$`, `£`, `€`, default `$`), then persists all values to `~/.config/aibar/config.json`. Final setup section configures logging flags (`log_enabled`, `debug_enabled`). GeminiAI OAuth source supports `skip`, `file`, `paste`, and `login` (re-authorization with current scopes). Also prompts for provider API keys and writes them to `~/.config/aibar/env`.
 - @return {None} Function return value.
@@ -1616,43 +1623,43 @@ providers other than Claude.
 - @satisfies REQ-056
 - @satisfies REQ-059
 
-### fn `def login(provider: str) -> None` (L4868-4886)
+### fn `def login(provider: str) -> None` (L4908-4926)
 - @brief Execute login.
 - @details Applies login logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param provider {str} Input parameter `provider`.
 - @return {None} Function return value.
 
-### fn `def _login_claude() -> None` `priv` (L4887-4935)
+### fn `def _login_claude() -> None` `priv` (L4927-4975)
 - @brief Execute login claude.
 - @details Applies login claude logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_copilot() -> None` `priv` (L4936-4963)
+### fn `def _login_copilot() -> None` `priv` (L4976-5003)
 - @brief Execute login copilot.
 - @details Applies login copilot logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_geminiai() -> None` `priv` (L4964-5002)
+### fn `def _login_geminiai() -> None` `priv` (L5004-5042)
 - @brief Execute GeminiAI OAuth login flow.
 - @details Reuses persisted OAuth client configuration to launch browser-based authorization and persist refresh-capable Google credentials.
 - @return {None} Function return value.
 - @satisfies REQ-055
 - @satisfies REQ-056
 
-### fn `def _resolve_extension_source_dir() -> Path` `priv` (L5003-5015)
+### fn `def _resolve_extension_source_dir() -> Path` `priv` (L5043-5055)
 - @brief Resolve GNOME extension source directory from within the `aibar` package.
 - @details Uses `Path(__file__).resolve().parent` to locate the `aibar` package directory, then appends `gnome-extension/<UUID>/`. Works in development (editable install), wheel-installed, and `uv tool install` layouts because the extension directory resides inside the `aibar` Python package subtree.
 - @return {Path} Absolute path to the extension source directory.
 - @satisfies REQ-025, REQ-083
 
-### fn `def gnome_install() -> None` (L5026-5152)
+### fn `def gnome_install() -> None` (L5066-5192)
 - @brief Install or update the AIBar GNOME Shell extension to the user's local extensions directory.
 - @details Resolves extension source from the installed package path, validates source directory contains `metadata.json` and is non-empty, then executes one of two flows: install flow (`target` absent) creates target and copies files before enabling extension; update flow (`target` present) disables extension, copies files, then enables extension. Update flow masks non-zero disable outcomes caused by missing extension and continues. Produces colored Click-styled terminal output for all status messages.
 - @return {None} Function return value.
 - @throws {SystemExit} Exits with code 1 on prerequisite validation failure.
 - @satisfies PRJ-008, REQ-025, REQ-026, REQ-027, REQ-028, REQ-029, REQ-030, REQ-032, REQ-099
 
-### fn `def gnome_uninstall() -> None` (L5162-5231)
+### fn `def gnome_uninstall() -> None` (L5202-5271)
 - @brief Remove the AIBar GNOME Shell extension from the user's local extensions directory.
 - @details Disables the extension via `gnome-extensions disable`, then removes the entire extension directory at `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/`. Exits with code 1 if the extension directory does not exist. Produces colored Click-styled terminal output for all status messages.
 - @return {None} Function return value.
@@ -1780,27 +1787,28 @@ providers other than Claude.
 |`_build_fail_panel_lines`|fn|priv|3738-3741|def _build_fail_panel_lines(|
 |`_extract_copilot_extra_premium_cost`|fn|priv|3762-3822|def _extract_copilot_extra_premium_cost(result: ProviderR...|
 |`_build_copilot_extra_premium_cost_line`|fn|priv|3823-3838|def _build_copilot_extra_premium_cost_line(result: Provid...|
-|`_build_zai_quota_lines`|fn|priv|3839-3874|def _build_zai_quota_lines(result: ProviderResult) -> lis...|
-|`_build_result_panel`|fn|priv|3875-3879|def _build_result_panel(|
-|`_format_billing_service_descriptions`|fn|priv|4114-4141|def _format_billing_service_descriptions(services: list[o...|
-|`_build_dual_window_section`|fn|priv|4142-4144|def _build_dual_window_section(|
-|`_build_dual_window_panel`|fn|priv|4160-4164|def _build_dual_window_panel(|
-|`_print_result`|fn|priv|4270-4294|def _print_result(name: ProviderName, result, label: str ...|
-|`_format_reset_duration`|fn|priv|4295-4310|def _format_reset_duration(seconds: float) -> str|
-|`_should_print_claude_reset_pending_hint`|fn|priv|4311-4313|def _should_print_claude_reset_pending_hint(|
-|`_is_displayed_zero_percent`|fn|priv|4333-4349|def _is_displayed_zero_percent(percent: float | None) -> ...|
-|`_progress_bar_layout`|fn|priv|4350-4382|def _progress_bar_layout(percent: float, width: int) -> t...|
-|`_progress_bar`|fn|priv|4383-4407|def _progress_bar(percent: float, provider_name: Provider...|
-|`doctor`|fn|pub|4412-4464|def doctor() -> None|
-|`env`|fn|pub|4469-4477|def env() -> None|
-|`setup`|fn|pub|4482-4681|def setup() -> None|
-|`login`|fn|pub|4868-4886|def login(provider: str) -> None|
-|`_login_claude`|fn|priv|4887-4935|def _login_claude() -> None|
-|`_login_copilot`|fn|priv|4936-4963|def _login_copilot() -> None|
-|`_login_geminiai`|fn|priv|4964-5002|def _login_geminiai() -> None|
-|`_resolve_extension_source_dir`|fn|priv|5003-5015|def _resolve_extension_source_dir() -> Path|
-|`gnome_install`|fn|pub|5026-5152|def gnome_install() -> None|
-|`gnome_uninstall`|fn|pub|5162-5231|def gnome_uninstall() -> None|
+|`_coerce_zai_quota_reset_at`|fn|priv|3839-3874|def _coerce_zai_quota_reset_at(quota: dict[str, object]) ...|
+|`_build_zai_quota_lines`|fn|priv|3875-3914|def _build_zai_quota_lines(result: ProviderResult) -> lis...|
+|`_build_result_panel`|fn|priv|3915-3919|def _build_result_panel(|
+|`_format_billing_service_descriptions`|fn|priv|4154-4181|def _format_billing_service_descriptions(services: list[o...|
+|`_build_dual_window_section`|fn|priv|4182-4184|def _build_dual_window_section(|
+|`_build_dual_window_panel`|fn|priv|4200-4204|def _build_dual_window_panel(|
+|`_print_result`|fn|priv|4310-4334|def _print_result(name: ProviderName, result, label: str ...|
+|`_format_reset_duration`|fn|priv|4335-4350|def _format_reset_duration(seconds: float) -> str|
+|`_should_print_claude_reset_pending_hint`|fn|priv|4351-4353|def _should_print_claude_reset_pending_hint(|
+|`_is_displayed_zero_percent`|fn|priv|4373-4389|def _is_displayed_zero_percent(percent: float | None) -> ...|
+|`_progress_bar_layout`|fn|priv|4390-4422|def _progress_bar_layout(percent: float, width: int) -> t...|
+|`_progress_bar`|fn|priv|4423-4447|def _progress_bar(percent: float, provider_name: Provider...|
+|`doctor`|fn|pub|4452-4504|def doctor() -> None|
+|`env`|fn|pub|4509-4517|def env() -> None|
+|`setup`|fn|pub|4522-4721|def setup() -> None|
+|`login`|fn|pub|4908-4926|def login(provider: str) -> None|
+|`_login_claude`|fn|priv|4927-4975|def _login_claude() -> None|
+|`_login_copilot`|fn|priv|4976-5003|def _login_copilot() -> None|
+|`_login_geminiai`|fn|priv|5004-5042|def _login_geminiai() -> None|
+|`_resolve_extension_source_dir`|fn|priv|5043-5055|def _resolve_extension_source_dir() -> Path|
+|`gnome_install`|fn|pub|5066-5192|def gnome_install() -> None|
+|`gnome_uninstall`|fn|pub|5202-5271|def gnome_uninstall() -> None|
 
 
 ---

@@ -3836,6 +3836,42 @@ def _build_copilot_extra_premium_cost_line(result: ProviderResult) -> str | None
     return "Cost: " + _format_bright_white_bold(f"{currency_symbol}{extra_cost:.4f}")
 
 
+def _coerce_zai_quota_reset_at(quota: dict[str, object]) -> datetime | None:
+    """
+    @brief Resolve a Z.ai quota reset datetime from round-trip-safe fields.
+    @details The shared cache pipeline serializes provider results with
+    `model_dump(mode="json")`, which converts the untyped
+    `raw.zai_quotas[i].reset_at` datetime into an ISO-8601 string, and reloads it
+    via `ProviderResult.model_validate` without reconverting nested raw values.
+    This helper restores a timezone-aware UTC datetime by preferring the
+    round-trip-safe `reset_at_epoch_ms` integer (consumed identically by the
+    GNOME extension card) and falling back to a `datetime` or ISO-8601 string
+    `reset_at`, so `Resets in:` rows render on both the fresh-fetch and cached
+    `show` paths.
+    @param quota {dict[str, object]} Normalized Z.ai quota record.
+    @return {datetime | None} UTC reset datetime or None when unavailable/invalid.
+    @satisfies REQ-137
+    """
+    epoch_ms = quota.get("reset_at_epoch_ms")
+    if isinstance(epoch_ms, (int, float)) and not isinstance(epoch_ms, bool):
+        try:
+            return datetime.fromtimestamp(float(epoch_ms) / 1000.0, tz=timezone.utc)
+        except (OverflowError, OSError, ValueError):
+            pass
+    reset_at = quota.get("reset_at")
+    if isinstance(reset_at, datetime):
+        return reset_at
+    if isinstance(reset_at, str) and reset_at:
+        try:
+            parsed = datetime.fromisoformat(reset_at.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed
+    return None
+
+
 def _build_zai_quota_lines(result: ProviderResult) -> list[str]:
     """
     @brief Build Z.ai per-quota usage and reset rows for CLI text panels.
@@ -3843,8 +3879,12 @@ def _build_zai_quota_lines(result: ProviderResult) -> list[str]:
     `Usage: <label> <percent>%` row followed by one `Resets in: <duration>` row
     per quota when a reset timestamp is available. Quotas without a parseable
     percentage normalize to `0.0%`; quotas without a future reset time omit the
-    reset row. No progress-bar glyphs are emitted so Z.ai stays aligned with
-    text-usage providers.
+    reset row. Reset datetimes are resolved via `_coerce_zai_quota_reset_at`
+    from the round-trip-safe `reset_at_epoch_ms` field (with `datetime`/ISO-string
+    `reset_at` fallback) so cached `show` executions render `Resets in:` rows
+    after the `model_dump(mode="json")` -> `model_validate` cache round-trip. No
+    progress-bar glyphs are emitted so Z.ai stays aligned with text-usage
+    providers.
     @param result {ProviderResult} Z.ai provider result.
     @return {list[str]} Ordered quota usage/reset detail lines.
     @satisfies REQ-137
@@ -3863,8 +3903,8 @@ def _build_zai_quota_lines(result: ProviderResult) -> list[str]:
             float(percentage) if isinstance(percentage, (int, float)) else 0.0
         )
         lines.append(f"Usage: {label} {percentage_value:.1f}%")
-        reset_at = quota.get("reset_at")
-        if isinstance(reset_at, datetime):
+        reset_at = _coerce_zai_quota_reset_at(quota)
+        if reset_at is not None:
             delta = reset_at - datetime.now(timezone.utc)
             if delta.total_seconds() > 0:
                 lines.append(
