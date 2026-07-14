@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.40.0](https://github.com/Ogekuri/AIBar/compare/v0.39.0..v0.40.0) - 2026-07-14
+### 🐛  Bug Fixes
+- restore CLI Resets-in rows after cache JSON round-trip [useReq] *(zai)*
+  - Z.ai Resets-in rows vanished from CLI show text because the shared cache
+  - pipeline serializes results via model_dump(mode=json), converting the
+  - untyped raw.zai_quotas reset_at datetime to an ISO string that the renderer
+  - skipped (it only handled datetime instances).
+  - Add _coerce_zai_quota_reset_at to resolve the reset datetime from the
+  - round-trip-safe reset_at_epoch_ms integer (same field the GNOME card uses)
+  - with datetime/ISO-string reset_at fallback, restoring REQ-137 rendering on
+  - both fresh-fetch and cached show paths.
+  - Add reproducer test covering the cache round-trip and in-memory paths.
+  - Progress-bar and dual-status-bar Z.ai requests require /req-change
+  - (conflict with REQ-140 and REQ-139); not implemented in this defect fix.
+
+### 🚜  Changes
+- render Z.ai progress bars and dual status-bar percentages [useReq] *(zai)*
+  - Update REQ-140/128/121/122 so Z.ai renders progress-bar usage rows in CLI
+  - and GNOME like claude/openrouter/copilot/codex; split REQ-139 (icon threshold
+  - from max) and add REQ-143 (status bar shows 5 Hours non-bold + Weekly bold).
+  - CLI: add ZAI to _should_render_cli_progress_bar; _build_zai_quota_lines now
+  - emits Usage: <label> <progress_bar> <percent>% plus Resets in per quota.
+  - GNOME: move zai into PROGRESS_BAR_PROVIDERS, render three per-quota window
+  - bars with Reset in labels in _populateProviderCard, add a Weekly (bold) panel
+  - label beside the 5 Hours (non-bold) label, drive icon color from max quota.
+  - Update TST-052/054/061 and extension tests for the new bar/dual-label surface.
+
 ## [0.39.0](https://github.com/Ogekuri/AIBar/compare/v0.38.0..v0.39.0) - 2026-07-13
 ### ⛰️  Features
 - Add Z.ai quota unit-mapping regression tests [useReq] *(tests/zai)*
@@ -1203,6 +1230,7 @@
 - \[0.37.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.37.0
 - \[0.38.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.38.0
 - \[0.39.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.39.0
+- \[0.40.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.40.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1243,3 +1271,4 @@
 [0.37.0]: https://github.com/Ogekuri/AIBar/compare/v0.36.0..v0.37.0
 [0.38.0]: https://github.com/Ogekuri/AIBar/compare/v0.37.0..v0.38.0
 [0.39.0]: https://github.com/Ogekuri/AIBar/compare/v0.38.0..v0.39.0
+[0.40.0]: https://github.com/Ogekuri/AIBar/compare/v0.39.0..v0.40.0
