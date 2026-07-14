@@ -3663,7 +3663,7 @@ from aibar.config import resolve_currency_symbol
 
 ---
 
-# zai.py | Python | 340L | 14 symbols | 6 imports | 14 comments
+# zai.py | Python | 353L | 14 symbols | 6 imports | 14 comments
 > Path: `src/aibar/aibar/providers/zai.py`
 - @brief Z.ai quota usage provider.
 - @details Fetches the Z.ai account quota-limit document from the Z.ai monitor API
@@ -3733,7 +3733,7 @@ monthly web-search quota) usage/limit/remaining counters.
 - @satisfies REQ-136
 - @satisfies REQ-137
 
-### fn `def _build_quota(self, entry: dict, key: str, label: str) -> dict` `priv` (L253-283)
+### fn `def _build_quota(self, entry: dict, key: str, label: str) -> dict` `priv` (L253-291)
 - @brief Build one normalized Z.ai quota record from a raw limit entry.
 - @details Coerces `percentage` to a float, converts `nextResetTime` (epoch milliseconds) to a UTC datetime `reset_at`, and preserves monthly web-search usage counters (`usage`, `currentValue`, `remaining`, `usageDetails`) when present.
 - @param entry {dict} Raw Z.ai limit entry.
@@ -3743,23 +3743,25 @@ monthly web-search quota) usage/limit/remaining counters.
 - @satisfies REQ-136
 - @satisfies REQ-137
 
-### fn `def _max_percentage(self, quotas: list[dict]) -> float` `priv` (L284-299)
+### fn `def _max_percentage(self, quotas: list[dict]) -> float` `priv` (L292-307)
 - @brief Compute the maximum quota percentage for status-bar aggregation.
 - @param quotas {list[dict]} Normalized quota records.
 - @return {float} Maximum percentage clamped to `>= 0`.
 - @satisfies REQ-139
 
-### fn `def _epoch_ms_to_datetime(value: object) -> datetime | None` `priv` `@staticmethod` (L301-313)
+### fn `def _epoch_ms_to_datetime(value: object) -> datetime | None` `priv` `@staticmethod` (L309-326)
 - @brief Convert an epoch-millisecond timestamp to a UTC datetime.
-- @param value {object} Epoch-millisecond integer or None.
+- @details Accepts both int and float epoch-millisecond values. Coerces float to int using ``int(round(value))`` so that the datetime conversion is deterministic. Returns None when the input is not a valid numeric type or when the timestamp is out of range.
+- @param value {object} Epoch-millisecond numeric value or None.
 - @return {datetime | None} UTC datetime or None when input is invalid.
+- @satisfies REQ-146
 
-### fn `def _to_float(value: float | int | None) -> float` `priv` `@staticmethod` (L315-327)
+### fn `def _to_float(value: float | int | None) -> float` `priv` `@staticmethod` (L328-340)
 - @brief Coerce a numeric value to float with `0.0` fallback.
 - @param value {float | int | None} Numeric or None value.
 - @return {float} Coerced float value.
 
-### fn `def _to_int(value: int | float | None) -> int | None` `priv` `@staticmethod` (L329-341)
+### fn `def _to_int(value: int | float | None) -> int | None` `priv` `@staticmethod` (L342-354)
 - @brief Coerce a numeric value to int preserving None.
 - @param value {int | float | None} Numeric or None value.
 - @return {int | None} Coerced int value or None.
@@ -3776,9 +3778,9 @@ monthly web-search quota) usage/limit/remaining counters.
 |`fetch`|fn|pub|81-166|async def fetch(self, window: WindowPeriod = WindowPeriod...|
 |`_parse_response`|fn|priv|167-168|def _parse_response(|
 |`_extract_quotas`|fn|priv|211-252|def _extract_quotas(self, data: dict) -> list[dict]|
-|`_build_quota`|fn|priv|253-283|def _build_quota(self, entry: dict, key: str, label: str)...|
-|`_max_percentage`|fn|priv|284-299|def _max_percentage(self, quotas: list[dict]) -> float|
-|`_epoch_ms_to_datetime`|fn|priv|301-313|def _epoch_ms_to_datetime(value: object) -> datetime | None|
-|`_to_float`|fn|priv|315-327|def _to_float(value: float | int | None) -> float|
-|`_to_int`|fn|priv|329-341|def _to_int(value: int | float | None) -> int | None|
+|`_build_quota`|fn|priv|253-291|def _build_quota(self, entry: dict, key: str, label: str)...|
+|`_max_percentage`|fn|priv|292-307|def _max_percentage(self, quotas: list[dict]) -> float|
+|`_epoch_ms_to_datetime`|fn|priv|309-326|def _epoch_ms_to_datetime(value: object) -> datetime | None|
+|`_to_float`|fn|priv|328-340|def _to_float(value: float | int | None) -> float|
+|`_to_int`|fn|priv|342-354|def _to_int(value: int | float | None) -> int | None|
 

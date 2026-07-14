@@ -263,6 +263,8 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-135**: MUST resolve the Z.ai API key from `ZAI_API_KEY` with env var then `~/.config/aibar/env` precedence and MUST prompt it in `setup`.
 - **REQ-136**: MUST map Z.ai `data.limits` entries by `unit`: `3`/`number=5` to 5 Hours Quota, `6`/`number=1` to Weekly Quota, `5`/`number=1`/`TIME_LIMIT` to Total Monthly Web Search/Reader/Zread Quota.
 - **REQ-137**: MUST expose each Z.ai quota `percentage` and `nextResetTime` and label quota progress-bar rows with `5h`, `1w`, and `1m` in CLI text and GNOME provider cards; each quota reset time MUST render immediately after its usage row.
+- **REQ-145**: MUST render each Z.ai quota reset time as `Resets in: <duration>` in CLI text and as `Reset in: <duration>` in GNOME provider cards, using the format `<d>d <h>h <m>m` for durations >= 24 hours and `<h>h <m>m` for durations < 24 hours, resolved from `reset_at_epoch_ms` with `datetime`/ISO-8601-string `reset_at` fallback.
+- **REQ-146**: MUST coerce Z.ai quota `reset_at_epoch_ms` from float to int when the value is finite and non-negative, so that `_coerce_zai_quota_reset_at` correctly resolves the reset datetime through the cache round-trip for all quotas including the 5h quota.
 - **REQ-138**: MUST render Z.ai as the last provider in CLI text panels, GNOME tabs/cards, and GNOME panel status bar.
 - **REQ-139**: MUST drive Z.ai GNOME panel icon threshold color from the maximum percentage across all Z.ai quotas.
 - **REQ-140**: MUST render Z.ai quotas as progress-bar usage rows with short side labels `5h`, `1w`, and `1m` in CLI text and GNOME provider cards, consistent with bar providers claude, openrouter, copilot, and codex.

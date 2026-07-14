@@ -264,12 +264,20 @@ class ZaiProvider(BaseProvider):
         @satisfies REQ-136
         @satisfies REQ-137
         """
+        raw_reset = entry.get("nextResetTime")
+        reset_epoch_ms: int | None = None
+        if isinstance(raw_reset, bool):
+            reset_epoch_ms = None
+        elif isinstance(raw_reset, int):
+            reset_epoch_ms = raw_reset
+        elif isinstance(raw_reset, float):
+            reset_epoch_ms = int(round(raw_reset))
         quota: dict = {
             "key": key,
             "label": label,
             "percentage": self._to_float(entry.get("percentage")),
-            "reset_at_epoch_ms": entry.get("nextResetTime"),
-            "reset_at": self._epoch_ms_to_datetime(entry.get("nextResetTime")),
+            "reset_at_epoch_ms": reset_epoch_ms,
+            "reset_at": self._epoch_ms_to_datetime(reset_epoch_ms),
         }
         if key == "monthly":
             quota["used"] = self._to_int(entry.get("currentValue"))
@@ -301,13 +309,18 @@ class ZaiProvider(BaseProvider):
     def _epoch_ms_to_datetime(value: object) -> datetime | None:
         """
         @brief Convert an epoch-millisecond timestamp to a UTC datetime.
-        @param value {object} Epoch-millisecond integer or None.
+        @details Accepts both int and float epoch-millisecond values. Coerces
+        float to int using ``int(round(value))`` so that the datetime conversion
+        is deterministic. Returns None when the input is not a valid numeric
+        type or when the timestamp is out of range.
+        @param value {object} Epoch-millisecond numeric value or None.
         @return {datetime | None} UTC datetime or None when input is invalid.
+        @satisfies REQ-146
         """
-        if not isinstance(value, int):
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
             return None
         try:
-            return datetime.fromtimestamp(value / 1000.0, tz=timezone.utc)
+            return datetime.fromtimestamp(float(value) / 1000.0, tz=timezone.utc)
         except (OverflowError, OSError, ValueError):
             return None
 
