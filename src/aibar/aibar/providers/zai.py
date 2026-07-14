@@ -3,8 +3,7 @@
 @brief Z.ai quota usage provider.
 @details Fetches the Z.ai account quota-limit document from the Z.ai monitor API
 and projects the returned limit entries into normalized per-quota usage metrics
-covering the 5 Hours Quota, the Weekly Quota, and the Total Monthly Web
-Search/Reader/Zread Quota.
+covering the `5h` Quota, the `1w` Quota, and the `1m` Quota.
 """
 
 from datetime import datetime, timezone
@@ -212,9 +211,9 @@ class ZaiProvider(BaseProvider):
     def _extract_quotas(self, data: dict) -> list[dict]:
         """
         @brief Map Z.ai `data.limits` entries into normalized quota records.
-        @details Selects limit entries by `unit` value: `3`/`number=5` -> 5 Hours
-        Quota, `6`/`number=1` -> Weekly Quota, `5`/`number=1` -> Total Monthly
-        Web Search/Reader/Zread Quota. Each record carries `key`, `label`,
+        @details Selects limit entries by `unit` value: `3`/`number=5` -> `5h`
+        Quota, `6`/`number=1` -> `1w` Quota, `5`/`number=1` -> `1m`
+        Quota. Each record carries `key`, `label`,
         `percentage`, `reset_at_epoch_ms`, `reset_at` (UTC datetime), and (for
         the monthly web-search quota) `used`, `limit`, `remaining`, and
         `usage_details`.
@@ -242,13 +241,13 @@ class ZaiProvider(BaseProvider):
         quotas: list[dict] = []
         five_hours = by_unit.get(self._UNIT_HOURS)
         if isinstance(five_hours, dict):
-            quotas.append(self._build_quota(five_hours, "5h", "5 Hours"))
+            quotas.append(self._build_quota(five_hours, "5h", "5h"))
         weekly = by_unit.get(self._UNIT_DAYS)
         if isinstance(weekly, dict):
-            quotas.append(self._build_quota(weekly, "weekly", "Weekly"))
+            quotas.append(self._build_quota(weekly, "weekly", "1w"))
         monthly = by_unit.get(self._UNIT_MONTHS)
         if isinstance(monthly, dict):
-            quotas.append(self._build_quota(monthly, "monthly", "Monthly Web Search"))
+            quotas.append(self._build_quota(monthly, "monthly", "1m"))
         return quotas
 
     def _build_quota(self, entry: dict, key: str, label: str) -> dict:

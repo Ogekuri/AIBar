@@ -1251,9 +1251,9 @@ class AIBarIndicator extends PanelMenu.Button {
         let zaiQuotaBars = [];
         if (providerName === 'zai') {
             zaiQuotaBars = [
-                createWindowBar('5 Hours'),
-                createWindowBar('Weekly'),
-                createWindowBar('Monthly Web Search'),
+                createWindowBar('5h'),
+                createWindowBar('1w'),
+                createWindowBar('1m'),
             ];
             for (const bar of zaiQuotaBars)
                 windowBars.add_child(bar.container);
@@ -2511,6 +2511,7 @@ class AIBarIndicator extends PanelMenu.Button {
         this._panelCodexPctLabel.set_text('');
         this._panelCodex7dPctLabel.set_text('');
         this._panelCodexCostLabel.set_text('');
+        this._panelOpenAICostLabel.set_text('');
         this._panelGeminiaiCostLabel.set_text('');
         this._panelZaiPctLabel.set_text('');
         this._panelZaiWeeklyPctLabel.set_text('');
@@ -2523,6 +2524,7 @@ class AIBarIndicator extends PanelMenu.Button {
         this._panelCodexPctLabel.hide();
         this._panelCodex7dPctLabel.hide();
         this._panelCodexCostLabel.hide();
+        this._panelOpenAICostLabel.hide();
         this._panelGeminiaiCostLabel.hide();
         this._panelZaiPctLabel.hide();
         this._panelZaiWeeklyPctLabel.hide();

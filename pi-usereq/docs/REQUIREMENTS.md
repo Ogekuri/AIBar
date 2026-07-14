@@ -262,13 +262,14 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-134**: MUST implement provider `zai` (Z.ai) that fetches quota data from `https://api.z.ai/api/monitor/usage/quota/limit` using `Authorization: Bearer <key>` and `Accept: application/json` headers.
 - **REQ-135**: MUST resolve the Z.ai API key from `ZAI_API_KEY` with env var then `~/.config/aibar/env` precedence and MUST prompt it in `setup`.
 - **REQ-136**: MUST map Z.ai `data.limits` entries by `unit`: `3`/`number=5` to 5 Hours Quota, `6`/`number=1` to Weekly Quota, `5`/`number=1`/`TIME_LIMIT` to Total Monthly Web Search/Reader/Zread Quota.
-- **REQ-137**: MUST expose each Z.ai quota `percentage` and `nextResetTime`; each quota reset time MUST render in CLI text and GNOME provider card immediately after its usage row.
+- **REQ-137**: MUST expose each Z.ai quota `percentage` and `nextResetTime` and label quota progress-bar rows with `5h`, `1w`, and `1m` in CLI text and GNOME provider cards; each quota reset time MUST render immediately after its usage row.
 - **REQ-138**: MUST render Z.ai as the last provider in CLI text panels, GNOME tabs/cards, and GNOME panel status bar.
 - **REQ-139**: MUST drive Z.ai GNOME panel icon threshold color from the maximum percentage across all Z.ai quotas.
-- **REQ-140**: MUST render Z.ai quotas as progress-bar usage rows in CLI text and GNOME provider cards, consistent with bar providers claude, openrouter, copilot, and codex.
+- **REQ-140**: MUST render Z.ai quotas as progress-bar usage rows with short side labels `5h`, `1w`, and `1m` in CLI text and GNOME provider cards, consistent with bar providers claude, openrouter, copilot, and codex.
 - **REQ-141**: MUST treat Z.ai as a single fixed-window provider with effective window `30d` that ignores the requested window and fetches all quotas in one API call.
 - **REQ-142**: MUST reuse the shared provider cache and idle-time lifecycle for Z.ai without modifying cache, idle-time, retry, or throttling logic.
-- **REQ-143**: MUST render Z.ai GNOME panel status bar with the 5 Hours quota percentage (non-bold) followed by the Weekly quota percentage (bold).
+- **REQ-143**: MUST render Z.ai GNOME panel status bar with the `5h` quota percentage (non-bold) followed by the `1w` quota percentage (bold), and MUST NOT hide Z.ai panel status labels when the Z.ai provider is enabled and has available quota data.
+- **REQ-144**: GNOME extension `_handleError` MUST reset text and hide every panel status label created in `_buildPanelButton` including `_panelOpenAICostLabel`, `_panelClaudePctLabel`, `_panelClaude7dPctLabel`, `_panelClaudeCostLabel`, `_panelOpenRouterCostLabel`, `_panelCopilotPctLabel`, `_panelCopilotExtraCostLabel`, `_panelCodexPctLabel`, `_panelCodex7dPctLabel`, `_panelCodexCostLabel`, `_panelGeminiaiCostLabel`, `_panelZaiPctLabel`, and `_panelZaiWeeklyPctLabel`.
 
 ## 4. Test Requirements
 
@@ -326,8 +327,8 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-052**: MUST verify GNOME cards render >100 progress bars only for `claude`, `openrouter`, `copilot`, `codex`, and `zai`, and render `openai`/`geminiai` usage as text without bars.
 - **TST-054**: MUST verify CLI text `show` renders progress bars only for `claude`, `openrouter`, `copilot`, `codex`, and `zai`, and renders `openai`/`geminiai` usage rows without bars.
 - **TST-059**: MUST verify CLI text `show` renders `openrouter` OK-state usage as `Usage: <window> <progress_bar> <percent>%` using the standard fixed-width CLI progress-bar format.
-- **TST-060**: MUST verify Z.ai fetch maps the three `unit` quota entries to 5 Hours, Weekly, and Monthly Web Search quotas and exposes each `percentage` and `nextResetTime`.
-- **TST-061**: MUST verify Z.ai renders last with cyan color in CLI text and GNOME extension and that the GNOME panel status bar shows the 5 Hours (non-bold) and Weekly (bold) Z.ai quota percentages.
+- **TST-060**: MUST verify Z.ai fetch maps the three `unit` quota entries to `5h`, `1w`, and `1m` quota rows and exposes each `percentage` and `nextResetTime`.
+- **TST-061**: MUST verify Z.ai renders last with cyan color in CLI text and GNOME extension and that the GNOME panel status bar shows the `5h` (non-bold) and `1w` (bold) Z.ai quota percentages and that the `_handleError` GNOME extension function resets and hides every panel status label including `_panelOpenAICostLabel`.
 - **TST-036**: MUST verify `--version` and `--ver` print installed version, bypass subcommand execution, and force one online startup release check even when `check_version_idle-time.json` contains future `idle_until`.
 - **TST-038**: MUST verify CLI text `show` renders `FAIL` blocks as `Status: FAIL`, blank line, `Reason: <reason>`, blank line, and right-aligned `Updated/Next`, never renders `Window 5h:/7d:/30d:` headings, and preserves `show --json` freshness, API-counter, cost, and GeminiAI effective-window behaviors.
 - **TST-042**: MUST verify CLI `show` and GNOME provider cards render equivalent failed-provider blocks formatted as `Status: FAIL`, blank line, `Reason: <reason>`, blank line, and `Updated/Next`, without `Window 5h:/7d:/30d:` headings.
