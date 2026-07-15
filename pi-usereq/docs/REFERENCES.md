@@ -3663,7 +3663,7 @@ from aibar.config import resolve_currency_symbol
 
 ---
 
-# zai.py | Python | 353L | 14 symbols | 6 imports | 14 comments
+# zai.py | Python | 392L | 15 symbols | 6 imports | 15 comments
 > Path: `src/aibar/aibar/providers/zai.py`
 - @brief Z.ai quota usage provider.
 - @details Fetches the Z.ai account quota-limit document from the Z.ai monitor API
@@ -3672,7 +3672,7 @@ covering the `5h` Quota, the `1w` Quota, and the `1m` Quota.
 
 ## Imports
 ```
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import httpx
 from aibar.providers.base import (
 from aibar.config import config
@@ -3682,13 +3682,13 @@ from aibar.config import resolve_currency_symbol
 
 ## Definitions
 
-### class `class ZaiProvider(BaseProvider)` : BaseProvider (L24-75)
+### class `class ZaiProvider(BaseProvider)` : BaseProvider (L27-78)
 - @brief Define Z.ai quota provider component.
 - @details Encapsulates Z.ai quota retrieval and normalization for AIBar runtime flows. The provider issues one API call to the Z.ai monitor quota-limit endpoint and parses the three canonical limit entries into one normalized result carrying per-quota percentages, reset times, and (for the monthly web-search quota) usage/limit/remaining counters.
 - @satisfies REQ-134
 - @satisfies REQ-136
 - @satisfies REQ-141
-- var `QUOTA_URL = "https://api.z.ai/api/monitor/usage/quota/limit"` (L38)
+- var `QUOTA_URL = "https://api.z.ai/api/monitor/usage/quota/limit"` (L41)
   - @brief Define Z.ai quota provider component.
   - @details Encapsulates Z.ai quota retrieval and normalization for AIBar
 runtime flows. The provider issues one API call to the Z.ai monitor
@@ -3698,22 +3698,22 @@ monthly web-search quota) usage/limit/remaining counters.
   - @satisfies REQ-134
   - @satisfies REQ-136
   - @satisfies REQ-141
-- var `TOKEN_ENV_VAR = "ZAI_API_KEY"` (L39)
-- fn `def __init__(self, api_key: str | None = None) -> None` `priv` (L44-60)
+- var `TOKEN_ENV_VAR = "ZAI_API_KEY"` (L42)
+- fn `def __init__(self, api_key: str | None = None) -> None` `priv` (L47-63)
   - @brief Initialize Z.ai provider with optional explicit API key.
   - @details When `api_key` is provided it takes precedence; otherwise the key is resolved from `Config.get_token(ProviderName.ZAI)` using the `ZAI_API_KEY` env var -> `~/.config/aibar/env` precedence chain.
   - @param api_key {str | None} Optional explicit Z.ai API key.
   - @return {None} Function return value.
   - @satisfies REQ-135
-- fn `def is_configured(self) -> bool` (L61-68)
+- fn `def is_configured(self) -> bool` (L64-71)
   - @brief Report whether the Z.ai API key is available.
   - @return {bool} True when a non-empty API key is resolved.
   - @satisfies REQ-135
-- fn `def get_config_help(self) -> str` (L69-75)
+- fn `def get_config_help(self) -> str` (L72-78)
   - @brief Render Z.ai configuration guidance.
   - @return {str} Human-readable configuration help text.
 
-### fn `async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult` (L81-166)
+### fn `async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult` (L84-169)
 - @brief Fetch Z.ai quota data from the monitor API.
 - @details Ignores the requested window because Z.ai returns all quotas in one document and is treated as a fixed-window provider with effective window `30d`. Maps HTTP 401 to `AuthenticationError`, HTTP 429 to a rate-limit error result carrying normalized `retry_after_seconds`, and any other non-200 status to a provider error result.
 - @param window {WindowPeriod} Requested window (ignored; effective window is `30d`).
@@ -3723,9 +3723,9 @@ monthly web-search quota) usage/limit/remaining counters.
 - @satisfies REQ-141
 - @satisfies REQ-142
 
-### fn `def _parse_response(` `priv` (L167-168)
+### fn `def _parse_response(` `priv` (L170-171)
 
-### fn `def _extract_quotas(self, data: dict) -> list[dict]` `priv` (L211-252)
+### fn `def _extract_quotas(self, data: dict) -> list[dict]` `priv` (L214-255)
 - @brief Map Z.ai `data.limits` entries into normalized quota records.
 - @details Selects limit entries by `unit` value: `3`/`number=5` -> `5h` Quota, `6`/`number=1` -> `1w` Quota, `5`/`number=1` -> `1m` Quota. Each record carries `key`, `label`, `percentage`, `reset_at_epoch_ms`, `reset_at` (UTC datetime), and (for the monthly web-search quota) `used`, `limit`, `remaining`, and `usage_details`.
 - @param data {dict} Raw Z.ai API response document.
@@ -3733,35 +3733,38 @@ monthly web-search quota) usage/limit/remaining counters.
 - @satisfies REQ-136
 - @satisfies REQ-137
 
-### fn `def _build_quota(self, entry: dict, key: str, label: str) -> dict` `priv` (L253-291)
+### fn `def _build_quota(self, entry: dict, key: str, label: str) -> dict` `priv` (L256-298)
 - @brief Build one normalized Z.ai quota record from a raw limit entry.
-- @details Coerces `percentage` to a float, converts `nextResetTime` (epoch milliseconds) to a UTC datetime `reset_at`, and preserves monthly web-search usage counters (`usage`, `currentValue`, `remaining`, `usageDetails`) when present.
+- @details Coerces `percentage` to a float, converts `nextResetTime` (epoch milliseconds) to a UTC datetime `reset_at`, derives the next UTC 5-hour boundary when `nextResetTime` is absent for the `5h` quota, and preserves monthly web-search usage counters (`usage`, `currentValue`, `remaining`, `usageDetails`) when present.
 - @param entry {dict} Raw Z.ai limit entry.
 - @param key {str} Machine-readable quota key (`5h`, `weekly`, `monthly`).
 - @param label {str} Human-readable quota label.
 - @return {dict} Normalized quota record.
 - @satisfies REQ-136
 - @satisfies REQ-137
+- @satisfies REQ-147
 
-### fn `def _max_percentage(self, quotas: list[dict]) -> float` `priv` (L292-307)
+### fn `def _max_percentage(self, quotas: list[dict]) -> float` `priv` (L299-314)
 - @brief Compute the maximum quota percentage for status-bar aggregation.
 - @param quotas {list[dict]} Normalized quota records.
 - @return {float} Maximum percentage clamped to `>= 0`.
 - @satisfies REQ-139
 
-### fn `def _epoch_ms_to_datetime(value: object) -> datetime | None` `priv` `@staticmethod` (L309-326)
+### fn `def _derive_five_hour_reset_epoch_ms(` `priv` `@staticmethod` (L316-317)
+
+### fn `def _epoch_ms_to_datetime(value: object) -> datetime | None` `priv` `@staticmethod` (L348-365)
 - @brief Convert an epoch-millisecond timestamp to a UTC datetime.
 - @details Accepts both int and float epoch-millisecond values. Coerces float to int using ``int(round(value))`` so that the datetime conversion is deterministic. Returns None when the input is not a valid numeric type or when the timestamp is out of range.
 - @param value {object} Epoch-millisecond numeric value or None.
 - @return {datetime | None} UTC datetime or None when input is invalid.
 - @satisfies REQ-146
 
-### fn `def _to_float(value: float | int | None) -> float` `priv` `@staticmethod` (L328-340)
+### fn `def _to_float(value: float | int | None) -> float` `priv` `@staticmethod` (L367-379)
 - @brief Coerce a numeric value to float with `0.0` fallback.
 - @param value {float | int | None} Numeric or None value.
 - @return {float} Coerced float value.
 
-### fn `def _to_int(value: int | float | None) -> int | None` `priv` `@staticmethod` (L342-354)
+### fn `def _to_int(value: int | float | None) -> int | None` `priv` `@staticmethod` (L381-393)
 - @brief Coerce a numeric value to int preserving None.
 - @param value {int | float | None} Numeric or None value.
 - @return {int | None} Coerced int value or None.
@@ -3769,18 +3772,19 @@ monthly web-search quota) usage/limit/remaining counters.
 ## Symbol Index
 |Symbol|Kind|Vis|Lines|Sig|
 |---|---|---|---|---|
-|`ZaiProvider`|class|pub|24-75|class ZaiProvider(BaseProvider)|
-|`ZaiProvider.QUOTA_URL`|var|pub|38||
-|`ZaiProvider.TOKEN_ENV_VAR`|var|pub|39||
-|`ZaiProvider.__init__`|fn|priv|44-60|def __init__(self, api_key: str | None = None) -> None|
-|`ZaiProvider.is_configured`|fn|pub|61-68|def is_configured(self) -> bool|
-|`ZaiProvider.get_config_help`|fn|pub|69-75|def get_config_help(self) -> str|
-|`fetch`|fn|pub|81-166|async def fetch(self, window: WindowPeriod = WindowPeriod...|
-|`_parse_response`|fn|priv|167-168|def _parse_response(|
-|`_extract_quotas`|fn|priv|211-252|def _extract_quotas(self, data: dict) -> list[dict]|
-|`_build_quota`|fn|priv|253-291|def _build_quota(self, entry: dict, key: str, label: str)...|
-|`_max_percentage`|fn|priv|292-307|def _max_percentage(self, quotas: list[dict]) -> float|
-|`_epoch_ms_to_datetime`|fn|priv|309-326|def _epoch_ms_to_datetime(value: object) -> datetime | None|
-|`_to_float`|fn|priv|328-340|def _to_float(value: float | int | None) -> float|
-|`_to_int`|fn|priv|342-354|def _to_int(value: int | float | None) -> int | None|
+|`ZaiProvider`|class|pub|27-78|class ZaiProvider(BaseProvider)|
+|`ZaiProvider.QUOTA_URL`|var|pub|41||
+|`ZaiProvider.TOKEN_ENV_VAR`|var|pub|42||
+|`ZaiProvider.__init__`|fn|priv|47-63|def __init__(self, api_key: str | None = None) -> None|
+|`ZaiProvider.is_configured`|fn|pub|64-71|def is_configured(self) -> bool|
+|`ZaiProvider.get_config_help`|fn|pub|72-78|def get_config_help(self) -> str|
+|`fetch`|fn|pub|84-169|async def fetch(self, window: WindowPeriod = WindowPeriod...|
+|`_parse_response`|fn|priv|170-171|def _parse_response(|
+|`_extract_quotas`|fn|priv|214-255|def _extract_quotas(self, data: dict) -> list[dict]|
+|`_build_quota`|fn|priv|256-298|def _build_quota(self, entry: dict, key: str, label: str)...|
+|`_max_percentage`|fn|priv|299-314|def _max_percentage(self, quotas: list[dict]) -> float|
+|`_derive_five_hour_reset_epoch_ms`|fn|priv|316-317|def _derive_five_hour_reset_epoch_ms(|
+|`_epoch_ms_to_datetime`|fn|priv|348-365|def _epoch_ms_to_datetime(value: object) -> datetime | None|
+|`_to_float`|fn|priv|367-379|def _to_float(value: float | int | None) -> float|
+|`_to_int`|fn|priv|381-393|def _to_int(value: int | float | None) -> int | None|
 

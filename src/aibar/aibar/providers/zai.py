@@ -6,7 +6,7 @@ and projects the returned limit entries into normalized per-quota usage metrics
 covering the `5h` Quota, the `1w` Quota, and the `1m` Quota.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import httpx
 
@@ -19,6 +19,9 @@ from aibar.providers.base import (
     UsageMetrics,
     WindowPeriod,
 )
+
+_FIVE_HOURS_SECONDS = 5 * 3600
+_SECONDS_PER_DAY = 24 * 3600
 
 
 class ZaiProvider(BaseProvider):
@@ -254,15 +257,17 @@ class ZaiProvider(BaseProvider):
         """
         @brief Build one normalized Z.ai quota record from a raw limit entry.
         @details Coerces `percentage` to a float, converts `nextResetTime`
-        (epoch milliseconds) to a UTC datetime `reset_at`, and preserves monthly
-        web-search usage counters (`usage`, `currentValue`, `remaining`,
-        `usageDetails`) when present.
+        (epoch milliseconds) to a UTC datetime `reset_at`, derives the next UTC
+        5-hour boundary when `nextResetTime` is absent for the `5h` quota, and
+        preserves monthly web-search usage counters (`usage`, `currentValue`,
+        `remaining`, `usageDetails`) when present.
         @param entry {dict} Raw Z.ai limit entry.
         @param key {str} Machine-readable quota key (`5h`, `weekly`, `monthly`).
         @param label {str} Human-readable quota label.
         @return {dict} Normalized quota record.
         @satisfies REQ-136
         @satisfies REQ-137
+        @satisfies REQ-147
         """
         raw_reset = entry.get("nextResetTime")
         reset_epoch_ms: int | None = None
@@ -272,6 +277,8 @@ class ZaiProvider(BaseProvider):
             reset_epoch_ms = raw_reset
         elif isinstance(raw_reset, float):
             reset_epoch_ms = int(round(raw_reset))
+        if reset_epoch_ms is None and key == "5h":
+            reset_epoch_ms = self._derive_five_hour_reset_epoch_ms()
         quota: dict = {
             "key": key,
             "label": label,
@@ -304,6 +311,38 @@ class ZaiProvider(BaseProvider):
         if not percentages:
             return 0.0
         return float(max(percentages))
+
+    @staticmethod
+    def _derive_five_hour_reset_epoch_ms(
+        reference: datetime | None = None,
+    ) -> int:
+        """
+        @brief Compute the next UTC 5-hour boundary as epoch milliseconds.
+        @details The Z.ai monitor API omits `nextResetTime` for the 5 Hours
+        quota, so this helper derives the reset countdown from the next fixed
+        UTC 5-hour boundary aligned to midnight (00:00, 05:00, 10:00, 15:00,
+        20:00). For reference times in the [20:00, 24:00) UTC interval the next
+        boundary rolls over to the following midnight so the returned timestamp
+        is always strictly in the future. Time complexity O(1). Space
+        complexity O(1).
+        @param reference {datetime | None} Optional reference time; `None`
+            resolves the current UTC time. Naive values are treated as UTC.
+        @return {int} Epoch milliseconds of the next UTC 5-hour boundary.
+        @satisfies REQ-147
+        """
+        now = reference if reference is not None else datetime.now(timezone.utc)
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=timezone.utc)
+        midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        elapsed_seconds = (now - midnight).total_seconds()
+        slot_seconds = (
+            int(elapsed_seconds // _FIVE_HOURS_SECONDS) + 1
+        ) * _FIVE_HOURS_SECONDS
+        if slot_seconds >= _SECONDS_PER_DAY:
+            boundary = midnight + timedelta(days=1)
+        else:
+            boundary = midnight + timedelta(seconds=slot_seconds)
+        return int(boundary.timestamp() * 1000)
 
     @staticmethod
     def _epoch_ms_to_datetime(value: object) -> datetime | None:
