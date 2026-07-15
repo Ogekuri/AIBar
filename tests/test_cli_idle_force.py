@@ -109,7 +109,7 @@ def test_show_force_bypasses_idle_time_and_recreates_state(
     output_without_extension = {
         k: v
         for k, v in output_payload.items()
-        if k not in {"extension", "idle_time", "freshness"}
+        if k not in {"extension", "idle_time", "freshness", "enabled_providers"}
     }
     assert output_without_extension == persisted_cache
     assert "extension" in output_payload

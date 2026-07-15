@@ -83,8 +83,8 @@ def test_setup_prompts_runtime_config_before_credentials(
     """
     config_dir = _patch_config_paths(monkeypatch, tmp_path)
     prompts: list[str] = []
-    # 7 provider toggles + 6 runtime values + Copilot overage + 7 currency
-    # symbols + OAuth source + empty credentials + 2 logging modes
+    # 7 provider toggles + 6 runtime values + Copilot overage + OpenRouter
+    # budget + 7 currency symbols + OAuth source + empty credentials + 2 logging modes
     responses = iter(
         [
             "enable",
@@ -101,6 +101,7 @@ def test_setup_prompts_runtime_config_before_credentials(
             90,
             "billing_data",
             0.04,
+            200,
             "$",
             "$",
             "$",
@@ -156,20 +157,21 @@ def test_setup_prompts_runtime_config_before_credentials(
     assert prompts[11] == "  gnome-refresh-interval seconds"
     assert prompts[12] == "  billing_data"
     assert prompts[13] == "  copilot extra premium request cost (USD/request)"
-    assert prompts[14] == "  claude currency symbol"
-    assert prompts[15] == "  openai currency symbol"
-    assert prompts[16] == "  openrouter currency symbol"
-    assert prompts[17] == "  copilot currency symbol"
-    assert prompts[18] == "  codex currency symbol"
-    assert prompts[19] == "  geminiai currency symbol"
-    assert prompts[20] == "  zai currency symbol"
-    assert prompts[21] == "  geminiai oauth source"
-    assert prompts[22] == "  OPENROUTER_API_KEY"
-    assert prompts[23] == "  OPENAI_ADMIN_KEY"
-    assert prompts[24] == "  GITHUB_TOKEN"
-    assert prompts[25] == "  ZAI_API_KEY"
-    assert prompts[26] == "  execution log mode"
-    assert prompts[27] == "  debug api log mode"
+    assert prompts[14] == "  openrouter monthly budget (USD)"
+    assert prompts[15] == "  claude currency symbol"
+    assert prompts[16] == "  openai currency symbol"
+    assert prompts[17] == "  openrouter currency symbol"
+    assert prompts[18] == "  copilot currency symbol"
+    assert prompts[19] == "  codex currency symbol"
+    assert prompts[20] == "  geminiai currency symbol"
+    assert prompts[21] == "  zai currency symbol"
+    assert prompts[22] == "  geminiai oauth source"
+    assert prompts[23] == "  OPENROUTER_API_KEY"
+    assert prompts[24] == "  OPENAI_ADMIN_KEY"
+    assert prompts[25] == "  GITHUB_TOKEN"
+    assert prompts[26] == "  ZAI_API_KEY"
+    assert prompts[27] == "  execution log mode"
+    assert prompts[28] == "  debug api log mode"
 
     runtime_config = json.loads(
         (config_dir / "config.json").read_text(encoding="utf-8")
@@ -190,6 +192,7 @@ def test_setup_prompts_runtime_config_before_credentials(
         "zai": True,
     }
     assert runtime_config["copilot_extra_premium_request_cost"] == 0.04
+    assert runtime_config["openrouter_monthly_budget"] == 200
     assert runtime_config["currency_symbols"] == {
         "claude": "$",
         "openai": "$",
@@ -258,6 +261,7 @@ def test_setup_accepts_geminiai_oauth_json_paste_and_persists_runtime_fields(
             60,
             "billing_data",
             0.04,
+            200,
             "$",
             "$",
             "$",
@@ -314,6 +318,7 @@ def test_setup_accepts_geminiai_oauth_json_paste_and_persists_runtime_fields(
     runtime_doc = json.loads((config_dir / "config.json").read_text(encoding="utf-8"))
     assert runtime_doc["geminiai_project_id"] == "gen-lang-client-0834428245"
     assert runtime_doc["billing_data"] == "billing_data"
+    assert runtime_doc["openrouter_monthly_budget"] == 200
     assert runtime_doc["enabled_providers"] == {
         "claude": True,
         "openrouter": True,
@@ -404,6 +409,7 @@ def test_setup_geminiai_oauth_login_source_reauthorizes_with_current_scopes(
             60,
             "billing_data",
             0.04,
+            200,
             "$",
             "$",
             "$",

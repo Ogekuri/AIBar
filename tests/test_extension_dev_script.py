@@ -1,7 +1,7 @@
 """
 @file
 @brief GNOME extension test launcher regressions.
-@details Ensures the test script launches a nested GNOME Shell at 1024x800,
+@details Ensures the test script launches a nested GNOME Shell at 1280x720,
 does not invoke `aibar gnome-install`, and accepts no subcommand
 parameters per REQ-033.
 @satisfies TST-004, REQ-031, REQ-033
@@ -14,13 +14,14 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEV_SCRIPT_PATH = PROJECT_ROOT / "scripts" / "test-gnome-extension.sh"
 
 
-def test_script_includes_1024x800_dummy_mode_spec() -> None:
+def test_script_includes_1280x720_dummy_mode_spec() -> None:
     """
-    @brief Verify script sets MUTTER_DEBUG_DUMMY_MODE_SPECS to 1024x800.
+    @brief Verify script sets MUTTER_DEBUG_DUMMY_MODE_SPECS to 1280x720.
+    @satisfies PRJ-004
     """
     source = DEV_SCRIPT_PATH.read_text(encoding="utf-8")
     assert (
-        "env MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800 dbus-run-session -- gnome-shell --nested --wayland"
+        "env MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720 dbus-run-session -- gnome-shell --nested --wayland"
         in source
     )
 

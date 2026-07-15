@@ -9,7 +9,7 @@ import re
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-REFERENCES_PATH = PROJECT_ROOT / "docs" / "REFERENCES.md"
+REFERENCES_PATH = PROJECT_ROOT / "pi-usereq" / "docs" / "REFERENCES.md"
 
 
 def _source_files_with_symbols() -> list[str]:
@@ -37,7 +37,7 @@ def test_references_include_all_source_files() -> None:
 
     expected_paths = set(_source_files_with_symbols())
     missing = sorted(expected_paths - documented_paths)
-    assert not missing, f"Missing file sections in docs/REFERENCES.md: {missing}"
+    assert not missing, f"Missing file sections in pi-usereq/docs/REFERENCES.md: {missing}"
 
 
 def test_references_symbol_rows_have_line_ranges() -> None:
@@ -46,7 +46,7 @@ def test_references_symbol_rows_have_line_ranges() -> None:
     """
     references = REFERENCES_PATH.read_text(encoding="utf-8")
     symbol_rows = [line for line in references.splitlines() if line.startswith("|`")]
-    assert symbol_rows, "No symbol rows found in docs/REFERENCES.md."
+    assert symbol_rows, "No symbol rows found in pi-usereq/docs/REFERENCES.md."
 
     invalid_rows: list[str] = []
     for row in symbol_rows:
@@ -58,4 +58,4 @@ def test_references_symbol_rows_have_line_ranges() -> None:
         if not re.fullmatch(r"\d+(?:-\d+)?", line_span):
             invalid_rows.append(row)
 
-    assert not invalid_rows, f"Invalid symbol line ranges in docs/REFERENCES.md: {invalid_rows}"
+    assert not invalid_rows, f"Invalid symbol line ranges in pi-usereq/docs/REFERENCES.md: {invalid_rows}"

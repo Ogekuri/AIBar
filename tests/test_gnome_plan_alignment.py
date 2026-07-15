@@ -1,7 +1,7 @@
 """
 @file
 @brief GNOME contract-documentation location regression tests.
-@details Verifies GNOME contract documentation remains canonical in `docs/`
+@details Verifies GNOME contract documentation remains canonical in `pi-usereq/docs/`
 and that deprecated source-tree plan artifact `src/aibar/plans/Gnome.plan.md`
 is absent.
 """
@@ -11,9 +11,9 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 GNOME_PLAN_PATH = PROJECT_ROOT / "src" / "aibar" / "plans" / "Gnome.plan.md"
-REQUIREMENTS_PATH = PROJECT_ROOT / "docs" / "REQUIREMENTS.md"
-WORKFLOW_PATH = PROJECT_ROOT / "docs" / "WORKFLOW.md"
-REFERENCES_PATH = PROJECT_ROOT / "docs" / "REFERENCES.md"
+REQUIREMENTS_PATH = PROJECT_ROOT / "pi-usereq" / "docs" / "REQUIREMENTS.md"
+WORKFLOW_PATH = PROJECT_ROOT / "pi-usereq" / "docs" / "WORKFLOW.md"
+REFERENCES_PATH = PROJECT_ROOT / "pi-usereq" / "docs" / "REFERENCES.md"
 
 
 def test_gnome_contract_docs_are_canonical_and_source_plan_is_absent() -> None:
