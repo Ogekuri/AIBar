@@ -1,8 +1,8 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.3.29"
-date: "2026-04-18"
+version: "0.3.30"
+date: "2026-07-15"
 author: "req-new"
 scope:
   paths:
@@ -102,7 +102,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **CTN-005**: MAY depend on unofficial/internal endpoints when official usage APIs are unavailable for Claude, Copilot, or Codex integrations.
 - **CTN-006**: MUST keep `pi-usereq/docs/REFERENCES.md` synchronized with symbols discovered from configured source directories.
 - **CTN-007**: MUST declare `hatchling` as `[build-system]` backend in `pyproject.toml` with `[project]` metadata including `name`, `version`, `requires-python`, `[project.scripts]`, and `dependencies` containing `pytest`.
-- **CTN-008**: MUST persist runtime configuration in `~/.config/aibar/config.json` with keys `idle_delay_seconds`, `api_call_delay_milliseconds`, `api_call_timeout_milliseconds`, `gnome_refresh_interval_seconds`, `billing_data`, `copilot_extra_premium_request_cost`, `currency_symbols`, `log_enabled`, and `debug_enabled`.
+- **CTN-008**: MUST persist runtime configuration in `~/.config/aibar/config.json` with keys `idle_delay_seconds`, `api_call_delay_milliseconds`, `api_call_timeout_milliseconds`, `gnome_refresh_interval_seconds`, `billing_data`, `copilot_extra_premium_request_cost`, `currency_symbols`, `openrouter_monthly_budget`, `log_enabled`, and `debug_enabled`.
 - **CTN-009**: MUST persist provider-scoped idle-time state in `~/.cache/aibar/idle-time.json` with `last_success_timestamp` and `idle_until_timestamp` (epoch seconds) and `last_success_human` and `idle_until_human` (local-timezone ISO-8601).
 - **CTN-010**: MUST update `cache.json` payload fields only after successful fetch for the same provider/window and MUST preserve previous payload fields on failed fetch attempts, including HTTP `429`.
 - **CTN-011**: MUST fetch latest release metadata from `https://api.github.com/repos/Ogekuri/AIBar/releases/latest` for startup update checks.
@@ -139,7 +139,11 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-125**: CLI text `show` MUST omit disabled providers and MUST NOT render panels or not-configured hints for providers whose `enabled_providers.<provider>` flag is `false`.
 - **REQ-126**: `show --json` MUST emit top-level section `enabled_providers` and MUST omit disabled providers from `payload`, `status`, `idle_time`, `freshness`, and `extension.window_labels`.
 - **REQ-010**: MUST ignore requested window for OpenAI fetch and return effective window `30d` in provider payload, CLI text output, and `show --json`.
-- **REQ-011**: MUST ignore requested window for OpenRouter fetch and return effective window `30d` in provider payload, CLI text output, and `show --json`; OpenRouter cost MUST derive from `usage_monthly` and include `limit` and `limit_remaining`.
+- **REQ-011**: MUST ignore requested window for OpenRouter fetch and return effective window `30d` in provider payload, CLI text output, and `show --json`; OpenRouter cost MUST derive from `usage_monthly`.
+- **REQ-148**: MUST set OpenRouter `metrics.limit` to configured `openrouter_monthly_budget` and `metrics.remaining` to `budget - cost` (negative when over-budget).
+- **REQ-149**: MUST compute OpenRouter progress-bar percentage as `cost / openrouter_monthly_budget * 100` in CLI text, `show --json`, and GNOME extension.
+- **REQ-150**: MUST render OpenRouter over-budget progress bars (percentage > 100) with the same over-limit segment and 100% boundary marker as Copilot over-quota bars.
+- **REQ-151**: `setup` MUST prompt `openrouter_monthly_budget` in USD with default `200` and persist it in `~/.config/aibar/config.json`.
 - **REQ-012**: MUST ignore requested window for Copilot fetch, return effective window `30d`, and publish `premium_requests_extra_cost = max(premium_requests - premium_requests_included, 0) * copilot_extra_premium_request_cost` in payload, CLI text, and `show --json`.
 - **REQ-013**: MUST select Codex rate-limit primary window for `5h` and secondary window for other requested windows.
 - **REQ-014**: MUST attempt Codex token refresh when refresh token exists and `last_refresh` age is at least eight days.
@@ -289,7 +293,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-009**: MUST verify `gnome-install` resolves package source, validates source directory, branches install/update by target-directory presence, executes update disable→copy→enable ordering, masks extension-absence disable failures, and exits non-zero on missing source; MUST verify `gnome-uninstall` disables extension then removes directory and exits non-zero when directory is missing.
 - **TST-010**: MUST verify `Remaining credits: <remaining> / <limit>` appears for Claude, Codex, and Copilot only when corresponding status is `OK`, appears after one blank line following `Resets in`, and renders `<remaining>` as bold bright white.
 - **TST-011**: MUST verify every provider refresh failure updates provider-scoped idle-time using `idle_until = last_attempt_at + max(idle_delay_seconds, retry_after_seconds_or_0)`, including HTTP `429` and authentication failures without `retry_after` metadata.
-- **TST-013**: MUST verify `setup` prompts provider activation first, then `idle_delay_seconds`, `api_call_delay_milliseconds` (default `100`), `api_call_timeout_milliseconds` (default `5000`), `default_retry_after_seconds` (default `3600`), `gnome_refresh_interval_seconds`, `billing_data`, Copilot extra-premium cost (default `0.04`), currency prompts, and final logging prompts, and persists all values into `~/.config/aibar/config.json`.
+- **TST-013**: MUST verify `setup` prompts provider activation first, then `idle_delay_seconds`, `api_call_delay_milliseconds` (default `100`), `api_call_timeout_milliseconds` (default `5000`), `default_retry_after_seconds` (default `3600`), `gnome_refresh_interval_seconds`, `billing_data`, Copilot extra-premium cost (default `0.04`), OpenRouter monthly budget (default `200`), currency prompts, and final logging prompts, and persists all values into `~/.config/aibar/config.json`.
 - **TST-055**: MUST verify `setup` presents and persists `enabled_providers` as the first setup section, with provider order `claude`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`.
 - **TST-056**: MUST verify disabled providers are omitted from `show` text and `show --json`, emit `enabled_providers`, and skip refresh plus idle-time updates for providers marked disabled.
 - **TST-057**: MUST verify GNOME extension source parses `enabled_providers` before provider extraction and hides tabs, cards, and panel labels for disabled providers.
@@ -333,6 +337,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-060**: MUST verify Z.ai fetch maps the three `unit` quota entries to `5h`, `1w`, and `1m` quota rows and exposes each `percentage` and `nextResetTime`.
 - **TST-061**: MUST verify Z.ai renders last with cyan color in CLI text and GNOME extension and that the GNOME panel status bar shows the `5h` (non-bold) and `1w` (bold) Z.ai quota percentages and that the `_handleError` GNOME extension function resets and hides every panel status label including `_panelOpenAICostLabel`.
 - **TST-062**: MUST verify ZaiProvider derives the `5h` quota `reset_at_epoch_ms` from the next UTC 5-hour boundary when the 5 Hours limit entry omits `nextResetTime`.
+- **TST-063**: MUST verify OpenRouter progress-bar percentage equals `cost / budget * 100`, over-budget bars render >100 identically to Copilot, and `setup` persists `openrouter_monthly_budget` default `200`.
 - **TST-036**: MUST verify `--version` and `--ver` print installed version, bypass subcommand execution, and force one online startup release check even when `check_version_idle-time.json` contains future `idle_until`.
 - **TST-038**: MUST verify CLI text `show` renders `FAIL` blocks as `Status: FAIL`, blank line, `Reason: <reason>`, blank line, and right-aligned `Updated/Next`, never renders `Window 5h:/7d:/30d:` headings, and preserves `show --json` freshness, API-counter, cost, and GeminiAI effective-window behaviors.
 - **TST-042**: MUST verify CLI `show` and GNOME provider cards render equivalent failed-provider blocks formatted as `Status: FAIL`, blank line, `Reason: <reason>`, blank line, and `Updated/Next`, without `Window 5h:/7d:/30d:` headings.

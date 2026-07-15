@@ -139,19 +139,43 @@ class OpenRouterUsageProvider(BaseProvider):
 
     def _parse_response(self, data: dict, window: WindowPeriod) -> ProviderResult:
         """
-        @brief Execute parse response.
-        @details Applies parse response logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
-        @param data {dict} Input parameter `data`.
-        @param window {WindowPeriod} Input parameter `window`.
-        @return {ProviderResult} Function return value.
+        @brief Normalize OpenRouter key-usage payload to ProviderResult with budget-based quota.
+        @details Derives current monthly spend from `usage_monthly`, resolves the
+        configured `openrouter_monthly_budget` (USD, default `200`) from
+        `RuntimeConfig`, and projects spend against that budget so the normalized
+        `metrics.limit` equals the budget and `metrics.remaining` equals
+        `budget - cost` (negative when current spend exceeds the budget). This
+        makes `UsageMetrics.usage_percent` resolve to `cost / budget * 100`,
+        naturally exceeding `100` when over-budget so the shared >100 over-limit
+        progress-bar segment renders identically to Copilot over-quota bars.
+        The raw API key `limit`/`limit_remaining` remain available in `raw.data`.
+        @param data {dict} Raw OpenRouter API JSON payload.
+        @param window {WindowPeriod} Effective window (`30d` for OpenRouter).
+        @return {ProviderResult} Normalized provider result payload.
+        @satisfies REQ-011
         @satisfies REQ-050
+        @satisfies REQ-148
+        @satisfies REQ-149
+        @satisfies REQ-150
         """
-        from aibar.config import resolve_currency_symbol
+        from aibar.config import (
+            DEFAULT_OPENROUTER_MONTHLY_BUDGET,
+            load_runtime_config,
+            resolve_currency_symbol,
+        )
 
         payload = data.get("data", {})
 
         usage = self._get_usage(payload, window)
         cost = usage
+
+        try:
+            monthly_budget = max(
+                0.0,
+                float(load_runtime_config().openrouter_monthly_budget),
+            )
+        except Exception:
+            monthly_budget = DEFAULT_OPENROUTER_MONTHLY_BUDGET
 
         currency_symbol = resolve_currency_symbol(data, self.name.value)
 
@@ -160,8 +184,8 @@ class OpenRouterUsageProvider(BaseProvider):
             requests=None,
             input_tokens=None,
             output_tokens=None,
-            remaining=payload.get("limit_remaining"),
-            limit=payload.get("limit"),
+            remaining=monthly_budget - cost,
+            limit=monthly_budget,
             reset_at=None,
             currency_symbol=currency_symbol,
         )

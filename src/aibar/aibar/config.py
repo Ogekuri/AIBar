@@ -32,6 +32,7 @@ DEFAULT_RETRY_AFTER_SECONDS = 3600
 DEFAULT_GNOME_REFRESH_INTERVAL_SECONDS = 60
 DEFAULT_BILLING_DATASET = "billing_data"
 DEFAULT_COPILOT_EXTRA_PREMIUM_REQUEST_COST = 0.04
+DEFAULT_OPENROUTER_MONTHLY_BUDGET = 200.0
 DEFAULT_CURRENCY_SYMBOL = "$"
 DEFAULT_LOG_ENABLED = False
 DEFAULT_DEBUG_ENABLED = False
@@ -65,6 +66,10 @@ class RuntimeConfig(BaseModel):
     billing export table discovery.
     `copilot_extra_premium_request_cost` stores the configured unit price (USD)
     for one Copilot premium request above included-plan quota.
+    `openrouter_monthly_budget` stores the configured USD monthly spend budget
+    used as OpenRouter `metrics.limit` so the progress-bar percentage equals
+    `spend / budget * 100` and exceeds `100` when current spend surpasses the
+    configured budget (over-budget rendered identically to Copilot over-quota).
     `enabled_providers` stores provider-keyed booleans; missing keys normalize
     to `true` via `resolve_enabled_providers(...)` for backward compatibility.
     `log_enabled` controls append logging to `~/.cache/aibar/aibar.log`.
@@ -85,6 +90,8 @@ class RuntimeConfig(BaseModel):
     @satisfies REQ-123
     @satisfies REQ-124
     @satisfies REQ-126
+    @satisfies REQ-148
+    @satisfies REQ-151
     """
 
     idle_delay_seconds: int = Field(default=DEFAULT_IDLE_DELAY_SECONDS, ge=1)
@@ -102,6 +109,10 @@ class RuntimeConfig(BaseModel):
     enabled_providers: dict[str, bool] = Field(default_factory=dict)
     copilot_extra_premium_request_cost: float = Field(
         default=DEFAULT_COPILOT_EXTRA_PREMIUM_REQUEST_COST,
+        ge=0,
+    )
+    openrouter_monthly_budget: float = Field(
+        default=DEFAULT_OPENROUTER_MONTHLY_BUDGET,
         ge=0,
     )
     currency_symbols: dict[str, str] = Field(default_factory=dict)

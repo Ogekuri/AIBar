@@ -289,7 +289,7 @@ from typing import Any
 
 ---
 
-# cli.py | Python | 5276L | 140 symbols | 31 imports | 158 comments
+# cli.py | Python | 5294L | 140 symbols | 31 imports | 158 comments
 > Path: `src/aibar/aibar/cli.py`
 - @brief Command-line interface for aibar.
 - @details Defines command parsing, provider dispatch, formatted output, setup helpers, login flows, and UI launch hooks.
@@ -1613,7 +1613,7 @@ providers other than Claude.
 
 ### fn `def setup() -> None` (L4525-4724)
 - @brief Execute setup.
-- @details Prompts dedicated provider-activation section first, then prompts `idle_delay_seconds`, `api_call_delay_milliseconds`, `api_call_timeout_milliseconds`, `default_retry_after_seconds`, `gnome_refresh_interval_seconds`, and `billing_data` in order, then prompts dedicated Copilot overage pricing field `copilot_extra_premium_request_cost` (USD/request), then prompts provider currency symbols including `geminiai` (choices: `$`, `£`, `€`, default `$`), then persists all values to `~/.config/aibar/config.json`. Final setup section configures logging flags (`log_enabled`, `debug_enabled`). GeminiAI OAuth source supports `skip`, `file`, `paste`, and `login` (re-authorization with current scopes). Also prompts for provider API keys and writes them to `~/.config/aibar/env`.
+- @details Prompts dedicated provider-activation section first, then prompts `idle_delay_seconds`, `api_call_delay_milliseconds`, `api_call_timeout_milliseconds`, `default_retry_after_seconds`, `gnome_refresh_interval_seconds`, and `billing_data` in order, then prompts dedicated Copilot overage pricing field `copilot_extra_premium_request_cost` (USD/request), then prompts OpenRouter monthly spend budget `openrouter_monthly_budget` (USD, default `200`), then prompts provider currency symbols including `geminiai` (choices: `$`, `£`, `€`, default `$`), then persists all values to `~/.config/aibar/config.json`. Final setup section configures logging flags (`log_enabled`, `debug_enabled`). GeminiAI OAuth source supports `skip`, `file`, `paste`, and `login` (re-authorization with current scopes). Also prompts for provider API keys and writes them to `~/.config/aibar/env`.
 - @return {None} Function return value.
 - @satisfies REQ-005
 - @satisfies REQ-049
@@ -1623,44 +1623,45 @@ providers other than Claude.
 - @satisfies REQ-055
 - @satisfies REQ-056
 - @satisfies REQ-059
+- @satisfies REQ-151
 
-### fn `def login(provider: str) -> None` (L4911-4929)
+### fn `def login(provider: str) -> None` (L4929-4947)
 - @brief Execute login.
 - @details Applies login logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param provider {str} Input parameter `provider`.
 - @return {None} Function return value.
 
-### fn `def _login_claude() -> None` `priv` (L4930-4978)
+### fn `def _login_claude() -> None` `priv` (L4948-4996)
 - @brief Execute login claude.
 - @details Applies login claude logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_copilot() -> None` `priv` (L4979-5006)
+### fn `def _login_copilot() -> None` `priv` (L4997-5024)
 - @brief Execute login copilot.
 - @details Applies login copilot logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_geminiai() -> None` `priv` (L5007-5045)
+### fn `def _login_geminiai() -> None` `priv` (L5025-5063)
 - @brief Execute GeminiAI OAuth login flow.
 - @details Reuses persisted OAuth client configuration to launch browser-based authorization and persist refresh-capable Google credentials.
 - @return {None} Function return value.
 - @satisfies REQ-055
 - @satisfies REQ-056
 
-### fn `def _resolve_extension_source_dir() -> Path` `priv` (L5046-5058)
+### fn `def _resolve_extension_source_dir() -> Path` `priv` (L5064-5076)
 - @brief Resolve GNOME extension source directory from within the `aibar` package.
 - @details Uses `Path(__file__).resolve().parent` to locate the `aibar` package directory, then appends `gnome-extension/<UUID>/`. Works in development (editable install), wheel-installed, and `uv tool install` layouts because the extension directory resides inside the `aibar` Python package subtree.
 - @return {Path} Absolute path to the extension source directory.
 - @satisfies REQ-025, REQ-083
 
-### fn `def gnome_install() -> None` (L5069-5195)
+### fn `def gnome_install() -> None` (L5087-5213)
 - @brief Install or update the AIBar GNOME Shell extension to the user's local extensions directory.
 - @details Resolves extension source from the installed package path, validates source directory contains `metadata.json` and is non-empty, then executes one of two flows: install flow (`target` absent) creates target and copies files before enabling extension; update flow (`target` present) disables extension, copies files, then enables extension. Update flow masks non-zero disable outcomes caused by missing extension and continues. Produces colored Click-styled terminal output for all status messages.
 - @return {None} Function return value.
 - @throws {SystemExit} Exits with code 1 on prerequisite validation failure.
 - @satisfies PRJ-008, REQ-025, REQ-026, REQ-027, REQ-028, REQ-029, REQ-030, REQ-032, REQ-099
 
-### fn `def gnome_uninstall() -> None` (L5205-5274)
+### fn `def gnome_uninstall() -> None` (L5223-5292)
 - @brief Remove the AIBar GNOME Shell extension from the user's local extensions directory.
 - @details Disables the extension via `gnome-extensions disable`, then removes the entire extension directory at `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/`. Exits with code 1 if the extension directory does not exist. Produces colored Click-styled terminal output for all status messages.
 - @return {None} Function return value.
@@ -1803,18 +1804,18 @@ providers other than Claude.
 |`doctor`|fn|pub|4455-4507|def doctor() -> None|
 |`env`|fn|pub|4512-4520|def env() -> None|
 |`setup`|fn|pub|4525-4724|def setup() -> None|
-|`login`|fn|pub|4911-4929|def login(provider: str) -> None|
-|`_login_claude`|fn|priv|4930-4978|def _login_claude() -> None|
-|`_login_copilot`|fn|priv|4979-5006|def _login_copilot() -> None|
-|`_login_geminiai`|fn|priv|5007-5045|def _login_geminiai() -> None|
-|`_resolve_extension_source_dir`|fn|priv|5046-5058|def _resolve_extension_source_dir() -> Path|
-|`gnome_install`|fn|pub|5069-5195|def gnome_install() -> None|
-|`gnome_uninstall`|fn|pub|5205-5274|def gnome_uninstall() -> None|
+|`login`|fn|pub|4929-4947|def login(provider: str) -> None|
+|`_login_claude`|fn|priv|4948-4996|def _login_claude() -> None|
+|`_login_copilot`|fn|priv|4997-5024|def _login_copilot() -> None|
+|`_login_geminiai`|fn|priv|5025-5063|def _login_geminiai() -> None|
+|`_resolve_extension_source_dir`|fn|priv|5064-5076|def _resolve_extension_source_dir() -> Path|
+|`gnome_install`|fn|pub|5087-5213|def gnome_install() -> None|
+|`gnome_uninstall`|fn|pub|5223-5292|def gnome_uninstall() -> None|
 
 
 ---
 
-# config.py | Python | 875L | 54 symbols | 14 imports | 43 comments
+# config.py | Python | 886L | 55 symbols | 14 imports | 43 comments
 > Path: `src/aibar/aibar/config.py`
 - @brief Configuration and credential resolution for aibar.
 - @details Provides environment-file parsing, token precedence resolution, and provider configuration status reporting.
@@ -1852,15 +1853,16 @@ from aibar.providers import (
 - var `DEFAULT_GNOME_REFRESH_INTERVAL_SECONDS = 60` (L32)
 - var `DEFAULT_BILLING_DATASET = "billing_data"` (L33)
 - var `DEFAULT_COPILOT_EXTRA_PREMIUM_REQUEST_COST = 0.04` (L34)
-- var `DEFAULT_CURRENCY_SYMBOL = "$"` (L35)
-- var `DEFAULT_LOG_ENABLED = False` (L36)
-- var `DEFAULT_DEBUG_ENABLED = False` (L37)
-- var `LOG_TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S"` (L38)
-- var `LOCK_POLL_INTERVAL_SECONDS = 0.25` (L40)
-- var `LOCK_ACQUIRE_TIMEOUT_SECONDS = 5.0` (L41)
-### class `class RuntimeConfig(BaseModel)` : BaseModel (L50-112)
+- var `DEFAULT_OPENROUTER_MONTHLY_BUDGET = 200.0` (L35)
+- var `DEFAULT_CURRENCY_SYMBOL = "$"` (L36)
+- var `DEFAULT_LOG_ENABLED = False` (L37)
+- var `DEFAULT_DEBUG_ENABLED = False` (L38)
+- var `LOG_TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S"` (L39)
+- var `LOCK_POLL_INTERVAL_SECONDS = 0.25` (L41)
+- var `LOCK_ACQUIRE_TIMEOUT_SECONDS = 5.0` (L42)
+### class `class RuntimeConfig(BaseModel)` : BaseModel (L51-123)
 - @brief Define runtime configuration component for refresh throttling, timeout, currency, and provider-activation controls.
-- @details Encodes persisted CLI runtime controls used by `show` refresh logic, GNOME extension scheduling, per-provider currency symbol resolution, and provider enable/disable gating. Fields are validated with defaults that reduce rate-limit pressure. `api_call_delay_milliseconds` defaults to `100` ms inter-call spacing. `api_call_timeout_milliseconds` defaults to `5000` ms HTTP response timeout applied to all provider API calls via `httpx.AsyncClient(timeout=<value>/1000.0)`. `default_retry_after_seconds` defaults to `3600` seconds and is used when provider failure payloads explicitly mark `retry_after_unavailable=true`. `currency_symbols` maps provider name strings to currency symbols (`$`, `£`, `€`); missing entries default to `DEFAULT_CURRENCY_SYMBOL` at resolution time. `billing_data` stores the Google BigQuery dataset name used for GeminiAI billing export table discovery. `copilot_extra_premium_request_cost` stores the configured unit price (USD) for one Copilot premium request above included-plan quota. `enabled_providers` stores provider-keyed booleans; missing keys normalize to `true` via `resolve_enabled_providers(...)` for backward compatibility. `log_enabled` controls append logging to `~/.cache/aibar/aibar.log`. `debug_enabled` controls API debug-result logging and requires `log_enabled`. Optional GeminiAI field persists Google Cloud project identifier used by OAuth-backed Monitoring API fetch execution.
+- @details Encodes persisted CLI runtime controls used by `show` refresh logic, GNOME extension scheduling, per-provider currency symbol resolution, and provider enable/disable gating. Fields are validated with defaults that reduce rate-limit pressure. `api_call_delay_milliseconds` defaults to `100` ms inter-call spacing. `api_call_timeout_milliseconds` defaults to `5000` ms HTTP response timeout applied to all provider API calls via `httpx.AsyncClient(timeout=<value>/1000.0)`. `default_retry_after_seconds` defaults to `3600` seconds and is used when provider failure payloads explicitly mark `retry_after_unavailable=true`. `currency_symbols` maps provider name strings to currency symbols (`$`, `£`, `€`); missing entries default to `DEFAULT_CURRENCY_SYMBOL` at resolution time. `billing_data` stores the Google BigQuery dataset name used for GeminiAI billing export table discovery. `copilot_extra_premium_request_cost` stores the configured unit price (USD) for one Copilot premium request above included-plan quota. `openrouter_monthly_budget` stores the configured USD monthly spend budget used as OpenRouter `metrics.limit` so the progress-bar percentage equals `spend / budget * 100` and exceeds `100` when current spend surpasses the configured budget (over-budget rendered identically to Copilot over-quota). `enabled_providers` stores provider-keyed booleans; missing keys normalize to `true` via `resolve_enabled_providers(...)` for backward compatibility. `log_enabled` controls append logging to `~/.cache/aibar/aibar.log`. `debug_enabled` controls API debug-result logging and requires `log_enabled`. Optional GeminiAI field persists Google Cloud project identifier used by OAuth-backed Monitoring API fetch execution.
 - @satisfies CTN-008
 - @satisfies REQ-107
 - @satisfies REQ-109
@@ -1875,34 +1877,36 @@ from aibar.providers import (
 - @satisfies REQ-123
 - @satisfies REQ-124
 - @satisfies REQ-126
+- @satisfies REQ-148
+- @satisfies REQ-151
 
-### class `class IdleTimeState(BaseModel)` : BaseModel (L113-128)
+### class `class IdleTimeState(BaseModel)` : BaseModel (L124-139)
 - @brief Define persisted idle-time entry for one provider.
 - @details Stores provider-local last-success and idle-until timestamps in epoch-seconds and local-timezone ISO-8601 formats. Serialized as one value under provider key in `~/.cache/aibar/idle-time.json`.
 - @satisfies CTN-009
 
-### class `class LockAcquisitionTimeoutError(RuntimeError)` : RuntimeError (L129-139)
+### class `class LockAcquisitionTimeoutError(RuntimeError)` : RuntimeError (L140-150)
 - @brief Define lock-acquisition timeout error for cache-file synchronization.
 - @details Raised when lock-file acquisition for `cache.json` or `idle-time.json` remains blocked beyond the configured timeout window.
 - @satisfies REQ-066
 
-### fn `def _ensure_app_config_dir() -> None` `priv` (L140-149)
+### fn `def _ensure_app_config_dir() -> None` `priv` (L151-160)
 - @brief Ensure AIBar configuration directory exists before file persistence.
 - @details Creates `~/.config/aibar` recursively when missing. This function is called by env-file and runtime-config persistence helpers.
 - @return {None} Function return value.
 
-### fn `def _ensure_app_cache_dir() -> None` `priv` (L150-159)
+### fn `def _ensure_app_cache_dir() -> None` `priv` (L161-170)
 - @brief Ensure AIBar cache directory exists before cache and idle-time persistence.
 - @details Creates `~/.cache/aibar` recursively when missing. This function is called by CLI cache and idle-time persistence helpers.
 - @return {None} Function return value.
 
-### fn `def _runtime_log_path() -> Path` `priv` (L160-170)
+### fn `def _runtime_log_path() -> Path` `priv` (L171-181)
 - @brief Resolve runtime execution log file path.
 - @details Produces deterministic path `~/.cache/aibar/aibar.log` under user cache directory for append-only execution logging.
 - @return {Path} Absolute runtime log file path.
 - @satisfies REQ-111
 
-### fn `def _runtime_log_flags() -> tuple[bool, bool]` `priv` (L171-187)
+### fn `def _runtime_log_flags() -> tuple[bool, bool]` `priv` (L182-198)
 - @brief Resolve persisted runtime log and debug flags.
 - @details Loads runtime configuration and extracts `log_enabled` and `debug_enabled`; invalid or unreadable config yields `(False, False)`.
 - @return {tuple[bool, bool]} Tuple `(log_enabled, debug_enabled)`.
@@ -1910,7 +1914,7 @@ from aibar.providers import (
 - @satisfies REQ-109
 - @satisfies REQ-110
 
-### fn `def append_runtime_log_line(message: str, debug_only: bool = False) -> None` (L188-213)
+### fn `def append_runtime_log_line(message: str, debug_only: bool = False) -> None` (L199-224)
 - @brief Append one timestamped runtime log line.
 - @details Writes `<timestamp> <message>` rows in append mode to `~/.cache/aibar/aibar.log` when `log_enabled` is true. Debug-only rows are emitted only when both `log_enabled` and `debug_enabled` are true.
 - @param message {str} Runtime log message payload without trailing newline.
@@ -1919,20 +1923,20 @@ from aibar.providers import (
 - @satisfies REQ-111
 - @satisfies REQ-114
 
-### fn `def append_runtime_log_separator() -> None` (L214-232)
+### fn `def append_runtime_log_separator() -> None` (L225-243)
 - @brief Append one trailing empty line to runtime log.
 - @details Emits one blank separator row in append mode when `log_enabled` is true to delimit consecutive execution blocks.
 - @return {None} Function return value.
 - @satisfies REQ-113
 
-### fn `def _lock_file_path(target_path: Path) -> Path` `priv` (L233-244)
+### fn `def _lock_file_path(target_path: Path) -> Path` `priv` (L244-255)
 - @brief Resolve lock-file path for one cache artifact.
 - @details Produces deterministic lock-file names under `~/.cache/aibar/` using `<filename>.lock` to coordinate cross-process read/write exclusion.
 - @param target_path {Path} Cache file path guarded by lock.
 - @return {Path} Absolute lock-file path.
 - @satisfies REQ-066
 
-### fn `def _blocking_file_lock(target_path: Path)` `priv` `@contextmanager` (L246-294)
+### fn `def _blocking_file_lock(target_path: Path)` `priv` `@contextmanager` (L257-305)
 - @brief Acquire and release blocking lock-file for cache artifact I/O.
 - @details Uses atomic `O_CREAT|O_EXCL` lock-file creation. When lock-file already exists, polls every `250ms` until lock release, then acquires lock. Raises timeout error after `5s` blocked wait and appends timeout diagnostics to runtime log when logging is enabled. Always removes owned lock-file during exit.
 - @param target_path {Path} Cache artifact path protected by this lock.
@@ -1941,14 +1945,14 @@ from aibar.providers import (
 - @satisfies REQ-066
 - @satisfies REQ-112
 
-### fn `def _sanitize_cache_payload(payload: dict[str, Any]) -> dict[str, Any]` `priv` (L295-329)
+### fn `def _sanitize_cache_payload(payload: dict[str, Any]) -> dict[str, Any]` `priv` (L306-340)
 - @brief Redact sensitive keys from cache payload before disk persistence.
 - @details Recursively traverses dictionaries/lists and replaces values for case-insensitive key matches in `{token,key,secret,password,authorization}` with deterministic placeholder string `[REDACTED]`.
 - @param payload {dict[str, Any]} Cache document containing `payload` and `status` sections.
 - @return {dict[str, Any]} Sanitized deep-copy structure safe for persistence.
 - @satisfies DES-004
 
-### fn `def clean(value: Any) -> Any` (L307-326)
+### fn `def clean(value: Any) -> Any` (L318-337)
 - @brief Redact sensitive keys from cache payload before disk persistence.
 - @brief Apply recursive redaction to one JSON-compatible node.
 - @details Recursively traverses dictionaries/lists and replaces values for
@@ -1961,13 +1965,13 @@ with deterministic placeholder string `[REDACTED]`.
 - @return {Any} Sanitized node.
 - @satisfies DES-004
 
-### fn `def load_runtime_config() -> RuntimeConfig` (L330-346)
+### fn `def load_runtime_config() -> RuntimeConfig` (L341-357)
 - @brief Load runtime refresh configuration from disk with schema validation.
 - @details Reads `~/.config/aibar/config.json`, validates fields against `RuntimeConfig`, and returns defaults when file is missing or invalid.
 - @return {RuntimeConfig} Validated runtime configuration payload.
 - @satisfies CTN-008
 
-### fn `def save_runtime_config(runtime_config: RuntimeConfig) -> None` (L347-363)
+### fn `def save_runtime_config(runtime_config: RuntimeConfig) -> None` (L358-374)
 - @brief Persist runtime refresh configuration to disk.
 - @details Serializes `RuntimeConfig` to `~/.config/aibar/config.json` using stable pretty-printed JSON (`indent=2`) for deterministic readability.
 - @param runtime_config {RuntimeConfig} Validated runtime configuration model.
@@ -1975,9 +1979,9 @@ with deterministic placeholder string `[REDACTED]`.
 - @satisfies CTN-008
 - @satisfies CTN-017
 
-### fn `def resolve_enabled_providers(` (L364-365)
+### fn `def resolve_enabled_providers(` (L375-376)
 
-### fn `def load_cli_cache() -> dict[str, Any] | None` (L388-414)
+### fn `def load_cli_cache() -> dict[str, Any] | None` (L399-425)
 - @brief Resolve normalized provider-enable flags from runtime configuration.
 - @brief Load CLI cache payload from disk.
 - @details Produces a provider-keyed boolean map for all `ProviderName`
@@ -1997,7 +2001,7 @@ O(P). Space complexity O(P), where P is provider count.
 - @satisfies REQ-066
 - @satisfies REQ-112
 
-### fn `def resolve_currency_symbol(raw: dict[str, Any] | None, provider_name: str) -> str` (L415-446)
+### fn `def resolve_currency_symbol(raw: dict[str, Any] | None, provider_name: str) -> str` (L426-457)
 - @brief Resolve currency symbol for a provider result from API response or config.
 - @details Extraction priority: 1. `raw["currency"]` field: if a recognized symbol (`$`, `£`, `€`) → use directly; if an ISO-4217 code (`USD`, `GBP`, `EUR`) → map to symbol. 2. `RuntimeConfig.currency_symbols[provider_name]` configured default. 3. `DEFAULT_CURRENCY_SYMBOL` (`"$"`) as final fallback.
 - @param raw {dict[str, Any] | None} Raw API response dict from the provider fetch call, or None.
@@ -2005,7 +2009,7 @@ O(P). Space complexity O(P), where P is provider count.
 - @return {str} Resolved currency symbol; always a member of `VALID_CURRENCY_SYMBOLS`.
 - @satisfies REQ-050
 
-### fn `def save_cli_cache(payload: dict[str, Any]) -> None` (L447-473)
+### fn `def save_cli_cache(payload: dict[str, Any]) -> None` (L458-484)
 - @brief Persist canonical cache document to disk.
 - @details Redacts sensitive keys from nested raw payload objects, then writes sanitized cache document to `~/.cache/aibar/cache.json` using pretty-printed JSON (`indent=2`) preserving `payload` and `status` sections.
 - @param payload {dict[str, Any]} Canonical cache document.
@@ -2019,9 +2023,9 @@ O(P). Space complexity O(P), where P is provider count.
 - @satisfies REQ-066
 - @satisfies REQ-112
 
-### fn `def build_idle_time_state(` (L474-475)
+### fn `def build_idle_time_state(` (L485-486)
 
-### fn `def load_idle_time() -> dict[str, IdleTimeState]` (L509-539)
+### fn `def load_idle_time() -> dict[str, IdleTimeState]` (L520-550)
 - @brief Build provider-local idle-time entry from UTC-compatible datetimes.
 - @brief Load provider-keyed idle-time state from disk.
 - @details Normalizes timestamps to UTC for epoch conversion, then emits
@@ -2036,9 +2040,9 @@ parity with CLI/GNOME freshness rendering.
 - @satisfies CTN-009
 - @satisfies REQ-066
 
-### fn `def save_idle_time(` (L540-541)
+### fn `def save_idle_time(` (L551-552)
 
-### fn `def remove_idle_time_file() -> None` (L576-591)
+### fn `def remove_idle_time_file() -> None` (L587-602)
 - @brief Persist provider-keyed idle-time state map.
 - @brief Remove persisted idle-time state file if present.
 - @details Validates each provider entry, serializes canonical epoch and
@@ -2053,55 +2057,55 @@ Invalid map entries are skipped.
 - @satisfies REQ-039
 - @satisfies REQ-066
 
-### fn `def get_api_call_timeout_seconds() -> float` (L592-608)
+### fn `def get_api_call_timeout_seconds() -> float` (L603-619)
 - @brief Resolve HTTP response timeout in seconds from runtime configuration.
 - @details Reads `api_call_timeout_milliseconds` from `RuntimeConfig` and converts to seconds. Returns `DEFAULT_API_CALL_TIMEOUT_MILLISECONDS / 1000.0` when configuration is missing or invalid.
 - @return {float} HTTP response timeout in seconds (>= 0.001).
 - @satisfies REQ-095
 - @satisfies CTN-003
 
-### fn `def load_env_file() -> dict[str, str]` (L609-627)
+### fn `def load_env_file() -> dict[str, str]` (L620-638)
 - @brief Execute load env file.
 - @details Applies load env file logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {dict[str, str]} Function return value.
 
-### fn `def write_env_file(updates: dict[str, str]) -> None` (L628-667)
+### fn `def write_env_file(updates: dict[str, str]) -> None` (L639-678)
 - @brief Execute write env file.
 - @details Applies write env file logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param updates {dict[str, str]} Input parameter `updates`.
 - @return {None} Function return value.
 
-### class `class Config` (L668-867)
+### class `class Config` (L679-878)
 - @brief Define config component.
 - @details Encapsulates config state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
-- var `ENV_VARS =` (L675)
-- var `PROVIDER_INFO =` (L686)
-- fn `def get_token(self, provider: ProviderName) -> str | None` (L731-774)
+- var `ENV_VARS =` (L686)
+- var `PROVIDER_INFO =` (L697)
+- fn `def get_token(self, provider: ProviderName) -> str | None` (L742-785)
   - @brief Execute get token.
   - @details Applies get token logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param provider {ProviderName} Input parameter `provider`.
   - @return {str | None} Function return value.
-- fn `def is_provider_configured(self, provider: ProviderName) -> bool` (L775-808)
+- fn `def is_provider_configured(self, provider: ProviderName) -> bool` (L786-819)
   - @brief Execute is provider configured.
   - @details Applies is provider configured logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param provider {ProviderName} Input parameter `provider`.
   - @return {bool} Function return value.
-- fn `def get_provider_status(self, provider: ProviderName) -> dict[str, Any]` (L809-830)
+- fn `def get_provider_status(self, provider: ProviderName) -> dict[str, Any]` (L820-841)
   - @brief Execute get provider status.
   - @details Applies get provider status logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param provider {ProviderName} Input parameter `provider`.
   - @return {dict[str, Any]} Function return value.
-- fn `def get_all_provider_status(self) -> list[dict[str, Any]]` (L831-838)
+- fn `def get_all_provider_status(self) -> list[dict[str, Any]]` (L842-849)
   - @brief Execute get all provider status.
   - @details Applies get all provider status logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @return {list[dict[str, Any]]} Function return value.
-- fn `def _get_token_preview(self, provider: ProviderName) -> str | None` `priv` (L839-850)
+- fn `def _get_token_preview(self, provider: ProviderName) -> str | None` `priv` (L850-861)
   - @brief Execute get token preview.
   - @details Applies get token preview logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
   - @param provider {ProviderName} Input parameter `provider`.
   - @return {str | None} Function return value.
 
-### fn `def get_env_var_help(self) -> str` (L851-873)
+### fn `def get_env_var_help(self) -> str` (L862-884)
 - @brief Execute get env var help.
 - @details Applies get env var help logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {str} Function return value.
@@ -2122,47 +2126,48 @@ Invalid map entries are skipped.
 |`DEFAULT_GNOME_REFRESH_INTERVAL_SECONDS`|var|pub|32||
 |`DEFAULT_BILLING_DATASET`|var|pub|33||
 |`DEFAULT_COPILOT_EXTRA_PREMIUM_REQUEST_COST`|var|pub|34||
-|`DEFAULT_CURRENCY_SYMBOL`|var|pub|35||
-|`DEFAULT_LOG_ENABLED`|var|pub|36||
-|`DEFAULT_DEBUG_ENABLED`|var|pub|37||
-|`LOG_TIMESTAMP_FORMAT`|var|pub|38||
-|`LOCK_POLL_INTERVAL_SECONDS`|var|pub|40||
-|`LOCK_ACQUIRE_TIMEOUT_SECONDS`|var|pub|41||
-|`RuntimeConfig`|class|pub|50-112|class RuntimeConfig(BaseModel)|
-|`IdleTimeState`|class|pub|113-128|class IdleTimeState(BaseModel)|
-|`LockAcquisitionTimeoutError`|class|pub|129-139|class LockAcquisitionTimeoutError(RuntimeError)|
-|`_ensure_app_config_dir`|fn|priv|140-149|def _ensure_app_config_dir() -> None|
-|`_ensure_app_cache_dir`|fn|priv|150-159|def _ensure_app_cache_dir() -> None|
-|`_runtime_log_path`|fn|priv|160-170|def _runtime_log_path() -> Path|
-|`_runtime_log_flags`|fn|priv|171-187|def _runtime_log_flags() -> tuple[bool, bool]|
-|`append_runtime_log_line`|fn|pub|188-213|def append_runtime_log_line(message: str, debug_only: boo...|
-|`append_runtime_log_separator`|fn|pub|214-232|def append_runtime_log_separator() -> None|
-|`_lock_file_path`|fn|priv|233-244|def _lock_file_path(target_path: Path) -> Path|
-|`_blocking_file_lock`|fn|priv|246-294|def _blocking_file_lock(target_path: Path)|
-|`_sanitize_cache_payload`|fn|priv|295-329|def _sanitize_cache_payload(payload: dict[str, Any]) -> d...|
-|`clean`|fn|pub|307-326|def clean(value: Any) -> Any|
-|`load_runtime_config`|fn|pub|330-346|def load_runtime_config() -> RuntimeConfig|
-|`save_runtime_config`|fn|pub|347-363|def save_runtime_config(runtime_config: RuntimeConfig) ->...|
-|`resolve_enabled_providers`|fn|pub|364-365|def resolve_enabled_providers(|
-|`load_cli_cache`|fn|pub|388-414|def load_cli_cache() -> dict[str, Any] | None|
-|`resolve_currency_symbol`|fn|pub|415-446|def resolve_currency_symbol(raw: dict[str, Any] | None, p...|
-|`save_cli_cache`|fn|pub|447-473|def save_cli_cache(payload: dict[str, Any]) -> None|
-|`build_idle_time_state`|fn|pub|474-475|def build_idle_time_state(|
-|`load_idle_time`|fn|pub|509-539|def load_idle_time() -> dict[str, IdleTimeState]|
-|`save_idle_time`|fn|pub|540-541|def save_idle_time(|
-|`remove_idle_time_file`|fn|pub|576-591|def remove_idle_time_file() -> None|
-|`get_api_call_timeout_seconds`|fn|pub|592-608|def get_api_call_timeout_seconds() -> float|
-|`load_env_file`|fn|pub|609-627|def load_env_file() -> dict[str, str]|
-|`write_env_file`|fn|pub|628-667|def write_env_file(updates: dict[str, str]) -> None|
-|`Config`|class|pub|668-867|class Config|
-|`Config.ENV_VARS`|var|pub|675||
-|`Config.PROVIDER_INFO`|var|pub|686||
-|`Config.get_token`|fn|pub|731-774|def get_token(self, provider: ProviderName) -> str | None|
-|`Config.is_provider_configured`|fn|pub|775-808|def is_provider_configured(self, provider: ProviderName) ...|
-|`Config.get_provider_status`|fn|pub|809-830|def get_provider_status(self, provider: ProviderName) -> ...|
-|`Config.get_all_provider_status`|fn|pub|831-838|def get_all_provider_status(self) -> list[dict[str, Any]]|
-|`Config._get_token_preview`|fn|priv|839-850|def _get_token_preview(self, provider: ProviderName) -> s...|
-|`get_env_var_help`|fn|pub|851-873|def get_env_var_help(self) -> str|
+|`DEFAULT_OPENROUTER_MONTHLY_BUDGET`|var|pub|35||
+|`DEFAULT_CURRENCY_SYMBOL`|var|pub|36||
+|`DEFAULT_LOG_ENABLED`|var|pub|37||
+|`DEFAULT_DEBUG_ENABLED`|var|pub|38||
+|`LOG_TIMESTAMP_FORMAT`|var|pub|39||
+|`LOCK_POLL_INTERVAL_SECONDS`|var|pub|41||
+|`LOCK_ACQUIRE_TIMEOUT_SECONDS`|var|pub|42||
+|`RuntimeConfig`|class|pub|51-123|class RuntimeConfig(BaseModel)|
+|`IdleTimeState`|class|pub|124-139|class IdleTimeState(BaseModel)|
+|`LockAcquisitionTimeoutError`|class|pub|140-150|class LockAcquisitionTimeoutError(RuntimeError)|
+|`_ensure_app_config_dir`|fn|priv|151-160|def _ensure_app_config_dir() -> None|
+|`_ensure_app_cache_dir`|fn|priv|161-170|def _ensure_app_cache_dir() -> None|
+|`_runtime_log_path`|fn|priv|171-181|def _runtime_log_path() -> Path|
+|`_runtime_log_flags`|fn|priv|182-198|def _runtime_log_flags() -> tuple[bool, bool]|
+|`append_runtime_log_line`|fn|pub|199-224|def append_runtime_log_line(message: str, debug_only: boo...|
+|`append_runtime_log_separator`|fn|pub|225-243|def append_runtime_log_separator() -> None|
+|`_lock_file_path`|fn|priv|244-255|def _lock_file_path(target_path: Path) -> Path|
+|`_blocking_file_lock`|fn|priv|257-305|def _blocking_file_lock(target_path: Path)|
+|`_sanitize_cache_payload`|fn|priv|306-340|def _sanitize_cache_payload(payload: dict[str, Any]) -> d...|
+|`clean`|fn|pub|318-337|def clean(value: Any) -> Any|
+|`load_runtime_config`|fn|pub|341-357|def load_runtime_config() -> RuntimeConfig|
+|`save_runtime_config`|fn|pub|358-374|def save_runtime_config(runtime_config: RuntimeConfig) ->...|
+|`resolve_enabled_providers`|fn|pub|375-376|def resolve_enabled_providers(|
+|`load_cli_cache`|fn|pub|399-425|def load_cli_cache() -> dict[str, Any] | None|
+|`resolve_currency_symbol`|fn|pub|426-457|def resolve_currency_symbol(raw: dict[str, Any] | None, p...|
+|`save_cli_cache`|fn|pub|458-484|def save_cli_cache(payload: dict[str, Any]) -> None|
+|`build_idle_time_state`|fn|pub|485-486|def build_idle_time_state(|
+|`load_idle_time`|fn|pub|520-550|def load_idle_time() -> dict[str, IdleTimeState]|
+|`save_idle_time`|fn|pub|551-552|def save_idle_time(|
+|`remove_idle_time_file`|fn|pub|587-602|def remove_idle_time_file() -> None|
+|`get_api_call_timeout_seconds`|fn|pub|603-619|def get_api_call_timeout_seconds() -> float|
+|`load_env_file`|fn|pub|620-638|def load_env_file() -> dict[str, str]|
+|`write_env_file`|fn|pub|639-678|def write_env_file(updates: dict[str, str]) -> None|
+|`Config`|class|pub|679-878|class Config|
+|`Config.ENV_VARS`|var|pub|686||
+|`Config.PROVIDER_INFO`|var|pub|697||
+|`Config.get_token`|fn|pub|742-785|def get_token(self, provider: ProviderName) -> str | None|
+|`Config.is_provider_configured`|fn|pub|786-819|def is_provider_configured(self, provider: ProviderName) ...|
+|`Config.get_provider_status`|fn|pub|820-841|def get_provider_status(self, provider: ProviderName) -> ...|
+|`Config.get_all_provider_status`|fn|pub|842-849|def get_all_provider_status(self) -> list[dict[str, Any]]|
+|`Config._get_token_preview`|fn|priv|850-861|def _get_token_preview(self, provider: ProviderName) -> s...|
+|`get_env_var_help`|fn|pub|862-884|def get_env_var_help(self) -> str|
 
 
 ---
@@ -3573,7 +3578,7 @@ from aibar.config import resolve_currency_symbol
 
 ---
 
-# openrouter.py | Python | 216L | 11 symbols | 5 imports | 11 comments
+# openrouter.py | Python | 240L | 11 symbols | 5 imports | 11 comments
 > Path: `src/aibar/aibar/providers/openrouter.py`
 - @brief OpenRouter key usage and credit provider.
 - @details Fetches key usage snapshots and quota limits, then transforms provider payloads into normalized cost and quota metrics.
@@ -3584,7 +3589,7 @@ import httpx
 from aibar.providers.base import (
 from aibar.config import config
 from aibar.config import get_api_call_timeout_seconds
-from aibar.config import resolve_currency_symbol
+from aibar.config import (
 ```
 
 ## Definitions
@@ -3617,29 +3622,33 @@ from aibar.config import resolve_currency_symbol
 - @return {ProviderResult} Function return value.
 - @throws {Exception} Propagates explicit raised error states from internal validation or provider operations.
 
-### fn `def _parse_response(self, data: dict, window: WindowPeriod) -> ProviderResult` `priv` (L140-175)
-- @brief Execute parse response.
-- @details Applies parse response logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
-- @param data {dict} Input parameter `data`.
-- @param window {WindowPeriod} Input parameter `window`.
-- @return {ProviderResult} Function return value.
+### fn `def _parse_response(self, data: dict, window: WindowPeriod) -> ProviderResult` `priv` (L140-199)
+- @brief Normalize OpenRouter key-usage payload to ProviderResult with budget-based quota.
+- @details Derives current monthly spend from `usage_monthly`, resolves the configured `openrouter_monthly_budget` (USD, default `200`) from `RuntimeConfig`, and projects spend against that budget so the normalized `metrics.limit` equals the budget and `metrics.remaining` equals `budget - cost` (negative when current spend exceeds the budget). This makes `UsageMetrics.usage_percent` resolve to `cost / budget * 100`, naturally exceeding `100` when over-budget so the shared >100 over-limit progress-bar segment renders identically to Copilot over-quota bars. The raw API key `limit`/`limit_remaining` remain available in `raw.data`.
+- @param data {dict} Raw OpenRouter API JSON payload.
+- @param window {WindowPeriod} Effective window (`30d` for OpenRouter).
+- @return {ProviderResult} Normalized provider result payload.
+- @satisfies REQ-011
 - @satisfies REQ-050
+- @satisfies REQ-148
+- @satisfies REQ-149
+- @satisfies REQ-150
 
-### fn `def _get_usage(self, payload: dict, window: WindowPeriod) -> float` `priv` (L176-189)
+### fn `def _get_usage(self, payload: dict, window: WindowPeriod) -> float` `priv` (L200-213)
 - @brief Execute get usage.
 - @details Applies get usage logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param payload {dict} Input parameter `payload`.
 - @param window {WindowPeriod} Input parameter `window`.
 - @return {float} Function return value.
 
-### fn `def _get_byok_usage(self, payload: dict, window: WindowPeriod) -> float` `priv` (L190-203)
+### fn `def _get_byok_usage(self, payload: dict, window: WindowPeriod) -> float` `priv` (L214-227)
 - @brief Execute get byok usage.
 - @details Applies get byok usage logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param payload {dict} Input parameter `payload`.
 - @param window {WindowPeriod} Input parameter `window`.
 - @return {float} Function return value.
 
-### fn `def _to_float(self, value: float | int | None) -> float` `priv` (L204-217)
+### fn `def _to_float(self, value: float | int | None) -> float` `priv` (L228-241)
 - @brief Execute to float.
 - @details Applies to float logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param value {float | int | None} Input parameter `value`.
@@ -3655,10 +3664,10 @@ from aibar.config import resolve_currency_symbol
 |`OpenRouterUsageProvider.is_configured`|fn|pub|43-50|def is_configured(self) -> bool|
 |`OpenRouterUsageProvider.get_config_help`|fn|pub|51-58|def get_config_help(self) -> str|
 |`fetch`|fn|pub|64-139|async def fetch(self, window: WindowPeriod = WindowPeriod...|
-|`_parse_response`|fn|priv|140-175|def _parse_response(self, data: dict, window: WindowPerio...|
-|`_get_usage`|fn|priv|176-189|def _get_usage(self, payload: dict, window: WindowPeriod)...|
-|`_get_byok_usage`|fn|priv|190-203|def _get_byok_usage(self, payload: dict, window: WindowPe...|
-|`_to_float`|fn|priv|204-217|def _to_float(self, value: float | int | None) -> float|
+|`_parse_response`|fn|priv|140-199|def _parse_response(self, data: dict, window: WindowPerio...|
+|`_get_usage`|fn|priv|200-213|def _get_usage(self, payload: dict, window: WindowPeriod)...|
+|`_get_byok_usage`|fn|priv|214-227|def _get_byok_usage(self, payload: dict, window: WindowPe...|
+|`_to_float`|fn|priv|228-241|def _to_float(self, value: float | int | None) -> float|
 
 
 ---

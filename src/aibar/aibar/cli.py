@@ -4530,7 +4530,9 @@ def setup() -> None:
     `api_call_timeout_milliseconds`, `default_retry_after_seconds`,
     `gnome_refresh_interval_seconds`, and `billing_data` in order, then prompts
     dedicated Copilot overage pricing field `copilot_extra_premium_request_cost`
-    (USD/request), then prompts provider currency symbols including `geminiai`
+    (USD/request), then prompts OpenRouter monthly spend budget
+    `openrouter_monthly_budget` (USD, default `200`), then prompts provider
+    currency symbols including `geminiai`
     (choices: `$`, `£`, `€`, default `$`), then persists all values to
     `~/.config/aibar/config.json`. Final setup section configures logging flags
     (`log_enabled`, `debug_enabled`). GeminiAI OAuth source supports `skip`,
@@ -4545,6 +4547,7 @@ def setup() -> None:
     @satisfies REQ-055
     @satisfies REQ-056
     @satisfies REQ-059
+    @satisfies REQ-151
     """
     from aibar.config import (
         ENV_FILE_PATH,
@@ -4651,6 +4654,20 @@ def setup() -> None:
         "  copilot extra premium request cost (USD/request)",
         type=float,
         default=runtime_config.copilot_extra_premium_request_cost,
+        show_default=True,
+    )
+    click.echo()
+    click.echo(click.style("OpenRouter monthly budget", bold=True))
+    click.echo(
+        "  Configure the USD monthly spend budget used to compute the OpenRouter progress bar."
+    )
+    click.echo(
+        "  Spend above this budget renders the over-budget bar identically to Copilot over-quota."
+    )
+    openrouter_monthly_budget = click.prompt(
+        "  openrouter monthly budget (USD)",
+        type=float,
+        default=runtime_config.openrouter_monthly_budget,
         show_default=True,
     )
     click.echo()
@@ -4883,6 +4900,7 @@ def setup() -> None:
         billing_data=billing_data,
         enabled_providers=enabled_providers,
         copilot_extra_premium_request_cost=copilot_extra_premium_request_cost,
+        openrouter_monthly_budget=openrouter_monthly_budget,
         currency_symbols=currency_symbols,
         log_enabled=(log_mode == "enable"),
         debug_enabled=(debug_mode == "enable"),
