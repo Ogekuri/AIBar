@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.44.0](https://github.com/Ogekuri/AIBar/compare/v0.43.0..v0.44.0) - 2026-07-15
+### 🐛  Bug Fixes
+- align stale tests with requirements and add OpenRouter budget coverage [useReq] *(tests)*
+  - Refresh test_setup_runtime_config.py for REQ-151 budget prompt + persistence
+  - Add tests/test_openrouter_monthly_budget.py for TST-063 (budget percent, over-budget Copilot parity)
+  - Fix test_cli_idle_force enabled_providers output-vs-cache comparison (REQ-126)
+  - Fix test_extension_dev_script and stale script comment to 1280x720 (PRJ-004)
+  - Fix test_gnome_plan_alignment and test_references_inventory paths to pi-usereq/docs/ (PRJ-011)
+  - Full suite: 223 passed, 0 failed (was 213 passed, 8 failed)
+
+### 🚜  Changes
+- BREAKING CHANGE: compute usage bar against configurable monthly budget [useReq] *(openrouter)*
+  - Add openrouter_monthly_budget config (default $200) prompted in aibar setup
+  - OpenRouter metrics.limit/remaining now derive from budget (spend/budget*100)
+  - Over-budget bars reuse the shared >100 over-limit segment (Copilot parity)
+  - CLI aibar show and GNOME openrouter tab render spend vs configured budget
+  - Requirements: add REQ-148..151, TST-063; update REQ-011, CTN-008, TST-013
+- derive 5h quota reset time so Resets in renders [useReq] *(zai)*
+  - The Z.ai monitor API omits nextResetTime for the 5 Hours quota, so
+  - reset_at_epoch_ms was None and the 'Resets in' row was suppressed for
+  - the 5h progress bar in both 'aibar show' CLI and the GNOME extension.
+  - Add ZaiProvider._derive_five_hour_reset_epoch_ms computing the next UTC
+  - 5-hour boundary (00:00/05:00/10:00/15:00/20:00); _build_quota applies it
+  - when nextResetTime is absent for the 5h quota.
+  - CLI and GNOME already consume reset_at_epoch_ms, so both render the
+  - missing 'Resets in'/'Reset in' for 5h.
+  - Add REQ-147 and TST-062; update WORKFLOW.md and REFERENCES.md.
+
 ## [0.43.0](https://github.com/Ogekuri/AIBar/compare/v0.42.0..v0.43.0) - 2026-07-14
 ### 🚜  Changes
 - add reset time indicator for Z.ai 5h quota progress bar [useReq] *(zai)*
@@ -1255,6 +1283,7 @@
 - \[0.41.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.41.0
 - \[0.42.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.42.0
 - \[0.43.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.43.0
+- \[0.44.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.44.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1299,3 +1328,4 @@
 [0.41.0]: https://github.com/Ogekuri/AIBar/compare/v0.40.0..v0.41.0
 [0.42.0]: https://github.com/Ogekuri/AIBar/compare/v0.41.0..v0.42.0
 [0.43.0]: https://github.com/Ogekuri/AIBar/compare/v0.42.0..v0.43.0
+[0.44.0]: https://github.com/Ogekuri/AIBar/compare/v0.43.0..v0.44.0
