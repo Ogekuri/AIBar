@@ -1,5 +1,47 @@
 # Changelog
 
+## [0.46.0](https://github.com/Ogekuri/AIBar/compare/v0.45.0..v0.46.0) - 2026-09-25
+### 🚜  Changes
+- drop zero Requests/Tokens rows and show Total cost from API usage [useReq] *(openrouter)*
+  - requirements: bump docs version to 0.3.33; add REQ-155 (suppress
+  - OpenRouter Requests/Tokens rows), REQ-156 (normalize data.usage into
+  - UsageMetrics.total_cost), REQ-157 (render Total cost after Cost row);
+  - drop openrouter from REQ-036 null-to-zero API-counter normalization;
+  - extend CTN-002 monetary fields with total_cost; update evidence rows
+  - base.py: add UsageMetrics.total_cost optional float field
+  - openrouter.py: _parse_response exposes total_cost from data.usage via
+  - new _to_optional_float helper (None when absent or non-finite)
+  - cli.py: remove openrouter from _API_COUNTER_PROVIDERS; _build_result_panel
+  - renders Total cost: <currency><value> after Cost and omits Requests/Tokens
+  - extension.js: drop openrouter from API_COUNTER_PROVIDERS;
+  - _populateProviderCard hides requests/tokens labels and renders the
+  - Total cost label from metrics.total_cost in the removed counters position
+- revert budget-total usage labels to 30d window label [useReq] *(openrouter)*
+  - requirements: drop REQ-151/152/153 (budget-total labels) and TST-064,
+  - restore REQ-132 <window> slot and TST-063 wording; add REQ-154 pinning
+  - OpenRouter usage labels to the effective-window label 30d because the key
+  - API exposes no explicit timeframe field (only usage_daily/usage_weekly/
+  - usage_monthly/all-time usage basis values) and the fixed DAY_30 window
+  - matches the usage_monthly credit basis; bump docs version to 0.3.32
+  - cli.py: remove _openrouter_budget_total and its _build_result_panel
+  - override so OpenRouter OK rows render Usage: 30d <progress_bar> <percent>%
+  - extension.js: remove _resolveOpenRouterBudgetLabel and its
+  - _populateProviderCard override so OpenRouter single-window 30d bars render
+  - the configured window label
+  - tests: show/openrouter usage-row and over-credit parity tests pass again
+  - (30d prefix, Copilot-row equality); full suite 223 passed, 1 skipped
+- render total budget in openrouter usage bar labels [useReq] *(openrouter)*
+  - requirements: add REQ-151/152/153 (OpenRouter usage labels show
+  - <currency><budget_total> = cost + remaining in CLI text and GNOME
+  - bars, window-label fallback when budget unavailable), reword REQ-132
+  - label slot and TST-063/064 semantics and evidence rows
+  - cli.py: add _openrouter_budget_total helper; OK OpenRouter usage rows
+  - render Usage: $<budget_total> <progress_bar> <percent>% instead of
+  - the 30d window label
+  - extension.js: add _resolveOpenRouterBudgetLabel helper; OpenRouter
+  - single-window 30d bar label renders <currency><budget_total> from
+  - cost + remaining with window-label fallback
+
 ## [0.45.0](https://github.com/Ogekuri/AIBar/compare/v0.44.0..v0.45.0) - 2026-09-25
 ### 🚜  Changes
 - BREAKING CHANGE: base openrouter progress bar on API credit total [useReq] *(openrouter)*
@@ -1297,6 +1339,7 @@
 - \[0.43.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.43.0
 - \[0.44.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.44.0
 - \[0.45.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.45.0
+- \[0.46.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.46.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1343,3 +1386,4 @@
 [0.43.0]: https://github.com/Ogekuri/AIBar/compare/v0.42.0..v0.43.0
 [0.44.0]: https://github.com/Ogekuri/AIBar/compare/v0.43.0..v0.44.0
 [0.45.0]: https://github.com/Ogekuri/AIBar/compare/v0.44.0..v0.45.0
+[0.46.0]: https://github.com/Ogekuri/AIBar/compare/v0.45.0..v0.46.0
