@@ -289,7 +289,7 @@ from typing import Any
 
 ---
 
-# cli.py | Python | 5277L | 140 symbols | 31 imports | 158 comments
+# cli.py | Python | 5313L | 141 symbols | 31 imports | 159 comments
 > Path: `src/aibar/aibar/cli.py`
 - @brief Command-line interface for aibar.
 - @details Defines command parsing, provider dispatch, formatted output, setup helpers, login flows, and UI launch hooks.
@@ -1462,7 +1462,7 @@ freshness line (`Updated: ..., Next: ...`) using provider freshness state.
 - @return {datetime | None} UTC reset datetime or None when unavailable/invalid.
 - @satisfies REQ-137
 
-### fn `def _build_zai_quota_lines(result: ProviderResult) -> list[str]` `priv` (L3877-3917)
+### fn `def _build_zai_quota_lines(result: ProviderResult) -> list[str]` `priv` (L3877-3918)
 - @brief Build Z.ai per-quota usage and reset rows for CLI text panels.
 - @details Projects the normalized `raw.zai_quotas` array into one `Usage: <label> <progress_bar> <percent>%` row followed by one `Resets in: <duration>` row per quota when a reset timestamp is available. Quotas without a parseable percentage normalize to `0.0%`; quotas without a future reset time omit the reset row. Usage rows delegate to `_build_cli_usage_line(ProviderName.ZAI, ...)` so Z.ai renders the standard fixed-width bracketed progress bar like `claude/openrouter/copilot/codex`. Reset datetimes are resolved via `_coerce_zai_quota_reset_at` from the round-trip-safe `reset_at_epoch_ms` field (with `datetime`/ISO-string `reset_at` fallback) so cached `show` executions render `Resets in:` rows after the `model_dump(mode="json")` -> `model_validate` cache round-trip.
 - @param result {ProviderResult} Z.ai provider result.
@@ -1470,9 +1470,17 @@ freshness line (`Updated: ..., Next: ...`) using provider freshness state.
 - @satisfies REQ-137
 - @satisfies REQ-140
 
-### fn `def _build_result_panel(` `priv` (L3918-3922)
+### fn `def _openrouter_budget_total(metrics: UsageMetrics) -> float | None` `priv` (L3919-3949)
+- @brief Resolve OpenRouter total-budget label value from normalized metrics.
+- @details Returns the total API credit budget `cost + remaining` when both values are finite, falling back to `metrics.limit` (algebraically equal when `remaining = limit - cost`) so the CLI usage-row label renders `Usage: <currency_symbol><budget_total>` in place of the effective window label. Returns None when no budget value is available (free-tier keys or absent credit fields) so renderers keep the window-label fallback. Time complexity O(1). Space complexity O(1).
+- @param metrics {UsageMetrics} Normalized OpenRouter metrics payload.
+- @return {float | None} Total budget value or None when unavailable.
+- @satisfies REQ-151
+- @satisfies REQ-153
 
-### fn `def _format_billing_service_descriptions(services: list[object]) -> str | None` `priv` (L4157-4184)
+### fn `def _build_result_panel(` `priv` (L3950-3954)
+
+### fn `def _format_billing_service_descriptions(services: list[object]) -> str | None` `priv` (L4193-4220)
 - @brief Build one provider panel title/body payload for CLI text rendering.
 - @brief Build human-readable GeminiAI billing service summary.
 - @details Formats deterministic panel lines for one provider/window result and
@@ -1510,9 +1518,9 @@ carrying `last_success_timestamp` and `idle_until_timestamp` freshness values.
 - @satisfies REQ-132
 - @satisfies REQ-106
 
-### fn `def _build_dual_window_section(` `priv` (L4185-4187)
+### fn `def _build_dual_window_section(` `priv` (L4221-4223)
 
-### fn `def _build_dual_window_panel(` `priv` (L4203-4207)
+### fn `def _build_dual_window_panel(` `priv` (L4239-4243)
 - @brief Build one labeled dual-window CLI section.
 - @details Prepends the raw window label (`5h` or `7d`) to the ordered detail
 lines for one Claude/Codex section. The helper intentionally preserves
@@ -1523,7 +1531,7 @@ rows remain visible in both windows.
 - @return {list[str]} Section heading followed by the provided detail lines.
 - @satisfies REQ-002
 
-### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L4313-4337)
+### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L4349-4373)
 - @brief Build one grouped CLI panel for dual-window providers.
 - @brief Render CLI text output for one provider result.
 - @details Produces one provider panel from `5h` and `7d` results while
@@ -1559,15 +1567,15 @@ line.
 - @satisfies REQ-131
 - @satisfies REQ-132
 
-### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L4338-4353)
+### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L4374-4389)
 - @brief Execute format reset duration.
 - @details Applies format reset duration logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param seconds {float} Input parameter `seconds`.
 - @return {str} Function return value.
 
-### fn `def _should_print_claude_reset_pending_hint(` `priv` (L4354-4356)
+### fn `def _should_print_claude_reset_pending_hint(` `priv` (L4390-4392)
 
-### fn `def _is_displayed_zero_percent(percent: float | None) -> bool` `priv` (L4376-4392)
+### fn `def _is_displayed_zero_percent(percent: float | None) -> bool` `priv` (L4412-4428)
 - @brief Determine whether CLI output must render the reset-pending fallback hint.
 - @brief Check whether a percentage renders as `0.0%` in one-decimal UI output.
 - @details The hint is only valid for Claude windows when no reset timestamp is
@@ -1583,7 +1591,7 @@ providers other than Claude.
 - @satisfies REQ-002
 - @satisfies REQ-002
 
-### fn `def _progress_bar_layout(percent: float, width: int) -> tuple[int, int, int]` `priv` (L4393-4425)
+### fn `def _progress_bar_layout(percent: float, width: int) -> tuple[int, int, int]` `priv` (L4429-4461)
 - @brief Compute fixed-width CLI progress-bar segment widths.
 - @details Normalizes `percent` to a non-negative finite value. Percentages up to `100` allocate provider-color fill plus empty cells. Percentages above `100` allocate one 100%-boundary marker cell and one over-limit segment scaled across the extra `0..100` range, clamped for larger values, and forced visible for any positive over-limit usage. Time complexity O(1). Space complexity O(1).
 - @param percent {float} Raw usage percentage.
@@ -1591,7 +1599,7 @@ providers other than Claude.
 - @return {tuple[int, int, int]} Tuple `(base_width, over_limit_width, marker_width)`.
 - @satisfies REQ-122
 
-### fn `def _progress_bar(percent: float, provider_name: ProviderName, width: int = 20) -> str` `priv` (L4426-4450)
+### fn `def _progress_bar(percent: float, provider_name: ProviderName, width: int = 20) -> str` `priv` (L4462-4486)
 - @brief Render one fixed-width CLI usage bar.
 - @details Uses provider-color fill for in-limit usage. Percentages above `100` preserve fixed bar width by rendering a bright-white `|` marker at the 100% boundary and a neutral shaded over-limit segment (`▓`) inside the same bar. Time complexity O(width). Space complexity O(width).
 - @param percent {float} Raw usage percentage.
@@ -1601,17 +1609,17 @@ providers other than Claude.
 - @satisfies REQ-122
 - @satisfies REQ-128
 
-### fn `def doctor() -> None` (L4455-4507)
+### fn `def doctor() -> None` (L4491-4543)
 - @brief Execute doctor.
 - @details Applies doctor logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def env() -> None` (L4512-4520)
+### fn `def env() -> None` (L4548-4556)
 - @brief Execute env.
 - @details Applies env logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def setup() -> None` (L4525-4724)
+### fn `def setup() -> None` (L4561-4760)
 - @brief Execute setup.
 - @details Prompts dedicated provider-activation section first, then prompts `idle_delay_seconds`, `api_call_delay_milliseconds`, `api_call_timeout_milliseconds`, `default_retry_after_seconds`, `gnome_refresh_interval_seconds`, and `billing_data` in order, then prompts dedicated Copilot overage pricing field `copilot_extra_premium_request_cost` (USD/request), then prompts provider currency symbols including `geminiai` (choices: `$`, `£`, `€`, default `$`), then persists all values to `~/.config/aibar/config.json`. Final setup section configures logging flags (`log_enabled`, `debug_enabled`). GeminiAI OAuth source supports `skip`, `file`, `paste`, and `login` (re-authorization with current scopes). Also prompts for provider API keys and writes them to `~/.config/aibar/env`.
 - @return {None} Function return value.
@@ -1624,43 +1632,43 @@ providers other than Claude.
 - @satisfies REQ-056
 - @satisfies REQ-059
 
-### fn `def login(provider: str) -> None` (L4912-4930)
+### fn `def login(provider: str) -> None` (L4948-4966)
 - @brief Execute login.
 - @details Applies login logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param provider {str} Input parameter `provider`.
 - @return {None} Function return value.
 
-### fn `def _login_claude() -> None` `priv` (L4931-4979)
+### fn `def _login_claude() -> None` `priv` (L4967-5015)
 - @brief Execute login claude.
 - @details Applies login claude logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_copilot() -> None` `priv` (L4980-5007)
+### fn `def _login_copilot() -> None` `priv` (L5016-5043)
 - @brief Execute login copilot.
 - @details Applies login copilot logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_geminiai() -> None` `priv` (L5008-5046)
+### fn `def _login_geminiai() -> None` `priv` (L5044-5082)
 - @brief Execute GeminiAI OAuth login flow.
 - @details Reuses persisted OAuth client configuration to launch browser-based authorization and persist refresh-capable Google credentials.
 - @return {None} Function return value.
 - @satisfies REQ-055
 - @satisfies REQ-056
 
-### fn `def _resolve_extension_source_dir() -> Path` `priv` (L5047-5059)
+### fn `def _resolve_extension_source_dir() -> Path` `priv` (L5083-5095)
 - @brief Resolve GNOME extension source directory from within the `aibar` package.
 - @details Uses `Path(__file__).resolve().parent` to locate the `aibar` package directory, then appends `gnome-extension/<UUID>/`. Works in development (editable install), wheel-installed, and `uv tool install` layouts because the extension directory resides inside the `aibar` Python package subtree.
 - @return {Path} Absolute path to the extension source directory.
 - @satisfies REQ-025, REQ-083
 
-### fn `def gnome_install() -> None` (L5070-5196)
+### fn `def gnome_install() -> None` (L5106-5232)
 - @brief Install or update the AIBar GNOME Shell extension to the user's local extensions directory.
 - @details Resolves extension source from the installed package path, validates source directory contains `metadata.json` and is non-empty, then executes one of two flows: install flow (`target` absent) creates target and copies files before enabling extension; update flow (`target` present) disables extension, copies files, then enables extension. Update flow masks non-zero disable outcomes caused by missing extension and continues. Produces colored Click-styled terminal output for all status messages.
 - @return {None} Function return value.
 - @throws {SystemExit} Exits with code 1 on prerequisite validation failure.
 - @satisfies PRJ-008, REQ-025, REQ-026, REQ-027, REQ-028, REQ-029, REQ-030, REQ-032, REQ-099
 
-### fn `def gnome_uninstall() -> None` (L5206-5275)
+### fn `def gnome_uninstall() -> None` (L5242-5311)
 - @brief Remove the AIBar GNOME Shell extension from the user's local extensions directory.
 - @details Disables the extension via `gnome-extensions disable`, then removes the entire extension directory at `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/`. Exits with code 1 if the extension directory does not exist. Produces colored Click-styled terminal output for all status messages.
 - @return {None} Function return value.
@@ -1789,27 +1797,28 @@ providers other than Claude.
 |`_extract_copilot_extra_premium_cost`|fn|priv|3764-3824|def _extract_copilot_extra_premium_cost(result: ProviderR...|
 |`_build_copilot_extra_premium_cost_line`|fn|priv|3825-3840|def _build_copilot_extra_premium_cost_line(result: Provid...|
 |`_coerce_zai_quota_reset_at`|fn|priv|3841-3876|def _coerce_zai_quota_reset_at(quota: dict[str, object]) ...|
-|`_build_zai_quota_lines`|fn|priv|3877-3917|def _build_zai_quota_lines(result: ProviderResult) -> lis...|
-|`_build_result_panel`|fn|priv|3918-3922|def _build_result_panel(|
-|`_format_billing_service_descriptions`|fn|priv|4157-4184|def _format_billing_service_descriptions(services: list[o...|
-|`_build_dual_window_section`|fn|priv|4185-4187|def _build_dual_window_section(|
-|`_build_dual_window_panel`|fn|priv|4203-4207|def _build_dual_window_panel(|
-|`_print_result`|fn|priv|4313-4337|def _print_result(name: ProviderName, result, label: str ...|
-|`_format_reset_duration`|fn|priv|4338-4353|def _format_reset_duration(seconds: float) -> str|
-|`_should_print_claude_reset_pending_hint`|fn|priv|4354-4356|def _should_print_claude_reset_pending_hint(|
-|`_is_displayed_zero_percent`|fn|priv|4376-4392|def _is_displayed_zero_percent(percent: float | None) -> ...|
-|`_progress_bar_layout`|fn|priv|4393-4425|def _progress_bar_layout(percent: float, width: int) -> t...|
-|`_progress_bar`|fn|priv|4426-4450|def _progress_bar(percent: float, provider_name: Provider...|
-|`doctor`|fn|pub|4455-4507|def doctor() -> None|
-|`env`|fn|pub|4512-4520|def env() -> None|
-|`setup`|fn|pub|4525-4724|def setup() -> None|
-|`login`|fn|pub|4912-4930|def login(provider: str) -> None|
-|`_login_claude`|fn|priv|4931-4979|def _login_claude() -> None|
-|`_login_copilot`|fn|priv|4980-5007|def _login_copilot() -> None|
-|`_login_geminiai`|fn|priv|5008-5046|def _login_geminiai() -> None|
-|`_resolve_extension_source_dir`|fn|priv|5047-5059|def _resolve_extension_source_dir() -> Path|
-|`gnome_install`|fn|pub|5070-5196|def gnome_install() -> None|
-|`gnome_uninstall`|fn|pub|5206-5275|def gnome_uninstall() -> None|
+|`_build_zai_quota_lines`|fn|priv|3877-3918|def _build_zai_quota_lines(result: ProviderResult) -> lis...|
+|`_openrouter_budget_total`|fn|priv|3919-3949|def _openrouter_budget_total(metrics: UsageMetrics) -> fl...|
+|`_build_result_panel`|fn|priv|3950-3954|def _build_result_panel(|
+|`_format_billing_service_descriptions`|fn|priv|4193-4220|def _format_billing_service_descriptions(services: list[o...|
+|`_build_dual_window_section`|fn|priv|4221-4223|def _build_dual_window_section(|
+|`_build_dual_window_panel`|fn|priv|4239-4243|def _build_dual_window_panel(|
+|`_print_result`|fn|priv|4349-4373|def _print_result(name: ProviderName, result, label: str ...|
+|`_format_reset_duration`|fn|priv|4374-4389|def _format_reset_duration(seconds: float) -> str|
+|`_should_print_claude_reset_pending_hint`|fn|priv|4390-4392|def _should_print_claude_reset_pending_hint(|
+|`_is_displayed_zero_percent`|fn|priv|4412-4428|def _is_displayed_zero_percent(percent: float | None) -> ...|
+|`_progress_bar_layout`|fn|priv|4429-4461|def _progress_bar_layout(percent: float, width: int) -> t...|
+|`_progress_bar`|fn|priv|4462-4486|def _progress_bar(percent: float, provider_name: Provider...|
+|`doctor`|fn|pub|4491-4543|def doctor() -> None|
+|`env`|fn|pub|4548-4556|def env() -> None|
+|`setup`|fn|pub|4561-4760|def setup() -> None|
+|`login`|fn|pub|4948-4966|def login(provider: str) -> None|
+|`_login_claude`|fn|priv|4967-5015|def _login_claude() -> None|
+|`_login_copilot`|fn|priv|5016-5043|def _login_copilot() -> None|
+|`_login_geminiai`|fn|priv|5044-5082|def _login_geminiai() -> None|
+|`_resolve_extension_source_dir`|fn|priv|5083-5095|def _resolve_extension_source_dir() -> Path|
+|`gnome_install`|fn|pub|5106-5232|def gnome_install() -> None|
+|`gnome_uninstall`|fn|pub|5242-5311|def gnome_uninstall() -> None|
 
 
 ---
@@ -2168,7 +2177,7 @@ Invalid map entries are skipped.
 
 ---
 
-# extension.js | JavaScript | 2608L | 52 symbols | 9 imports | 53 comments
+# extension.js | JavaScript | 2643L | 53 symbols | 9 imports | 54 comments
 > Path: `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`
 - @brief GNOME Shell panel extension for aibar metrics.
 - @details Collects usage JSON from the aibar CLI and renders provider-specific quota/cost cards in the GNOME panel popup.
@@ -2287,25 +2296,39 @@ Falls back to raw `premium_requests_extra_cost` or
 - @satisfies REQ-117
 - @satisfies REQ-118
 
-### fn `function _formatLocalDateTime(value)` (L273-284)
+### fn `const _resolveOpenRouterBudgetLabel = (metrics) =>` (L281-295)
+- @brief Build the OpenRouter total-budget window-bar label.
+- @details Returns `<currency_symbol><budget_total>` with `budget_total`
+equal to `cost + remaining` when both are finite numbers, falling back to
+`metrics.limit` (algebraically equal when `remaining = limit - cost`),
+formatted to two decimal places. Returns null when no budget value is
+available (free-tier keys or absent credit fields) so the caller keeps
+the configured window-label fallback. Time complexity O(1). Space
+complexity O(1).
+- @param {Object<string, any>} metrics Normalized OpenRouter metrics payload.
+- @return s {string | null} Budget label text or null when unavailable.
+- @satisfies REQ-152
+- @satisfies REQ-153
+
+### fn `function _formatLocalDateTime(value)` (L303-314)
 - @brief Format one Date object as local datetime for provider freshness labels.
 - @details Produces `%Y-%m-%d %H:%M` in runtime local timezone; invalid Date values return null.
 - @param {Date} value Date object to format.
 - @return s {string | null} Formatted local datetime string or null.
 
-### fn `function _coerceRetryAfterSeconds(value)` (L291-301)
+### fn `function _coerceRetryAfterSeconds(value)` (L321-331)
 - @brief Normalize retry-after value to positive integer seconds.
 - @param {any} value Retry-after candidate value.
 - @return s {number | null} Integer retry-after seconds or null when unavailable.
 
-### fn `function _classifyPanelFailureCategory(statusEntry)` (L310-324)
+### fn `function _classifyPanelFailureCategory(statusEntry)` (L340-354)
 - @brief Classify panel-failure category from cache status metadata.
 - @details Returns one of `oauth`, `rate_limit`, or `other` by inspecting
 normalized status error text and optional HTTP status code.
 - @param {any} statusEntry Window-specific cache status entry.
 - @return s {'oauth' | 'rate_limit' | 'other'} Failure category.
 
-### fn `function _panelProviderFailureState(statusData, providerName, windows)` (L335-358)
+### fn `function _panelProviderFailureState(statusData, providerName, windows)` (L365-388)
 - @brief Build provider-scoped panel failure state for one provider.
 - @details Resolves per-window FAIL entries from status data and computes
 `hasFailure` plus failure category for panel collapse logic.
@@ -2314,24 +2337,24 @@ normalized status error text and optional HTTP status code.
 - @param {string[]} windows Ordered window keys to inspect.
 - @return s {{hasFailure: boolean, category: 'oauth' | 'rate_limit' | 'other'}} Provider failure state.
 
-### fn `function _buildHttpStatusRetryLabel(statusCodeRaw, retryAfterRaw)` (L367-377)
+### fn `function _buildHttpStatusRetryLabel(statusCodeRaw, retryAfterRaw)` (L397-407)
 - @brief Build normalized HTTP status/retry metadata label.
 - @param {any} statusCodeRaw HTTP status candidate value.
 - @param {any} retryAfterRaw Retry-after candidate value.
 - @return s {string} Diagnostic label text or empty string.
 - @satisfies REQ-037
 
-### fn `function _escapeMarkup(value)` (L384-391)
+### fn `function _escapeMarkup(value)` (L414-421)
 - @brief Escape text for safe Pango markup insertion.
 - @param {string} value Raw text.
 - @return s {string} Markup-safe text.
 
-### fn `function _boldWhiteMarkup(value)` (L398-400)
+### fn `function _boldWhiteMarkup(value)` (L428-430)
 - @brief Wrap one value as bright-white bold Pango markup.
 - @param {string} value Raw text value.
 - @return s {string} Bright-white bold markup snippet.
 
-### fn `function _buildFallbackFreshnessState(statusEntry, idleDelaySeconds)` (L412-433)
+### fn `function _buildFallbackFreshnessState(statusEntry, idleDelaySeconds)` (L442-463)
 - @brief Build provider freshness fallback from cache-status `updated_at` metadata.
 - @details Converts `statusEntry.updated_at` to epoch seconds and derives
 `idle_until_timestamp` using configured idle-delay seconds when `freshness`/`idle_time`
@@ -2341,7 +2364,7 @@ sections are unavailable from CLI JSON output.
 - @return s {{last_success_timestamp: number, idle_until_timestamp: number} | null} Fallback freshness state or null.
 - @satisfies REQ-017
 
-### fn `function _resolveProviderFreshnessState(freshnessData, providerName, statusEntry, idleDelaySeconds)` (L447-461)
+### fn `function _resolveProviderFreshnessState(freshnessData, providerName, statusEntry, idleDelaySeconds)` (L477-491)
 - @brief Resolve provider freshness state from canonical CLI freshness source.
 - @details Uses `freshness.<provider>` (or `idle_time.<provider>` compatibility
 alias populated by parser) and falls back to status-derived timestamps only
@@ -2353,36 +2376,36 @@ when freshness state is unavailable in CLI JSON.
 - @return s {{last_success_timestamp: number, idle_until_timestamp: number} | null} Resolved freshness state.
 - @satisfies REQ-017
 
-### fn `function _getAiBarPath()` (L468-478)
+### fn `function _getAiBarPath()` (L498-508)
 - @brief Resolve aibar executable path.
 - @details Prefers PATH discovery and falls back to AIBAR_PATH from the env file.
 - @return s {string} Resolved executable path or fallback command name.
 
-### fn `function _loadEnvFromFile()` (L485-537)
+### fn `function _loadEnvFromFile()` (L515-567)
 - @brief Load key-value environment variables from aibar env file.
 - @details Parses export syntax, quoted values, and inline comments.
 - @return s {Object<string,string>} Parsed environment map.
 
-### fn `function _getProviderProgressClass(providerName)` (L544-546)
+### fn `function _getProviderProgressClass(providerName)` (L574-576)
 - @brief Map percentage usage to CSS progress severity class.
 - @param {number} pct Usage percentage.
 - @return s {string} CSS class suffix for progress state.
 
-### fn `function _isDisplayedZeroPercent(pct)` (L555-562)
+### fn `function _isDisplayedZeroPercent(pct)` (L585-592)
 - @brief Check whether a percentage renders as `0.0%` in one-decimal UI output.
 - @details Mirrors display rounding semantics so fallback reset text is shown when
 usage is effectively zero from the user's perspective (e.g. internal 0.04 -> 0.0%).
 - @param {number} pct Usage percentage candidate.
 - @return s {boolean} True when value is finite, non-negative, and rounds to 0.0.
 
-### fn `function _isDisplayedFullPercent(pct)` (L571-576)
+### fn `function _isDisplayedFullPercent(pct)` (L601-606)
 - @brief Check whether a percentage renders as `100.0%` in one-decimal UI output.
 - @details Mirrors display rounding semantics so near-full values are treated as
 full usage for limit-reached warning rendering.
 - @param {number} pct Usage percentage candidate.
 - @return s {boolean} True when value is finite and rounds to `100.0`.
 
-### fn `function _attachOverLimitActors(backgroundActor, fillActor)` (L591-605)
+### fn `function _attachOverLimitActors(backgroundActor, fillActor)` (L621-635)
 - @brief Attach over-limit visualization actors to one progress background.
 - @details Appends one bright-neutral 100%-boundary marker actor and one opaque
 neutral over-limit fill actor to the same horizontal background container used
@@ -2395,7 +2418,7 @@ complexity O(1).
 - @return s {void} No return value.
 - @satisfies REQ-121
 
-### fn `function _applyProgressSegmentRadii(fillActor, markerActor, overLimitActor, fillWidth, markerWidth, overLimitWidth)` (L623-653)
+### fn `function _applyProgressSegmentRadii(fillActor, markerActor, overLimitActor, fillWidth, markerWidth, overLimitWidth)` (L653-683)
 - @brief Apply rounded-edge shape classes to the currently visible progress segments.
 - @details Ensures the bar start and end caps are rounded on whichever actors
 actually touch the outer edges of the progress bar. This keeps sub-100 bars,
@@ -2411,7 +2434,7 @@ visible. Time complexity O(1). Space complexity O(1).
 - @return s {void} No return value.
 - @satisfies REQ-121
 
-### fn `function _applyProgressFillGeometry(fillActor, backgroundActor, pct)` (L673-721)
+### fn `function _applyProgressFillGeometry(fillActor, backgroundActor, pct)` (L703-751)
 - @brief Apply deterministic progress-fill geometry with over-limit segment support.
 - @details Computes fixed-width progress geometry from percentage and current
 background width. Percentages up to `100` render provider-color fill plus background.
@@ -2429,19 +2452,19 @@ Space complexity O(1).
 - @satisfies REQ-119
 - @satisfies REQ-121
 
-### class `class AIBarIndicator extends PanelMenu.Button` : PanelMenu.Button (L725-1024)
+### class `class AIBarIndicator extends PanelMenu.Button` : PanelMenu.Button (L755-1054)
 - @brief Panel indicator widget that manages popup rendering and refresh lifecycle. */
 - @brief Execute init.
 - @details Applies init logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @return s {any} Function return value.
 
-### fn `const createWindowBar = (labelText) =>` (L1195-1241)
+### fn `const createWindowBar = (labelText) =>` (L1225-1271)
 - @brief Execute create provider card.
 - @details Applies create provider card logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 - @param {any} providerName Input parameter `providerName`.
 - @return s {any} Function return value.
 
-### fn `const updateWindowBar = (bar, pct, resetTime, useDays, allowResetPendingHint = true) =>` (L1534-1598)
+### fn `const updateWindowBar = (bar, pct, resetTime, useDays, allowResetPendingHint = true) =>` (L1564-1628)
 - @brief Execute populate provider card.
 - @details Projects provider payload and cached status into one card surface.
 Failed states render a strict block with `Status: FAIL` and `Reason: ...`
@@ -2465,11 +2488,11 @@ geometry recalculation must not blank those labels.
 - @satisfies REQ-117
 - @satisfies REQ-130
 
-### fn `const setResetLabel = (baseText) =>` (L1540-1546)
+### fn `const setResetLabel = (baseText) =>` (L1570-1576)
 
-### fn `const showResetPendingHint = () =>` (L1553-1555)
+### fn `const showResetPendingHint = () =>` (L1583-1585)
 
-### fn `const toPercent = (value) =>` (L2217-2222)
+### fn `const toPercent = (value) =>` (L2252-2257)
 - @brief Execute update u i.
 - @details Applies update u i logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 Resolves provider-window failure metadata from cache `status` section and forwards it
@@ -2483,9 +2506,9 @@ After card refresh, re-sizes the popup provider viewport to the visible card hei
 - @satisfies REQ-120
 - @satisfies REQ-127
 
-### fn `const getPanelUsageValues = (providerName, data) =>` (L2223-2322)
+### fn `const getPanelUsageValues = (providerName, data) =>` (L2258-2357)
 
-### class `export default class AIBarExtension extends Extension` : Extension (L2582-2608)
+### class `export default class AIBarExtension extends Extension` : Extension (L2617-2643)
 - @brief GNOME extension lifecycle adapter for AIBarIndicator registration.
 - @brief Execute enable.
 - @details Extends Extension (GNOME Shell 45+ API) to integrate with the extension lifecycle.
@@ -2524,31 +2547,32 @@ Uses this.uuid (provided by the Extension base class) as the status-area key.
 |`_resetMenuItemFocusVisualState`|fn||192-198|function _resetMenuItemFocusVisualState(menuItem)|
 |`_providerSupportsApiCounters`|fn||208-210|function _providerSupportsApiCounters(providerName)|
 |`_resolveCopilotExtraPremiumCost`|fn||225-265|function _resolveCopilotExtraPremiumCost(data, configured...|
-|`_formatLocalDateTime`|fn||273-284|function _formatLocalDateTime(value)|
-|`_coerceRetryAfterSeconds`|fn||291-301|function _coerceRetryAfterSeconds(value)|
-|`_classifyPanelFailureCategory`|fn||310-324|function _classifyPanelFailureCategory(statusEntry)|
-|`_panelProviderFailureState`|fn||335-358|function _panelProviderFailureState(statusData, providerN...|
-|`_buildHttpStatusRetryLabel`|fn||367-377|function _buildHttpStatusRetryLabel(statusCodeRaw, retryA...|
-|`_escapeMarkup`|fn||384-391|function _escapeMarkup(value)|
-|`_boldWhiteMarkup`|fn||398-400|function _boldWhiteMarkup(value)|
-|`_buildFallbackFreshnessState`|fn||412-433|function _buildFallbackFreshnessState(statusEntry, idleDe...|
-|`_resolveProviderFreshnessState`|fn||447-461|function _resolveProviderFreshnessState(freshnessData, pr...|
-|`_getAiBarPath`|fn||468-478|function _getAiBarPath()|
-|`_loadEnvFromFile`|fn||485-537|function _loadEnvFromFile()|
-|`_getProviderProgressClass`|fn||544-546|function _getProviderProgressClass(providerName)|
-|`_isDisplayedZeroPercent`|fn||555-562|function _isDisplayedZeroPercent(pct)|
-|`_isDisplayedFullPercent`|fn||571-576|function _isDisplayedFullPercent(pct)|
-|`_attachOverLimitActors`|fn||591-605|function _attachOverLimitActors(backgroundActor, fillActor)|
-|`_applyProgressSegmentRadii`|fn||623-653|function _applyProgressSegmentRadii(fillActor, markerActo...|
-|`_applyProgressFillGeometry`|fn||673-721|function _applyProgressFillGeometry(fillActor, background...|
-|`AIBarIndicator`|class||725-1024|class AIBarIndicator extends PanelMenu.Button|
-|`createWindowBar`|fn||1195-1241|const createWindowBar = (labelText) =>|
-|`updateWindowBar`|fn||1534-1598|const updateWindowBar = (bar, pct, resetTime, useDays, al...|
-|`setResetLabel`|fn||1540-1546|const setResetLabel = (baseText) =>|
-|`showResetPendingHint`|fn||1553-1555|const showResetPendingHint = () =>|
-|`toPercent`|fn||2217-2222|const toPercent = (value) =>|
-|`getPanelUsageValues`|fn||2223-2322|const getPanelUsageValues = (providerName, data) =>|
-|`AIBarExtension`|class||2582-2608|export default class AIBarExtension extends Extension|
+|`_resolveOpenRouterBudgetLabel`|fn||281-295|const _resolveOpenRouterBudgetLabel = (metrics) =>|
+|`_formatLocalDateTime`|fn||303-314|function _formatLocalDateTime(value)|
+|`_coerceRetryAfterSeconds`|fn||321-331|function _coerceRetryAfterSeconds(value)|
+|`_classifyPanelFailureCategory`|fn||340-354|function _classifyPanelFailureCategory(statusEntry)|
+|`_panelProviderFailureState`|fn||365-388|function _panelProviderFailureState(statusData, providerN...|
+|`_buildHttpStatusRetryLabel`|fn||397-407|function _buildHttpStatusRetryLabel(statusCodeRaw, retryA...|
+|`_escapeMarkup`|fn||414-421|function _escapeMarkup(value)|
+|`_boldWhiteMarkup`|fn||428-430|function _boldWhiteMarkup(value)|
+|`_buildFallbackFreshnessState`|fn||442-463|function _buildFallbackFreshnessState(statusEntry, idleDe...|
+|`_resolveProviderFreshnessState`|fn||477-491|function _resolveProviderFreshnessState(freshnessData, pr...|
+|`_getAiBarPath`|fn||498-508|function _getAiBarPath()|
+|`_loadEnvFromFile`|fn||515-567|function _loadEnvFromFile()|
+|`_getProviderProgressClass`|fn||574-576|function _getProviderProgressClass(providerName)|
+|`_isDisplayedZeroPercent`|fn||585-592|function _isDisplayedZeroPercent(pct)|
+|`_isDisplayedFullPercent`|fn||601-606|function _isDisplayedFullPercent(pct)|
+|`_attachOverLimitActors`|fn||621-635|function _attachOverLimitActors(backgroundActor, fillActor)|
+|`_applyProgressSegmentRadii`|fn||653-683|function _applyProgressSegmentRadii(fillActor, markerActo...|
+|`_applyProgressFillGeometry`|fn||703-751|function _applyProgressFillGeometry(fillActor, background...|
+|`AIBarIndicator`|class||755-1054|class AIBarIndicator extends PanelMenu.Button|
+|`createWindowBar`|fn||1225-1271|const createWindowBar = (labelText) =>|
+|`updateWindowBar`|fn||1564-1628|const updateWindowBar = (bar, pct, resetTime, useDays, al...|
+|`setResetLabel`|fn||1570-1576|const setResetLabel = (baseText) =>|
+|`showResetPendingHint`|fn||1583-1585|const showResetPendingHint = () =>|
+|`toPercent`|fn||2252-2257|const toPercent = (value) =>|
+|`getPanelUsageValues`|fn||2258-2357|const getPanelUsageValues = (providerName, data) =>|
+|`AIBarExtension`|class||2617-2643|export default class AIBarExtension extends Extension|
 
 
 ---

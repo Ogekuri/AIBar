@@ -1,7 +1,7 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.3.30"
+version: "0.3.31"
 date: "2026-07-15"
 author: "req-new"
 scope:
@@ -143,6 +143,9 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-148**: MUST set OpenRouter `metrics.limit` to API credit total `data.limit` and `metrics.remaining` to `limit - cost` (null when `data.limit` is absent or zero; negative when over-credit).
 - **REQ-149**: MUST compute OpenRouter progress-bar percentage as `cost / (cost + remaining) * 100` in CLI text, `show --json`, and GNOME extension.
 - **REQ-150**: MUST render OpenRouter over-credit progress bars (percentage > 100) with the same over-limit segment and 100% boundary marker as Copilot over-quota bars.
+- **REQ-151**: CLI text `show` MUST render OpenRouter OK usage rows as `Usage: <currency_symbol><budget_total> <progress_bar> <percent>%` where `<budget_total>` equals `cost + remaining` (total API credit budget in dollars).
+- **REQ-152**: GNOME OpenRouter provider-card single-window bars MUST render label `<currency_symbol><budget_total>` from `cost + remaining` instead of the `30d` window label.
+- **REQ-153**: OpenRouter usage labels MUST fall back to the effective window label when the total budget `cost + remaining` is unavailable.
 - **REQ-012**: MUST ignore requested window for Copilot fetch, return effective window `30d`, and publish `premium_requests_extra_cost = max(premium_requests - premium_requests_included, 0) * copilot_extra_premium_request_cost` in payload, CLI text, and `show --json`.
 - **REQ-013**: MUST select Codex rate-limit primary window for `5h` and secondary window for other requested windows.
 - **REQ-014**: MUST attempt Codex token refresh when refresh token exists and `last_refresh` age is at least eight days.
@@ -221,7 +224,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-066**: MUST guard every read/write of `~/.cache/aibar/cache.json` and `~/.cache/aibar/idle-time.json` with lock files under `~/.cache/aibar/`, polling every 250 milliseconds, and fail with explicit error after 5 seconds if lock acquisition remains blocked.
 - **REQ-067**: CLI `show` text mode MUST render ANSI provider-colored bordered panels ordered `claude`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, keep one shared panel width, and render `Status` first on `OK`.
 - **REQ-128**: CLI `show` text mode MUST render `Usage: <window> <progress_bar> <percent>%` for `claude`, `copilot`, `codex`, and `zai`.
-- **REQ-132**: CLI `show` text mode for `openrouter` MUST render `Usage: <window> <progress_bar> <percent>%` using the standard fixed-width CLI progress-bar format.
+- **REQ-132**: CLI `show` text mode for `openrouter` MUST render `Usage: <label> <progress_bar> <percent>%` using the standard fixed-width CLI progress-bar format.
 - **REQ-131**: CLI text `show` for `openai` and `geminiai` MUST render `Usage: <window> <percent>%` and MUST NOT print progress bars.
 - **REQ-129**: CLI `show` text mode MUST render Copilot `Cost: <currency_symbol><value>` after one blank line following `Remaining credits` and MUST NOT render `Window <window>` heading text.
 - **REQ-117**: GNOME Copilot card MUST render `Cost: <currency_symbol><value>` from `metrics.cost` (fallback `premium_requests_extra_cost`), including `0`, preserving existing Copilot typography and spacing.
@@ -336,7 +339,8 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-060**: MUST verify Z.ai fetch maps the three `unit` quota entries to `5h`, `1w`, and `1m` quota rows and exposes each `percentage` and `nextResetTime`.
 - **TST-061**: MUST verify Z.ai renders last with cyan color in CLI text and GNOME extension and that the GNOME panel status bar shows the `5h` (non-bold) and `1w` (bold) Z.ai quota percentages and that the `_handleError` GNOME extension function resets and hides every panel status label including `_panelOpenAICostLabel`.
 - **TST-062**: MUST verify ZaiProvider derives the `5h` quota `reset_at_epoch_ms` from the next UTC 5-hour boundary when the 5 Hours limit entry omits `nextResetTime`.
-- **TST-063**: MUST verify OpenRouter progress-bar percentage equals `cost / (cost + remaining) * 100` from API credit total `data.limit`, over-credit bars render >100 identically to Copilot, and `setup` prompts no budget.
+- **TST-063**: MUST verify OpenRouter progress-bar percentage equals `cost / (cost + remaining) * 100` from API credit total `data.limit`, CLI text and GNOME usage bars render `<currency_symbol><budget_total>` instead of `30d`, over-credit bars render >100 with the shared over-limit segment and 100% boundary marker, and `setup` prompts no budget.
+- **TST-064**: MUST verify OpenRouter CLI usage rows and GNOME bar labels render `<currency_symbol><budget_total>` equal to `cost + remaining` (dollars) and fall back to the `30d` window label when the budget is unavailable.
 - **TST-036**: MUST verify `--version` and `--ver` print installed version, bypass subcommand execution, and force one online startup release check even when `check_version_idle-time.json` contains future `idle_until`.
 - **TST-038**: MUST verify CLI text `show` renders `FAIL` blocks as `Status: FAIL`, blank line, `Reason: <reason>`, blank line, and right-aligned `Updated/Next`, never renders `Window 5h:/7d:/30d:` headings, and preserves `show --json` freshness, API-counter, cost, and GeminiAI effective-window behaviors.
 - **TST-042**: MUST verify CLI `show` and GNOME provider cards render equivalent failed-provider blocks formatted as `Status: FAIL`, blank line, `Reason: <reason>`, blank line, and `Updated/Next`, without `Window 5h:/7d:/30d:` headings.
@@ -387,6 +391,9 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-009 | `src/aibar/aibar/cli.py` + shared retrieval entrypoint used by `show` + executes force check, per-provider idle-time check, per-provider conditional refresh, then `cache.json` load. |
 | REQ-010 | `src/aibar/aibar/cli.py` + provider-window normalization in `show`/refresh pipeline pins OpenAI to `WindowPeriod.DAY_30`; `src/aibar/aibar/providers/openai_usage.py` + `fetch/_get_time_range` executes 30-day usage-cost retrieval. |
 | REQ-011 | `src/aibar/aibar/cli.py` + provider-window normalization in `show`/refresh pipeline pins OpenRouter to `WindowPeriod.DAY_30`; `src/aibar/aibar/providers/openrouter.py` + `_get_usage/_parse_response` derives monthly cost from `usage_monthly` and credit total from `data.limit`. |
+| REQ-151 | `src/aibar/aibar/cli.py` + `_openrouter_budget_total`/`_build_result_panel` + OpenRouter OK usage rows render `Usage: <currency_symbol><budget_total> <progress_bar> <percent>%` with `<budget_total>` equal to `cost + remaining` (dollars) in place of the `<label>` window slot. |
+| REQ-152 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_resolveOpenRouterBudgetLabel`/`_populateProviderCard` + OpenRouter single-window bar label renders `<currency_symbol><budget_total>` from `cost + remaining` instead of `30d`. |
+| REQ-153 | `src/aibar/aibar/cli.py` + `_openrouter_budget_total` and `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_resolveOpenRouterBudgetLabel` + budget-unavailable fallback to the effective window label (`30d`). |
 | REQ-012 | `src/aibar/aibar/providers/copilot.py` + `fetch` + sets `effective_window = WindowPeriod.DAY_30` and returns that window. |
 | REQ-013 | `src/aibar/aibar/providers/codex.py` + `_parse_response` + `window_key = "primary_window" if 5h else "secondary_window"`. |
 | REQ-014 | `src/aibar/aibar/providers/codex.py` + `CodexCredentials.needs_refresh` + threshold `age.days >= 8`; `CodexProvider.fetch` calls refresher. |
@@ -459,7 +466,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-130 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `TEXT_USAGE_PROVIDERS/_populateProviderCard` + `openai/geminiai` cards render `Usage: <window> <percent>%` text, hide bar actors, and keep non-usage rows visible. |
 | REQ-122 | `src/aibar/aibar/cli.py` + `_should_render_cli_progress_bar/_build_cli_usage_line/_build_result_panel/_progress_bar` + >100 progress-bar rendering is limited to `claude/openrouter/copilot/codex/zai` while preserving marker and over-limit segment. |
 | REQ-128 | `src/aibar/aibar/cli.py` + `_should_render_cli_progress_bar/_build_cli_usage_line/_build_result_panel` + usage rows render `Usage: <window> <progress_bar> <percent>%` for `claude/copilot/codex/zai`. |
-| REQ-132 | `src/aibar/aibar/cli.py` + `_should_render_cli_progress_bar/_build_cli_usage_line/_build_result_panel` + `openrouter` usage rows render the standard fixed-width CLI progress-bar format. |
+| REQ-132 | `src/aibar/aibar/cli.py` + `_should_render_cli_progress_bar/_build_cli_usage_line/_build_result_panel/_openrouter_budget_total` + `openrouter` usage rows render the standard fixed-width CLI progress-bar format with the budget-total label. |
 | REQ-131 | `src/aibar/aibar/cli.py` + `_should_render_cli_progress_bar/_build_cli_usage_line/_build_result_panel` + `openai/geminiai` usage rows render `Usage: <window> <percent>%` without progress bars. |
 | REQ-133 | `src/aibar/aibar/cli.py` + `_ordered_rendered_panels/_provider_panel_sort_key` and `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_orderedEnabledProviderNames/_updateUI` + all visible provider surfaces keep canonical order after disabled-provider filtering. |
 | REQ-129 | `src/aibar/aibar/cli.py` + `_build_result_panel` + Copilot cost line stays one blank line after `Remaining credits`, and `_build_dual_window_panel` strips `Window <window>` headings from CLI panels. |
@@ -501,3 +508,5 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-143 | `src/aibar/aibar/gnome-extension/.../extension.js` + `_buildPanelButton`/`_updateUI` Z.ai 5 Hours (non-bold) and Weekly (bold) panel status-bar percentage labels. |
 | TST-060 | `src/aibar/aibar/providers/zai.py` + `_extract_quotas`/`_build_quota` map `unit` 3/6/5 to 5 Hours, Weekly, and Monthly Web Search quotas with per-quota `percentage`/`reset_at`; dedicated standalone test pending (no existing test maps to this module). |
 | TST-061 | `tests/test_geminiai_surface_integration.py` + `tests/test_extension_quota_label.py` + Z.ai last-position, cyan `aibar-tab-label-zai`/`aibar-progress-provider-zai`, `PROGRESS_BAR_PROVIDERS` includes `zai`, and `src/aibar/aibar/cli.py` + `_SHOW_PROVIDER_ORDER`/`_PROVIDER_PANEL_COLOR_CODES` trailing `zai`; `src/aibar/aibar/gnome-extension/.../extension.js` + `_buildPanelButton`/`_updateUI` Z.ai 5 Hours (non-bold) and Weekly (bold) panel status-bar labels. |
+| TST-063 | `tests/test_openrouter_credit_usage.py` + `OpenRouterUsageProvider._parse_response` metrics derivation from `data.limit` and `_build_result_panel` usage-row coverage for `cost / (cost + remaining) * 100` percentage, over-credit >100 bar segment parity, and missing-`data.limit` zero-percent fallback. |
+| TST-064 | `tests/test_cli_show_status_messages.py` + `tests/test_openrouter_credit_usage.py` + `tests/test_extension_quota_label.py` + OpenRouter usage-row and GNOME bar-label `<currency_symbol><budget_total>` rendering and window-label fallback coverage. |
