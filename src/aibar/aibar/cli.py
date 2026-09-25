@@ -99,7 +99,6 @@ _PROVIDER_PANEL_COLOR_CODES: dict[ProviderName, str] = {
 _API_COUNTER_PROVIDERS: frozenset[ProviderName] = frozenset(
     {
         ProviderName.OPENAI,
-        ProviderName.OPENROUTER,
         ProviderName.CODEX,
         ProviderName.GEMINIAI,
     }
@@ -3469,9 +3468,13 @@ def _provider_supports_api_counters(provider_name: ProviderName) -> bool:
     @brief Determine whether provider panels always render API counter lines.
     @details Returns true for providers that expose requests/token counters in
     CLI and GNOME output surfaces, enforcing null-to-zero normalization.
+    OpenRouter is excluded: its key API exposes no per-key request/token
+    counters, so its `OK` blocks render the `Total cost:` row instead of
+    `Requests`/`Tokens` rows (REQ-155).
     @param provider_name {ProviderName} Provider enum key.
     @return {bool} True when requests/tokens lines must render on OK state.
     @satisfies REQ-036
+    @satisfies REQ-155
     """
     return provider_name in _API_COUNTER_PROVIDERS
 
@@ -3934,6 +3937,10 @@ def _build_result_panel(
     GNOME single-window progress-bar behavior, do not emit `Window <window>`
     headings, insert one blank separator between Copilot `Remaining credits`
     and `Cost` rows, and end with one right-aligned freshness line.
+    OpenRouter `OK` blocks render `Total cost: <currency_symbol><total_cost>`
+    after the `Cost` row from `metrics.total_cost` and MUST NOT render
+    `Requests`/`Tokens` rows because the key API exposes no request/token
+    counters (REQ-155, REQ-157).
     @param name {ProviderName} Provider name enum value.
     @param result {ProviderResult} Provider result to render.
     @param label {str | None} Optional window label suffix (e.g. `"5h"`, `"7d"`).
@@ -3953,6 +3960,8 @@ def _build_result_panel(
     @satisfies REQ-129
     @satisfies REQ-131
     @satisfies REQ-132
+    @satisfies REQ-155
+    @satisfies REQ-157
     """
     title = _provider_display_name(name)
     if label:
@@ -4056,6 +4065,11 @@ def _build_result_panel(
                 detail_lines.append("")
                 copilot_has_remaining_credits = False
             detail_lines.append(copilot_extra_cost_line)
+
+    if name == ProviderName.OPENROUTER and m.total_cost is not None:
+        detail_lines.append(
+            f"Total cost: {_format_bright_white_bold(f'{m.currency_symbol}{m.total_cost:.4f}')}"
+        )
 
     if _provider_supports_api_counters(name):
         if (

@@ -1,7 +1,7 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.3.32"
+version: "0.3.33"
 date: "2026-07-15"
 author: "req-new"
 scope:
@@ -96,7 +96,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 
 ### 2.2 Project Constraints
 - **CTN-001**: MUST resolve provider credentials with precedence: environment variable, then `~/.config/aibar/env`, then provider-specific local credential stores.
-- **CTN-002**: MUST represent provider fetch output with `ProviderResult` containing `provider`, `window`, `metrics`, `updated_at`, `raw`, and optional `error`; `UsageMetrics` MUST include `currency_symbol: str` (default `"$"`) annotating all monetary fields (`cost`, `remaining`, `limit`).
+- **CTN-002**: MUST represent provider fetch output with `ProviderResult` containing `provider`, `window`, `metrics`, `updated_at`, `raw`, and optional `error`; `UsageMetrics` MUST include `currency_symbol: str` (default `"$"`) annotating all monetary fields (`cost`, `remaining`, `limit`, `total_cost`).
 - **CTN-003**: MUST perform external HTTP API calls with `httpx.AsyncClient(timeout=<api_call_timeout_milliseconds>/1000.0)` using `RuntimeConfig.api_call_timeout_milliseconds` for provider integrations.
 - **CTN-004**: MUST persist `~/.cache/aibar/cache.json` as the canonical store for per-provider, per-window last-success payload snapshots and last-attempt status metadata.
 - **CTN-005**: MAY depend on unofficial/internal endpoints when official usage APIs are unavailable for Claude, Copilot, or Codex integrations.
@@ -144,6 +144,9 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-149**: MUST compute OpenRouter progress-bar percentage as `cost / (cost + remaining) * 100` in CLI text, `show --json`, and GNOME extension.
 - **REQ-150**: MUST render OpenRouter over-credit progress bars (percentage > 100) with the same over-limit segment and 100% boundary marker as Copilot over-quota bars.
 - **REQ-154**: MUST render OpenRouter usage-row and GNOME single-window bar labels with the effective-window label `30d`, because the OpenRouter key API exposes no explicit timeframe field (it returns `usage_daily`, `usage_weekly`, `usage_monthly`, and all-time `usage` basis values only) and the fixed `WindowPeriod.DAY_30` effective window matches the `usage_monthly` credit basis.
+- **REQ-155**: OpenRouter `OK` CLI text blocks and GNOME provider cards MUST NOT render `Requests` or `Tokens` rows because the OpenRouter key API exposes no per-key request/token counters.
+- **REQ-156**: OpenRouter provider fetch MUST normalize API all-time usage `data.usage` into `UsageMetrics.total_cost`, with `None` when the value is absent or non-finite.
+- **REQ-157**: OpenRouter CLI text blocks and GNOME provider cards MUST render `Total cost: <currency_symbol><total_cost>` after the `Cost` row, and `show --json` MUST expose `metrics.total_cost`, when `total_cost` is finite.
 - **REQ-012**: MUST ignore requested window for Copilot fetch, return effective window `30d`, and publish `premium_requests_extra_cost = max(premium_requests - premium_requests_included, 0) * copilot_extra_premium_request_cost` in payload, CLI text, and `show --json`.
 - **REQ-013**: MUST select Codex rate-limit primary window for `5h` and secondary window for other requested windows.
 - **REQ-014**: MUST attempt Codex token refresh when refresh token exists and `last_refresh` age is at least eight days.
@@ -170,7 +173,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-033**: `scripts/test-gnome-extension.sh` MUST NOT accept subcommand parameters and MUST execute its install-and-launch flow immediately on invocation without arguments.
 - **REQ-034**: MUST render reset countdown as `Resets in: <d>d <h>h <m>m` for durations >= 24 hours in CLI text output.
 - **REQ-035**: MUST print `Remaining credits: <remaining> / <limit>` for Claude, Codex, and Copilot only when rendered status is `OK` and both values exist; line MUST follow `Resets in` after one blank line and `<remaining>` MUST be bold bright white.
-- **REQ-036**: CLI text `show` MUST render `FAIL` provider/window blocks as `Status: FAIL`, blank line, `Reason: <reason>`, blank line, and `Updated: <datetime>, Next: <datetime>`, while `openai`, `openrouter`, `codex`, `geminiai` `OK` blocks MUST normalize null API counters to `0`.
+- **REQ-036**: CLI text `show` MUST render `FAIL` provider/window blocks as `Status: FAIL`, blank line, `Reason: <reason>`, blank line, and `Updated: <datetime>, Next: <datetime>`, while `openai`, `codex`, `geminiai` `OK` blocks MUST normalize null API counters to `0`.
 - **REQ-037**: CLI text `show` and GNOME provider-card error blocks MUST NOT append HTTP status or retry-after metadata in `FAIL` output blocks.
 - **REQ-038**: MUST update only the refreshed provider idle-time entry after success by setting `last_success_at` to refresh completion time and `idle_until` to `last_success_at + idle_delay_seconds`, then persist epoch and human-readable values in `~/.cache/aibar/idle-time.json`.
 - **REQ-039**: MUST support force-refresh handling that deletes `~/.cache/aibar/idle-time.json`, bypasses idle-time gating for the current execution, and executes a fresh provider refresh before loading `~/.cache/aibar/cache.json`.
@@ -389,6 +392,9 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-010 | `src/aibar/aibar/cli.py` + provider-window normalization in `show`/refresh pipeline pins OpenAI to `WindowPeriod.DAY_30`; `src/aibar/aibar/providers/openai_usage.py` + `fetch/_get_time_range` executes 30-day usage-cost retrieval. |
 | REQ-011 | `src/aibar/aibar/cli.py` + provider-window normalization in `show`/refresh pipeline pins OpenRouter to `WindowPeriod.DAY_30`; `src/aibar/aibar/providers/openrouter.py` + `_get_usage/_parse_response` derives monthly cost from `usage_monthly` and credit total from `data.limit`. |
 | REQ-154 | `src/aibar/aibar/cli.py` + `_build_result_panel`/`_build_cli_usage_line` + `usage_window_label = label or result.window.value` renders the `30d` effective-window label on OpenRouter OK usage rows; `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_populateProviderCard` + `configuredWindowLabel` renders `30d` on OpenRouter single-window bars; the key API exposes no explicit timeframe field (only `usage_daily`/`usage_weekly`/`usage_monthly`/`usage`), so the fixed `WindowPeriod.DAY_30` label matches the `usage_monthly` credit basis (REQ-011). |
+| REQ-155 | `src/aibar/aibar/cli.py` + `_API_COUNTER_PROVIDERS`/`_provider_supports_api_counters`/`_build_result_panel` + OpenRouter excluded from null-to-zero counter normalization; `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `API_COUNTER_PROVIDERS`/`_providerSupportsApiCounters`/`_populateProviderCard` + OpenRouter cards hide `requests`/`tokens` labels when counters are null. |
+| REQ-156 | `src/aibar/aibar/providers/openrouter.py` + `_parse_response` + `UsageMetrics.total_cost` normalized from `data.usage` all-time usage with `None` fallback. |
+| REQ-157 | `src/aibar/aibar/cli.py` + `_build_result_panel` + `Total cost: <currency_symbol><total_cost>` row emitted after the OpenRouter `Cost` row; `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_populateProviderCard` + OpenRouter `Total cost: <currency_symbol><total_cost>` label rendered in the removed counters position. |
 | REQ-012 | `src/aibar/aibar/providers/copilot.py` + `fetch` + sets `effective_window = WindowPeriod.DAY_30` and returns that window. |
 | REQ-013 | `src/aibar/aibar/providers/codex.py` + `_parse_response` + `window_key = "primary_window" if 5h else "secondary_window"`. |
 | REQ-014 | `src/aibar/aibar/providers/codex.py` + `CodexCredentials.needs_refresh` + threshold `age.days >= 8`; `CodexProvider.fetch` calls refresher. |
@@ -404,7 +410,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-024 | `src/aibar/aibar/__main__.py` + `main()` import and invocation from `aibar.cli`. |
 | REQ-034 | `src/aibar/aibar/cli.py` + `_format_reset_duration/_print_result` + day-token reset countdown formatting in text output. |
 | REQ-035 | `src/aibar/aibar/cli.py` + `_build_result_panel/_print_result` + remaining-credits line gated to `result.is_error == False` and `remaining/limit` presence. |
-| REQ-036 | `src/aibar/aibar/cli.py` + `_build_result_panel` failed-state branch returns after error diagnostics and suppresses usage/reset/quota/cost statistics lines; `openai/openrouter/codex/geminiai` `Requests`/`Tokens` lines render with null→`0` normalization on `OK` states. |
+| REQ-036 | `src/aibar/aibar/cli.py` + `_build_result_panel` failed-state branch returns after error diagnostics and suppresses usage/reset/quota/cost statistics lines; `openai/codex/geminiai` `Requests`/`Tokens` lines render with null→`0` normalization on `OK` states, while OpenRouter `OK` blocks omit `Requests`/`Tokens` rows and render the `Total cost:` row from `metrics.total_cost`. |
 | REQ-037 | `src/aibar/aibar/cli.py` + error-rendering lines include unified `HTTP status: <code>, Retry after: <seconds> sec.` string; `src/aibar/aibar/gnome-extension/.../extension.js` + provider-card error block includes equivalent retry metadata text. |
 | REQ-038 | `src/aibar/aibar/cli.py` + successful refresh path computes per-provider `idle_until = last_success_at + idle_delay_seconds` and writes provider-keyed epoch/human-readable values to `~/.cache/aibar/idle-time.json`. |
 | REQ-039 | `src/aibar/aibar/cli.py` + shared force-refresh handling removes `~/.cache/aibar/idle-time.json`, bypasses idle-time gate, and refreshes before loading `cache.json`. |
@@ -419,7 +425,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | TST-001 | `src/aibar/aibar/cli.py` + `parse_window/parse_provider` provide validation points for invalid input diagnostics. |
 | TST-002 | `src/aibar/aibar/config.py` + `get_token` implements explicit precedence chain requiring regression coverage. |
 | TST-003 | `tests/test_cli_idle_cache.py` and `tests/test_cli_idle_force.py` + assertions for cache schema parity with `show --json` and provider-keyed idle-time epoch/human-readable field persistence under `~/.cache/aibar/`. |
-| TST-004 | `tests/test_extension_quota_label.py` + popup-header/remove-action assertions, failed-state metric-row suppression, `extension.window_labels`-driven 30d usage rendering assertions for `copilot/openrouter` bars plus `openai/geminiai` text-only usage, freshness fallback assertions via `extension.idle_delay_seconds`, bottom-right `Updated/Next` assertions, bold-bright-white `Costs:` numeric/no-spacer assertions, and API-counter format assertions for `openai/openrouter/codex/geminiai`. |
+| TST-004 | `tests/test_extension_quota_label.py` + popup-header/remove-action assertions, failed-state metric-row suppression, `extension.window_labels`-driven 30d usage rendering assertions for `copilot/openrouter` bars plus `openai/geminiai` text-only usage, freshness fallback assertions via `extension.idle_delay_seconds`, bottom-right `Updated/Next` assertions, bold-bright-white `Costs:` numeric/no-spacer assertions, API-counter format assertions for `openai/codex/geminiai`, and OpenRouter card `Total cost:` label + hidden `requests`/`tokens` labels on null counters. |
 | TST-005 | `src/aibar/aibar/providers/copilot.py` + `fetch` hard-codes `effective_window` to `WindowPeriod.DAY_30`. |
 | TST-006 | `pi-usereq/docs/REFERENCES.md` + generated configured-source symbol coverage validates documentation inventory completeness. |
 | TST-007 | `tests/test_extension_quota_label.py` + single `Err` projection assertions for OAuth/rate-limit failures, provider-color bold-style assertions, normal-state order/style assertions, and zero-cost/missing-metric behavior checks. |
@@ -471,7 +477,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-060 | `src/aibar/aibar/cli.py` + `show` provider/window resolution and payload rendering expose GeminiAI monitoring/billing/status fields in text and JSON surfaces. |
 | REQ-097 | `src/aibar/aibar/cli.py` + `show` GeminiAI provider selection path forces effective `30d` window independent from requested window argument. |
 | REQ-098 | `src/aibar/aibar/providers/geminiai.py` + monitoring interval construction uses current UTC month start as interval start and current UTC time as interval end. |
-| TST-038 | `tests/test_cli_show_status_messages.py` + verifies CLI `show` right-aligned freshness line uses provider `idle_time` timestamps with local-timezone `%Y-%m-%d %H:%M` parity, `show --json` top-level `freshness` parity, fail-state statistics suppression, retry-after rendering format, `Window <window>:` heading suppression, API-counter null→`0` rendering for `openai/openrouter/codex/geminiai`, and GeminiAI effective window `30d` under non-30d requests. |
+| TST-038 | `tests/test_cli_show_status_messages.py` + verifies CLI `show` right-aligned freshness line uses provider `idle_time` timestamps with local-timezone `%Y-%m-%d %H:%M` parity, `show --json` top-level `freshness` parity, fail-state statistics suppression, retry-after rendering format, `Window <window>:` heading suppression, API-counter null→`0` rendering for `openai/codex/geminiai`, OpenRouter suppressed-counter/`Total cost:` rendering, and GeminiAI effective window `30d` under non-30d requests. |
 | TST-042 | `tests/test_cli_show_status_messages.py` + `tests/test_extension_quota_label.py` + cross-surface assertions for equivalent error category, HTTP status, retry-after value, and `Updated/Next` text sourced from the same `idle_time` timestamps on failed states. |
 | TST-052 | `tests/test_extension_quota_label.py` + source assertions verify progress-bar geometry remains only for `claude/openrouter/copilot/codex/zai`, while `openai/geminiai` render text-only usage without bar widgets. |
 | TST-054 | `tests/test_cli_show_panel_alignment.py` + output assertions verify bar providers keep `Usage: <window> <progress_bar> <percent>%`, while `openai/geminiai` render `Usage: <window> <percent>%` and preserve shared panel width. |

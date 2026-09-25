@@ -41,7 +41,7 @@ const PROVIDER_DISPLAY_NAMES = {
     geminiai: 'GEMINIAI',
     zai: 'Z.AI',
 };
-const API_COUNTER_PROVIDERS = new Set(['openai', 'openrouter', 'codex', 'geminiai']);
+const API_COUNTER_PROVIDERS = new Set(['openai', 'codex', 'geminiai']);
 const PROGRESS_BAR_PROVIDERS = new Set(['claude', 'openrouter', 'copilot', 'codex', 'zai']);
 const TEXT_USAGE_PROVIDERS = new Set(['openai', 'geminiai']);
 const WINDOW_BAR_30D_PROVIDERS = new Set(['copilot', 'openrouter']);
@@ -1346,7 +1346,10 @@ class AIBarIndicator extends PanelMenu.Button {
      * per-quota progress bar with its `Reset in:` label in the same location as
      * other providers. Dual-window
      * providers preserve fixed left labels `5h` and `7d`; progress-width
-     * geometry recalculation must not blank those labels.
+     * geometry recalculation must not blank those labels. OpenRouter cards hide
+     * the `requests`/`tokens` labels (the key API exposes no per-key request/token
+     * counters) and render a `Total cost: <currency_symbol><total_cost>` label
+     * from `metrics.total_cost` in the removed counters position.
      * @param {any} card Input parameter `card`.
      * @param {any} providerName Input parameter `providerName`.
      * @param {any} data Input parameter `data`.
@@ -1356,6 +1359,8 @@ class AIBarIndicator extends PanelMenu.Button {
      * @satisfies REQ-017
      * @satisfies REQ-117
      * @satisfies REQ-130
+     * @satisfies REQ-155
+     * @satisfies REQ-157
      */
     _populateProviderCard(card, providerName, data, statusEntry = null, freshnessState = null) {
         const metrics = data.metrics || {};
@@ -1856,6 +1861,26 @@ class AIBarIndicator extends PanelMenu.Button {
                 card.tokensLabel.show();
             else
                 card.tokensLabel.hide();
+        }
+
+        if (providerName === 'openrouter') {
+            const openRouterTotalCost = (
+                metrics.total_cost !== null &&
+                metrics.total_cost !== undefined &&
+                Number.isFinite(Number(metrics.total_cost))
+            ) ? Number(metrics.total_cost) : null;
+            if (openRouterTotalCost !== null) {
+                const totalCostCurrency = metrics.currency_symbol || '$';
+                card.requestsLabel.text = (
+                    `Total cost: ${totalCostCurrency}${openRouterTotalCost.toFixed(4)}`
+                );
+                card.requestsLabel.show();
+            } else {
+                card.requestsLabel.text = '';
+                card.requestsLabel.hide();
+            }
+            card.tokensLabel.text = '';
+            card.tokensLabel.hide();
         }
 
         if (metrics.reset_at) {

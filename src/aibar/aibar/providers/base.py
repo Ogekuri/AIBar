@@ -42,23 +42,26 @@ class UsageMetrics(BaseModel):
     """
     @brief Define usage metrics component.
     @details Encapsulates normalized provider usage metrics for AIBar runtime flows.
-    Field `currency_symbol` annotates all monetary fields (`cost`, `remaining`, `limit`)
-    and defaults to `"$"` when not resolved from API response or provider config.
+    Field `currency_symbol` annotates all monetary fields (`cost`, `remaining`, `limit`, `total_cost`)
+    and defaults to `"$"` when not resolved from API response or provider config. `total_cost`
+    carries the provider all-time API usage total (OpenRouter `data.usage`) when exposed.
     @satisfies CTN-002
     @satisfies REQ-050
     @satisfies REQ-051
     @satisfies REQ-052
     @satisfies REQ-053
+    @satisfies REQ-156
     """
 
     cost: float | None = Field(default=None, description="Total cost in USD")
+    total_cost: float | None = Field(default=None, description="All-time API usage total in USD")
     requests: int | None = Field(default=None, description="Number of API requests")
     input_tokens: int | None = Field(default=None, description="Total input tokens")
     output_tokens: int | None = Field(default=None, description="Total output tokens")
     remaining: float | None = Field(default=None, description="Remaining quota/budget")
     limit: float | None = Field(default=None, description="Total quota/budget limit")
     reset_at: datetime | None = Field(default=None, description="When quota resets")
-    currency_symbol: str = Field(default="$", description="Currency symbol for monetary fields (cost, remaining, limit)")
+    currency_symbol: str = Field(default="$", description="Currency symbol for monetary fields (cost, remaining, limit, total_cost)")
 
     @property
     def usage_percent(self) -> float | None:

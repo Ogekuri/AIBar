@@ -1,8 +1,10 @@
 """
 @file
 @brief OpenRouter key usage and credit provider.
-@details Fetches key usage snapshots and credit limits, then transforms provider payloads into normalized cost and credit quota metrics.
+@details Fetches key usage snapshots and credit limits, then transforms provider payloads into normalized cost and credit quota metrics. Exposes the all-time API usage total (`data.usage`) as `UsageMetrics.total_cost`; the key API exposes no per-key request/token counters so those metrics stay `None`.
 """
+
+import math
 
 import httpx
 
@@ -151,6 +153,10 @@ class OpenRouterUsageProvider(BaseProvider):
         When `data.limit` is absent or zero (e.g. free-tier keys), `limit` and
         `remaining` normalize to `None` so `usage_percent` becomes `None` and
         renderers fall back to the zero-percent usage display.
+        `metrics.total_cost` normalizes the all-time API usage total `data.usage`
+        (raw `data` is preserved unmodified for `show --json` consumers);
+        `requests`/`input_tokens`/`output_tokens` remain `None` because the key
+        API exposes no per-key request/token counters (REQ-155).
         @param data {dict} Raw OpenRouter API JSON payload.
         @param window {WindowPeriod} Effective window (`30d` for OpenRouter).
         @return {ProviderResult} Normalized provider result payload.
@@ -159,6 +165,8 @@ class OpenRouterUsageProvider(BaseProvider):
         @satisfies REQ-148
         @satisfies REQ-149
         @satisfies REQ-150
+        @satisfies REQ-155
+        @satisfies REQ-156
         """
         from aibar.config import resolve_currency_symbol
 
@@ -180,6 +188,7 @@ class OpenRouterUsageProvider(BaseProvider):
             requests=None,
             input_tokens=None,
             output_tokens=None,
+            total_cost=self._to_optional_float(payload.get("usage")),
             remaining=remaining,
             limit=limit,
             reset_at=None,
@@ -234,3 +243,24 @@ class OpenRouterUsageProvider(BaseProvider):
             return float(value)
         except (TypeError, ValueError):
             return 0.0
+
+    def _to_optional_float(self, value: object) -> float | None:
+        """
+        @brief Convert one API numeric field to float preserving missing values as None.
+        @details Extracts `data.usage` (all-time API usage total) into a normalized
+        `UsageMetrics.total_cost` value. Returns `None` for absent, non-numeric, and
+        non-finite payload values so renderers can distinguish unavailable totals
+        from exact zero usage.
+        @param value {object} Raw candidate value from the OpenRouter key payload.
+        @return {float | None} Parsed finite float total or None when unavailable.
+        @satisfies REQ-156
+        """
+        if not isinstance(value, (int, float, str)):
+            return None
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError):
+            return None
+        if not math.isfinite(parsed):
+            return None
+        return parsed
