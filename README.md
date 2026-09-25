@@ -10,7 +10,7 @@
 
 <p align="center">
 <strong>Monitor AI usage and quota in one CLI.</strong><br>
-AIBar aggregates usage metrics for Claude, OpenAI, OpenRouter, GitHub Copilot, Codex, and GeminiAI, with terminal output and a GNOME panel extension.
+AIBar aggregates usage metrics for Claude, OpenAI, OpenRouter, GitHub Copilot, Codex, GeminiAI, and Z.ai, with terminal output and a GNOME panel extension.
 </p>
 
 <p align="center">
@@ -31,7 +31,7 @@ AIBar aggregates usage metrics for Claude, OpenAI, OpenRouter, GitHub Copilot, C
 
 
 ## Feature Highlights
-- Unified `show` command for multiple providers (`claude`, `openai`, `openrouter`, `copilot`, `codex`, `geminiai`).
+- Unified `show` command for multiple providers (`claude`, `openai`, `openrouter`, `copilot`, `codex`, `geminiai`, `zai`).
 - Text output and machine output (`show --json`) with stable top-level sections (`payload`, `status`, `idle_time`, `freshness`, `extension`, `enabled_providers`).
 - Per-run refresh override with `show --force` (bypasses idle-time gating for that execution).
 - Interactive `setup` for provider enable/disable state, runtime throttling, Copilot overage pricing, provider currency symbols, GeminiAI OAuth/project settings, and logging flags.
@@ -119,7 +119,7 @@ uv tool uninstall aibar
 aibar show
 
 # Provider selection
-# allowed values: claude, openai, openrouter, copilot, codex, geminiai, all
+# allowed values: claude, openai, openrouter, copilot, codex, geminiai, zai, all
 aibar show --provider claude --window 5h
 
 # JSON output for scripts/integrations
@@ -170,7 +170,13 @@ aibar --disable-debug
 
 - Allowed windows: `5h`, `7d`, `30d`.
 - `claude` and `codex` support dual-window rendering (`5h` and `7d`) in default text output when `--window` is not explicitly set.
-- For `copilot`, `openrouter`, `openai`, and `geminiai`, the effective window is fixed to `30d` even if another `--window` is provided.
+- For `copilot`, `openrouter`, `openai`, `geminiai`, and `zai`, the effective window is fixed to `30d` even if another `--window` is provided.
+
+### OpenRouter
+
+- The OpenRouter usage view is driven by the **API key credit total** returned by OpenRouter: `100%` on the progress bar corresponds to the total credits on the key (current spend + remaining credit), and the bar shows current spend relative to that total.
+- No monthly budget needs to be configured. Spending beyond purchased credits renders the over-credit bar (`>100%`) with the same over-limit marker used by other quota providers.
+- `aibar setup` does not prompt for an OpenRouter budget, and no budget key is stored in `config.json`.
 
 ### `show --json` contract
 
