@@ -1,7 +1,7 @@
 """
 @file
 @brief OpenRouter key usage and credit provider.
-@details Fetches key usage snapshots and quota limits, then transforms provider payloads into normalized cost and quota metrics.
+@details Fetches key usage snapshots and credit limits, then transforms provider payloads into normalized cost and credit quota metrics.
 """
 
 import httpx
@@ -139,16 +139,18 @@ class OpenRouterUsageProvider(BaseProvider):
 
     def _parse_response(self, data: dict, window: WindowPeriod) -> ProviderResult:
         """
-        @brief Normalize OpenRouter key-usage payload to ProviderResult with budget-based quota.
-        @details Derives current monthly spend from `usage_monthly`, resolves the
-        configured `openrouter_monthly_budget` (USD, default `200`) from
-        `RuntimeConfig`, and projects spend against that budget so the normalized
-        `metrics.limit` equals the budget and `metrics.remaining` equals
-        `budget - cost` (negative when current spend exceeds the budget). This
-        makes `UsageMetrics.usage_percent` resolve to `cost / budget * 100`,
-        naturally exceeding `100` when over-budget so the shared >100 over-limit
+        @brief Normalize OpenRouter key-usage payload to ProviderResult with API credit quota.
+        @details Derives current spend from `usage_monthly` via `_get_usage`, then
+        projects that spend against the API key credit total `data.limit` so the
+        normalized `metrics.limit` equals the total credit and `metrics.remaining`
+        equals `limit - cost` residual credit (negative when spend exceeds
+        purchased credits). `UsageMetrics.usage_percent` then resolves to
+        `cost / (cost + remaining) * 100` (equivalent to `cost / limit * 100`),
+        exceeding `100` when over-credit so the shared >100 over-limit
         progress-bar segment renders identically to Copilot over-quota bars.
-        The raw API key `limit`/`limit_remaining` remain available in `raw.data`.
+        When `data.limit` is absent or zero (e.g. free-tier keys), `limit` and
+        `remaining` normalize to `None` so `usage_percent` becomes `None` and
+        renderers fall back to the zero-percent usage display.
         @param data {dict} Raw OpenRouter API JSON payload.
         @param window {WindowPeriod} Effective window (`30d` for OpenRouter).
         @return {ProviderResult} Normalized provider result payload.
@@ -158,24 +160,18 @@ class OpenRouterUsageProvider(BaseProvider):
         @satisfies REQ-149
         @satisfies REQ-150
         """
-        from aibar.config import (
-            DEFAULT_OPENROUTER_MONTHLY_BUDGET,
-            load_runtime_config,
-            resolve_currency_symbol,
-        )
+        from aibar.config import resolve_currency_symbol
 
         payload = data.get("data", {})
 
         usage = self._get_usage(payload, window)
         cost = usage
-
-        try:
-            monthly_budget = max(
-                0.0,
-                float(load_runtime_config().openrouter_monthly_budget),
-            )
-        except Exception:
-            monthly_budget = DEFAULT_OPENROUTER_MONTHLY_BUDGET
+        limit = self._to_float(payload.get("limit"))
+        if limit > 0:
+            remaining = limit - cost
+        else:
+            limit = None
+            remaining = None
 
         currency_symbol = resolve_currency_symbol(data, self.name.value)
 
@@ -184,8 +180,8 @@ class OpenRouterUsageProvider(BaseProvider):
             requests=None,
             input_tokens=None,
             output_tokens=None,
-            remaining=monthly_budget - cost,
-            limit=monthly_budget,
+            remaining=remaining,
+            limit=limit,
             reset_at=None,
             currency_symbol=currency_symbol,
         )
