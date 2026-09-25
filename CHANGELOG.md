@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.45.0](https://github.com/Ogekuri/AIBar/compare/v0.44.0..v0.45.0) - 2026-09-25
+### 🚜  Changes
+- BREAKING CHANGE: base openrouter progress bar on API credit total [useReq] *(openrouter)*
+  - requirements: REQ-148/149/150 switch to credit total data.limit,
+  - remove REQ-151 budget prompt; update CTN-008 keys, TST-013 order,
+  - TST-063 semantics and evidence rows
+  - openrouter.py: metrics.limit/remaining derive from data.limit
+  - (None fallback when absent/zero), percentage cost/(cost+remaining)*100
+  - cli.py/config.py: drop openrouter_monthly_budget setup/config
+  - tests: rename openrouter suite to credit usage, adapt setup tests
+  - docs: regenerate references, update workflow model
+
 ## [0.44.0](https://github.com/Ogekuri/AIBar/compare/v0.43.0..v0.44.0) - 2026-07-15
 ### 🐛  Bug Fixes
 - align stale tests with requirements and add OpenRouter budget coverage [useReq] *(tests)*
@@ -1284,6 +1296,7 @@
 - \[0.42.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.42.0
 - \[0.43.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.43.0
 - \[0.44.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.44.0
+- \[0.45.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.45.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1329,3 +1342,4 @@
 [0.42.0]: https://github.com/Ogekuri/AIBar/compare/v0.41.0..v0.42.0
 [0.43.0]: https://github.com/Ogekuri/AIBar/compare/v0.42.0..v0.43.0
 [0.44.0]: https://github.com/Ogekuri/AIBar/compare/v0.43.0..v0.44.0
+[0.45.0]: https://github.com/Ogekuri/AIBar/compare/v0.44.0..v0.45.0
