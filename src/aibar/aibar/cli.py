@@ -3915,38 +3915,6 @@ def _build_zai_quota_lines(result: ProviderResult) -> list[str]:
                 )
     return lines
 
-
-def _openrouter_budget_total(metrics: UsageMetrics) -> float | None:
-    """
-    @brief Resolve OpenRouter total-budget label value from normalized metrics.
-    @details Returns the total API credit budget `cost + remaining` when both
-    values are finite, falling back to `metrics.limit` (algebraically equal when
-    `remaining = limit - cost`) so the CLI usage-row label renders
-    `Usage: <currency_symbol><budget_total>` in place of the effective window
-    label. Returns None when no budget value is available (free-tier keys or
-    absent credit fields) so renderers keep the window-label fallback.
-    Time complexity O(1). Space complexity O(1).
-    @param metrics {UsageMetrics} Normalized OpenRouter metrics payload.
-    @return {float | None} Total budget value or None when unavailable.
-    @satisfies REQ-151
-    @satisfies REQ-153
-    """
-    if (
-        metrics.cost is not None
-        and metrics.remaining is not None
-        and math.isfinite(metrics.cost)
-        and math.isfinite(metrics.remaining)
-    ):
-        return metrics.cost + metrics.remaining
-    if (
-        metrics.limit is not None
-        and math.isfinite(metrics.limit)
-        and metrics.limit > 0
-    ):
-        return float(metrics.limit)
-    return None
-
-
 def _build_result_panel(
     name: ProviderName,
     result: ProviderResult,
@@ -4018,10 +3986,6 @@ def _build_result_panel(
         usage_percent = 0.0
     if usage_percent is not None:
         usage_window_label = label or result.window.value
-        if name == ProviderName.OPENROUTER:
-            budget_total = _openrouter_budget_total(m)
-            if budget_total is not None:
-                usage_window_label = f"{m.currency_symbol}{budget_total:.2f}"
         detail_lines.append(
             _build_cli_usage_line(name, usage_window_label, usage_percent)
         )

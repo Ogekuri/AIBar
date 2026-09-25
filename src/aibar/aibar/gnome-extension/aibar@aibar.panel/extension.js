@@ -265,36 +265,6 @@ function _resolveCopilotExtraPremiumCost(data, configuredUnitCost) {
 }
 
 /**
- * @brief Build the OpenRouter total-budget window-bar label.
- * @details Returns `<currency_symbol><budget_total>` with `budget_total`
- * equal to `cost + remaining` when both are finite numbers, falling back to
- * `metrics.limit` (algebraically equal when `remaining = limit - cost`),
- * formatted to two decimal places. Returns null when no budget value is
- * available (free-tier keys or absent credit fields) so the caller keeps
- * the configured window-label fallback. Time complexity O(1). Space
- * complexity O(1).
- * @param {Object<string, any>} metrics Normalized OpenRouter metrics payload.
- * @returns {string | null} Budget label text or null when unavailable.
- * @satisfies REQ-152
- * @satisfies REQ-153
- */
-const _resolveOpenRouterBudgetLabel = (metrics) => {
-    const currencySymbol = metrics.currency_symbol || '$';
-    let budgetTotal = null;
-    if (metrics.cost !== null && metrics.cost !== undefined &&
-        metrics.remaining !== null && metrics.remaining !== undefined &&
-        Number.isFinite(Number(metrics.cost)) && Number.isFinite(Number(metrics.remaining))) {
-        budgetTotal = Number(metrics.cost) + Number(metrics.remaining);
-    } else if (metrics.limit !== null && metrics.limit !== undefined &&
-        Number.isFinite(Number(metrics.limit)) && Number(metrics.limit) > 0) {
-        budgetTotal = Number(metrics.limit);
-    }
-    if (budgetTotal === null)
-        return null;
-    return `${currencySymbol}${budgetTotal.toFixed(2)}`;
-};
-
-/**
  * @brief Format one Date object as local datetime for provider freshness labels.
  * @details Produces `%Y-%m-%d %H:%M` in runtime local timezone; invalid Date values return null.
  * @param {Date} value Date object to format.
@@ -1661,11 +1631,6 @@ class AIBarIndicator extends PanelMenu.Button {
             const hasUsagePercent = usagePercent !== null && usagePercent !== undefined;
             const effectiveUsagePercent = hasUsagePercent ? usagePercent : 0;
             card.fiveHourBar.label.text = configuredWindowLabel;
-            if (providerName === 'openrouter') {
-                const openRouterBudgetLabel = _resolveOpenRouterBudgetLabel(metrics);
-                if (openRouterBudgetLabel !== null)
-                    card.fiveHourBar.label.text = openRouterBudgetLabel;
-            }
             card._barData.fiveHour = {pct: effectiveUsagePercent, resetTime: singleWindowReset};
             updateWindowBar(
                 card.fiveHourBar,
