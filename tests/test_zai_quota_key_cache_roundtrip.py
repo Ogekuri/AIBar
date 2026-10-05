@@ -19,6 +19,10 @@ round-trip consumed by the panel, the card, and the CLI renderer.
 """
 
 from pathlib import Path
+import json
+import shutil
+import subprocess
+import tempfile
 
 import pytest
 
@@ -122,19 +126,89 @@ def test_zai_quota_keys_survive_cache_sanitizer_roundtrip() -> None:
 
 def test_extension_consume_round_trip_safe_quota_key_field() -> None:
     """
-    @brief Verify the GNOME extension reads the sanitizer-safe `quota_key` field.
-    @details Asserts the panel usage matcher and the card label fallback source
-    `quota.quota_key` and that no consumer still reads the sanitizer-redacted
-    `quota.key` field, so panel and card stay consistent for cached payloads.
+    @brief Verify the GNOME extension reads quota identifiers shape-tolerantly.
+    @details Asserts the panel usage matcher prefers the sanitizer-safe
+    `quota_key` field, accepts the legacy `key` field emitted by pre-migration
+    CLI builds and cached payloads, and that the card label fallback uses the
+    same identifier chain, so panel and card stay consistent for every payload
+    shape.
     @return {None} Function return value.
     @satisfies REQ-143
     @satisfies REQ-137
     """
     source = EXTENSION_PATH.read_text(encoding="utf-8")
 
-    assert "const quotaKey = quota.quota_key || '';" in source
-    assert "quota.label || quota.quota_key || 'Quota';" in source
-    assert "quota.key" not in source
+    assert "const quotaKey = quota.quota_key || quota.key || '';" in source
+    assert "quota.label || quota.quota_key || quota.key || 'Quota';" in source
+
+
+def test_zai_panel_values_render_for_all_payload_shapes() -> None:
+    """
+    @brief Verify Z.ai panel percentages render for every quota payload shape.
+    @details Executes the real `getPanelUsageValues` extracted from
+    `extension.js` under node against three payload shapes: the current
+    `quota_key` shape, the legacy `key` shape emitted by pre-migration CLI
+    builds, and a sanitizer-redacted shape. The panel matcher MUST return the
+    canonical 5h/weekly percentages in every case, mirroring the card, which
+    renders from `label` fields and array order and therefore never hides Z.ai
+    quota bars.
+    @return {None} Function return value.
+    @satisfies REQ-143
+    @satisfies REQ-140
+    """
+    if shutil.which("node") is None:
+        pytest.skip("node runtime unavailable")
+
+    harness = """
+const fs = require('fs');
+const src = fs.readFileSync(process.argv[2], 'utf8');
+function sliceConst(name, stopMarker) {
+    const start = src.indexOf('const ' + name + ' = ');
+    const end = src.indexOf(stopMarker, start);
+    if (start < 0 || end < 0) throw new Error('slice failed for ' + name);
+    return src.slice(start, end).trim().replace(/;$/, '');
+}
+const toPercentSrc = sliceConst('toPercent', 'const getPanelUsageValues');
+const panelSrc = sliceConst(
+    'getPanelUsageValues', 'const claudeUsage = getPanelUsageValues'
+);
+const getPanelUsageValues = eval(toPercentSrc + ';' + panelSrc + ';getPanelUsageValues');
+const metrics = {limit: 100.0, remaining: 86.0};
+const buildData = (identifierField, identifierValue) => ({
+    metrics,
+    raw: {zai_quotas: [
+        {[identifierField]: identifierValue, label: '5h', percentage: 11.0},
+        {[identifierField]: identifierValue === '5h' ? 'weekly' : identifierValue,
+            label: '1w', percentage: 7.0},
+        {[identifierField]: 'monthly', label: '1m', percentage: 0.0},
+    ]},
+});
+const fresh = getPanelUsageValues('zai', buildData('quota_key', '5h'));
+const legacy = getPanelUsageValues('zai', buildData('key', '5h'));
+const redacted = getPanelUsageValues('zai', buildData('key', '[REDACTED]'));
+console.log(JSON.stringify({fresh, legacy, redacted}));
+"""
+    with tempfile.NamedTemporaryFile(
+        "w", suffix=".js", encoding="utf-8", delete=False
+    ) as harness_file:
+        harness_file.write(harness)
+        harness_path = harness_file.name
+    try:
+        completed = subprocess.run(
+            ["node", harness_path, str(EXTENSION_PATH)],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=True,
+        )
+    finally:
+        Path(harness_path).unlink(missing_ok=True)
+
+    rendered = json.loads(completed.stdout.strip().splitlines()[-1])
+    for shape in ("fresh", "legacy", "redacted"):
+        assert rendered[shape]["primary"] == pytest.approx(11.0), shape
+        assert rendered[shape]["secondary"] == pytest.approx(7.0), shape
+        assert rendered[shape]["max"] == pytest.approx(11.0), shape
 
 
 def test_zai_cli_quota_labels_render_after_sanitizer_roundtrip() -> None:

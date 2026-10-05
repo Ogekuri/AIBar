@@ -1471,9 +1471,10 @@ class AIBarIndicator extends PanelMenu.Button {
                     bar.container.hide();
                     continue;
                 }
-                // quota_key (not key): the cache sanitizer redacts `key` values,
-                // so the card label fallback reads the round-trip-safe field.
-                const quotaLabel = quota.label || quota.quota_key || 'Quota';
+                // Identifier chain prefers the sanitizer-safe `quota_key` field
+                // and tolerates the legacy `key` field from pre-migration
+                // payloads; `label` takes precedence for display text.
+                const quotaLabel = quota.label || quota.quota_key || quota.key || 'Quota';
                 const quotaPercentage = (
                     typeof quota.percentage === 'number' &&
                     Number.isFinite(quota.percentage)
@@ -2269,16 +2270,37 @@ class AIBarIndicator extends PanelMenu.Button {
                         ) {
                             if (maxPct === null || quota.percentage > maxPct)
                                 maxPct = quota.percentage;
-                            // quota_key (not key): `key` is redacted by the CLI
-                            // cache sanitizer, which hid Z.ai panel status labels
-                            // on every cached (idle-time-gated) startup payload.
-                            const quotaKey = quota.quota_key || '';
+                            // Identifier chain prefers the sanitizer-safe
+                            // `quota_key` field and tolerates the legacy `key`
+                            // field emitted by pre-migration CLI builds and
+                            // cached payloads; when both are missing or redacted,
+                            // the positional fallback below mirrors the card.
+                            const quotaKey = quota.quota_key || quota.key || '';
                             if (quotaKey === '5h' && fiveHourPct === null)
                                 fiveHourPct = quota.percentage;
                             else if (quotaKey === 'weekly' && weeklyPct === null)
                                 weeklyPct = quota.percentage;
                         }
                     }
+                    // Positional fallback mirrors the canonical quota order of
+                    // ZaiProvider._extract_quotas (5h, weekly, monthly) and the
+                    // index-based card bars, so the panel renders the 5h/1w
+                    // percentages whenever the card renders them, independent
+                    // of identifier corruption in older payload shapes.
+                    if (
+                        fiveHourPct === null &&
+                        quotas[0] &&
+                        typeof quotas[0].percentage === 'number' &&
+                        Number.isFinite(quotas[0].percentage)
+                    )
+                        fiveHourPct = quotas[0].percentage;
+                    if (
+                        weeklyPct === null &&
+                        quotas[1] &&
+                        typeof quotas[1].percentage === 'number' &&
+                        Number.isFinite(quotas[1].percentage)
+                    )
+                        weeklyPct = quotas[1].percentage;
                     return {
                         primary: toPercent(fiveHourPct),
                         secondary: toPercent(weeklyPct),

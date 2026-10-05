@@ -3888,8 +3888,8 @@ def _build_zai_quota_lines(result: ProviderResult) -> list[str]:
     `_build_cli_usage_line(ProviderName.ZAI, ...)` so Z.ai renders the standard
     fixed-width bracketed progress bar like `claude/openrouter/copilot/codex`.
     Quota labels resolve from the `label` field with the round-trip-safe
-    `quota_key` fallback; the legacy `key` field name cannot be used because the
-    cache sanitizer redacts its value (DES-004).
+    `quota_key` fallback and a legacy `key` fallback tolerated for pre-migration
+    cached payloads; sanitizer-redacted legacy values normalize to `Quota`.
     Reset datetimes are resolved via `_coerce_zai_quota_reset_at` from the
     round-trip-safe `reset_at_epoch_ms` field (with `datetime`/ISO-string
     `reset_at` fallback) so cached `show` executions render `Resets in:` rows
@@ -3906,7 +3906,15 @@ def _build_zai_quota_lines(result: ProviderResult) -> list[str]:
     for quota in quotas:
         if not isinstance(quota, dict):
             continue
-        label = quota.get("label") or quota.get("quota_key") or "Quota"
+        legacy_key = quota.get("key")
+        if not isinstance(legacy_key, str) or legacy_key == "[REDACTED]":
+            legacy_key = None
+        label = (
+            quota.get("label")
+            or quota.get("quota_key")
+            or legacy_key
+            or "Quota"
+        )
         percentage = quota.get("percentage")
         percentage_value = (
             float(percentage) if isinstance(percentage, (int, float)) else 0.0
