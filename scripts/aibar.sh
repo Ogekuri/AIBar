@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # -*- coding: utf-8 -*-
-# VERSION: 0.48.0
+# VERSION: 0.49.0
 # AUTHORS: Ogekuri
 #
 # @file
