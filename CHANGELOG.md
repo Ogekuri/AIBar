@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.47.0](https://github.com/Ogekuri/AIBar/compare/v0.46.0..v0.47.0) - 2026-10-05
+### 🐛  Bug Fixes
+- keep Z.ai panel status labels on cached payloads [useReq] *(gnome-extension)*
+  - root cause: cache sanitizer (DES-004) redacts dict fields named 'key',
+  - so Z.ai quota records lost their '5h'/'weekly' identifiers on every
+  - cache.json round-trip; the GNOME panel matcher required quota.key and
+  - hid both Z.ai status-bar labels on idle-gated (cached) startup payloads
+  - while cards kept rendering from label/array order
+  - zai.py: rename quota record field key -> quota_key (round-trip safe)
+  - cli.py/extension.js: consume quota_key in CLI label fallback, panel
+  - usage matcher, and card label fallback
+  - tests: add cache-roundtrip reproducer; align stale assertions with
+  - REQ-155 (OpenRouter no longer renders Requests/Tokens) and pyright
+  - docs: update WORKFLOW.md call-trace nodes and regenerate REFERENCES.md
+
 ## [0.46.0](https://github.com/Ogekuri/AIBar/compare/v0.45.0..v0.46.0) - 2026-09-25
 ### 🚜  Changes
 - drop zero Requests/Tokens rows and show Total cost from API usage [useReq] *(openrouter)*
@@ -1340,6 +1355,7 @@
 - \[0.44.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.44.0
 - \[0.45.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.45.0
 - \[0.46.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.46.0
+- \[0.47.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.47.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1387,3 +1403,4 @@
 [0.44.0]: https://github.com/Ogekuri/AIBar/compare/v0.43.0..v0.44.0
 [0.45.0]: https://github.com/Ogekuri/AIBar/compare/v0.44.0..v0.45.0
 [0.46.0]: https://github.com/Ogekuri/AIBar/compare/v0.45.0..v0.46.0
+[0.47.0]: https://github.com/Ogekuri/AIBar/compare/v0.46.0..v0.47.0
