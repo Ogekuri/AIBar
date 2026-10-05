@@ -143,6 +143,8 @@ aibar gnome-install
 aibar gnome-uninstall
 ```
 
+Providers disabled during `aibar setup` (stored under `enabled_providers`) are skipped by refresh/idle-time handling and omitted from `show` text and `show --json` output.
+
 ### Global lifecycle and logging options
 
 ```bash
@@ -172,11 +174,30 @@ aibar --disable-debug
 - `claude` and `codex` support dual-window rendering (`5h` and `7d`) in default text output when `--window` is not explicitly set.
 - For `copilot`, `openrouter`, `openai`, `geminiai`, and `zai`, the effective window is fixed to `30d` even if another `--window` is provided.
 
+### Text output layout
+
+- Each provider renders one colored panel in the canonical order `claude`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, `zai`; all panels share the same width.
+- `Status` is the first line on successful panels, and every panel ends with a right-aligned `Updated: <datetime>, Next: <datetime>` freshness line.
+- Usage rows use `Usage: <window> <progress_bar> <percent>%` for `claude`, `openrouter`, `copilot`, `codex`, and `zai`; `openai` and `geminiai` render `Usage: <window> <percent>%` without a bar.
+- `Remaining credits: <remaining> / <limit>` is printed for `claude`, `codex`, and `copilot` when the status is `OK`.
+- Percentages above 100% render the over-limit segment with the 100% boundary marker.
+- Failed providers render `Status: FAIL`, the failure `Reason:`, and the `Updated/Next` freshness line instead of usage statistics.
+
 ### OpenRouter
 
 - The OpenRouter usage view is driven by the **API key credit total** returned by OpenRouter: `100%` on the progress bar corresponds to the total credits on the key (current spend + remaining credit), and the bar shows current spend relative to that total.
 - No monthly budget needs to be configured. Spending beyond purchased credits renders the over-credit bar (`>100%`) with the same over-limit marker used by other quota providers.
 - `aibar setup` does not prompt for an OpenRouter budget, and no budget key is stored in `config.json`.
+- CLI and GNOME views also render `Total cost: <currency_symbol><total_cost>` from the all-time API usage reported for the key (exposed as `metrics.total_cost` in `show --json`).
+- `Requests` and `Tokens` rows are not rendered for OpenRouter: the key API exposes no per-key request/token counters.
+
+### Z.ai
+
+- Provider key `zai`; the API key is read from `ZAI_API_KEY` (environment variable or `~/.config/aibar/env`) and can be entered during `aibar setup`.
+- One quota request returns all quotas; the effective window is fixed to `30d`.
+- Text output renders one progress bar per quota with the short labels `5h`, `1w`, and `1m` (5-hour quota, weekly quota, and total monthly Web Search/Reader quota), each followed by its own `Resets in: <duration>` countdown.
+- Usage above 100% on any quota renders the shared over-limit bar segment with the 100% boundary marker.
+- In the GNOME extension, Z.ai renders as the last provider tab/card (cyan accent): one progress bar per quota with `Reset in: <duration>`, and the panel status bar shows the `5h` quota percentage followed by the bold `1w` quota percentage.
 
 ### `show --json` contract
 
@@ -203,7 +224,7 @@ User-editable `config.json` keys surfaced by setup:
 - `billing_data` (default `billing_data`)
 - `enabled_providers` (missing provider keys default to enabled)
 - `copilot_extra_premium_request_cost` (default `0.04`)
-- `currency_symbols`
+- `currency_symbols` (per-provider display symbol; setup choices `$`, `£`, `€`, default `$`)
 - `log_enabled`
 - `debug_enabled`
 - `geminiai_project_id`
@@ -277,7 +298,7 @@ To enable GeminiAI features, configure Google Cloud before running `aibar setup`
 [![Screenshot03](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot03.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot03.png)
 
 
-### Claude
+### Claude (7d window)
 
 [![Screenshot04](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot04.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot04.png)
 
@@ -295,8 +316,8 @@ To enable GeminiAI features, configure Google Cloud before running `aibar setup`
 
 ### Gemini AI API
 
-[![Screenshot08](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot08.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot07.png)
+[![Screenshot08](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot08.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot08.png)
 
 ### OpenAI API
 
-[![Screenshot09](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot09.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot07.png)
+[![Screenshot09](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot09.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot09.png)
