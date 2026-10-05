@@ -1471,7 +1471,9 @@ class AIBarIndicator extends PanelMenu.Button {
                     bar.container.hide();
                     continue;
                 }
-                const quotaLabel = quota.label || quota.key || 'Quota';
+                // quota_key (not key): the cache sanitizer redacts `key` values,
+                // so the card label fallback reads the round-trip-safe field.
+                const quotaLabel = quota.label || quota.quota_key || 'Quota';
                 const quotaPercentage = (
                     typeof quota.percentage === 'number' &&
                     Number.isFinite(quota.percentage)
@@ -2267,7 +2269,10 @@ class AIBarIndicator extends PanelMenu.Button {
                         ) {
                             if (maxPct === null || quota.percentage > maxPct)
                                 maxPct = quota.percentage;
-                            const quotaKey = quota.key || '';
+                            // quota_key (not key): `key` is redacted by the CLI
+                            // cache sanitizer, which hid Z.ai panel status labels
+                            // on every cached (idle-time-gated) startup payload.
+                            const quotaKey = quota.quota_key || '';
                             if (quotaKey === '5h' && fiveHourPct === null)
                                 fiveHourPct = quota.percentage;
                             else if (quotaKey === 'weekly' && weeklyPct === null)

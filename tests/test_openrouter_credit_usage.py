@@ -68,7 +68,9 @@ def test_openrouter_parse_response_projects_spend_against_api_credit() -> None:
     assert in_credit.metrics.limit == 100.0
     assert in_credit.metrics.remaining == 50.0
     assert in_credit.metrics.cost == 50.0
-    assert abs(in_credit.metrics.usage_percent - 50.0) < 1e-9
+    in_credit_usage_percent = in_credit.metrics.usage_percent
+    assert in_credit_usage_percent is not None
+    assert abs(in_credit_usage_percent - 50.0) < 1e-9
     assert in_credit.raw["data"]["limit"] == 100.0
     assert in_credit.raw["data"]["limit_remaining"] == 50.0
 
@@ -114,7 +116,9 @@ def test_openrouter_over_credit_bar_matches_copilot_over_quota_bar() -> None:
         metrics=UsageMetrics(remaining=-50.0, limit=100.0),
     )
 
-    assert abs(openrouter_result.metrics.usage_percent - 150.0) < 1e-9
+    over_credit_usage_percent = openrouter_result.metrics.usage_percent
+    assert over_credit_usage_percent is not None
+    assert abs(over_credit_usage_percent - 150.0) < 1e-9
 
     openrouter_line = _usage_line(ProviderName.OPENROUTER, openrouter_result)
     copilot_line = _usage_line(ProviderName.COPILOT, copilot_result)

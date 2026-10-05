@@ -517,10 +517,12 @@ def test_geminiai_load_credentials_refresh_error_surfaces_google_reason(
     store = GeminiAICredentialStore(client_config_path=client_path, token_path=token_path)
 
     def _raise_refresh_error(self, request):  # pylint: disable=unused-argument
-        raise RefreshError(
-            "invalid_grant",
-            response={"error": "invalid_grant", "error_description": "Token has been expired or revoked."},
-        )
+        error = RefreshError("invalid_grant")
+        error.response = {  # pyright: ignore[reportAttributeAccessIssue]
+            "error": "invalid_grant",
+            "error_description": "Token has been expired or revoked.",
+        }
+        raise error
 
     monkeypatch.setattr(Credentials, "refresh", _raise_refresh_error)
 

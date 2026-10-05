@@ -53,7 +53,7 @@ def test_extract_quotas_maps_all_three_units_in_order() -> None:
     """
     @brief Verify all three unit entries map to canonical quotas in order.
     @details Asserts `data.limits` units 3, 6, 5 project to ordered records with
-    keys `5h`, `weekly`, `monthly`, labels `5h`, `1w`, `1m`,
+    `quota_key` values `5h`, `weekly`, `monthly`, labels `5h`, `1w`, `1m`,
     and that each quota exposes its `percentage` and `nextResetTime`-
     derived `reset_at` plus the raw epoch-millisecond reset value.
     @return {None} Function return value.
@@ -66,7 +66,7 @@ def test_extract_quotas_maps_all_three_units_in_order() -> None:
         ]
     )
     quotas = _provider()._extract_quotas(document)
-    assert [quota["key"] for quota in quotas] == ["5h", "weekly", "monthly"]
+    assert [quota["quota_key"] for quota in quotas] == ["5h", "weekly", "monthly"]
     assert [quota["label"] for quota in quotas] == [
         "5h",
         "1w",
@@ -89,7 +89,7 @@ def test_extract_quotas_returns_only_present_units() -> None:
     document = _zai_document([_limit_entry(unit=3, percentage=12.5, number=5)])
     quotas = _provider()._extract_quotas(document)
     assert len(quotas) == 1
-    assert quotas[0]["key"] == "5h"
+    assert quotas[0]["quota_key"] == "5h"
     assert quotas[0]["label"] == "5h"
     assert quotas[0]["percentage"] == pytest.approx(12.5)
 def test_extract_quotas_normalizes_missing_fields() -> None:
@@ -103,7 +103,7 @@ def test_extract_quotas_normalizes_missing_fields() -> None:
     document = _zai_document([{"unit": 6, "number": 1}])
     quotas = _provider()._extract_quotas(document)
     assert len(quotas) == 1
-    assert quotas[0]["key"] == "weekly"
+    assert quotas[0]["quota_key"] == "weekly"
     assert quotas[0]["percentage"] == pytest.approx(0.0)
     assert quotas[0]["reset_at"] is None
     assert quotas[0]["reset_at_epoch_ms"] is None
@@ -124,7 +124,7 @@ def test_extract_quotas_ignores_malformed_entries() -> None:
     )
     quotas = _provider()._extract_quotas(document)
     assert len(quotas) == 1
-    assert quotas[0]["key"] == "monthly"
+    assert quotas[0]["quota_key"] == "monthly"
 def test_max_percentage_derives_from_highest_quota() -> None:
     """
     @brief Verify aggregate percentage equals the maximum quota percentage.

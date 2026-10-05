@@ -216,10 +216,13 @@ class ZaiProvider(BaseProvider):
         @brief Map Z.ai `data.limits` entries into normalized quota records.
         @details Selects limit entries by `unit` value: `3`/`number=5` -> `5h`
         Quota, `6`/`number=1` -> `1w` Quota, `5`/`number=1` -> `1m`
-        Quota. Each record carries `key`, `label`,
+        Quota. Each record carries `quota_key`, `label`,
         `percentage`, `reset_at_epoch_ms`, `reset_at` (UTC datetime), and (for
         the monthly web-search quota) `used`, `limit`, `remaining`, and
-        `usage_details`.
+        `usage_details`. The identifier field is named `quota_key` (not `key`)
+        because the cache sanitizer redacts values of dict fields named `key`
+        (DES-004), which would otherwise corrupt the identifier on every cache
+        round-trip consumed by the CLI renderer and the GNOME panel matcher.
         @param data {dict} Raw Z.ai API response document.
         @return {list[dict]} Ordered normalized quota records (5h, weekly, monthly).
         @satisfies REQ-136
@@ -260,9 +263,14 @@ class ZaiProvider(BaseProvider):
         (epoch milliseconds) to a UTC datetime `reset_at`, derives the next UTC
         5-hour boundary when `nextResetTime` is absent for the `5h` quota, and
         preserves monthly web-search usage counters (`usage`, `currentValue`,
-        `remaining`, `usageDetails`) when present.
+        `remaining`, `usageDetails`) when present. The machine-readable quota
+        identifier is stored under the record field `quota_key` so the value
+        survives the `save_cli_cache` sanitizer round-trip; a field named `key`
+        would be redacted to `[REDACTED]` by DES-004 and hide the Z.ai GNOME
+        panel status labels on cached payloads.
         @param entry {dict} Raw Z.ai limit entry.
-        @param key {str} Machine-readable quota key (`5h`, `weekly`, `monthly`).
+        @param key {str} Machine-readable quota key (`5h`, `weekly`, `monthly`),
+        stored as the `quota_key` record field.
         @param label {str} Human-readable quota label.
         @return {dict} Normalized quota record.
         @satisfies REQ-136
@@ -280,7 +288,7 @@ class ZaiProvider(BaseProvider):
         if reset_epoch_ms is None and key == "5h":
             reset_epoch_ms = self._derive_five_hour_reset_epoch_ms()
         quota: dict = {
-            "key": key,
+            "quota_key": key,
             "label": label,
             "percentage": self._to_float(entry.get("percentage")),
             "reset_at_epoch_ms": reset_epoch_ms,

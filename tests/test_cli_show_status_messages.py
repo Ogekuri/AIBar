@@ -351,15 +351,18 @@ def test_show_dual_window_cached_fail_status_renders_reason_with_freshness(
 def test_build_result_panel_renders_zero_api_counters_for_null_metrics() -> None:
     """
     @brief Verify API-counter providers render `Requests` and `Tokens` lines as zero on null metrics.
-    @details Builds panel lines for `openai`, `openrouter`, `codex`, and `geminiai` with null
-    requests/input/output counters and asserts deterministic null-to-zero text rendering.
+    @details Builds panel lines for `openai`, `codex`, and `geminiai` with null
+    requests/input/output counters and asserts deterministic null-to-zero text
+    rendering; OpenRouter is excluded because REQ-155 mandates that its OK
+    blocks omit `Requests`/`Tokens` rows (its key API exposes no per-key
+    request/token counters).
     @return {None} Function return value.
     @satisfies REQ-036
+    @satisfies REQ-155
     @satisfies TST-038
     """
     provider_names = (
         ProviderName.OPENAI,
-        ProviderName.OPENROUTER,
         ProviderName.CODEX,
         ProviderName.GEMINIAI,
     )

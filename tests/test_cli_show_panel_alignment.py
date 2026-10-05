@@ -157,8 +157,9 @@ def test_print_result_keeps_panel_rows_aligned_with_over_limit_progress_bar(
     @satisfies REQ-122
     @satisfies TST-054
     """
+    # usage_percent is a derived property: (limit - remaining) / limit * 100
+    # resolves to 111.1% for the remaining/limit pair below.
     metrics = UsageMetrics(
-        usage_percent=111.1,
         remaining=-167.0,
         limit=1500.0,
         cost=6.68,

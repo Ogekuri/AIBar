@@ -310,15 +310,17 @@ def test_popup_scroll_view_uses_gnome_compatible_child_attachment() -> None:
 def test_provider_cards_render_zero_api_counters_for_null_metrics() -> None:
     """
     @brief Verify extension cards normalize null API counter metrics to zero for supported providers.
-    @details Asserts source defines provider gating for `openai/openrouter/codex/geminiai`
-    and renders `requests`/`tokens` labels with explicit null-to-zero fallback logic.
+    @details Asserts source defines provider gating for `openai/codex/geminiai`
+    (OpenRouter is excluded per REQ-155: its key API exposes no per-key
+    request/token counters) and renders `requests`/`tokens` labels with explicit
+    null-to-zero fallback logic.
     @return {None} Function return value.
     @satisfies REQ-017
     @satisfies TST-004
     """
     source = EXTENSION_PATH.read_text(encoding="utf-8")
     assert (
-        "const API_COUNTER_PROVIDERS = new Set(['openai', 'openrouter', 'codex', 'geminiai']);"
+        "const API_COUNTER_PROVIDERS = new Set(['openai', 'codex', 'geminiai']);"
         in source
     )
     assert "function _providerSupportsApiCounters(providerName)" in source
