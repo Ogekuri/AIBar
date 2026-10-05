@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.48.0](https://github.com/Ogekuri/AIBar/compare/v0.47.0..v0.48.0) - 2026-10-05
+### 🐛  Bug Fixes
+- render Z.ai panel quotas from any payload shape [useReq] *(gnome-extension)*
+  - root cause (residual): the Z.ai panel matcher required quota_key, so
+  - payloads emitted by pre-9defd00 CLI builds or legacy/redacted cached
+  - entries left both Z.ai status-bar labels hidden while the card kept
+  - rendering from label fields and array order
+  - extension.js: panel extraction now accepts quota_key and legacy key
+  - identifiers and adds a positional fallback over the canonical quota
+  - order (5h, 1w) mirroring the index-based card bars; card label
+  - fallback tolerates the legacy field too
+  - cli.py: Z.ai CLI label fallback tolerates legacy key values while
+  - normalizing sanitizer-redacted placeholders to Quota
+  - tests: node-executed reproducer asserts the panel renders 5h/1w
+  - percentages for fresh, legacy, and redacted payload shapes
+  - docs: update WORKFLOW.md call-trace nodes; regenerate REFERENCES.md
+
 ## [0.47.0](https://github.com/Ogekuri/AIBar/compare/v0.46.0..v0.47.0) - 2026-10-05
 ### 🐛  Bug Fixes
 - keep Z.ai panel status labels on cached payloads [useReq] *(gnome-extension)*
@@ -1356,6 +1373,7 @@
 - \[0.45.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.45.0
 - \[0.46.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.46.0
 - \[0.47.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.47.0
+- \[0.48.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.48.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1404,3 +1422,4 @@
 [0.45.0]: https://github.com/Ogekuri/AIBar/compare/v0.44.0..v0.45.0
 [0.46.0]: https://github.com/Ogekuri/AIBar/compare/v0.45.0..v0.46.0
 [0.47.0]: https://github.com/Ogekuri/AIBar/compare/v0.46.0..v0.47.0
+[0.48.0]: https://github.com/Ogekuri/AIBar/compare/v0.47.0..v0.48.0
