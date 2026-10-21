@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.50.0](https://github.com/Ogekuri/AIBar/compare/v0.49.0..v0.50.0) - 2026-10-21
+### 🐛  Bug Fixes
+- .gitignore file.
+
 ## [0.48.0](https://github.com/Ogekuri/AIBar/compare/v0.47.0..v0.48.0) - 2026-10-05
 ### 🐛  Bug Fixes
 - render Z.ai panel quotas from any payload shape [useReq] *(gnome-extension)*
@@ -1375,6 +1379,7 @@
 - \[0.47.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.47.0
 - \[0.48.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.48.0
 - \[0.49.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.49.0
+- \[0.50.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.50.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1425,3 +1430,4 @@
 [0.47.0]: https://github.com/Ogekuri/AIBar/compare/v0.46.0..v0.47.0
 [0.48.0]: https://github.com/Ogekuri/AIBar/compare/v0.47.0..v0.48.0
 [0.49.0]: https://github.com/Ogekuri/AIBar/compare/v0.48.0..v0.49.0
+[0.50.0]: https://github.com/Ogekuri/AIBar/compare/v0.49.0..v0.50.0
