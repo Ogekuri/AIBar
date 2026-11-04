@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.51.0](https://github.com/Ogekuri/AIBar/compare/v0.50.0..v0.51.0) - 2026-11-04
+### 🐛  Bug Fixes
+- bound in-process 429 retry sleeps to unblock show [useReq] *(claude_oauth)*
+  - Root cause: _request_usage slept max(retry-after, backoff) for each of 3 retries; Anthropic hourly-quota Retry-After ~3600s stalled each show run ~3h.
+  - Add IN_PROCESS_RETRY_DELAY_CAP_SECONDS=10 cap; clamp per-attempt sleep and short-circuit retries when server Retry-After exceeds the cap so the REQ-041 idle-time policy defers the next attempt across runs (REQ-042 request minimization).
+  - Add reproducer + regression tests TestClaudeRetryDelayBound; update WORKFLOW.md and regenerate REFERENCES.md.
+- Fix .gitignore file.
+
+### 🚜  Changes
+- login without --provider targets cached error-state providers [useReq] *(cli)*
+  - REQ-172..REQ-175: bare aibar login now selects login-capable providers (copilot, geminiai) whose cached status section contains result=FAIL and executes their flows sequentially; the former implicit --provider copilot default is removed.
+  - Adds _LOGIN_FLOW_REGISTRY, _select_login_error_providers, and _login_error_state_providers to src/aibar/aibar/cli.py with per-flow failure capture, sequential continuation, and non-zero aggregate exit.
+  - Adds tests/test_login_error_state.py covering TST-066/TST-067; updates REQUIREMENTS.md (v0.3.35), WORKFLOW.md login call-trace, and regenerated REFERENCES.md.
+  - Verification: static-check clean; full pytest suite 202 passed, 1 skipped.
+- BREAKING CHANGE: raise Python floor to 3.12 and pin interpreter via .python-version [useReq] *(build)*
+  - Raise pyproject requires-python from >= 3.11 to >= 3.12 and regenerate uv.lock.
+  - Add tracked .python-version (3.12) so uv run never resolves the managed 3.11.
+  - Pin release workflow to python-version 3.12 and document the floor in README.
+  - Eliminates the google-api-core 2.30.0 FutureWarning on Python 3.11 runs.
+  - Add CTN-018/TST-065 constraints and update PRJ-007/CTN-007/REQ-086/REQ-087 evidence.
+- BREAKING CHANGE: remove Claude support and add Antigravity (AGY) provider [useReq] *(providers)*
+  - Remove Claude OAuth provider, CLI login/renewal flows, refresh-block
+  - lifecycle, claude_cli_auth module, and claude_token_refresh.sh script.
+  - Add AntigravityProvider executing 'agy -p /usage', stripping ANSI
+  - escapes, and parsing TSV rows into five per-quota used percentages.
+  - AGY takes Claude's first position and red palette in CLI panels and the
+  - GNOME extension panel, tabs, cards, and stylesheet.
+  - Update requirements (REQ-158..171), workflow runtime model, references
+  - inventory, and affected test suites.
+
 ## [0.50.0](https://github.com/Ogekuri/AIBar/compare/v0.49.0..v0.50.0) - 2026-10-21
 ### 🐛  Bug Fixes
 - .gitignore file.
@@ -1380,6 +1410,7 @@
 - \[0.48.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.48.0
 - \[0.49.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.49.0
 - \[0.50.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.50.0
+- \[0.51.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.51.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1431,3 +1462,4 @@
 [0.48.0]: https://github.com/Ogekuri/AIBar/compare/v0.47.0..v0.48.0
 [0.49.0]: https://github.com/Ogekuri/AIBar/compare/v0.48.0..v0.49.0
 [0.50.0]: https://github.com/Ogekuri/AIBar/compare/v0.49.0..v0.50.0
+[0.51.0]: https://github.com/Ogekuri/AIBar/compare/v0.50.0..v0.51.0
