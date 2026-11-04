@@ -2711,7 +2711,7 @@ from pydantic import BaseModel, Field
 
 ---
 
-# claude_oauth.py | Python | 387L | 16 symbols | 13 imports | 19 comments
+# claude_oauth.py | Python | 413L | 17 symbols | 13 imports | 28 comments
 > Path: `src/aibar/aibar/providers/claude_oauth.py`
 - @brief Claude OAuth usage provider.
 - @details Fetches Claude subscription utilization through OAuth credentials and normalizes provider quota state into the shared result contract.
@@ -2773,13 +2773,16 @@ from datetime import timezone
 - var `MAX_RETRIES = 3` (L124)
 - var `RETRY_BACKOFF_BASE = 2.0` (L125)
 - var `RETRY_JITTER_MAX = 1.0` (L126)
-### fn `async def _request_usage(self, client: httpx.AsyncClient) -> httpx.Response` `priv` (L128-167)
+- var `IN_PROCESS_RETRY_DELAY_CAP_SECONDS = 10.0` (L132)
+### fn `async def _request_usage(self, client: httpx.AsyncClient) -> httpx.Response` `priv` (L134-193)
 - @brief Execute HTTP GET to usage endpoint with retry on HTTP 429.
-- @details Retries up to MAX_RETRIES times on 429 responses, respecting the retry-after header with exponential backoff fallback and random jitter to prevent thundering-herd synchronization. Backoff sequence with RETRY_BACKOFF_BASE=2.0: ~2-3s, ~4-5s, ~8-9s (total ~14-17s).
+- @details Retries up to MAX_RETRIES times on 429 responses, respecting the retry-after header with exponential backoff fallback and random jitter to prevent thundering-herd synchronization. Backoff sequence with RETRY_BACKOFF_BASE=2.0: ~2-3s, ~4-5s, ~8-9s (total ~14-17s). Each in-process retry sleep is clamped to IN_PROCESS_RETRY_DELAY_CAP_SECONDS (plus RETRY_JITTER_MAX jitter) so one `show` execution stays responsive. When the server-advised retry-after exceeds IN_PROCESS_RETRY_DELAY_CAP_SECONDS (e.g. Anthropic hourly quota ~3600s), the 429 response is returned immediately without further in-process retries: the CLI records the failure and the idle-time policy (REQ-041) defers the next attempt across runs, minimizing provider API requests (REQ-042). Time complexity O(MAX_RETRIES); space complexity O(1).
 - @param client {httpx.AsyncClient} Reusable HTTP client session.
 - @return {httpx.Response} Final HTTP response after retries exhausted or success.
+- @satisfies REQ-040
+- @satisfies REQ-042
 
-### fn `async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult` (L168-211)
+### fn `async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult` (L194-237)
 - @brief Execute fetch for a single window period.
 - @details Makes one HTTP request to the usage endpoint (with retry on 429) and parses the response for the requested window.
 - @param window {WindowPeriod} Window period to parse from the API response.
@@ -2787,11 +2790,11 @@ from datetime import timezone
 - @throws {AuthenticationError} When the OAuth token is invalid or expired.
 - @throws {ProviderError} On unexpected non-HTTP errors.
 
-### fn `async def fetch_all_windows(` (L212-213)
+### fn `async def fetch_all_windows(` (L238-239)
 
-### fn `def _handle_response(` `priv` (L270-271)
+### fn `def _handle_response(` `priv` (L296-297)
 
-### fn `def _parse_response(self, data: dict, window: WindowPeriod) -> ProviderResult` `priv` (L321-388)
+### fn `def _parse_response(self, data: dict, window: WindowPeriod) -> ProviderResult` `priv` (L347-414)
 - @brief Map HTTP error status codes to ProviderResult error payloads.
 - @brief Normalize a raw Claude API payload dict into a ProviderResult for the given window.
 - @details Returns None on HTTP 200 (success), otherwise returns an error
@@ -2820,11 +2823,12 @@ ProviderResult for the given window. Raises AuthenticationError on 401.
 |`MAX_RETRIES`|var|pub|124||
 |`RETRY_BACKOFF_BASE`|var|pub|125||
 |`RETRY_JITTER_MAX`|var|pub|126||
-|`_request_usage`|fn|priv|128-167|async def _request_usage(self, client: httpx.AsyncClient)...|
-|`fetch`|fn|pub|168-211|async def fetch(self, window: WindowPeriod = WindowPeriod...|
-|`fetch_all_windows`|fn|pub|212-213|async def fetch_all_windows(|
-|`_handle_response`|fn|priv|270-271|def _handle_response(|
-|`_parse_response`|fn|priv|321-388|def _parse_response(self, data: dict, window: WindowPerio...|
+|`IN_PROCESS_RETRY_DELAY_CAP_SECONDS`|var|pub|132||
+|`_request_usage`|fn|priv|134-193|async def _request_usage(self, client: httpx.AsyncClient)...|
+|`fetch`|fn|pub|194-237|async def fetch(self, window: WindowPeriod = WindowPeriod...|
+|`fetch_all_windows`|fn|pub|238-239|async def fetch_all_windows(|
+|`_handle_response`|fn|priv|296-297|def _handle_response(|
+|`_parse_response`|fn|priv|347-414|def _parse_response(self, data: dict, window: WindowPerio...|
 
 
 ---

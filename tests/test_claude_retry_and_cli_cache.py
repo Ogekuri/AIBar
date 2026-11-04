@@ -4,10 +4,12 @@
 @details Verifies: (1) ClaudeOAuthProvider retries on HTTP 429 respecting
 retry-after header, (2) fetch_all_windows uses one API call for dual windows,
 (3) CLI shared refresh helper routes Claude 5h/7d reads through one dual-window
-fetch implementation without legacy ResultCache usage.
+fetch implementation without legacy ResultCache usage, (4) in-process 429
+retry sleeps stay bounded so server-advised long Retry-After values cannot
+stall a `show` execution.
 HTTP-pipeline tests restrict assertions to success/error state, window key presence,
 and HTTP call count; specific numeric metric values MUST NOT be asserted per TST-021.
-@satisfies CTN-003, CTN-004, REQ-002, REQ-043, TST-021
+@satisfies CTN-003, CTN-004, REQ-002, REQ-040, REQ-041, REQ-042, REQ-043, TST-021
 """
 
 import asyncio
@@ -17,6 +19,7 @@ from unittest.mock import AsyncMock, patch
 
 import httpx
 
+from aibar.config import RuntimeConfig
 from aibar.providers.base import (
     ProviderName,
     ProviderResult,
@@ -198,6 +201,97 @@ class TestClaudeRetryOn429:
         assert result.is_error
         assert result.raw["status_code"] == 429
         assert 899 <= result.raw["retry_after_seconds"] <= 901
+
+
+class TestClaudeRetryDelayBound:
+    """
+    @brief Verify Claude 429 in-process retry sleeps stay bounded.
+    @details Reproducer for the `aibar show` indefinite-stall defect:
+    server-advised `Retry-After` values (Anthropic hourly quota ~3600s)
+    were passed unbounded to `asyncio.sleep` inside
+    `ClaudeOAuthProvider._request_usage`, stalling each CLI execution for
+    hours. Asserts (a) every in-process retry sleep respects
+    `ClaudeOAuthProvider.IN_PROCESS_RETRY_DELAY_CAP_SECONDS` plus jitter, and
+    (b) server-advised delays above the cap short-circuit in-process retries
+    (exactly one HTTP call) so the REQ-041 CLI idle-time policy defers the
+    next attempt across runs, minimizing provider API requests per REQ-042.
+    @satisfies REQ-040
+    @satisfies REQ-041
+    @satisfies REQ-042
+    """
+
+    def test_long_server_retry_after_bounded_in_process(self) -> None:
+        """
+        @brief Verify long server Retry-After values do not stall `show`.
+        @details Rate-limited responses carrying `Retry-After: 3600` must
+        surface the 429 result without hour-long in-process sleeps and
+        without futile HTTP retries against a server that already advised
+        a long wait. Asserts error state, recorded sleep delays, and HTTP
+        call count only per TST-021.
+        @satisfies REQ-040, REQ-041, REQ-042
+        @satisfies TST-021
+        """
+        provider = ClaudeOAuthProvider(token="sk-ant-test-token")
+        all_429 = [_make_429_response("3600")] * 4
+        sleep_mock = AsyncMock(return_value=None)
+
+        with patch("aibar.providers.claude_oauth.asyncio.sleep", sleep_mock):
+            with patch(
+                "aibar.providers.claude_oauth.random.uniform", return_value=0.0
+            ):
+                with patch.object(
+                    httpx.AsyncClient,
+                    "get",
+                    new_callable=AsyncMock,
+                    side_effect=all_429,
+                ) as mock_get:
+                    result = asyncio.run(provider.fetch(WindowPeriod.DAY_7))
+
+        cap = ClaudeOAuthProvider.IN_PROCESS_RETRY_DELAY_CAP_SECONDS
+        max_delay = cap + ClaudeOAuthProvider.RETRY_JITTER_MAX
+        recorded_delays = [float(call.args[0]) for call in sleep_mock.await_args_list]
+        assert result.is_error
+        assert result.raw["status_code"] == 429
+        assert all(delay <= max_delay for delay in recorded_delays)
+        assert mock_get.call_count == 1
+
+    def test_small_server_retry_after_still_retries_within_cap(self) -> None:
+        """
+        @brief Verify small server Retry-After values keep the retry path.
+        @details `Retry-After` values within the in-process cap must keep the
+        documented bounded retry sequence and succeed on the second attempt,
+        with every sleep clamped to the cap plus jitter while preserving the
+        REQ-040 minimum inter-call delay semantics. Asserts success state,
+        recorded sleep delays, and HTTP call count only per TST-021.
+        @satisfies REQ-040
+        @satisfies TST-021
+        """
+        provider = ClaudeOAuthProvider(token="sk-ant-test-token")
+        mock_responses = [_make_429_response("3"), _make_200_response()]
+        sleep_mock = AsyncMock(return_value=None)
+
+        with patch("aibar.providers.claude_oauth.asyncio.sleep", sleep_mock):
+            with patch(
+                "aibar.providers.claude_oauth.random.uniform", return_value=0.0
+            ):
+                with patch(
+                    "aibar.config.load_runtime_config", return_value=RuntimeConfig()
+                ):
+                    with patch.object(
+                        httpx.AsyncClient,
+                        "get",
+                        new_callable=AsyncMock,
+                        side_effect=mock_responses,
+                    ) as mock_get:
+                        result = asyncio.run(provider.fetch(WindowPeriod.DAY_7))
+
+        cap = ClaudeOAuthProvider.IN_PROCESS_RETRY_DELAY_CAP_SECONDS
+        max_delay = cap + ClaudeOAuthProvider.RETRY_JITTER_MAX
+        recorded_delays = [float(call.args[0]) for call in sleep_mock.await_args_list]
+        assert not result.is_error
+        assert mock_get.call_count == 2
+        assert recorded_delays
+        assert all(delay <= max_delay for delay in recorded_delays)
 
 
 class TestFetchAllWindows:

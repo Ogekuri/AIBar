@@ -124,6 +124,12 @@ Note: Token must start with 'sk-ant-' prefix."""
     MAX_RETRIES = 3
     RETRY_BACKOFF_BASE = 2.0
     RETRY_JITTER_MAX = 1.0
+    #: Upper bound (seconds) for one in-process HTTP 429 retry sleep.
+    #: Server-advised `Retry-After` delays above this cap short-circuit
+    #: in-process retries: the 429 response is surfaced immediately so the
+    #: CLI idle-time policy (REQ-041) defers the next attempt across runs
+    #: instead of stalling the current `show` execution (REQ-042).
+    IN_PROCESS_RETRY_DELAY_CAP_SECONDS = 10.0
 
     async def _request_usage(self, client: httpx.AsyncClient) -> httpx.Response:
         """
@@ -132,8 +138,19 @@ Note: Token must start with 'sk-ant-' prefix."""
         the retry-after header with exponential backoff fallback and random
         jitter to prevent thundering-herd synchronization. Backoff sequence
         with RETRY_BACKOFF_BASE=2.0: ~2-3s, ~4-5s, ~8-9s (total ~14-17s).
+        Each in-process retry sleep is clamped to
+        IN_PROCESS_RETRY_DELAY_CAP_SECONDS (plus RETRY_JITTER_MAX jitter) so
+        one `show` execution stays responsive. When the server-advised
+        retry-after exceeds IN_PROCESS_RETRY_DELAY_CAP_SECONDS (e.g.
+        Anthropic hourly quota ~3600s), the 429 response is returned
+        immediately without further in-process retries: the CLI records the
+        failure and the idle-time policy (REQ-041) defers the next attempt
+        across runs, minimizing provider API requests (REQ-042). Time
+        complexity O(MAX_RETRIES); space complexity O(1).
         @param client {httpx.AsyncClient} Reusable HTTP client session.
         @return {httpx.Response} Final HTTP response after retries exhausted or success.
+        @satisfies REQ-040
+        @satisfies REQ-042
         """
         headers = {
             "Authorization": f"Bearer {self._token}",
@@ -147,6 +164,12 @@ Note: Token must start with 'sk-ant-' prefix."""
                 return response
             retry_after_raw = response.headers.get("retry-after", "0")
             retry_after = _parse_retry_after_header(retry_after_raw)
+            if retry_after > self.IN_PROCESS_RETRY_DELAY_CAP_SECONDS:
+                # Server-advised delay exceeds the in-process retry budget:
+                # surface the 429 response so the CLI idle-time policy
+                # (REQ-041) defers the next attempt across runs instead of
+                # sleeping inside the current `show` execution.
+                return response
             from aibar.config import load_runtime_config
 
             min_api_delay_seconds = (
@@ -154,10 +177,13 @@ Note: Token must start with 'sk-ant-' prefix."""
             )
             jitter = random.uniform(0, self.RETRY_JITTER_MAX)
             delay = (
-                max(
-                    retry_after,
-                    self.RETRY_BACKOFF_BASE * (2**attempt),
-                    min_api_delay_seconds,
+                min(
+                    max(
+                        retry_after,
+                        self.RETRY_BACKOFF_BASE * (2**attempt),
+                        min_api_delay_seconds,
+                    ),
+                    self.IN_PROCESS_RETRY_DELAY_CAP_SECONDS,
                 )
                 + jitter
             )
