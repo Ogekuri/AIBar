@@ -1,7 +1,7 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.3.34"
+version: "0.3.35"
 date: "2026-11-04"
 author: "req-new"
 scope:
@@ -131,6 +131,10 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-005**: MUST prompt `setup` for `idle_delay_seconds` (`300`) first, `api_call_delay_milliseconds` (`100`) second, `api_call_timeout_milliseconds` (`5000`) third, `default_retry_after_seconds` (`3600`) fourth, `gnome_refresh_interval_seconds` (`60`) fifth, and `billing_data` (`billing_data`) sixth, then persist values in `~/.config/aibar/config.json`.
 - **REQ-123**: `setup` MUST present a dedicated provider activation section before all other setup sections and prompt toggleable `enable`/`disable` values for `agy`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, and `zai`.
 - **REQ-007**: MUST execute GitHub device-flow login for Copilot and save the token in `~/.config/aibar/copilot.json`.
+- **REQ-172**: `aibar login` without `--provider` MUST sequentially execute login flows for login-capable providers whose cached last-attempt status in `~/.cache/aibar/cache.json` contains `result=FAIL`.
+- **REQ-173**: `aibar login` without `--provider` MUST NOT execute login flows for login-capable providers whose cached window statuses are all `OK` or absent.
+- **REQ-174**: `aibar login` without `--provider` MUST print an informational message and exit with status 0 when no login-capable provider is in error state.
+- **REQ-175**: `aibar login` without `--provider` MUST exit with non-zero status when at least one executed login flow fails.
 - **REQ-009**: MUST execute provider retrieval for `show` in this order: force-flag handling, per-provider idle-time evaluation, per-provider conditional refresh to `~/.cache/aibar/cache.json`, then data load from `~/.cache/aibar/cache.json`.
 - **REQ-124**: `show` refresh execution MUST exclude disabled providers from fetch scheduling and MUST NOT apply idle-time, API-delay, API-timeout, or retry-after handling to disabled providers.
 - **REQ-125**: CLI text `show` MUST omit disabled providers and MUST NOT render panels or not-configured hints for providers whose `enabled_providers.<provider>` flag is `false`.
@@ -351,6 +355,8 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-039**: MUST verify `scripts/aibar.sh` invokes `uv run python -m aibar.cli`, forwards CLI arguments, and contains no virtualenv creation/activation or `pip install -r requirements.txt` commands.
 - **TST-040**: MUST verify `.gitignore` includes `uv.lock` and excludes `requirements.txt` from allowlist, repository file `requirements.txt` is absent, and README contains uv-tool requirement plus export command snippet.
 - **TST-037**: MUST verify `pyproject.toml` wheel `packages` setting includes the `aibar` package containing `gnome-extension/` subtree, and sdist `include` covers `src/aibar/aibar/gnome-extension/**` and `scripts/**` for `.github/workflows/release-uvx+extension.yml` builds.
+- **TST-066**: MUST verify `aibar login` without `--provider` executes login flows exactly for login-capable providers whose cached status contains `result=FAIL` and skips providers with `OK` or absent cached status.
+- **TST-067**: MUST verify `aibar login` without `--provider` exits 0 with an informational message when no login-capable provider is in error state and exits non-zero when a login flow fails.
 
 ## 5. Evidence
 
@@ -527,3 +533,9 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | TST-064 | `src/aibar/aibar/providers/agy.py` + `_parse_tsv_rows`/`_extract_quotas`/`_find_remaining_percent` map TSV rows to five quota records with normalized used percentages and auth-error classification; dedicated standalone test pending (no existing test maps to this module). |
 | CTN-018 | `pyproject.toml` + `requires-python = ">= 3.12"`; `.python-version` + `3.12` interpreter pin; `.github/workflows/release-uvx+extension.yml` + `python-version: "3.12"` setup pin; `uv.lock` + `requires-python = ">=3.12"`. |
 | TST-065 | `.python-version` + content `3.12` and `.github/workflows/release-uvx+extension.yml` + `python-version: "3.12"`; dedicated standalone test pending (no existing test maps to this surface). |
+| REQ-172 | `src/aibar/aibar/cli.py` + `login`/`_login_error_state_providers`/`_select_login_error_providers` + bare-login branch selects login-capable providers with cached `result=FAIL` status via locked `load_cli_cache` read. |
+| REQ-173 | `src/aibar/aibar/cli.py` + `_select_login_error_providers` + provider selection requires at least one cached window status entry with `result=FAIL`. |
+| REQ-174 | `src/aibar/aibar/cli.py` + `_login_error_state_providers` + empty-selection branch prints informational message and returns with exit status 0. |
+| REQ-175 | `src/aibar/aibar/cli.py` + `_login_error_state_providers` + per-flow `SystemExit`/exception capture records failed flows and exits non-zero when any flow fails. |
+| TST-066 | `tests/test_login_error_state.py` + bare-login targeting assertions for cached `FAIL`-only execution and `OK`/absent/non-login-capable skip. |
+| TST-067 | `tests/test_login_error_state.py` + zero-exit informational message and non-zero flow-failure exit assertions. |

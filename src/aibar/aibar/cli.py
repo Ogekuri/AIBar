@@ -19,7 +19,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import NoReturn, Sequence
+from typing import Callable, NoReturn, Sequence
 from urllib import error as urllib_error
 from urllib import request as urllib_request
 
@@ -4285,21 +4285,36 @@ def setup() -> None:
 
 @main.command(
     short_help="Authenticate provider accounts.",
-    help="Authenticate supported providers (copilot, geminiai).",
+    help=(
+        "Authenticate supported providers (copilot, geminiai).\n"
+        "Without --provider, re-authenticates providers currently in error state."
+    ),
 )
 @click.option(
     "--provider",
     "-p",
-    default="copilot",
+    default=None,
     help="Provider to login to (copilot, geminiai)",
 )
-def login(provider: str) -> None:
+def login(provider: str | None) -> None:
     """
-    @brief Execute login.
-    @details Applies login logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
-    @param provider {str} Input parameter `provider`.
+    @brief Execute provider login dispatch.
+    @details With `--provider`, executes the single provider login flow and prints
+    diagnostics with non-zero exit for unsupported provider values. Without
+    `--provider`, delegates to `_login_error_state_providers(...)` so only
+    login-capable providers whose cached last-attempt status is `FAIL` are
+    re-authenticated (the former default `copilot` fallback is removed).
+    @param provider {str | None} Optional provider selector (`copilot`, `geminiai`); `None` selects cached error-state providers.
     @return {None} Function return value.
+    @throws {SystemExit} Exits non-zero for unsupported provider values and failed login flows.
+    @satisfies REQ-172
+    @satisfies REQ-173
+    @satisfies REQ-174
+    @satisfies REQ-175
     """
+    if provider is None:
+        _login_error_state_providers()
+        return
     if provider == "copilot":
         _login_copilot()
     elif provider == "geminiai":
@@ -4375,6 +4390,88 @@ def _login_geminiai() -> None:
         click.echo(f"  Access token: {credentials.token[:12]}...")
     click.echo()
     click.echo("You can now run: aibar show --provider geminiai")
+
+
+_LOGIN_FLOW_REGISTRY: tuple[tuple[ProviderName, Callable[[], None]], ...] = (
+    (ProviderName.COPILOT, _login_copilot),
+    (ProviderName.GEMINIAI, _login_geminiai),
+)
+
+
+def _select_login_error_providers() -> list[ProviderName]:
+    """
+    @brief Select login-capable providers whose cached last-attempt status is FAIL.
+    @details Reads `~/.cache/aibar/cache.json` through the locked `load_cli_cache`
+    reader, extracts the canonical `status` section via `_cache_status_section(...)`,
+    and returns one registry-ordered entry per login-capable provider carrying at
+    least one cached window status with `result == "FAIL"`. Providers whose cached
+    window statuses are all `OK` or absent are skipped (REQ-173). Missing, corrupt,
+    or empty cache documents yield an empty selection.
+    @return {list[ProviderName]} Registry-ordered login-capable providers in error state.
+    @satisfies REQ-172
+    @satisfies REQ-173
+    @note Complexity: O(P*W) time over providers P and cached windows W; O(P) space.
+    """
+    cache_document = load_cli_cache()
+    if not cache_document:
+        return []
+    status_section = _cache_status_section(cache_document)
+    selected: list[ProviderName] = []
+    for provider_name, _login_flow in _LOGIN_FLOW_REGISTRY:
+        provider_status = status_section.get(provider_name.value)
+        if not isinstance(provider_status, dict):
+            continue
+        for window_status in provider_status.values():
+            if isinstance(window_status, dict) and window_status.get("result") == "FAIL":
+                selected.append(provider_name)
+                break
+    return selected
+
+
+def _login_error_state_providers() -> None:
+    """
+    @brief Re-authenticate login-capable providers currently in cached error state.
+    @details Selects cached `result=FAIL` login-capable providers via
+    `_select_login_error_providers(...)`. An empty selection prints one
+    informational message and returns with exit status 0 (REQ-174). Each selected
+    provider executes its login flow sequentially in registry order (REQ-172);
+    `SystemExit` raised by a failed flow and any flow exception are captured per
+    provider so remaining providers still execute. When at least one flow fails,
+    one `ClickException` forces a non-zero exit after all flows complete (REQ-175).
+    @return {None} Function return value.
+    @throws {click.ClickException} When at least one executed login flow fails.
+    @satisfies REQ-172
+    @satisfies REQ-174
+    @satisfies REQ-175
+    """
+    selected = _select_login_error_providers()
+    if not selected:
+        click.secho(
+            "No provider in error state: nothing to re-authenticate.", fg="green"
+        )
+        return
+    selected_names = set(selected)
+    failed: list[str] = []
+    for provider_name, login_flow in _LOGIN_FLOW_REGISTRY:
+        if provider_name not in selected_names:
+            continue
+        click.secho(
+            f"Re-authenticating provider '{provider_name.value}'"
+            " (cached status: FAIL)...",
+            fg="yellow",
+        )
+        try:
+            login_flow()
+        except (Exception, SystemExit) as exc:
+            failed.append(provider_name.value)
+            click.secho(
+                f"Login failed for provider '{provider_name.value}': {exc}",
+                fg="red",
+                err=True,
+            )
+    if failed:
+        raise click.ClickException("Login failed for provider(s): " + ", ".join(failed))
+    click.secho("Login completed for all providers in error state.", fg="green")
 
 
 def _resolve_extension_source_dir() -> Path:

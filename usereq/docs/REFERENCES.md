@@ -220,7 +220,7 @@ from aibar.providers.base import ProviderName, ProviderResult, WindowPeriod
 
 ---
 
-# cli.py | Python | 4610L | 119 symbols | 29 imports | 134 comments
+# cli.py | Python | 4707L | 121 symbols | 29 imports | 136 comments
 > Path: `src/aibar/aibar/cli.py`
 - @brief Command-line interface for aibar.
 - @details Defines command parsing, provider dispatch, formatted output, setup helpers, login flows, and UI launch hooks.
@@ -242,7 +242,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import NoReturn, Sequence
+from typing import Callable, NoReturn, Sequence
 from urllib import error as urllib_error
 from urllib import request as urllib_request
 import click
@@ -1370,38 +1370,60 @@ line.
 - @satisfies REQ-056
 - @satisfies REQ-059
 
-### fn `def login(provider: str) -> None` (L4296-4312)
-- @brief Execute login.
-- @details Applies login logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
-- @param provider {str} Input parameter `provider`.
+### fn `def login(provider: str | None) -> None` (L4299-4327)
+- @brief Execute provider login dispatch.
+- @details With `--provider`, executes the single provider login flow and prints diagnostics with non-zero exit for unsupported provider values. Without `--provider`, delegates to `_login_error_state_providers(...)` so only login-capable providers whose cached last-attempt status is `FAIL` are re-authenticated (the former default `copilot` fallback is removed).
+- @param provider {str | None} Optional provider selector (`copilot`, `geminiai`); `None` selects cached error-state providers.
 - @return {None} Function return value.
+- @throws {SystemExit} Exits non-zero for unsupported provider values and failed login flows.
+- @satisfies REQ-172
+- @satisfies REQ-173
+- @satisfies REQ-174
+- @satisfies REQ-175
 
-### fn `def _login_copilot() -> None` `priv` (L4313-4340)
+### fn `def _login_copilot() -> None` `priv` (L4328-4355)
 - @brief Execute login copilot.
 - @details Applies login copilot logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_geminiai() -> None` `priv` (L4341-4379)
+### fn `def _login_geminiai() -> None` `priv` (L4356-4394)
 - @brief Execute GeminiAI OAuth login flow.
 - @details Reuses persisted OAuth client configuration to launch browser-based authorization and persist refresh-capable Google credentials.
 - @return {None} Function return value.
 - @satisfies REQ-055
 - @satisfies REQ-056
 
-### fn `def _resolve_extension_source_dir() -> Path` `priv` (L4380-4392)
+### fn `def _select_login_error_providers() -> list[ProviderName]` `priv` (L4401-4430)
+- @brief Select login-capable providers whose cached last-attempt status is FAIL.
+- @details Reads `~/.cache/aibar/cache.json` through the locked `load_cli_cache` reader, extracts the canonical `status` section via `_cache_status_section(...)`, and returns one registry-ordered entry per login-capable provider carrying at least one cached window status with `result == "FAIL"`. Providers whose cached window statuses are all `OK` or absent are skipped (REQ-173). Missing, corrupt, or empty cache documents yield an empty selection.
+- @return {list[ProviderName]} Registry-ordered login-capable providers in error state.
+- @note Complexity: O(P*W) time over providers P and cached windows W; O(P) space.
+- @satisfies REQ-172
+- @satisfies REQ-173
+
+### fn `def _login_error_state_providers() -> None` `priv` (L4431-4476)
+- @brief Re-authenticate login-capable providers currently in cached error state.
+- @details Selects cached `result=FAIL` login-capable providers via `_select_login_error_providers(...)`. An empty selection prints one informational message and returns with exit status 0 (REQ-174). Each selected provider executes its login flow sequentially in registry order (REQ-172); `SystemExit` raised by a failed flow and any flow exception are captured per provider so remaining providers still execute. When at least one flow fails, one `ClickException` forces a non-zero exit after all flows complete (REQ-175).
+- @return {None} Function return value.
+- @throws {click.ClickException} When at least one executed login flow fails.
+- @satisfies REQ-172
+- @satisfies REQ-174
+- @satisfies REQ-175
+
+### fn `def _resolve_extension_source_dir() -> Path` `priv` (L4477-4489)
 - @brief Resolve GNOME extension source directory from within the `aibar` package.
 - @details Uses `Path(__file__).resolve().parent` to locate the `aibar` package directory, then appends `gnome-extension/<UUID>/`. Works in development (editable install), wheel-installed, and `uv tool install` layouts because the extension directory resides inside the `aibar` Python package subtree.
 - @return {Path} Absolute path to the extension source directory.
 - @satisfies REQ-025, REQ-083
 
-### fn `def gnome_install() -> None` (L4403-4529)
+### fn `def gnome_install() -> None` (L4500-4626)
 - @brief Install or update the AIBar GNOME Shell extension to the user's local extensions directory.
 - @details Resolves extension source from the installed package path, validates source directory contains `metadata.json` and is non-empty, then executes one of two flows: install flow (`target` absent) creates target and copies files before enabling extension; update flow (`target` present) disables extension, copies files, then enables extension. Update flow masks non-zero disable outcomes caused by missing extension and continues. Produces colored Click-styled terminal output for all status messages.
 - @return {None} Function return value.
 - @throws {SystemExit} Exits with code 1 on prerequisite validation failure.
 - @satisfies PRJ-008, REQ-025, REQ-026, REQ-027, REQ-028, REQ-029, REQ-030, REQ-032, REQ-099
 
-### fn `def gnome_uninstall() -> None` (L4539-4608)
+### fn `def gnome_uninstall() -> None` (L4636-4705)
 - @brief Remove the AIBar GNOME Shell extension from the user's local extensions directory.
 - @details Disables the extension via `gnome-extensions disable`, then removes the entire extension directory at `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/`. Exits with code 1 if the extension directory does not exist. Produces colored Click-styled terminal output for all status messages.
 - @return {None} Function return value.
@@ -1524,12 +1546,14 @@ line.
 |`doctor`|fn|pub|3834-3889|def doctor() -> None|
 |`env`|fn|pub|3894-3902|def env() -> None|
 |`setup`|fn|pub|3907-4106|def setup() -> None|
-|`login`|fn|pub|4296-4312|def login(provider: str) -> None|
-|`_login_copilot`|fn|priv|4313-4340|def _login_copilot() -> None|
-|`_login_geminiai`|fn|priv|4341-4379|def _login_geminiai() -> None|
-|`_resolve_extension_source_dir`|fn|priv|4380-4392|def _resolve_extension_source_dir() -> Path|
-|`gnome_install`|fn|pub|4403-4529|def gnome_install() -> None|
-|`gnome_uninstall`|fn|pub|4539-4608|def gnome_uninstall() -> None|
+|`login`|fn|pub|4299-4327|def login(provider: str | None) -> None|
+|`_login_copilot`|fn|priv|4328-4355|def _login_copilot() -> None|
+|`_login_geminiai`|fn|priv|4356-4394|def _login_geminiai() -> None|
+|`_select_login_error_providers`|fn|priv|4401-4430|def _select_login_error_providers() -> list[ProviderName]|
+|`_login_error_state_providers`|fn|priv|4431-4476|def _login_error_state_providers() -> None|
+|`_resolve_extension_source_dir`|fn|priv|4477-4489|def _resolve_extension_source_dir() -> Path|
+|`gnome_install`|fn|pub|4500-4626|def gnome_install() -> None|
+|`gnome_uninstall`|fn|pub|4636-4705|def gnome_uninstall() -> None|
 
 
 ---
