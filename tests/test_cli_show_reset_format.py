@@ -27,7 +27,7 @@ def test_show_output_prints_remaining_credits_for_quota_providers() -> None:
     @brief Verify CLI source renders remaining-credits line for quota providers.
     """
     source = CLI_PATH.read_text(encoding="utf-8")
-    assert "ProviderName.CLAUDE" in source
+    assert "ProviderName.AGY" in source
     assert "ProviderName.CODEX" in source
     assert "ProviderName.COPILOT" in source
     assert "ProviderName.GEMINIAI" in source

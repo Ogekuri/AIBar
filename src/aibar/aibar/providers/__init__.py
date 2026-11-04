@@ -5,7 +5,7 @@
 """
 
 from aibar.providers.base import BaseProvider, UsageMetrics, ProviderResult
-from aibar.providers.claude_oauth import ClaudeOAuthProvider
+from aibar.providers.agy import AntigravityProvider
 from aibar.providers.openai_usage import OpenAIUsageProvider
 from aibar.providers.openrouter import OpenRouterUsageProvider
 from aibar.providers.copilot import CopilotProvider
@@ -17,7 +17,7 @@ __all__ = [
     "BaseProvider",
     "UsageMetrics",
     "ProviderResult",
-    "ClaudeOAuthProvider",
+    "AntigravityProvider",
     "OpenAIUsageProvider",
     "OpenRouterUsageProvider",
     "CopilotProvider",

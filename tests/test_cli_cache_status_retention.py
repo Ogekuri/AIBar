@@ -3,7 +3,7 @@
 @brief Cache status-retention tests for per-provider/window refresh outcomes.
 @details Verifies failed refresh attempts preserve last-success payload snapshots,
 persist granular `OK`/`FAIL` window statuses with error metadata, and avoid legacy
-`claude_dual_last_success.json` read/write paths.
+per-provider snapshot file read/write paths.
 @satisfies REQ-044
 @satisfies REQ-045
 @satisfies REQ-046
@@ -16,7 +16,7 @@ persist granular `OK`/`FAIL` window statuses with error metadata, and avoid lega
 import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 from click.testing import CliRunner
 
@@ -28,7 +28,6 @@ from aibar.providers.base import (
     UsageMetrics,
     WindowPeriod,
 )
-from aibar.providers.claude_oauth import ClaudeOAuthProvider
 
 
 def _patch_config_paths(monkeypatch, tmp_path: Path) -> None:
@@ -75,48 +74,6 @@ def _make_openrouter_429() -> ProviderResult:
         metrics=UsageMetrics(),
         error="Rate limited. Try again later.",
         raw={"status_code": 429, "retry_after_seconds": 120},
-    )
-
-
-def _make_claude_success(window: WindowPeriod, utilization_7d: float) -> ProviderResult:
-    """
-    @brief Build deterministic successful Claude dual-window payload fixture.
-    @param window {WindowPeriod} Window encoded in ProviderResult wrapper.
-    @param utilization_7d {float} Seven-day utilization encoded in raw payload.
-    @return {ProviderResult} Successful Claude result with dual-window raw payload.
-    """
-    dual_raw = {
-        "five_hour": {
-            "utilization": 35.0,
-            "resets_at": "2026-03-08T15:00:00+00:00",
-        },
-        "seven_day": {
-            "utilization": utilization_7d,
-            "resets_at": "2026-03-12T08:00:00+00:00",
-        },
-    }
-    return ProviderResult(
-        provider=ProviderName.CLAUDE,
-        window=window,
-        metrics=UsageMetrics(remaining=100.0 - utilization_7d, limit=100.0),
-        raw=dual_raw,
-        updated_at=datetime.now(timezone.utc),
-    )
-
-
-def _make_claude_429(window: WindowPeriod) -> ProviderResult:
-    """
-    @brief Build deterministic Claude HTTP 429 result fixture.
-    @param window {WindowPeriod} Window identifier.
-    @return {ProviderResult} Failed Claude result with 429 marker.
-    """
-    return ProviderResult(
-        provider=ProviderName.CLAUDE,
-        window=window,
-        metrics=UsageMetrics(),
-        error="Rate limited. Try again later.",
-        raw={"status_code": 429, "retry_after_seconds": 45},
-        updated_at=datetime.now(timezone.utc),
     )
 
 
@@ -206,14 +163,15 @@ def test_failed_refresh_preserves_previous_payload_and_records_fail_status(
     assert isinstance(output["status"]["openrouter"]["30d"]["updated_at"], str)
 
 
-def test_partial_claude_refresh_records_mixed_window_statuses(
+def test_partial_multi_provider_refresh_records_mixed_statuses(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
     """
-    @brief Verify partial Claude refresh records mixed window statuses with payload retention.
-    @details Simulates `5h=FAIL` and `7d=OK` in one refresh run and verifies both
-    statuses are persisted while payload remains successful (non-error) snapshot.
+    @brief Verify partial refresh records mixed per-provider statuses with payload retention.
+    @details Simulates `openrouter=FAIL` and `geminiai=OK` in one refresh run and
+    verifies both statuses are persisted while the failing provider keeps its
+    successful (non-error) cached snapshot and the healthy provider updates.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
     @param tmp_path {Path} Temporary path fixture.
     @return {None} Function return value.
@@ -225,45 +183,47 @@ def test_partial_claude_refresh_records_mixed_window_statuses(
             idle_delay_seconds=300, api_call_delay_milliseconds=20
         )
     )
-    initial_claude = _make_claude_success(WindowPeriod.DAY_7, utilization_7d=30.0)
+    cached_openrouter = _make_openrouter_success(source="cached-openrouter")
     config_module.save_cli_cache(
         {
-            "payload": {"claude": initial_claude.model_dump(mode="json")},
+            "payload": {"openrouter": cached_openrouter.model_dump(mode="json")},
             "status": {},
         }
     )
 
-    provider = ClaudeOAuthProvider(token="sk-ant-test-token")
-    mixed_results = (
-        _make_claude_429(WindowPeriod.HOUR_5),
-        _make_claude_success(WindowPeriod.DAY_7, utilization_7d=55.0),
-    )
+    failing_provider = MagicMock()
+    failing_provider.is_configured.return_value = True
+    failing_provider.name = ProviderName.OPENROUTER
+    failing_provider.fetch = AsyncMock(return_value=_make_openrouter_429())
+    healthy_provider = MagicMock()
+    healthy_provider.is_configured.return_value = True
+    healthy_provider.name = ProviderName.GEMINIAI
+    healthy_provider.fetch = AsyncMock(return_value=_make_geminiai_success(source="fresh"))
     monkeypatch.setattr(
         "aibar.cli.get_providers",
-        lambda: {ProviderName.CLAUDE: provider},
+        lambda: {
+            ProviderName.OPENROUTER: failing_provider,
+            ProviderName.GEMINIAI: healthy_provider,
+        },
     )
     monkeypatch.setattr("aibar.cli._apply_api_call_delay", lambda state: None)
-    with patch("aibar.cli._fetch_claude_dual", return_value=mixed_results):
-        runner = CliRunner()
-        result = runner.invoke(
-            main,
-            ["show", "--provider", "claude", "--window", "5h", "--json", "--force"],
-        )
+    runner = CliRunner()
+    result = runner.invoke(main, ["show", "--json", "--force"])
     assert result.exit_code == 0
 
     output = json.loads(result.output)
-    assert output["status"]["claude"]["5h"]["result"] == "FAIL"
-    assert output["status"]["claude"]["7d"]["result"] == "OK"
-    assert output["payload"]["claude"]["error"] is None
-    assert output["payload"]["claude"]["window"] in {"5h", "7d"}
+    assert output["status"]["openrouter"]["30d"]["result"] == "FAIL"
+    assert output["status"]["geminiai"]["30d"]["result"] == "OK"
+    assert output["payload"]["openrouter"]["raw"]["source"] == "cached-openrouter"
+    assert output["payload"]["geminiai"]["error"] is None
 
 
-def test_refresh_flow_does_not_create_legacy_claude_snapshot_file(
+def test_refresh_flow_does_not_create_legacy_snapshot_files(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
     """
-    @brief Verify refresh flow does not create legacy `claude_dual_last_success.json`.
+    @brief Verify refresh flow does not create legacy per-provider snapshot files.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
     @param tmp_path {Path} Temporary path fixture.
     @return {None} Function return value.
@@ -275,33 +235,23 @@ def test_refresh_flow_does_not_create_legacy_claude_snapshot_file(
             idle_delay_seconds=300, api_call_delay_milliseconds=20
         )
     )
-    provider = ClaudeOAuthProvider(token="sk-ant-test-token")
-    successful = {
-        WindowPeriod.HOUR_5: _make_claude_success(
-            WindowPeriod.HOUR_5, utilization_7d=44.0
-        ),
-        WindowPeriod.DAY_7: _make_claude_success(
-            WindowPeriod.DAY_7, utilization_7d=44.0
-        ),
-    }
+    provider = MagicMock()
+    provider.is_configured.return_value = True
+    provider.name = ProviderName.OPENROUTER
+    provider.fetch = AsyncMock(return_value=_make_openrouter_success(source="fresh"))
     monkeypatch.setattr(
         "aibar.cli.get_providers",
-        lambda: {ProviderName.CLAUDE: provider},
+        lambda: {ProviderName.OPENROUTER: provider},
     )
     monkeypatch.setattr("aibar.cli._apply_api_call_delay", lambda state: None)
-    with patch.object(
-        ClaudeOAuthProvider,
-        "fetch_all_windows",
-        new=AsyncMock(return_value=successful),
-    ):
-        runner = CliRunner()
-        result = runner.invoke(
-            main,
-            ["show", "--provider", "claude", "--window", "7d", "--json", "--force"],
-        )
+    runner = CliRunner()
+    result = runner.invoke(
+        main,
+        ["show", "--provider", "openrouter", "--window", "7d", "--json", "--force"],
+    )
     assert result.exit_code == 0
-    legacy_path = tmp_path / ".cache" / "aibar" / "claude_dual_last_success.json"
-    assert not legacy_path.exists()
+    cache_dir = tmp_path / ".cache" / "aibar"
+    assert not list(cache_dir.glob("*last_success*"))
 
 
 def test_geminiai_cached_fail_status_is_rendered_in_show_output(

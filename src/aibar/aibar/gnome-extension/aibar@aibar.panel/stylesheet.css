@@ -59,7 +59,7 @@
     margin-right: 2px;
 }
 
-.aibar-tab-active-claude {
+.aibar-tab-active-agy {
     border-bottom: 2px solid #FF3B30;
 }
 
@@ -96,7 +96,7 @@
     max-width: 90px;
 }
 
-.aibar-tab-label-claude {
+.aibar-tab-label-agy {
     color: #FF3B30;
 }
 
@@ -156,7 +156,7 @@
     padding: 8px 5px 5px 5px;
 }
 
-.aibar-provider-claude {
+.aibar-provider-agy {
     border-left: 3px solid #FF3B30;
 }
 
@@ -276,7 +276,7 @@
     border-radius: 0 3px 3px 0;
 }
 
-.aibar-progress-provider-claude {
+.aibar-progress-provider-agy {
     background-color: #FF3B30;
 }
 

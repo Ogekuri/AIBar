@@ -1,8 +1,8 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.3.33"
-date: "2026-07-15"
+version: "0.3.34"
+date: "2026-11-04"
 author: "req-new"
 scope:
   paths:
@@ -32,7 +32,7 @@ This document MUST follow these authoring rules (LLM-first, normative SRS):
 - Requirement IDs MUST remain stable across updates; IDs MUST NOT be reused.
 
 ### 1.2 Project Scope
-AIBar implements a Python CLI/UI usage monitor for Claude, OpenAI, OpenRouter, Copilot, and Codex, plus a GNOME Shell extension that renders the CLI JSON output in the top panel popup UI, and shell scripts for extension installation and maintenance.
+AIBar implements a Python CLI/UI usage monitor for Antigravity (AGY), OpenAI, OpenRouter, Copilot, and Codex, plus a GNOME Shell extension that renders the CLI JSON output in the top panel popup UI, and shell scripts for extension installation and maintenance. Provider `agy` extracts quota metrics from the local Antigravity CLI by executing `agy -p /usage` and parsing tab-separated `<group>\t<field>\t<value>` rows after ANSI-escape stripping; Claude support is fully removed.
 
 Used libraries/components evidenced by direct imports:
 - Python: `click`, `textual`, `pydantic`, `httpx` (`src/aibar/aibar/*.py`, `src/aibar/aibar/providers/*.py`)
@@ -54,7 +54,6 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 ├── pyproject.toml
 ├── scripts/
 │   ├── aibar.sh
-│   ├── claude_token_refresh.sh
 │   └── test-gnome-extension.sh
 ├── src/
 │   └── aibar/
@@ -66,12 +65,11 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 │       └── aibar/
 │           ├── __main__.py
 │           ├── cache.py
-│           ├── claude_cli_auth.py
 │           ├── cli.py
 │           ├── config.py
 │           └── providers/
+│               ├── agy.py
 │               ├── base.py
-│               ├── claude_oauth.py
 │               ├── codex.py
 │               ├── copilot.py
 │               ├── openai_usage.py
@@ -84,7 +82,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 
 ### 2.1 Project Functions
 - **PRJ-001**: MUST expose CLI subcommands `show`, `doctor`, `env`, `setup`, `login`, `gnome-install`, and `gnome-uninstall` under one Click command group.
-- **PRJ-002**: MUST aggregate provider metrics through a normalized provider contract for `claude`, `openai`, `openrouter`, `copilot`, and `codex`.
+- **PRJ-002**: MUST aggregate provider metrics through a normalized provider contract for `agy`, `openai`, `openrouter`, `copilot`, and `codex`.
 - **PRJ-004**: MUST provide GNOME Shell extension `AIBar Monitor` that executes `aibar show --json`, renders provider-specific cards, exposes owner metadata `url=https://github.com/Ogekuri/AIBar` and `donations.github=Ogekuri`, and forces `scripts/test-gnome-extension.sh` resolution to `1280x720` via `MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720`.
 - **PRJ-005**: MUST maintain a machine-readable symbol inventory in `pi-usereq/docs/REFERENCES.md` for symbols discovered from configured source directories.
 - **PRJ-006**: MUST provide a PEP 621-compliant `pyproject.toml` at repository root enabling `uv tool install` distribution execution and `uv run`/`uvx` live execution without external virtualenv bootstrap scripts.
@@ -99,7 +97,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **CTN-002**: MUST represent provider fetch output with `ProviderResult` containing `provider`, `window`, `metrics`, `updated_at`, `raw`, and optional `error`; `UsageMetrics` MUST include `currency_symbol: str` (default `"$"`) annotating all monetary fields (`cost`, `remaining`, `limit`, `total_cost`).
 - **CTN-003**: MUST perform external HTTP API calls with `httpx.AsyncClient(timeout=<api_call_timeout_milliseconds>/1000.0)` using `RuntimeConfig.api_call_timeout_milliseconds` for provider integrations.
 - **CTN-004**: MUST persist `~/.cache/aibar/cache.json` as the canonical store for per-provider, per-window last-success payload snapshots and last-attempt status metadata.
-- **CTN-005**: MAY depend on unofficial/internal endpoints when official usage APIs are unavailable for Claude, Copilot, or Codex integrations.
+- **CTN-005**: MAY depend on unofficial/internal endpoints when official usage APIs are unavailable for Copilot or Codex integrations; provider `agy` MUST use the local `agy` CLI subprocess instead of remote HTTP endpoints.
 - **CTN-006**: MUST keep `pi-usereq/docs/REFERENCES.md` synchronized with symbols discovered from configured source directories.
 - **CTN-007**: MUST declare `hatchling` as `[build-system]` backend in `pyproject.toml` with `[project]` metadata including `name`, `version`, `requires-python`, `[project.scripts]`, and `dependencies` containing `pytest`.
 - **CTN-008**: MUST persist runtime configuration in `~/.config/aibar/config.json` with keys `idle_delay_seconds`, `api_call_delay_milliseconds`, `api_call_timeout_milliseconds`, `gnome_refresh_interval_seconds`, `billing_data`, `copilot_extra_premium_request_cost`, `currency_symbols`, `log_enabled`, and `debug_enabled`.
@@ -110,29 +108,27 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **CTN-013**: MUST persist startup update-check idle state in `~/.cache/aibar/check_version_idle-time.json` JSON with epoch and human-readable `last_success_at` and `idle_until`.
 - **CTN-014**: MUST perform at most one startup update HTTP check per 300 seconds unless `~/.cache/aibar/check_version_idle-time.json` is missing or expired.
 - **CTN-015**: MUST use lifecycle command strings exactly as `uv tool install aibar --force --from git+https://github.com/Ogekuri/AIBar.git` and `uv tool uninstall aibar`.
-- **CTN-016**: MUST allow `~/.cache/aibar/idle-time.json` provider entries to include optional boolean field `oauth_refresh_blocked` for Claude authentication-retry suppression state.
-- **CTN-017**: MUST persist `enabled_providers` in `~/.config/aibar/config.json` as provider-keyed booleans for `claude`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, and `zai`; missing keys MUST default to `true`.
+- **CTN-017**: MUST persist `enabled_providers` in `~/.config/aibar/config.json` as provider-keyed booleans for `agy`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, and `zai`; missing keys MUST default to `true`.
 
 ## 3. Requirements
 
 ### 3.1 Design and Implementation
 - **DES-001**: MUST define `BaseProvider` as an abstract interface with `fetch`, `is_configured`, and `get_config_help`.
-- **DES-002**: MUST encode supported windows as `5h`, `7d`, `30d`, and `code_review` and provider names as `claude`, `openai`, `openrouter`, `copilot`, `codex`, `geminiai`, and `zai`.
+- **DES-002**: MUST encode supported windows as `5h`, `7d`, `30d`, and `code_review` and provider names as `agy`, `openai`, `openrouter`, `copilot`, `codex`, `geminiai`, and `zai`.
 - **DES-003**: MUST reject invalid CLI window values and provider values using Click `BadParameter`.
 - **DES-004**: MUST sanitize sensitive keys (`token`, `key`, `secret`, `password`, `authorization`) from cached raw payloads before disk writes.
 - **DES-005**: MUST parse env-file assignments with optional `export`, quoted values, and inline comments in GNOME extension env loading.
 - **DES-006**: MUST auto-refresh GNOME extension data at interval read from `extension.gnome_refresh_interval_seconds` in the `aibar show --json` output (fallback `60` seconds when field absent), execute popup `Refresh Now` actions with `aibar show --json --force`, and apply the new interval on each successful data refresh.
 - **DES-007**: MUST use provider-registry-driven instantiation so adding `geminiai` introduces no duplicated control-flow branches in `show`, `doctor`, `setup`, `login`, or refresh/load orchestration.
-- **DES-008**: MUST include `geminiai` in provider-name typing and validation while preserving compatibility for `claude`, `openai`, `openrouter`, `copilot`, and `codex`.
+- **DES-008**: MUST include `geminiai` in provider-name typing and validation while preserving compatibility for `openai`, `openrouter`, `copilot`, and `codex`.
 
 ### 3.2 Functions
 - **REQ-001**: MUST skip unconfigured providers in `show` output and print missing environment-variable hints when text mode is used.
-- **REQ-002**: MUST render default-window Claude and Codex as single panels with `5h` and `7d` sections separated by one blank line; a shared `Remaining credits` line MUST follow `7d` `Resets in`, separated by one blank line and derived from `7d`.
+- **REQ-002**: MUST render default-window Codex as a single panel with `5h` and `7d` sections separated by one blank line; a shared `Remaining credits` line MUST follow `7d` `Resets in`, separated by one blank line and derived from `7d`.
 - **REQ-003**: MUST emit pretty-printed JSON (`indent=2`) for `show --json` with top-level sections `payload`, `status`, `idle_time`, `freshness`, and `extension`; `freshness` MUST expose provider-keyed `last_success_timestamp`/`idle_until_timestamp` plus local-time `%Y-%m-%d %H:%M` strings, and `extension` MUST expose `gnome_refresh_interval_seconds`, `idle_delay_seconds`, `copilot_extra_premium_request_cost`, and provider-keyed `window_labels` values consumed by GNOME provider bars.
 - **REQ-004**: MUST run provider health checks in `doctor` using the 5-hour window and report per-provider configuration and test status.
 - **REQ-005**: MUST prompt `setup` for `idle_delay_seconds` (`300`) first, `api_call_delay_milliseconds` (`100`) second, `api_call_timeout_milliseconds` (`5000`) third, `default_retry_after_seconds` (`3600`) fourth, `gnome_refresh_interval_seconds` (`60`) fifth, and `billing_data` (`billing_data`) sixth, then persist values in `~/.config/aibar/config.json`.
-- **REQ-123**: `setup` MUST present a dedicated provider activation section before all other setup sections and prompt toggleable `enable`/`disable` values for `claude`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, and `zai`.
-- **REQ-006**: MUST fail Claude login when CLI credentials are missing or expired and MUST print `claude setup-token` remediation guidance.
+- **REQ-123**: `setup` MUST present a dedicated provider activation section before all other setup sections and prompt toggleable `enable`/`disable` values for `agy`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, and `zai`.
 - **REQ-007**: MUST execute GitHub device-flow login for Copilot and save the token in `~/.config/aibar/copilot.json`.
 - **REQ-009**: MUST execute provider retrieval for `show` in this order: force-flag handling, per-provider idle-time evaluation, per-provider conditional refresh to `~/.cache/aibar/cache.json`, then data load from `~/.cache/aibar/cache.json`.
 - **REQ-124**: `show` refresh execution MUST exclude disabled providers from fetch scheduling and MUST NOT apply idle-time, API-delay, API-timeout, or retry-after handling to disabled providers.
@@ -154,10 +150,10 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-016**: MUST load `~/.config/aibar/env` into subprocess environment before GNOME extension executes `aibar show --json` and before popup `Refresh Now` executes `aibar show --json --force`.
 - **REQ-017**: GNOME provider cards MUST render `FAIL` blocks as `Status: FAIL`, blank line, `Reason: <reason>`, blank line, and `Updated: <datetime>, Next: <datetime>`, and MUST NOT render `Window 5h:`, `Window 7d:`, or `Window 30d:` text.
 - **REQ-018**: MUST set GNOME panel label to `Err` and truncate popup error text to 40 characters when command execution or JSON parsing fails.
-- **REQ-019**: SHOULD order extension provider tabs/cards by `claude`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, `zai`, with providers not listed in ordering array appended alphabetically.
+- **REQ-019**: SHOULD order extension provider tabs/cards by `agy`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, `zai`, with providers not listed in ordering array appended alphabetically.
 - **REQ-020**: MUST include each discovered configured-source symbol in `pi-usereq/docs/REFERENCES.md` with file path, symbol kind, line-range evidence, and parsed Doxygen fields (`@brief`, `@param`, `@return`, `@throws`) when present in source declarations.
 - **REQ-021**: GNOME panel status labels MUST render `Err` only for providers whose `status.result=FAIL` category is OAuth or rate-limit, while providers without those failures MUST keep normal percentage/cost labels.
-- **REQ-022**: MUST style GNOME panel tab and label fonts with provider classes and bright colors: Claude red, OpenRouter orange, Copilot yellow, Codex green, OpenAI blue, GeminiAI purple, Z.ai cyan; cost labels MUST use the same font family, render when numeric value is `0`, and hide only when cost metric is unavailable.
+- **REQ-022**: MUST style GNOME panel tab and label fonts with provider classes and bright colors: Antigravity red, OpenRouter orange, Copilot yellow, Codex green, OpenAI blue, GeminiAI purple, Z.ai cyan; cost labels MUST use the same font family, render when numeric value is `0`, and hide only when cost metric is unavailable.
 - **REQ-023**: MUST declare a `[project.scripts]` entry `aibar = "aibar.cli:main"` in `pyproject.toml` so that `uv pip install` and `uvx` resolve the `aibar` console command.
 - **REQ-024**: MUST provide `src/aibar/aibar/__main__.py` that delegates to `aibar.cli:main` to enable `python -m aibar` execution.
 - **REQ-025**: MUST resolve GNOME extension source files from within the `aibar` Python package directory via module-relative path resolution (`Path(__file__).resolve().parent / "gnome-extension" / <UUID>`) in `gnome-install`, independent of git repository, working directory, or installation method (editable, wheel, `uv tool`).
@@ -172,7 +168,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-099**: `gnome-install` update flow MUST mask non-zero disable outcomes caused by extension absence and continue copy/enable without exposing raw disable errors.
 - **REQ-033**: `scripts/test-gnome-extension.sh` MUST NOT accept subcommand parameters and MUST execute its install-and-launch flow immediately on invocation without arguments.
 - **REQ-034**: MUST render reset countdown as `Resets in: <d>d <h>h <m>m` for durations >= 24 hours in CLI text output.
-- **REQ-035**: MUST print `Remaining credits: <remaining> / <limit>` for Claude, Codex, and Copilot only when rendered status is `OK` and both values exist; line MUST follow `Resets in` after one blank line and `<remaining>` MUST be bold bright white.
+- **REQ-035**: MUST print `Remaining credits: <remaining> / <limit>` for Codex and Copilot only when rendered status is `OK` and both values exist; line MUST follow `Resets in` after one blank line and `<remaining>` MUST be bold bright white.
 - **REQ-036**: CLI text `show` MUST render `FAIL` provider/window blocks as `Status: FAIL`, blank line, `Reason: <reason>`, blank line, and `Updated: <datetime>, Next: <datetime>`, while `openai`, `codex`, `geminiai` `OK` blocks MUST normalize null API counters to `0`.
 - **REQ-037**: CLI text `show` and GNOME provider-card error blocks MUST NOT append HTTP status or retry-after metadata in `FAIL` output blocks.
 - **REQ-038**: MUST update only the refreshed provider idle-time entry after success by setting `last_success_at` to refresh completion time and `idle_until` to `last_success_at + idle_delay_seconds`, then persist epoch and human-readable values in `~/.cache/aibar/idle-time.json`.
@@ -190,9 +186,8 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-044**: MUST persist per-provider, per-window last-attempt status in `cache.json` with fields `result`, `error`, and `updated_at`, where `result` is `OK` or `FAIL`.
 - **REQ-045**: MUST overwrite a provider/window payload in `cache.json` only when the current fetch for that provider/window succeeds.
 - **REQ-046**: MUST preserve the previous provider/window payload in `cache.json` when the current fetch for that provider/window fails, including HTTP `429`.
-- **REQ-047**: MUST store and load all last-success fallback payloads from `~/.cache/aibar/cache.json` and MUST NOT require `~/.cache/aibar/claude_dual_last_success.json`.
-- **REQ-048**: `scripts/claude_token_refresh.sh` `do_refresh()` MUST truncate `LOG_FILE` to zero bytes before writing any log entries, so each `once` invocation and each daemon refresh cycle produces a standalone log containing only entries from that cycle.
-- **REQ-049**: `setup` MUST prompt for per-provider default currency symbol (choices: `$`, `£`, `€`; default `$`) for providers `claude`, `openai`, `openrouter`, `copilot`, `codex`, `geminiai` in a dedicated section after timeout configuration, then persist selections in `~/.config/aibar/config.json` `currency_symbols`.
+- **REQ-047**: MUST store and load all last-success fallback payloads from `~/.cache/aibar/cache.json` and MUST NOT require legacy per-provider snapshot files.
+- **REQ-049**: `setup` MUST prompt for per-provider default currency symbol (choices: `$`, `£`, `€`; default `$`) for providers `openai`, `openrouter`, `copilot`, `codex`, `geminiai`, and `zai` in a dedicated section after timeout configuration, then persist selections in `~/.config/aibar/config.json` `currency_symbols`; provider `agy` MUST be excluded because it exposes no monetary metrics.
 - **REQ-107**: MUST expose global flags `--enable-log`, `--disable-log`, `--enable-debug`, and `--disable-debug` that update `~/.config/aibar/config.json` and persist until reconfigured.
 - **REQ-108**: `setup` MUST present a final logging section after all existing setup sections and MUST configure `log_enabled` and `debug_enabled` in `~/.config/aibar/config.json`.
 - **REQ-109**: `--enable-log` and `--disable-log` MUST set `log_enabled` to `true` and `false` respectively without modifying `debug_enabled`.
@@ -223,8 +218,8 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-064**: GeminiAI billing fetch MUST read `<project_id>` from `~/.config/aibar/geminiai_oauth_client.json`, discover `<table_id>` by listing tables in dataset `RuntimeConfig.billing_data` (default `billing_data`), and fail with structured error when billing export table is unavailable.
 - **REQ-065**: GeminiAI billing fetch MUST query `<billing_dataset>.gcp_billing_export_v1_<table_id>` using explicit column projection and aggregate the latest available invoice month (`MAX(invoice.month)`); when invoice month is unavailable, implementation MUST fallback to `usage_start_time >= TIMESTAMP_TRUNC(CURRENT_TIMESTAMP(), MONTH)`.
 - **REQ-066**: MUST guard every read/write of `~/.cache/aibar/cache.json` and `~/.cache/aibar/idle-time.json` with lock files under `~/.cache/aibar/`, polling every 250 milliseconds, and fail with explicit error after 5 seconds if lock acquisition remains blocked.
-- **REQ-067**: CLI `show` text mode MUST render ANSI provider-colored bordered panels ordered `claude`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, keep one shared panel width, and render `Status` first on `OK`.
-- **REQ-128**: CLI `show` text mode MUST render `Usage: <window> <progress_bar> <percent>%` for `claude`, `copilot`, `codex`, and `zai`.
+- **REQ-067**: CLI `show` text mode MUST render ANSI provider-colored bordered panels ordered `agy`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, keep one shared panel width, and render `Status` first on `OK`.
+- **REQ-128**: CLI `show` text mode MUST render `Usage: <window> <progress_bar> <percent>%` for `agy`, `copilot`, `codex`, and `zai`.
 - **REQ-132**: CLI `show` text mode for `openrouter` MUST render `Usage: <window> <progress_bar> <percent>%` using the standard fixed-width CLI progress-bar format.
 - **REQ-131**: CLI text `show` for `openai` and `geminiai` MUST render `Usage: <window> <percent>%` and MUST NOT print progress bars.
 - **REQ-129**: CLI `show` text mode MUST render Copilot `Cost: <currency_symbol><value>` after one blank line following `Remaining credits` and MUST NOT render `Window <window>` heading text.
@@ -250,20 +245,14 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-084**: CLI text `show` MUST render right-aligned `Updated: <datetime>, Next: <datetime>` freshness lines for both `OK` and `FAIL` provider/window blocks, and `show --json` MUST export provider freshness in local-time `%Y-%m-%d %H:%M`.
 - **REQ-085**: CLI text `show` MUST render per-provider last-attempt authentication and refresh-rate-limit failures from cached status errors, including invalid or expired OAuth tokens and HTTP `429` refresh-limit diagnostics; when status is `FAIL`, statistics lines MUST remain suppressed.
 - **REQ-090**: GNOME provider cards MUST render error category, HTTP status, and retry-after values from cached status entries using semantics equivalent to CLI `show` for the same provider/window.
-- **REQ-100**: MUST implement one internal Claude OAuth renewal routine that truncates `~/.config/aibar/claude_token_refresh.log` before each execution and then runs `claude /usage` plus `aibar login --provider claude` with command-availability checks.
-- **REQ-101**: MUST execute each Claude OAuth renewal command with runtime `api_call_delay_milliseconds` spacing and runtime `api_call_timeout_milliseconds` timeout enforcement.
 - **REQ-119**: GNOME extension popup window MUST enforce a fixed standard width, word-wrap verbose error messages, and constrain tab content and status bars to prevent horizontal UI expansion.
 - **REQ-120**: GNOME extension popup window MUST size the provider-card viewport to active content height up to a fixed maximum and MUST avoid persistent empty bottom space when content height is lower.
-- **REQ-121**: GNOME provider-card progress bars for `claude`, `openrouter`, `copilot`, `codex`, and `zai` MUST render >100 with a visible over-limit segment and preserved 100% boundary marker.
+- **REQ-121**: GNOME provider-card progress bars for `agy`, `openrouter`, `copilot`, `codex`, and `zai` MUST render >100 with a visible over-limit segment and preserved 100% boundary marker.
 - **REQ-130**: GNOME provider cards for `openai` and `geminiai` MUST render `Usage: <window> <percent>%` text and MUST NOT render progress bars.
-- **REQ-122**: CLI text `show` progress bars for `claude`, `openrouter`, `copilot`, `codex`, and `zai` MUST render >100 with a visible over-limit segment and preserved 100% boundary marker.
-- **REQ-102**: MUST classify Claude authentication failure when API execution yields `Invalid or expired OAuth token` and MUST preserve canonical surface text `Error: Invalid or expired OAuth token` for failed Claude outputs.
-- **REQ-103**: MUST execute exactly one Claude OAuth renewal attempt and exactly one Claude API retry when Claude fetch raises authentication error `Invalid or expired OAuth token`.
-- **REQ-104**: MUST set `~/.cache/aibar/idle-time.json` field `claude.oauth_refresh_blocked=true` when Claude retry after renewal still fails with `Invalid or expired OAuth token`, and MUST skip further renewal attempts while the flag remains active.
-- **REQ-105**: MUST clear `claude.oauth_refresh_blocked` when `show --force` is used and MUST auto-clear it when current epoch exceeds `last_success_timestamp + 86400`.
+- **REQ-122**: CLI text `show` progress bars for `agy`, `openrouter`, `copilot`, `codex`, and `zai` MUST render >100 with a visible over-limit segment and preserved 100% boundary marker.
 - **REQ-086**: `scripts/aibar.sh` MUST execute CLI via `uv run python -m aibar.cli` and MUST NOT create, activate, or install dependencies into repository-local or system virtual environments.
 - **REQ-087**: Repository root MUST track `uv.lock`, MUST NOT track `requirements.txt`, and MUST keep `README.md` instructions for optional export command `uv export --format requirements-txt > requirements.txt`.
-- **REQ-133**: CLI `show` panels, GNOME tabs/cards, and GNOME panel status labels MUST preserve canonical order `claude`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, `zai` after disabled providers are filtered out.
+- **REQ-133**: CLI `show` panels, GNOME tabs/cards, and GNOME panel status labels MUST preserve canonical order `agy`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, `zai` after disabled providers are filtered out.
 
 ### 3.3 Z.ai Provider
 - **REQ-134**: MUST implement provider `zai` (Z.ai) that fetches quota data from `https://api.z.ai/api/monitor/usage/quota/limit` using `Authorization: Bearer <key>` and `Accept: application/json` headers.
@@ -275,11 +264,27 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-147**: MUST derive the Z.ai `5h` quota `reset_at_epoch_ms` from the next UTC 5-hour boundary (00:00, 05:00, 10:00, 15:00, 20:00) when the 5 Hours limit entry omits `nextResetTime`, so `Resets in` renders for the `5h` progress bar.
 - **REQ-138**: MUST render Z.ai as the last provider in CLI text panels, GNOME tabs/cards, and GNOME panel status bar.
 - **REQ-139**: MUST drive Z.ai GNOME panel icon threshold color from the maximum percentage across all Z.ai quotas.
-- **REQ-140**: MUST render Z.ai quotas as progress-bar usage rows with short side labels `5h`, `1w`, and `1m` in CLI text and GNOME provider cards, consistent with bar providers claude, openrouter, copilot, and codex.
+- **REQ-140**: MUST render Z.ai quotas as progress-bar usage rows with short side labels `5h`, `1w`, and `1m` in CLI text and GNOME provider cards, consistent with bar providers agy, openrouter, copilot, and codex.
 - **REQ-141**: MUST treat Z.ai as a single fixed-window provider with effective window `30d` that ignores the requested window and fetches all quotas in one API call.
 - **REQ-142**: MUST reuse the shared provider cache and idle-time lifecycle for Z.ai without modifying cache, idle-time, retry, or throttling logic.
 - **REQ-143**: MUST render Z.ai GNOME panel status bar with the `5h` quota percentage (non-bold) followed by the `1w` quota percentage (bold), and MUST NOT hide Z.ai panel status labels when the Z.ai provider is enabled and has available quota data.
-- **REQ-144**: GNOME extension `_handleError` MUST reset text and hide every panel status label created in `_buildPanelButton` including `_panelOpenAICostLabel`, `_panelClaudePctLabel`, `_panelClaude7dPctLabel`, `_panelClaudeCostLabel`, `_panelOpenRouterCostLabel`, `_panelCopilotPctLabel`, `_panelCopilotExtraCostLabel`, `_panelCodexPctLabel`, `_panelCodex7dPctLabel`, `_panelCodexCostLabel`, `_panelGeminiaiCostLabel`, `_panelZaiPctLabel`, and `_panelZaiWeeklyPctLabel`.
+- **REQ-144**: GNOME extension `_handleError` MUST reset text and hide every panel status label created in `_buildPanelButton` including `_panelOpenAICostLabel`, `_panelAgyPctLabel`, `_panelAgy7dPctLabel`, `_panelOpenRouterCostLabel`, `_panelCopilotPctLabel`, `_panelCopilotExtraCostLabel`, `_panelCodexPctLabel`, `_panelCodex7dPctLabel`, `_panelCodexCostLabel`, `_panelGeminiaiCostLabel`, `_panelZaiPctLabel`, and `_panelZaiWeeklyPctLabel`.
+
+### 3.4 Antigravity (AGY) Provider
+- **REQ-158**: MUST implement provider `agy` (Antigravity CLI) that extracts quota metrics by executing `agy -p /usage` as one local subprocess and parsing tab-separated `<group>\t<field>\t<value>` rows after stripping ANSI escape sequences.
+- **REQ-159**: MUST map AGY group `Gemini Models` fields `Weekly Limit Remaining` and `Five Hour Limit Remaining` to quotas labeled `G 7d` and `G 5h`.
+- **REQ-160**: MUST map AGY group `Claude and GPT models` fields `Weekly Limit Remaining` and `Five Hour Limit Remaining` to quotas labeled `CG 7d` and `CG 5h`.
+- **REQ-161**: MUST map AGY group `Gemini 4 Argon` field `Gemini 4 Argon Weekly Limit` to quota labeled `A 7d`.
+- **REQ-162**: MUST extract each AGY quota value as the first percentage matching `[0-9]+([.][0-9]+)?%` in the TSV value column; missing rows MUST be omitted, never fabricated.
+- **REQ-163**: MUST normalize each AGY remaining percentage to used percentage `100 - remaining` clamped to `[0.0, 100.0]` for CLI text, `show --json`, and GNOME rendering.
+- **REQ-164**: MUST expose AGY quotas in `raw.agy_quotas` records with fields `quota_key`, `label`, `remaining_percent`, and `percentage` (used) so cache round-trips preserve quota identity.
+- **REQ-165**: MUST treat `agy` as a single fixed-window provider with effective window `30d` that ignores the requested window, fetches all quotas in one subprocess call, and reuses the shared cache and idle-time lifecycle unmodified.
+- **REQ-166**: MUST classify AGY authentication failures when output matches `authentication failed|unauthorized|not authenticated|please log in|login expired` case-insensitively, and MUST return error results when the subprocess exits non-zero or returns no quota rows.
+- **REQ-167**: MUST report `agy` as not configured when the `agy` executable is absent from `PATH` and MUST render a CLI-missing hint instead of an environment-variable hint.
+- **REQ-168**: MUST render AGY quotas as CLI progress-bar usage rows and GNOME per-quota progress bars with labels `G 7d`, `G 5h`, `CG 7d`, `CG 5h`, `A 7d`, styled identically to Z.ai quota rows.
+- **REQ-169**: MUST position `agy` first in CLI panels, GNOME tabs/cards, and GNOME panel status ordering, reusing Claude's former red palette (CLI `\033[91m`, GNOME `#FF3B30`).
+- **REQ-170**: MUST render the AGY GNOME panel status bar with the `G 5h` quota percentage followed by the `G 7d` quota percentage, and MUST drive panel icon thresholds from the maximum AGY quota percentage.
+- **REQ-171**: MUST exclude `agy` from `setup` currency-symbol prompts and monetary rendering because the AGY surface exposes no cost metrics.
 
 ## 4. Test Requirements
 
@@ -294,10 +299,10 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-007**: MUST verify GNOME panel status labels render exactly one provider-colored bold `Err` for OAuth/rate-limit failures, hide normal percentage/cost labels in that state, keep provider order styling, verify icon thresholds, preserve zero-cost currency rendering, and place Copilot cost between Copilot percentages and Codex labels.
 - **TST-008**: MUST verify `pyproject.toml` declares `[build-system]` with `hatchling`, `[project.scripts]` entry `aibar = "aibar.cli:main"`, `requires-python`, and `dependencies` list containing `pytest`.
 - **TST-009**: MUST verify `gnome-install` resolves package source, validates source directory, branches install/update by target-directory presence, executes update disable→copy→enable ordering, masks extension-absence disable failures, and exits non-zero on missing source; MUST verify `gnome-uninstall` disables extension then removes directory and exits non-zero when directory is missing.
-- **TST-010**: MUST verify `Remaining credits: <remaining> / <limit>` appears for Claude, Codex, and Copilot only when corresponding status is `OK`, appears after one blank line following `Resets in`, and renders `<remaining>` as bold bright white.
+- **TST-010**: MUST verify `Remaining credits: <remaining> / <limit>` appears for Codex and Copilot only when corresponding status is `OK`, appears after one blank line following `Resets in`, and renders `<remaining>` as bold bright white.
 - **TST-011**: MUST verify every provider refresh failure updates provider-scoped idle-time using `idle_until = last_attempt_at + max(idle_delay_seconds, retry_after_seconds_or_0)`, including HTTP `429` and authentication failures without `retry_after` metadata.
 - **TST-013**: MUST verify `setup` prompts provider activation first, then `idle_delay_seconds`, `api_call_delay_milliseconds` (default `100`), `api_call_timeout_milliseconds` (default `5000`), `default_retry_after_seconds` (default `3600`), `gnome_refresh_interval_seconds`, `billing_data`, Copilot extra-premium cost (default `0.04`), currency prompts, and final logging prompts, and persists all values into `~/.config/aibar/config.json`.
-- **TST-055**: MUST verify `setup` presents and persists `enabled_providers` as the first setup section, with provider order `claude`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`.
+- **TST-055**: MUST verify `setup` presents and persists `enabled_providers` as the first setup section, with provider order `agy`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`.
 - **TST-056**: MUST verify disabled providers are omitted from `show` text and `show --json`, emit `enabled_providers`, and skip refresh plus idle-time updates for providers marked disabled.
 - **TST-057**: MUST verify GNOME extension source parses `enabled_providers` before provider extraction and hides tabs, cards, and panel labels for disabled providers.
 - **TST-014**: MUST verify `show` evaluates idle-time per provider, serves `~/.cache/aibar/cache.json` for providers with future `idle_until`, and refreshes only providers with missing or expired idle-time state.
@@ -305,10 +310,9 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-016**: MUST verify refresh execution enforces configured inter-call delay in milliseconds between provider API requests, using `100` milliseconds when `api_call_delay_milliseconds` is absent.
 - **TST-017**: MUST verify CLI `show` invokes one shared cache-retrieval implementation and does not call legacy `ResultCache` read/write APIs.
 - **TST-018**: MUST verify failed provider/window refresh attempts set `result=FAIL` and `error` in `cache.json` while preserving the previous payload for the same provider/window.
-- **TST-019**: MUST verify partial refresh outcomes can record mixed `OK` and `FAIL` statuses across windows of the same provider without overwriting unaffected payload snapshots.
-- **TST-020**: MUST verify refresh and fallback logic do not read or write `~/.cache/aibar/claude_dual_last_success.json`.
+- **TST-019**: MUST verify partial refresh outcomes can record mixed `OK` and `FAIL` statuses across providers in one refresh run without overwriting unaffected payload snapshots.
+- **TST-020**: MUST verify refresh and fallback logic do not read or write legacy per-provider snapshot files.
 - **TST-021**: Tests that mock `httpx.AsyncClient` transport and invoke provider `fetch` or `fetch_all_windows` execution path MUST restrict assertions to success/error state (`is_error`, `error` fields), result-dict window key presence, HTTP call count, and cache/filesystem side effects; MUST NOT assert specific numeric metric field values (`usage_percent`, `remaining`, `cost`) derived from the parsed HTTP response.
-- **TST-022**: MUST verify `scripts/claude_token_refresh.sh` `do_refresh()` truncates `LOG_FILE` before writing any log entries (source-level pattern assertion).
 - **TST-023**: MUST verify `currency_symbol` in `UsageMetrics` flows through provider fetch and cache serialization to CLI text output (`_print_result`) and GNOME extension cost labels using the symbol from metrics, not a hardcoded `$`.
 - **TST-024**: MUST verify `setup` accepts GeminiAI OAuth desktop-client credentials from both pasted JSON and file path input and persists normalized client-secret JSON in `~/.config/aibar/`.
 - **TST-025**: MUST verify GeminiAI OAuth authorization requests `bigquery.readonly`, `monitoring.read`, and `cloud-platform` scopes and persists refresh-capable authorized-user credentials for provider fetch execution.
@@ -316,7 +320,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-027**: MUST verify GeminiAI HTTP `429`, quota-exhaustion, and missing billing-export-table failures preserve cached payload snapshots, mark status `FAIL`, and update only GeminiAI idle-time state according to rate-limit retry policy.
 - **TST-028**: MUST verify `setup` currency prompts exclude `geminiai` and GeminiAI rendering in CLI text and JSON payload includes latest-available billing-period monetary cost values when billing data exists.
 - **TST-029**: MUST verify GNOME extension renders GeminiAI provider tab/card with bright-purple style class assignment, provider title `GEMINIAI`, provider ordering as the last tab/card after `openai`, and GeminiAI cost/error status propagation from cache payload.
-- **TST-030**: MUST verify CLI `show` renders panels ordered `claude`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, keeps one shared panel width, never renders `Window 5h:/7d:/30d:` headings, and renders `Status` then right-aligned `Updated/Next` for both `OK` and `FAIL` states.
+- **TST-030**: MUST verify CLI `show` renders panels ordered `agy`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, keeps one shared panel width, never renders `Window 5h:/7d:/30d:` headings, and renders `Status` then right-aligned `Updated/Next` for both `OK` and `FAIL` states.
 - **TST-058**: MUST verify CLI `show` renders Copilot `Cost: <currency_symbol><value>` after one blank line following `Remaining credits`.
 - **TST-053**: MUST verify GNOME Copilot card renders `Cost: <currency_symbol><value>` and panel status bar renders Copilot `<currency_symbol><cost>` between Copilot percentages and Codex labels.
 - **TST-031**: MUST verify startup update preflight executes before invalid-argument diagnostics and before subcommand handlers run.
@@ -325,22 +329,20 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-034**: MUST verify repeated startup update HTTP `429` responses compute idle-time using `max(300, max(retry-after values))`.
 - **TST-035**: MUST verify Linux `--upgrade` and `--uninstall` invoke required `uv tool` subprocess commands, propagate subprocess exit codes, and during `--uninstall` delete `~/.cache/aibar/check_version_idle-time.json` and `~/.cache/aibar/`.
 - **TST-041**: MUST verify non-Linux `--upgrade` and `--uninstall` skip lifecycle subprocess execution and print manual command guidance.
-- **TST-043**: MUST verify Claude OAuth renewal routine truncates `~/.config/aibar/claude_token_refresh.log`, executes `claude /usage` and `aibar login --provider claude`, and records command-availability failures without aborting execution.
-- **TST-044**: MUST verify Claude authentication error `Invalid or expired OAuth token` triggers one renewal attempt and one retry, then persists `claude.oauth_refresh_blocked=true` when retry authentication fails again.
-- **TST-045**: MUST verify `claude.oauth_refresh_blocked` suppresses repeated renewal attempts, auto-clears at `last_success_timestamp + 86400`, and is removed on `show --force`.
 - **TST-046**: MUST verify GeminiAI CLI text renders `Billing services: <count> (<service1>, <service2>, ...)` using billing `service_description` values, preserving order, and printing all discovered services without truncation markers.
 - **TST-047**: MUST verify `--enable-log`, `--disable-log`, `--enable-debug`, and `--disable-debug` persist `log_enabled` and `debug_enabled` in `~/.config/aibar/config.json` without cross-flag side effects.
 - **TST-048**: MUST verify `log_enabled=true` appends timestamped entries in `~/.cache/aibar/aibar.log` for execution start, idle-time checks, idle-driven branches, error handling, cache.json load/save operations, and execution end plus one trailing empty line.
 - **TST-049**: MUST verify API-call debug logging writes API metadata and debug response summaries only when `log_enabled=true` and `debug_enabled=true`, includes unmodified full JSON `raw` payload on failed calls, and omits debug rows otherwise.
 - **TST-050**: MUST verify runtime logging records provider `FAIL` categories `oauth` and `rate_limit` when `log_enabled=true`, and logs `retry_after_seconds` for each category when that value exists.
 - **TST-051**: MUST verify lock acquisition timeout after 5 seconds raises explicit lock-file error for cache/idle operations, and `show` exits non-zero with the same diagnostic while runtime log records timeout when `log_enabled=true`.
-- **TST-052**: MUST verify GNOME cards render >100 progress bars only for `claude`, `openrouter`, `copilot`, `codex`, and `zai`, and render `openai`/`geminiai` usage as text without bars.
-- **TST-054**: MUST verify CLI text `show` renders progress bars only for `claude`, `openrouter`, `copilot`, `codex`, and `zai`, and renders `openai`/`geminiai` usage rows without bars.
+- **TST-052**: MUST verify GNOME cards render >100 progress bars only for `agy`, `openrouter`, `copilot`, `codex`, and `zai`, and render `openai`/`geminiai` usage as text without bars.
+- **TST-054**: MUST verify CLI text `show` renders progress bars only for `agy`, `openrouter`, `copilot`, `codex`, and `zai`, and renders `openai`/`geminiai` usage rows without bars.
 - **TST-059**: MUST verify CLI text `show` renders `openrouter` OK-state usage as `Usage: <window> <progress_bar> <percent>%` using the standard fixed-width CLI progress-bar format.
 - **TST-060**: MUST verify Z.ai fetch maps the three `unit` quota entries to `5h`, `1w`, and `1m` quota rows and exposes each `percentage` and `nextResetTime`.
 - **TST-061**: MUST verify Z.ai renders last with cyan color in CLI text and GNOME extension and that the GNOME panel status bar shows the `5h` (non-bold) and `1w` (bold) Z.ai quota percentages and that the `_handleError` GNOME extension function resets and hides every panel status label including `_panelOpenAICostLabel`.
 - **TST-062**: MUST verify ZaiProvider derives the `5h` quota `reset_at_epoch_ms` from the next UTC 5-hour boundary when the 5 Hours limit entry omits `nextResetTime`.
 - **TST-063**: MUST verify OpenRouter progress-bar percentage equals `cost / (cost + remaining) * 100` from API credit total `data.limit`, over-credit bars render >100 identically to Copilot, and `setup` prompts no budget.
+- **TST-064**: MUST verify AGY provider parses `agy -p /usage` TSV rows into the five quota records with normalized used percentages, classifies authentication failures, and omits missing quota rows; dedicated standalone test pending (no existing test maps to this module).
 - **TST-036**: MUST verify `--version` and `--ver` print installed version, bypass subcommand execution, and force one online startup release check even when `check_version_idle-time.json` contains future `idle_until`.
 - **TST-038**: MUST verify CLI text `show` renders `FAIL` blocks as `Status: FAIL`, blank line, `Reason: <reason>`, blank line, and right-aligned `Updated/Next`, never renders `Window 5h:/7d:/30d:` headings, and preserves `show --json` freshness, API-counter, cost, and GeminiAI effective-window behaviors.
 - **TST-042**: MUST verify CLI `show` and GNOME provider cards render equivalent failed-provider blocks formatted as `Status: FAIL`, blank line, `Reason: <reason>`, blank line, and `Updated/Next`, without `Window 5h:/7d:/30d:` headings.
@@ -353,17 +355,17 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | Requirement ID | Evidence (file + symbol + excerpt) |
 |---|---|
 | PRJ-001 | `src/aibar/aibar/cli.py` + `main/show/doctor/env/setup/login/gnome_install/gnome_uninstall` + `@main.command()` declarations for all subcommands. |
-| PRJ-002 | `src/aibar/aibar/cli.py` + `get_providers` + returns Claude/OpenAI/OpenRouter/Copilot/Codex provider instances keyed by `ProviderName`. |
+| PRJ-002 | `src/aibar/aibar/cli.py` + `get_providers` + returns Antigravity/OpenAI/OpenRouter/Copilot/Codex provider instances keyed by `ProviderName`. |
 | PRJ-004 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/metadata.json` + `name = AIBar Monitor`, `url = https://github.com/Ogekuri/AIBar`, and `donations.github = Ogekuri`; `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + provider-card rendering path; `scripts/test-gnome-extension.sh` + `MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720`. |
 | PRJ-005 | `pi-usereq/docs/REFERENCES.md` + machine-readable symbol sections for configured-source files. |
 | PRJ-006 | `pyproject.toml` + `[build-system]`/`[project]`/`[project.scripts]` sections + `aibar = "aibar.cli:main"` console entry point used by `uv tool install`, `uv run`, and `uvx` execution without external virtualenv bootstrap. |
 | PRJ-007 | `README.md` + dedicated `Requirements (uv)` and `Installation (uv)` sections + `uv tool`/`uv run`/`uvx` instructions and optional `uv export --format requirements-txt > requirements.txt` snippet. |
 | PRJ-011 | `pi-usereq/docs/REQUIREMENTS.md`, `pi-usereq/docs/WORKFLOW.md`, and `pi-usereq/docs/REFERENCES.md` + GNOME contract documentation sources; repository tree excludes `src/aibar/plans/Gnome.plan.md`. |
-| CTN-001 | `src/aibar/aibar/config.py` + `Config.get_token` + env var -> env file -> provider-specific stores (`ClaudeCLIAuth`, `CodexCredentialStore`, `CopilotCredentialStore`). |
+| CTN-001 | `src/aibar/aibar/config.py` + `Config.get_token` + env var -> env file -> provider-specific stores (`CodexCredentialStore`, `CopilotCredentialStore`); provider `agy` resolves the local `agy` CLI from `PATH` via `AntigravityProvider.is_configured`. |
 | CTN-002 | `src/aibar/aibar/providers/base.py` + `ProviderResult` model + fields `provider/window/metrics/updated_at/raw/error`; `UsageMetrics` + `currency_symbol` field. |
 | CTN-003 | `src/aibar/aibar/providers/*.py` + `fetch` methods + `httpx.AsyncClient(timeout=api_call_timeout_milliseconds/1000.0)` in all providers using `RuntimeConfig.api_call_timeout_milliseconds`. |
 | CTN-004 | `src/aibar/aibar/cache.py` + cache schema helpers and `src/aibar/aibar/cli.py` + `cache.json` as canonical store for payload snapshots and attempt statuses. |
-| CTN-005 | `src/aibar/aibar/config.py` + `PROVIDER_INFO` notes + entries describing unofficial/internal usage for Claude, Copilot, and Codex. |
+| CTN-005 | `src/aibar/aibar/config.py` + `PROVIDER_INFO` notes + entries describing unofficial/internal usage for Copilot and Codex plus local-CLI usage for `agy`. |
 | CTN-006 | `pi-usereq/docs/REFERENCES.md` + configured-source symbol index regenerated from repository source files. |
 | CTN-007 | `pyproject.toml` + `[build-system] requires = ["hatchling"]` + `[project]` metadata fields `name`, `version`, `requires-python`, `dependencies` (including `pytest`), and `[project.scripts]`. |
 | CTN-008 | `src/aibar/aibar/config.py` + `RuntimeConfig` model + `idle_delay_seconds`, `api_call_delay_milliseconds`, `api_call_timeout_milliseconds`, `gnome_refresh_interval_seconds`, and `currency_symbols` fields persisted in `~/.config/aibar/config.json`. |
@@ -376,7 +378,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | DES-005 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_loadEnvFromFile` + parses `export KEY=VALUE`, handles quotes/comments/semicolon cleanup. |
 | DES-006 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + scheduler-driven `_startAutoRefresh/_refreshData` using `this._refreshIntervalSeconds` read from `json.extension.gnome_refresh_interval_seconds`, popup `Refresh Now` command uses `aibar show --json --force`, interval updated on each successful refresh. |
 | REQ-001 | `src/aibar/aibar/cli.py` + `show` loop + `if not prov.is_configured(): ... continue` and text hint `Set {config.ENV_VARS.get(name)}`. |
-| REQ-002 | `src/aibar/aibar/cli.py` + `show/_build_dual_window_panel` + default-window Claude/Codex rendering emits one grouped panel each with `5h`/`7d` sections and Codex `Cost/Requests/Tokens` lines after `7d`. |
+| REQ-002 | `src/aibar/aibar/cli.py` + `show/_build_dual_window_panel` + default-window Codex rendering emits one grouped panel with `5h`/`7d` sections, shared `Remaining credits` from `7d`, and Codex `Cost/Requests/Tokens` lines after `7d`. |
 | REQ-003 | `src/aibar/aibar/cli.py` + `show` JSON renderer emits `indent=2` with `payload`, `status`, `idle_time`, `freshness`, and `extension` sections; `freshness` exports provider-keyed timestamps/local-time strings and `extension` exports `gnome_refresh_interval_seconds`, `idle_delay_seconds`, plus provider-keyed `window_labels`. |
 | REQ-004 | `src/aibar/aibar/cli.py` + `doctor` + configuration status and `_fetch_result(provider, WindowPeriod.HOUR_5)` health check. |
 | REQ-005 | `src/aibar/aibar/cli.py` + `setup` prompts `idle_delay_seconds`, `api_call_delay_milliseconds`, `api_call_timeout_milliseconds`, `default_retry_after_seconds`, `gnome_refresh_interval_seconds`, and `billing_data` with defaults `300`, `100`, `5000`, `3600`, `60`, and `billing_data`, then persists `~/.config/aibar/config.json`. |
@@ -386,7 +388,6 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-053 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_updateUI/_populateProviderCard` + panel summary cost uses `metrics.currency_symbol`; card cost label uses per-provider `metrics.currency_symbol`. |
 | TST-013 | `tests/test_setup_runtime_config.py` + setup prompt-order/default assertions extended with currency symbol prompt section and `currency_symbols` persistence checks. |
 | TST-023 | `tests/test_currency_symbol_flow.py` + `currency_symbol` field in `UsageMetrics`, provider fetch pass-through, CLI `_print_result`, and GNOME extension cost label use metrics symbol. |
-| REQ-006 | `src/aibar/aibar/cli.py` + `_login_claude` + missing/expired flows print `claude setup-token` then `sys.exit(1)`. |
 | REQ-007 | `src/aibar/aibar/providers/copilot.py` + `CopilotDeviceFlow` and `CopilotProvider.login` + device-code request/poll and `save_token`. |
 | REQ-009 | `src/aibar/aibar/cli.py` + shared retrieval entrypoint used by `show` + executes force check, per-provider idle-time check, per-provider conditional refresh, then `cache.json` load. |
 | REQ-010 | `src/aibar/aibar/cli.py` + provider-window normalization in `show`/refresh pipeline pins OpenAI to `WindowPeriod.DAY_30`; `src/aibar/aibar/providers/openai_usage.py` + `fetch/_get_time_range` executes 30-day usage-cost retrieval. |
@@ -402,7 +403,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-016 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_refreshData` and popup `Refresh Now` handler + loads env file and `launcher.setenv(key, value, true)` before command spawn, including `--force` manual refresh path. |
 | REQ-017 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_buildPopupMenu/_parseOutput/_updateUI/_populateProviderCard` + popup removes `Open AIBar Report`, `copilot/openrouter` render single `30d` window bars with labels sourced from JSON `extension.window_labels` (fallback `30d`), `openai/geminiai` render `Usage: <window> <percent>%` text without progress bars, freshness uses `freshness` data with status+`extension.idle_delay_seconds` fallback, and cost/API-counter rows stay normalized. |
 | REQ-018 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_handleError` + `this._panelLabel.set_text('Err')` and `message.substring(0, 40)`. |
-| REQ-019 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_providerOrder` and `_updateUI` sorting enforce `claude/openrouter/copilot/codex/openai/geminiai`; unknown providers rank `999` then lexical order. |
+| REQ-019 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_providerOrder` and `_updateUI` sorting enforce `agy/openrouter/copilot/codex/openai/geminiai`; unknown providers rank `999` then lexical order. |
 | REQ-020 | `pi-usereq/docs/REFERENCES.md` + per-symbol entries containing symbol identifier, file path, line-range spans, and parsed `@brief/@param/@return/@throws` fields. |
 | REQ-021 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_buildPanelButton/_updateUI` + panel labels preserve fixed order for normal state and collapse to one provider-colored bold `Err` token for OAuth/rate-limit failure states. |
 | REQ-022 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_buildPanelButton/_updateUI` + panel labels use provider classes/colors; cost labels render provider currency for numeric `0` values and hide only when cost metric is unavailable. |
@@ -421,7 +422,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-044 | `src/aibar/aibar/cache.py` + cache status-write helpers persist per-provider/window `result` (`OK`/`FAIL`), `error`, and `updated_at` fields. |
 | REQ-045 | `src/aibar/aibar/cache.py` + provider/window upsert path only writes payload on successful fetch outcomes. |
 | REQ-046 | `src/aibar/aibar/cache.py` + failed provider/window upsert path preserves existing payload while updating failure status metadata. |
-| REQ-047 | `src/aibar/aibar/cli.py` + `src/aibar/aibar/cache.py` + fallback and refresh flows use only `cache.json` and remove dependency on `claude_dual_last_success.json`. |
+| REQ-047 | `src/aibar/aibar/cli.py` + `src/aibar/aibar/cache.py` + fallback and refresh flows use only `cache.json` and no legacy per-provider snapshot files. |
 | TST-001 | `src/aibar/aibar/cli.py` + `parse_window/parse_provider` provide validation points for invalid input diagnostics. |
 | TST-002 | `src/aibar/aibar/config.py` + `get_token` implements explicit precedence chain requiring regression coverage. |
 | TST-003 | `tests/test_cli_idle_cache.py` and `tests/test_cli_idle_force.py` + assertions for cache schema parity with `show --json` and provider-keyed idle-time epoch/human-readable field persistence under `~/.cache/aibar/`. |
@@ -430,7 +431,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | TST-006 | `pi-usereq/docs/REFERENCES.md` + generated configured-source symbol coverage validates documentation inventory completeness. |
 | TST-007 | `tests/test_extension_quota_label.py` + single `Err` projection assertions for OAuth/rate-limit failures, provider-color bold-style assertions, normal-state order/style assertions, and zero-cost/missing-metric behavior checks. |
 | TST-008 | `tests/test_pyproject_metadata.py` + assertions for `[build-system]` backend, `[project.scripts]` entry, `requires-python`, and `dependencies` list containing `pytest` in `pyproject.toml`. |
-| TST-010 | `tests/test_reset_pending_message.py` and `src/aibar/aibar/cli.py` + verify remaining-credits rendering path appears only for successful quota-provider states. |
+| TST-010 | `src/aibar/aibar/cli.py` + `_build_result_panel` remaining-credits rendering path appears only for successful Codex/Copilot states. |
 | TST-011 | `tests/test_cli_idle_time_429.py` + provider failure scenarios verify provider-scoped `idle_until = last_attempt_at + max(idle_delay_seconds, retry_after_seconds_or_0)` updates across HTTP `429` and auth failures without retry-after metadata. |
 | TST-013 | `tests/test_setup_runtime_config.py` + setup prompt-order/default assertions and `~/.config/aibar/config.json` persistence checks for idle delay, API delay, and gnome_refresh_interval_seconds. |
 | TST-014 | `tests/test_cli_idle_cache.py` + provider-scoped idle-time future/missing/expired branches verify per-provider cache-serving behavior and refresh gating in `show`. |
@@ -438,7 +439,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | TST-017 | `tests/test_cli_cache_status_retention.py` and `src/aibar/aibar/cli.py` + verify shared retrieval usage and absence of `ResultCache` read/write calls in CLI `show` path. |
 | TST-018 | `tests/test_cli_cache_status_retention.py` + failed-refresh assertions verify `result=FAIL` with error metadata while preserving existing provider/window payload snapshots. |
 | TST-019 | `tests/test_cli_cache_status_retention.py` + mixed-window assertions verify partial provider updates preserve unaffected windows and record per-window status granularity. |
-| TST-020 | `tests/test_cli_cache_status_retention.py` + file-system assertions verify no read/write path targets `~/.cache/aibar/claude_dual_last_success.json`. |
+| TST-020 | `tests/test_cli_cache_status_retention.py` + file-system assertions verify no read/write path targets legacy per-provider snapshot files. |
 | TST-016 | `tests/test_cli_provider_throttle.py` + refresh timing assertions verify configured inter-call delay and default `20`-second fallback. |
 | PRJ-008 | `src/aibar/aibar/cli.py` + `gnome_install` command + install/update mode detection using target-directory presence, file copy from package source, update-path disable before copy, and post-copy enable. |
 | REQ-025 | `src/aibar/aibar/cli.py` + `_resolve_extension_source_dir` + `Path(__file__).resolve().parent / "gnome-extension" / _EXT_UUID` module-relative path resolution for extension source directory. |
@@ -456,17 +457,15 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-081 | `src/aibar/aibar/cli.py` + `gnome_uninstall` + `shutil.rmtree` removes extension directory and all contents. |
 | REQ-082 | `src/aibar/aibar/cli.py` + `gnome_uninstall` + `sys.exit(1)` when extension directory does not exist with descriptive error message. |
 | TST-009 | `tests/test_gnome_install_uninstall.py` + `gnome-install` install/update branch, update disable→copy→enable ordering, and masked-missing-extension disable assertions; `gnome-uninstall` disable-before-remove and missing-directory exit assertions. |
-| TST-021 | `tests/test_claude_retry_and_cli_cache.py` + `TestClaudeRetryOn429::test_retries_on_429_then_succeeds` and `TestFetchAllWindows::test_single_call_returns_both_windows` + metric-value assertions on parsed HTTP responses removed; assertions restricted to `is_error` state, window key presence in results dict, and `mock_get.call_count`. |
-| REQ-048 | `scripts/claude_token_refresh.sh` + `do_refresh()` + `> "$LOG_FILE"` truncation statement before first `log` call. |
-| TST-022 | `tests/test_claude_token_refresh_script.py` + source-level assertion that `do_refresh()` body contains `LOG_FILE` truncation before any `log` invocation. |
+| TST-021 | `tests/test_cli_idle_time_429.py` + mocked provider fetch assertions restricted to success/error state (`is_error`, `error` fields), window key presence, call counts, and cache/filesystem side effects; no numeric metric values asserted from parsed HTTP responses. |
 | TST-023 | `tests/test_currency_symbol_flow.py` + assertions for `currency_symbol` field in `UsageMetrics`, CLI `_print_result` cost formatting, and GNOME extension panel label using metrics symbol. |
 | TST-030 | `tests/test_cli_show_panel_alignment.py` + CLI output assertions verify provider order, shared panel width, `Window 5h:/7d:/30d:` heading suppression, and `Status` first/right-aligned `Updated/Next` last layout. |
 | TST-058 | `tests/test_cli_show_panel_alignment.py` + Copilot panel assertions verify one blank line separates `Remaining credits` from `Cost`. |
 | REQ-067 | `src/aibar/aibar/cli.py` + `show/_provider_panel_sort_key/_build_result_panel/_build_dual_window_panel/_emit_provider_panel` + provider ordering, status-first layout, ANSI colors, and shared-width rendering. |
-| REQ-121 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `PROGRESS_BAR_PROVIDERS/_populateProviderCard/_applyBarWidths/_applyProgressFillGeometry` + progress-bar geometry stays active only for `claude/openrouter/copilot/codex/zai`, preserving >100 marker and over-limit segment. |
+| REQ-121 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `PROGRESS_BAR_PROVIDERS/_populateProviderCard/_applyBarWidths/_applyProgressFillGeometry` + progress-bar geometry stays active only for `agy/openrouter/copilot/codex/zai`, preserving >100 marker and over-limit segment; AGY per-quota bars reuse the same geometry helpers. |
 | REQ-130 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `TEXT_USAGE_PROVIDERS/_populateProviderCard` + `openai/geminiai` cards render `Usage: <window> <percent>%` text, hide bar actors, and keep non-usage rows visible. |
-| REQ-122 | `src/aibar/aibar/cli.py` + `_should_render_cli_progress_bar/_build_cli_usage_line/_build_result_panel/_progress_bar` + >100 progress-bar rendering is limited to `claude/openrouter/copilot/codex/zai` while preserving marker and over-limit segment. |
-| REQ-128 | `src/aibar/aibar/cli.py` + `_should_render_cli_progress_bar/_build_cli_usage_line/_build_result_panel` + usage rows render `Usage: <window> <progress_bar> <percent>%` for `claude/copilot/codex/zai`. |
+| REQ-122 | `src/aibar/aibar/cli.py` + `_should_render_cli_progress_bar/_build_cli_usage_line/_build_result_panel/_progress_bar` + >100 progress-bar rendering is limited to `agy/openrouter/copilot/codex/zai` while preserving marker and over-limit segment. |
+| REQ-128 | `src/aibar/aibar/cli.py` + `_should_render_cli_progress_bar/_build_cli_usage_line/_build_result_panel/_build_agy_quota_lines` + usage rows render `Usage: <window> <progress_bar> <percent>%` for `agy/copilot/codex/zai`. |
 | REQ-132 | `src/aibar/aibar/cli.py` + `_should_render_cli_progress_bar/_build_cli_usage_line/_build_result_panel` + `openrouter` usage rows render the standard fixed-width CLI progress-bar format. |
 | REQ-131 | `src/aibar/aibar/cli.py` + `_should_render_cli_progress_bar/_build_cli_usage_line/_build_result_panel` + `openai/geminiai` usage rows render `Usage: <window> <percent>%` without progress bars. |
 | REQ-133 | `src/aibar/aibar/cli.py` + `_ordered_rendered_panels/_provider_panel_sort_key` and `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_orderedEnabledProviderNames/_updateUI` + all visible provider surfaces keep canonical order after disabled-provider filtering. |
@@ -479,7 +478,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-098 | `src/aibar/aibar/providers/geminiai.py` + monitoring interval construction uses current UTC month start as interval start and current UTC time as interval end. |
 | TST-038 | `tests/test_cli_show_status_messages.py` + verifies CLI `show` right-aligned freshness line uses provider `idle_time` timestamps with local-timezone `%Y-%m-%d %H:%M` parity, `show --json` top-level `freshness` parity, fail-state statistics suppression, retry-after rendering format, `Window <window>:` heading suppression, API-counter null→`0` rendering for `openai/codex/geminiai`, OpenRouter suppressed-counter/`Total cost:` rendering, and GeminiAI effective window `30d` under non-30d requests. |
 | TST-042 | `tests/test_cli_show_status_messages.py` + `tests/test_extension_quota_label.py` + cross-surface assertions for equivalent error category, HTTP status, retry-after value, and `Updated/Next` text sourced from the same `idle_time` timestamps on failed states. |
-| TST-052 | `tests/test_extension_quota_label.py` + source assertions verify progress-bar geometry remains only for `claude/openrouter/copilot/codex/zai`, while `openai/geminiai` render text-only usage without bar widgets. |
+| TST-052 | `tests/test_extension_quota_label.py` + source assertions verify progress-bar geometry remains only for `agy/openrouter/copilot/codex/zai`, while `openai/geminiai` render text-only usage without bar widgets. |
 | TST-054 | `tests/test_cli_show_panel_alignment.py` + output assertions verify bar providers keep `Usage: <window> <progress_bar> <percent>%`, while `openai/geminiai` render `Usage: <window> <percent>%` and preserve shared panel width. |
 | TST-059 | `tests/test_cli_show_status_messages.py` + `_build_result_panel` assertions verify `openrouter` renders `Usage: <window> <progress_bar> <percent>%` with the standard fixed-width CLI bar glyphs. |
 | REQ-086 | `scripts/aibar.sh` + launcher executes `uv run python -m aibar.cli "$@"` and removes repository virtualenv bootstrap/install commands. |
@@ -509,3 +508,18 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-143 | `src/aibar/aibar/gnome-extension/.../extension.js` + `_buildPanelButton`/`_updateUI` Z.ai 5 Hours (non-bold) and Weekly (bold) panel status-bar percentage labels. |
 | TST-060 | `src/aibar/aibar/providers/zai.py` + `_extract_quotas`/`_build_quota` map `unit` 3/6/5 to 5 Hours, Weekly, and Monthly Web Search quotas with per-quota `percentage`/`reset_at`; dedicated standalone test pending (no existing test maps to this module). |
 | TST-061 | `tests/test_geminiai_surface_integration.py` + `tests/test_extension_quota_label.py` + Z.ai last-position, cyan `aibar-tab-label-zai`/`aibar-progress-provider-zai`, `PROGRESS_BAR_PROVIDERS` includes `zai`, and `src/aibar/aibar/cli.py` + `_SHOW_PROVIDER_ORDER`/`_PROVIDER_PANEL_COLOR_CODES` trailing `zai`; `src/aibar/aibar/gnome-extension/.../extension.js` + `_buildPanelButton`/`_updateUI` Z.ai 5 Hours (non-bold) and Weekly (bold) panel status-bar labels. |
+| REQ-158 | `src/aibar/aibar/providers/agy.py` + `AntigravityProvider.fetch` + executes `["agy", "-p", "/usage"]` subprocess, strips ANSI escapes via `_ANSI_ESCAPE_PATTERN`, parses TSV rows via `_parse_tsv_rows`. |
+| REQ-159 | `src/aibar/aibar/providers/agy.py` + `AntigravityProvider._QUOTA_SPECS` + `Gemini Models`/`Weekly Limit Remaining` -> `G 7d` and `Gemini Models`/`Five Hour Limit Remaining` -> `G 5h`. |
+| REQ-160 | `src/aibar/aibar/providers/agy.py` + `AntigravityProvider._QUOTA_SPECS` + `Claude and GPT models`/`Weekly Limit Remaining` -> `CG 7d` and `Claude and GPT models`/`Five Hour Limit Remaining` -> `CG 5h`. |
+| REQ-161 | `src/aibar/aibar/providers/agy.py` + `AntigravityProvider._QUOTA_SPECS` + `Gemini 4 Argon`/`Gemini 4 Argon Weekly Limit` -> `A 7d`. |
+| REQ-162 | `src/aibar/aibar/providers/agy.py` + `AntigravityProvider._find_remaining_percent` + first `_PERCENTAGE_PATTERN` match in TSV value column; `_extract_quotas` omits missing rows. |
+| REQ-163 | `src/aibar/aibar/providers/agy.py` + `AntigravityProvider._extract_quotas` + used percentage `100.0 - remaining` clamped to `[0.0, 100.0]` stored as `percentage`. |
+| REQ-164 | `src/aibar/aibar/providers/agy.py` + `AntigravityProvider._parse_response` + `raw.agy_quotas` records with `quota_key`/`label`/`remaining_percent`/`percentage`. |
+| REQ-165 | `src/aibar/aibar/cli.py` + `_FIXED_WINDOW_BY_PROVIDER[ProviderName.AGY] = WindowPeriod.DAY_30`; `src/aibar/aibar/providers/agy.py` single-subprocess fetch consumed by unmodified cache/idle pipeline. |
+| REQ-166 | `src/aibar/aibar/providers/agy.py` + `AntigravityProvider._AUTH_ERROR_PATTERN` classification and non-zero-exit/no-quota error results. |
+| REQ-167 | `src/aibar/aibar/providers/agy.py` + `AntigravityProvider.is_configured` via `shutil.which("agy")`; `src/aibar/aibar/cli.py` + `show` not-configured hint renders CLI-missing text for providers without env vars. |
+| REQ-168 | `src/aibar/aibar/cli.py` + `_build_agy_quota_lines`/`_build_result_panel` AGY branch; `src/aibar/aibar/gnome-extension/.../extension.js` + `_populateProviderCard` AGY per-quota bars with labels `G 7d`/`G 5h`/`CG 7d`/`CG 5h`/`A 7d`. |
+| REQ-169 | `src/aibar/aibar/cli.py` + `_SHOW_PROVIDER_ORDER` leading `agy` and `_PROVIDER_PANEL_COLOR_CODES[ProviderName.AGY] = "\033[91m"`; `src/aibar/aibar/gnome-extension/.../extension.js` + `_providerOrder` leading `'agy'`; `stylesheet.css` + `aibar-tab-label-agy`/`aibar-progress-provider-agy` using `#FF3B30`. |
+| REQ-170 | `src/aibar/aibar/gnome-extension/.../extension.js` + `_buildPanelButton` AGY 5h/7d panel labels and `_updateUI` `panelValues.agy5h`/`agy7d`/`agyMax` including `agyMax` in `panelPercents`. |
+| REQ-171 | `src/aibar/aibar/cli.py` + `setup` currency prompt list excludes `ProviderName.AGY`; AGY panels/cards render no cost rows. |
+| TST-064 | `src/aibar/aibar/providers/agy.py` + `_parse_tsv_rows`/`_extract_quotas`/`_find_remaining_percent` map TSV rows to five quota records with normalized used percentages and auth-error classification; dedicated standalone test pending (no existing test maps to this module). |

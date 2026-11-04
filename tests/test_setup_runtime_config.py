@@ -65,7 +65,7 @@ def test_setup_prompts_runtime_config_before_credentials(
     """
     @brief Verify setup prompt order and runtime-config persistence.
     @details Ensures setup asks provider activation toggles first through sixth
-    in order `claude`, `openrouter`, `copilot`, `codex`, `openai`,
+    in order `agy`, `openrouter`, `copilot`, `codex`, `openai`,
     `geminiai`, then asks `idle-delay` seventh, `api-call delay` eighth,
     `api-call timeout` ninth, `default-retry-after` tenth,
     `gnome-refresh-interval` eleventh, `billing_data` twelfth, Copilot extra
@@ -84,7 +84,7 @@ def test_setup_prompts_runtime_config_before_credentials(
     config_dir = _patch_config_paths(monkeypatch, tmp_path)
     prompts: list[str] = []
     # 7 provider toggles + 6 runtime values + Copilot overage
-    # + 7 currency symbols + OAuth source + empty credentials + 2 logging modes
+    # + 6 currency symbols (agy excluded) + OAuth source + empty credentials + 2 logging modes
     responses = iter(
         [
             "enable",
@@ -101,7 +101,6 @@ def test_setup_prompts_runtime_config_before_credentials(
             90,
             "billing_data",
             0.04,
-            "$",
             "$",
             "$",
             "$",
@@ -142,7 +141,7 @@ def test_setup_prompts_runtime_config_before_credentials(
     result = runner.invoke(main, ["setup"])
 
     assert result.exit_code == 0
-    assert prompts[0] == "  claude statistics mode"
+    assert prompts[0] == "  agy statistics mode"
     assert prompts[1] == "  openrouter statistics mode"
     assert prompts[2] == "  copilot statistics mode"
     assert prompts[3] == "  codex statistics mode"
@@ -156,20 +155,19 @@ def test_setup_prompts_runtime_config_before_credentials(
     assert prompts[11] == "  gnome-refresh-interval seconds"
     assert prompts[12] == "  billing_data"
     assert prompts[13] == "  copilot extra premium request cost (USD/request)"
-    assert prompts[14] == "  claude currency symbol"
-    assert prompts[15] == "  openai currency symbol"
-    assert prompts[16] == "  openrouter currency symbol"
-    assert prompts[17] == "  copilot currency symbol"
-    assert prompts[18] == "  codex currency symbol"
-    assert prompts[19] == "  geminiai currency symbol"
-    assert prompts[20] == "  zai currency symbol"
-    assert prompts[21] == "  geminiai oauth source"
-    assert prompts[22] == "  OPENROUTER_API_KEY"
-    assert prompts[23] == "  OPENAI_ADMIN_KEY"
-    assert prompts[24] == "  GITHUB_TOKEN"
-    assert prompts[25] == "  ZAI_API_KEY"
-    assert prompts[26] == "  execution log mode"
-    assert prompts[27] == "  debug api log mode"
+    assert prompts[14] == "  openai currency symbol"
+    assert prompts[15] == "  openrouter currency symbol"
+    assert prompts[16] == "  copilot currency symbol"
+    assert prompts[17] == "  codex currency symbol"
+    assert prompts[18] == "  geminiai currency symbol"
+    assert prompts[19] == "  zai currency symbol"
+    assert prompts[20] == "  geminiai oauth source"
+    assert prompts[21] == "  OPENROUTER_API_KEY"
+    assert prompts[22] == "  OPENAI_ADMIN_KEY"
+    assert prompts[23] == "  GITHUB_TOKEN"
+    assert prompts[24] == "  ZAI_API_KEY"
+    assert prompts[25] == "  execution log mode"
+    assert prompts[26] == "  debug api log mode"
 
     runtime_config = json.loads(
         (config_dir / "config.json").read_text(encoding="utf-8")
@@ -181,7 +179,7 @@ def test_setup_prompts_runtime_config_before_credentials(
     assert runtime_config["gnome_refresh_interval_seconds"] == 90
     assert runtime_config["billing_data"] == "billing_data"
     assert runtime_config["enabled_providers"] == {
-        "claude": True,
+        "agy": True,
         "openrouter": True,
         "copilot": True,
         "codex": True,
@@ -191,7 +189,6 @@ def test_setup_prompts_runtime_config_before_credentials(
     }
     assert runtime_config["copilot_extra_premium_request_cost"] == 0.04
     assert runtime_config["currency_symbols"] == {
-        "claude": "$",
         "openai": "$",
         "openrouter": "$",
         "copilot": "$",
@@ -264,7 +261,6 @@ def test_setup_accepts_geminiai_oauth_json_paste_and_persists_runtime_fields(
             "$",
             "$",
             "$",
-            "$",
             "paste",
             oauth_payload,
             "gen-lang-client-0834428245",
@@ -315,7 +311,7 @@ def test_setup_accepts_geminiai_oauth_json_paste_and_persists_runtime_fields(
     assert runtime_doc["geminiai_project_id"] == "gen-lang-client-0834428245"
     assert runtime_doc["billing_data"] == "billing_data"
     assert runtime_doc["enabled_providers"] == {
-        "claude": True,
+        "agy": True,
         "openrouter": True,
         "copilot": True,
         "codex": True,
@@ -410,7 +406,6 @@ def test_setup_geminiai_oauth_login_source_reauthorizes_with_current_scopes(
             "$",
             "$",
             "$",
-            "$",
             "login",
             "",
             "",
@@ -448,7 +443,7 @@ def test_setup_geminiai_oauth_login_source_reauthorizes_with_current_scopes(
     assert recorded_scopes == [geminiai_module.GEMINIAI_OAUTH_SCOPES]
     runtime_doc = json.loads((config_dir / "config.json").read_text(encoding="utf-8"))
     assert runtime_doc["enabled_providers"] == {
-        "claude": True,
+        "agy": True,
         "openrouter": True,
         "copilot": True,
         "codex": True,

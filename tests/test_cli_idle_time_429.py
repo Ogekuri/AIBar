@@ -18,13 +18,11 @@ from click.testing import CliRunner
 from aibar import config as config_module
 from aibar.cli import main
 from aibar.providers.base import (
-    AuthenticationError,
     ProviderName,
     ProviderResult,
     UsageMetrics,
     WindowPeriod,
 )
-from aibar.providers.claude_oauth import ClaudeOAuthProvider
 
 
 def _patch_config_paths(monkeypatch, tmp_path: Path) -> Path:
@@ -375,122 +373,3 @@ def test_429_without_retry_after_uses_configured_default_retry_after(
     )
     assert 3599 <= openrouter_delta <= 3601
 
-
-def test_claude_auth_error_uses_configured_default_retry_after(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    """
-    @brief Verify Claude OAuth-auth failures apply configured default Retry-After.
-    @details Forces Claude dual-window fetch to raise canonical OAuth auth error.
-    Asserts persisted Claude idle-time delta follows
-    `RuntimeConfig.default_retry_after_seconds` when retry-after metadata is
-    unavailable in the synthesized failure payload.
-    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
-    @param tmp_path {Path} Temporary path fixture.
-    @return {None} Function return value.
-    @satisfies REQ-041
-    @satisfies TST-011
-    """
-    _patch_config_paths(monkeypatch, tmp_path)
-    config_module.save_runtime_config(
-        config_module.RuntimeConfig(
-            idle_delay_seconds=300,
-            api_call_delay_milliseconds=20,
-            default_retry_after_seconds=3600,
-        )
-    )
-    claude = ClaudeOAuthProvider(token="sk-ant-test-token")
-    monkeypatch.setattr(
-        "aibar.cli.get_providers",
-        lambda: {ProviderName.CLAUDE: claude},
-    )
-    monkeypatch.setattr(
-        ClaudeOAuthProvider,
-        "fetch_all_windows",
-        AsyncMock(side_effect=AuthenticationError("Invalid or expired OAuth token")),
-    )
-    monkeypatch.setattr("aibar.cli._run_claude_oauth_token_refresh", lambda *_: True)
-
-    runner = CliRunner()
-    result = runner.invoke(main, ["show", "--provider", "claude", "--json", "--force"])
-    assert result.exit_code == 0
-
-    idle_state = json.loads(config_module.IDLE_TIME_PATH.read_text(encoding="utf-8"))
-    claude_state = idle_state[ProviderName.CLAUDE.value]
-    claude_delta = (
-        claude_state["idle_until_timestamp"] - claude_state["last_success_timestamp"]
-    )
-    assert 3599 <= claude_delta <= 3601
-
-
-def test_claude_oauth_scope_error_uses_configured_default_retry_after(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    """
-    @brief Verify Claude OAuth scope failures apply configured default Retry-After.
-    @details Forces Claude dual-window fetch to return OAuth scope error results
-    without retry-after metadata, then asserts persisted Claude idle-time delta
-    follows `RuntimeConfig.default_retry_after_seconds`.
-    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
-    @param tmp_path {Path} Temporary path fixture.
-    @return {None} Function return value.
-    @satisfies REQ-041
-    @satisfies TST-011
-    """
-    _patch_config_paths(monkeypatch, tmp_path)
-    config_module.save_runtime_config(
-        config_module.RuntimeConfig(
-            idle_delay_seconds=300,
-            api_call_delay_milliseconds=20,
-            default_retry_after_seconds=3600,
-        )
-    )
-    claude = ClaudeOAuthProvider(token="sk-ant-test-token")
-    monkeypatch.setattr(
-        "aibar.cli.get_providers",
-        lambda: {ProviderName.CLAUDE: claude},
-    )
-    oauth_scope_error_5h = ProviderResult(
-        provider=ProviderName.CLAUDE,
-        window=WindowPeriod.HOUR_5,
-        metrics=UsageMetrics(),
-        error=(
-            "OAuth scope error. Fix: unset CLAUDE_CODE_OAUTH_TOKEN && "
-            "claude setup-token"
-        ),
-        raw={"status_code": 403},
-    )
-    oauth_scope_error_7d = ProviderResult(
-        provider=ProviderName.CLAUDE,
-        window=WindowPeriod.DAY_7,
-        metrics=UsageMetrics(),
-        error=(
-            "OAuth scope error. Fix: unset CLAUDE_CODE_OAUTH_TOKEN && "
-            "claude setup-token"
-        ),
-        raw={"status_code": 403},
-    )
-    monkeypatch.setattr(
-        ClaudeOAuthProvider,
-        "fetch_all_windows",
-        AsyncMock(
-            return_value={
-                WindowPeriod.HOUR_5: oauth_scope_error_5h,
-                WindowPeriod.DAY_7: oauth_scope_error_7d,
-            }
-        ),
-    )
-    monkeypatch.setattr("aibar.cli._run_claude_oauth_token_refresh", lambda *_: True)
-
-    runner = CliRunner()
-    result = runner.invoke(main, ["show", "--provider", "claude", "--json", "--force"])
-    assert result.exit_code == 0
-
-    idle_state = json.loads(config_module.IDLE_TIME_PATH.read_text(encoding="utf-8"))
-    claude_state = idle_state[ProviderName.CLAUDE.value]
-    claude_delta = (
-        claude_state["idle_until_timestamp"] - claude_state["last_success_timestamp"]
-    )
-    assert 3599 <= claude_delta <= 3601

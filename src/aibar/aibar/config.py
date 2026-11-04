@@ -14,7 +14,6 @@ from typing import Any
 
 from pydantic import BaseModel, Field, ValidationError
 
-from aibar.claude_cli_auth import extract_claude_cli_token
 from aibar.providers.base import ProviderName
 
 # Runtime/config file locations
@@ -124,7 +123,6 @@ class IdleTimeState(BaseModel):
     last_success_human: str
     idle_until_timestamp: int
     idle_until_human: str
-    oauth_refresh_blocked: bool = False
 
 
 class LockAcquisitionTimeoutError(RuntimeError):
@@ -422,7 +420,7 @@ def resolve_currency_symbol(raw: dict[str, Any] | None, provider_name: str) -> s
     2. `RuntimeConfig.currency_symbols[provider_name]` configured default.
     3. `DEFAULT_CURRENCY_SYMBOL` (`"$"`) as final fallback.
     @param raw {dict[str, Any] | None} Raw API response dict from the provider fetch call, or None.
-    @param provider_name {str} Provider name string key (e.g. `"claude"`, `"openai"`).
+    @param provider_name {str} Provider name string key (e.g. `"codex"`, `"openai"`).
     @return {str} Resolved currency symbol; always a member of `VALID_CURRENCY_SYMBOLS`.
     @satisfies REQ-050
     """
@@ -674,7 +672,6 @@ class Config:
 
     # Environment variable mappings
     ENV_VARS = {
-        ProviderName.CLAUDE: "CLAUDE_CODE_OAUTH_TOKEN",
         ProviderName.OPENAI: "OPENAI_ADMIN_KEY",
         ProviderName.OPENROUTER: "OPENROUTER_API_KEY",
         ProviderName.COPILOT: "GITHUB_TOKEN",
@@ -685,11 +682,11 @@ class Config:
 
     # Provider descriptions
     PROVIDER_INFO = {
-        ProviderName.CLAUDE: {
-            "name": "Claude Code",
-            "description": "Claude Code subscription quota via OAuth",
+        ProviderName.AGY: {
+            "name": "Antigravity",
+            "description": "Antigravity CLI quota usage via local agy CLI",
             "official": False,
-            "note": "Uses unofficial OAuth endpoint with beta header",
+            "note": "Executes 'agy -p /usage' local subprocess",
         },
         ProviderName.OPENAI: {
             "name": "OpenAI",
@@ -749,9 +746,6 @@ class Config:
                 return token
 
         # 3. Provider-specific credential stores
-        if provider == ProviderName.CLAUDE:
-            return extract_claude_cli_token()
-
         if provider == ProviderName.CODEX:
             from aibar.providers.codex import CodexCredentialStore
 
@@ -782,7 +776,7 @@ class Config:
         """
         # Import providers lazily to avoid circular imports
         from aibar.providers import (
-            ClaudeOAuthProvider,
+            AntigravityProvider,
             OpenAIUsageProvider,
             OpenRouterUsageProvider,
             CopilotProvider,
@@ -792,7 +786,7 @@ class Config:
         )
 
         provider_map = {
-            ProviderName.CLAUDE: ClaudeOAuthProvider,
+            ProviderName.AGY: AntigravityProvider,
             ProviderName.OPENAI: OpenAIUsageProvider,
             ProviderName.OPENROUTER: OpenRouterUsageProvider,
             ProviderName.COPILOT: CopilotProvider,
@@ -815,7 +809,7 @@ class Config:
         @return {dict[str, Any]} Function return value.
         """
         info = self.PROVIDER_INFO.get(provider, {})
-        env_var = self.ENV_VARS.get(provider, "UNKNOWN")
+        env_var = self.ENV_VARS.get(provider) or "N/A (local agy CLI)"
         configured = self.is_provider_configured(provider)
 
         return {
@@ -859,6 +853,8 @@ class Config:
 
         for provider in ProviderName:
             env_var = self.ENV_VARS.get(provider)
+            if not env_var:
+                continue
             info = self.PROVIDER_INFO.get(provider, {})
             configured = self.is_provider_configured(provider)
             status = "[OK]" if configured else "[NOT SET]"

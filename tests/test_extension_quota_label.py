@@ -103,7 +103,7 @@ def test_quota_providers_scope_30d_bars_and_text_only_usage_rendering() -> None:
     """
     source = EXTENSION_PATH.read_text(encoding="utf-8")
     assert (
-        "const PROGRESS_BAR_PROVIDERS = new Set(['claude', 'openrouter', 'copilot', 'codex', 'zai']);"
+        "const PROGRESS_BAR_PROVIDERS = new Set(['agy', 'openrouter', 'copilot', 'codex', 'zai']);"
         in source
     )
     assert "const TEXT_USAGE_PROVIDERS = new Set(['openai', 'geminiai']);" in source
@@ -134,7 +134,7 @@ def test_quota_providers_scope_30d_bars_and_text_only_usage_rendering() -> None:
 
 def test_dual_window_providers_keep_visible_5h_and_7d_labels() -> None:
     """
-    @brief Verify Claude and Codex bars keep fixed dual-window side labels.
+    @brief Verify Codex bars keep fixed dual-window side labels.
     @details Guards the regression where dual-window providers blanked the left
     label text after card creation, causing `5h` and `7d` to disappear from the
     popup beside the progress bars. The bar-width geometry helper must not erase
@@ -356,14 +356,11 @@ def test_panel_percentage_labels_use_fixed_order_provider_styles_and_primary_bol
     assert "this._panelBox.add_child(this._panelPercentages);" in source
     assert "this._panelBox.add_child(this._panelLabel);" in source
 
-    claude_idx = source.index(
-        "this._panelPercentages.add_child(this._panelClaudePctLabel);"
+    agy_idx = source.index(
+        "this._panelPercentages.add_child(this._panelAgyPctLabel);"
     )
-    claude_7d_idx = source.index(
-        "this._panelPercentages.add_child(this._panelClaude7dPctLabel);"
-    )
-    claude_cost_idx = source.index(
-        "this._panelPercentages.add_child(this._panelClaudeCostLabel);"
+    agy_7d_idx = source.index(
+        "this._panelPercentages.add_child(this._panelAgy7dPctLabel);"
     )
     openrouter_cost_idx = source.index(
         "this._panelPercentages.add_child(this._panelOpenRouterCostLabel);"
@@ -393,9 +390,8 @@ def test_panel_percentage_labels_use_fixed_order_provider_styles_and_primary_bol
         "this._panelPercentages.add_child(this._panelZaiWeeklyPctLabel);"
     )
     assert (
-        claude_idx
-        < claude_7d_idx
-        < claude_cost_idx
+        agy_idx
+        < agy_7d_idx
         < openrouter_cost_idx
         < copilot_idx
         < codex_5h_idx
@@ -408,15 +404,11 @@ def test_panel_percentage_labels_use_fixed_order_provider_styles_and_primary_bol
     )
 
     assert (
-        "style_class: 'aibar-panel-pct aibar-panel-pct-primary aibar-tab-label-claude'"
+        "style_class: 'aibar-panel-pct aibar-panel-pct-primary aibar-tab-label-agy'"
         in source
     )
     assert (
-        "style_class: 'aibar-panel-pct aibar-panel-pct-secondary aibar-tab-label-claude'"
-        in source
-    )
-    assert (
-        "style_class: 'aibar-panel-pct aibar-panel-cost aibar-tab-label-claude'"
+        "style_class: 'aibar-panel-pct aibar-panel-pct-secondary aibar-tab-label-agy'"
         in source
     )
     assert (
@@ -484,9 +476,9 @@ def test_panel_percentage_labels_hide_when_metrics_are_unavailable() -> None:
     source = EXTENSION_PATH.read_text(encoding="utf-8")
     assert "label.set_text('');" in source
     assert "label.hide();" in source
-    assert "this._panelClaudePctLabel.hide();" in source
-    assert "this._panelClaude7dPctLabel.hide();" in source
-    assert "this._panelClaudeCostLabel.hide();" in source
+    assert "this._panelAgyPctLabel.hide();" in source
+    assert "this._panelAgy7dPctLabel.hide();" in source
+    assert "this._panelOpenRouterCostLabel.hide();" in source
     assert "this._panelOpenRouterCostLabel.hide();" in source
     assert "this._panelCopilotPctLabel.hide();" in source
     assert "this._panelCodexPctLabel.hide();" in source
@@ -507,14 +499,14 @@ def test_panel_labels_render_provider_scoped_bold_colored_err_for_oauth_or_rate_
     @satisfies REQ-021
     """
     source = EXTENSION_PATH.read_text(encoding="utf-8")
-    assert "const CLAUDE_OAUTH_ERROR_MESSAGE = 'Invalid or expired OAuth token';" in source
+    assert "const AUTH_ERROR_MARKER = 'authentication failed';" in source
     assert "function _classifyPanelFailureCategory(statusEntry)" in source
-    assert "if (errorText.includes(CLAUDE_OAUTH_ERROR_MESSAGE))" in source
+    assert "normalizedErrorText.includes(AUTH_ERROR_MARKER)" in source
     assert "if (errorText.includes(RATE_LIMIT_ERROR_MESSAGE) || statusCode === 429)" in source
     assert "function _panelProviderFailureState(statusData, providerName, windows)" in source
     assert "const providerFailureStates = {" in source
     assert "const providerErrClassNames = {" in source
-    assert "const providerErrPriority = ['claude', 'openrouter', 'copilot', 'codex', 'openai', 'geminiai', 'zai'];" in source
+    assert "const providerErrPriority = ['agy', 'openrouter', 'copilot', 'codex', 'openai', 'geminiai', 'zai'];" in source
     assert "const errProviders = [];" in source
     assert "if (state.category === 'oauth' || state.category === 'rate_limit')" in source
     assert "if (errProviders.length > 0) {" in source
@@ -538,7 +530,7 @@ def test_panel_error_mapping_still_tracks_failed_provider_windows_and_costs() ->
     assert "function _panelProviderFailureState(statusData, providerName, windows)" in source
     assert "entry.result !== 'FAIL'" in source
     assert "const providerFailureStates = {" in source
-    assert "claude: _panelProviderFailureState(this._statusData, 'claude', ['5h', '7d'])" in source
+    assert "agy: _panelProviderFailureState(this._statusData, 'agy', ['30d'])" in source
     assert "openrouter: _panelProviderFailureState(this._statusData, 'openrouter', ['30d'])" in source
     assert "copilot: _panelProviderFailureState(this._statusData, 'copilot', ['30d'])" in source
     assert "codex: _panelProviderFailureState(this._statusData, 'codex', ['5h', '7d'])" in source
@@ -615,7 +607,7 @@ def test_geminiai_extension_tab_order_label_and_bright_pink_styles() -> None:
     stylesheet_source = STYLESHEET_PATH.read_text(encoding="utf-8")
 
     assert (
-        "this._providerOrder = ['claude', 'openrouter', 'copilot', 'codex', 'openai', 'geminiai', 'zai'];"
+        "this._providerOrder = ['agy', 'openrouter', 'copilot', 'codex', 'openai', 'geminiai', 'zai'];"
         in extension_source
     )
     assert "const PROVIDER_DISPLAY_NAMES = {" in extension_source
@@ -654,7 +646,7 @@ def test_provider_color_palette_is_applied_to_tabs_cards_and_progress_fills() ->
     """
     stylesheet_source = STYLESHEET_PATH.read_text(encoding="utf-8")
     assert (
-        ".aibar-tab-label-claude {" in stylesheet_source
+        ".aibar-tab-label-agy {" in stylesheet_source
         and "#FF3B30" in stylesheet_source
     )
     assert (
@@ -677,7 +669,7 @@ def test_provider_color_palette_is_applied_to_tabs_cards_and_progress_fills() ->
         ".aibar-tab-label-geminiai {" in stylesheet_source
         and "#BF5AF2" in stylesheet_source
     )
-    assert ".aibar-progress-provider-claude {" in stylesheet_source
+    assert ".aibar-progress-provider-agy {" in stylesheet_source
     assert ".aibar-progress-provider-openrouter {" in stylesheet_source
     assert ".aibar-progress-provider-copilot {" in stylesheet_source
     assert ".aibar-progress-provider-codex {" in stylesheet_source
@@ -705,7 +697,7 @@ def test_progress_bar_handles_percentages_over_100() -> None:
     """
     @brief Verify GNOME over-limit progress bars remain scoped to bar-enabled providers.
     @details Asserts one shared geometry helper is used by single-window bars,
-    dual-window bars, and fallback progress rows for `claude/openrouter/copilot/codex`,
+    dual-window bars, and fallback progress rows for `agy/openrouter/copilot/codex`,
     while `openai/geminiai` switch to text-only usage rendering without bar geometry calls.
     @satisfies REQ-121
     @satisfies REQ-130

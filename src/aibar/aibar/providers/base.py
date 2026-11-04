@@ -29,7 +29,7 @@ class ProviderName(str, Enum):
     @details Encapsulates provider name state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
     """
 
-    CLAUDE = "claude"
+    AGY = "agy"
     OPENAI = "openai"
     OPENROUTER = "openrouter"
     COPILOT = "copilot"

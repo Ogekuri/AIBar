@@ -38,9 +38,9 @@ def test_cli_registers_geminiai_provider_and_login_paths() -> None:
     assert "geminiai oauth source" in source
     assert "billing_data" in source
     assert 'click.Choice(["skip", "file", "paste", "login"])' in source
-    assert "_currency_provider_names = [p.value for p in ProviderName]" in source
-    assert 'help="Provider to query (claude, openai, openrouter, copilot, codex, geminiai, zai, all)"' in source
-    assert 'help="Provider to login to (claude, copilot, geminiai)"' in source
+    assert "p != ProviderName.AGY" in source
+    assert 'help="Provider to query (agy, openai, openrouter, copilot, codex, geminiai, zai, all)"' in source
+    assert 'help="Provider to login to (copilot, geminiai)"' in source
     assert "_login_geminiai()" in source
     assert 'if provider_name == ProviderName.GEMINIAI:' in source
     assert 'return "GEMINIAI"' in source
@@ -66,7 +66,7 @@ def test_extension_and_dependencies_include_geminiai_support() -> None:
     pyproject_source = PYPROJECT_PATH.read_text(encoding="utf-8")
     uv_lock_source = UV_LOCK_PATH.read_text(encoding="utf-8")
 
-    assert "this._providerOrder = ['claude', 'openrouter', 'copilot', 'codex', 'openai', 'geminiai', 'zai'];" in extension_source
+    assert "this._providerOrder = ['agy', 'openrouter', 'copilot', 'codex', 'openai', 'geminiai', 'zai'];" in extension_source
     assert "geminiai: 'GEMINIAI'" in extension_source
     assert "google-api-python-client" in pyproject_source
     assert "google-cloud-bigquery" in pyproject_source

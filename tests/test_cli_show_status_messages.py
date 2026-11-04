@@ -23,7 +23,6 @@ from aibar.providers.base import (
     UsageMetrics,
     WindowPeriod,
 )
-from aibar.providers.claude_oauth import ClaudeOAuthProvider
 from aibar.providers.openrouter import OpenRouterUsageProvider
 
 
@@ -253,8 +252,8 @@ def test_show_dual_window_cached_fail_status_renders_reason_with_freshness(
     tmp_path: Path,
 ) -> None:
     """
-    @brief Verify Claude grouped dual-window panel renders deduplicated failed block.
-    @details Seeds successful Claude dual-window payload with cached `status[claude][5h|7d]=FAIL`,
+    @brief Verify Codex grouped dual-window panel renders deduplicated failed block.
+    @details Seeds successful Codex dual-window payload with cached `status[codex][5h|7d]=FAIL`,
     activates idle-time cache read path, and asserts one grouped panel renders one shared
     failed block (`Status`, `Reason`, `Updated/Next`) without `Window` headings.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
@@ -272,36 +271,38 @@ def test_show_dual_window_cached_fail_status_renders_reason_with_freshness(
         )
     )
     cached_success = ProviderResult(
-        provider=ProviderName.CLAUDE,
+        provider=ProviderName.CODEX,
         window=WindowPeriod.DAY_7,
         metrics=UsageMetrics(remaining=65.0, limit=100.0),
         raw={
-            "five_hour": {
-                "utilization": 35.0,
-                "resets_at": "2026-03-20T08:00:00+00:00",
-            },
-            "seven_day": {
-                "utilization": 45.0,
-                "resets_at": "2026-03-24T08:00:00+00:00",
-            },
+            "rate_limit": {
+                "primary_window": {
+                    "used_percent": 35.0,
+                    "reset_at": "2026-03-20T08:00:00+00:00",
+                },
+                "secondary_window": {
+                    "used_percent": 45.0,
+                    "reset_at": "2026-03-24T08:00:00+00:00",
+                },
+            }
         },
     )
     status_updated_at = datetime.now(timezone.utc).isoformat()
     config_module.save_cli_cache(
         {
-            "payload": {"claude": cached_success.model_dump(mode="json")},
+            "payload": {"codex": cached_success.model_dump(mode="json")},
             "status": {
-                "claude": {
+                "codex": {
                     "5h": {
                         "result": "FAIL",
-                        "error": "Invalid or expired OAuth token",
+                        "error": "Invalid or expired token",
                         "updated_at": status_updated_at,
                         "status_code": 401,
                         "retry_after_seconds": 300,
                     },
                     "7d": {
                         "result": "FAIL",
-                        "error": "Invalid or expired OAuth token",
+                        "error": "Invalid or expired token",
                         "updated_at": status_updated_at,
                         "status_code": 401,
                         "retry_after_seconds": 300,
@@ -313,25 +314,41 @@ def test_show_dual_window_cached_fail_status_renders_reason_with_freshness(
     now_utc = datetime.now(timezone.utc)
     config_module.save_idle_time(
         {
-            ProviderName.CLAUDE.value: config_module.build_idle_time_state(
+            ProviderName.CODEX.value: config_module.build_idle_time_state(
                 now_utc,
                 now_utc + timedelta(minutes=5),
             )
         }
     )
-    provider = ClaudeOAuthProvider(token="sk-ant-test-token")
+
+    def _parse_codex_raw(raw: dict, window: WindowPeriod) -> ProviderResult:
+        window_key = (
+            "primary_window" if window == WindowPeriod.HOUR_5 else "secondary_window"
+        )
+        window_data = raw["rate_limit"][window_key]
+        used = float(window_data["used_percent"])
+        return ProviderResult(
+            provider=ProviderName.CODEX,
+            window=window,
+            metrics=UsageMetrics(remaining=100.0 - used, limit=100.0),
+            raw=raw,
+        )
+
+    provider = MagicMock()
+    provider.is_configured.return_value = True
+    provider._parse_response = _parse_codex_raw
     monkeypatch.setattr(
         "aibar.cli.get_providers",
-        lambda: {ProviderName.CLAUDE: provider},
+        lambda: {ProviderName.CODEX: provider},
     )
 
     runner = CliRunner()
-    result = runner.invoke(main, ["show", "--provider", "claude"])
+    result = runner.invoke(main, ["show", "--provider", "codex"])
     assert result.exit_code == 0
     assert result.output.count("Status: FAIL") == 1
     assert "Status: OK" not in result.output
-    assert result.output.count("Reason: Invalid or expired OAuth token") == 1
-    assert "Error: Invalid or expired OAuth token" not in result.output
+    assert result.output.count("Reason: Invalid or expired token") == 1
+    assert "Error: Invalid or expired token" not in result.output
     assert "Window 5h:" not in result.output
     assert "Window 7d:" not in result.output
     assert "Window: 5h" not in result.output
@@ -343,7 +360,7 @@ def test_show_dual_window_cached_fail_status_renders_reason_with_freshness(
     assert "Tokens:" not in result.output
     assert "Resets in:" not in result.output
     status_idx = result.output.index("Status: FAIL")
-    reason_idx = result.output.index("Reason: Invalid or expired OAuth token")
+    reason_idx = result.output.index("Reason: Invalid or expired token")
     updated_idx = result.output.index("Updated:")
     assert status_idx < reason_idx < updated_idx
 

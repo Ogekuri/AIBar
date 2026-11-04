@@ -170,7 +170,7 @@ function sliceConst(name, stopMarker) {
 }
 const toPercentSrc = sliceConst('toPercent', 'const getPanelUsageValues');
 const panelSrc = sliceConst(
-    'getPanelUsageValues', 'const claudeUsage = getPanelUsageValues'
+    'getPanelUsageValues', 'const agyUsage = getPanelUsageValues'
 );
 const getPanelUsageValues = eval(toPercentSrc + ';' + panelSrc + ';getPanelUsageValues');
 const metrics = {limit: 100.0, remaining: 86.0};

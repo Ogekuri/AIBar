@@ -28,7 +28,6 @@ from click.core import ParameterSource
 from pydantic import ValidationError
 
 from . import __version__
-from aibar.claude_cli_auth import extract_claude_cli_token
 from aibar.config import (
     IdleTimeState,
     LockAcquisitionTimeoutError,
@@ -47,7 +46,7 @@ from aibar.config import (
     save_runtime_config,
 )
 from aibar.providers import (
-    ClaudeOAuthProvider,
+    AntigravityProvider,
     OpenAIUsageProvider,
     OpenRouterUsageProvider,
     CopilotProvider,
@@ -60,7 +59,6 @@ from aibar.providers.base import (
     ProviderError,
     ProviderName,
     ProviderResult,
-    UsageMetrics,
     WindowPeriod,
 )
 
@@ -70,7 +68,6 @@ _WINDOW_PERIOD_TIMEDELTA: dict[WindowPeriod, timedelta] = {
     WindowPeriod.DAY_7: timedelta(days=7),
     WindowPeriod.DAY_30: timedelta(days=30),
 }
-_RESET_PENDING_MESSAGE = "Starts when the first message is sent"
 _CACHE_PAYLOAD_SECTION_KEY = "payload"
 _CACHE_STATUS_SECTION_KEY = "status"
 _CACHE_IDLE_TIME_SECTION_KEY = "idle_time"
@@ -88,7 +85,7 @@ _ANSI_BRIGHT_WHITE = "\033[97m"
 _ANSI_BRIGHT_GREEN = "\033[92m"
 _ANSI_BRIGHT_RED = "\033[91m"
 _PROVIDER_PANEL_COLOR_CODES: dict[ProviderName, str] = {
-    ProviderName.CLAUDE: "\033[91m",
+    ProviderName.AGY: "\033[91m",
     ProviderName.OPENROUTER: "\033[38;5;208m",
     ProviderName.COPILOT: "\033[93m",
     ProviderName.CODEX: "\033[92m",
@@ -104,7 +101,7 @@ _API_COUNTER_PROVIDERS: frozenset[ProviderName] = frozenset(
     }
 )
 _SHOW_PROVIDER_ORDER: tuple[ProviderName, ...] = (
-    ProviderName.CLAUDE,
+    ProviderName.AGY,
     ProviderName.OPENROUTER,
     ProviderName.COPILOT,
     ProviderName.CODEX,
@@ -113,6 +110,7 @@ _SHOW_PROVIDER_ORDER: tuple[ProviderName, ...] = (
     ProviderName.ZAI,
 )
 _FIXED_WINDOW_BY_PROVIDER: dict[ProviderName, WindowPeriod] = {
+    ProviderName.AGY: WindowPeriod.DAY_30,
     ProviderName.COPILOT: WindowPeriod.DAY_30,
     ProviderName.OPENROUTER: WindowPeriod.DAY_30,
     ProviderName.OPENAI: WindowPeriod.DAY_30,
@@ -143,13 +141,8 @@ _UPGRADE_LIFECYCLE_COMMAND: list[str] = [
     "git+https://github.com/Ogekuri/AIBar.git",
 ]
 _UNINSTALL_LIFECYCLE_COMMAND: list[str] = ["uv", "tool", "uninstall", "aibar"]
-_CLAUDE_OAUTH_AUTH_ERROR_TEXT = "Invalid or expired OAuth token"
-_CLAUDE_OAUTH_BLOCK_TTL_SECONDS = 86400
 _LOG_FAILURE_CATEGORY_OAUTH = "oauth"
 _LOG_FAILURE_CATEGORY_RATE_LIMIT = "rate_limit"
-_CLAUDE_TOKEN_REFRESH_LOG_PATH = (
-    Path.home() / ".config" / "aibar" / "claude_token_refresh.log"
-)
 
 
 @dataclass(frozen=True)
@@ -1149,9 +1142,10 @@ def _classify_provider_failure_log_category(result: ProviderResult) -> str | Non
         return None
     if _is_http_429_result(result):
         return _LOG_FAILURE_CATEGORY_RATE_LIMIT
-    if _is_claude_oauth_authentication_error(result.error):
-        return _LOG_FAILURE_CATEGORY_OAUTH
-    if isinstance(result.error, str) and "oauth" in result.error.lower():
+    if isinstance(result.error, str) and (
+        "oauth" in result.error.lower()
+        or "authentication failed" in result.error.lower()
+    ):
         return _LOG_FAILURE_CATEGORY_OAUTH
     return None
 
@@ -1248,320 +1242,6 @@ def _retry_after_probe_payload(raw_payload: dict[str, object]) -> dict[str, obje
         "raw.error.retry_after_seconds": error_retry_after_seconds,
         "raw.error.retry_after": error_retry_after,
     }
-
-
-def _is_claude_oauth_authentication_error(message: object) -> bool:
-    """
-    @brief Detect canonical Claude OAuth authentication-expired error text.
-    @details Applies strict substring match against `Invalid or expired OAuth token`
-    using case-sensitive semantics so retry/renewal logic is only enabled for the
-    documented Claude token-expiration failure.
-    @param message {object} Candidate error message object.
-    @return {bool} True when candidate contains canonical Claude auth-expired text.
-    @satisfies REQ-102
-    """
-    return isinstance(message, str) and _CLAUDE_OAUTH_AUTH_ERROR_TEXT in message
-
-
-def _subprocess_return_code_from_exception(exc: Exception) -> int:
-    """
-    @brief Normalize subprocess exception to deterministic integer return code.
-    @details Maps TimeoutExpired to `124`, CalledProcessError to its integer
-    return code when available, and all other exception classes to `1`.
-    @param exc {Exception} Subprocess exception emitted by `subprocess.run`.
-    @return {int} Deterministic synthetic return code.
-    """
-    if isinstance(exc, subprocess.TimeoutExpired):
-        return 124
-    if isinstance(exc, subprocess.CalledProcessError):
-        try:
-            return int(exc.returncode)
-        except (TypeError, ValueError):
-            return 1
-    return 1
-
-
-def _execute_claude_refresh_command(
-    command: list[str],
-    timeout_seconds: float,
-) -> tuple[bool, int, str]:
-    """
-    @brief Execute one Claude token-refresh subprocess command.
-    @details Runs command without shell expansion, captures combined stdout/stderr,
-    and enforces timeout using runtime `api_call_timeout_milliseconds` policy.
-    Command-not-found and timeout failures are converted to deterministic error
-    tuples without raising.
-    @param command {list[str]} Subprocess argv tokens.
-    @param timeout_seconds {float} Timeout in seconds for command completion.
-    @return {tuple[bool, int, str]} Tuple `(success, return_code, output_text)`.
-    @satisfies REQ-101
-    """
-    try:
-        completed = subprocess.run(
-            command,
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=timeout_seconds,
-        )
-    except (OSError, subprocess.SubprocessError) as exc:
-        return (False, _subprocess_return_code_from_exception(exc), str(exc))
-
-    merged_output = "\n".join(
-        part for part in (completed.stdout, completed.stderr) if part
-    ).strip()
-    return (completed.returncode == 0, int(completed.returncode), merged_output)
-
-
-def _run_claude_oauth_token_refresh(runtime_config: RuntimeConfig) -> bool:
-    """
-    @brief Execute one Claude OAuth token-renewal routine in-process.
-    @details Truncates `~/.config/aibar/claude_token_refresh.log`, then executes
-    `claude /usage` followed by `aibar login --provider claude` when each command
-    is available in PATH. Applies configured API-call delay spacing and configured
-    API-call timeout to each subprocess call. Command failures are logged and do
-    not raise; function returns true only when both available commands complete
-    successfully.
-    @param runtime_config {RuntimeConfig} Runtime delay and timeout configuration.
-    @return {bool} True when refresh routine completes without command failures.
-    @satisfies REQ-100
-    @satisfies REQ-101
-    """
-    _CLAUDE_TOKEN_REFRESH_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    _CLAUDE_TOKEN_REFRESH_LOG_PATH.write_text("", encoding="utf-8")
-    timeout_seconds = max(0.001, runtime_config.api_call_timeout_milliseconds / 1000.0)
-    throttle_state: dict[str, float | int] = {
-        "delay_milliseconds": runtime_config.api_call_delay_milliseconds,
-    }
-    command_plan: tuple[tuple[str, list[str]], ...] = (
-        ("claude", ["claude", "/usage"]),
-        ("aibar", ["aibar", "login", "--provider", "claude"]),
-    )
-    all_ok = True
-    log_lines: list[str] = ["Starting token refresh cycle"]
-
-    for binary_name, command in command_plan:
-        if shutil.which(binary_name) is None:
-            all_ok = False
-            log_lines.append(f"Warning: {binary_name} command not found")
-            continue
-
-        _apply_api_call_delay(throttle_state)
-        log_lines.append(f"Running: {' '.join(command)}")
-        success, return_code, output_text = _execute_claude_refresh_command(
-            command=command,
-            timeout_seconds=timeout_seconds,
-        )
-        if not success:
-            all_ok = False
-            log_lines.append(
-                f"Warning: command failed ({' '.join(command)}), return_code={return_code}"
-            )
-        if output_text:
-            log_lines.append(output_text)
-
-    log_lines.append("Token refresh cycle complete")
-    _CLAUDE_TOKEN_REFRESH_LOG_PATH.write_text(
-        "\n".join(log_lines) + "\n",
-        encoding="utf-8",
-    )
-    return all_ok
-
-
-def _clear_claude_refresh_block_flag(
-    idle_time_by_provider: dict[str, IdleTimeState],
-) -> bool:
-    """
-    @brief Clear Claude OAuth refresh-block flag from idle-time state.
-    @details Removes `oauth_refresh_blocked` by replacing the Claude state entry
-    with an equivalent object where `oauth_refresh_blocked=false`.
-    @param idle_time_by_provider {dict[str, IdleTimeState]} Provider idle-time map.
-    @return {bool} True when map content changed.
-    @satisfies REQ-105
-    """
-    claude_key = ProviderName.CLAUDE.value
-    claude_state = idle_time_by_provider.get(claude_key)
-    if claude_state is None or not claude_state.oauth_refresh_blocked:
-        return False
-    idle_time_by_provider[claude_key] = claude_state.model_copy(
-        update={"oauth_refresh_blocked": False}
-    )
-    return True
-
-
-def _is_claude_refresh_block_active(
-    claude_state: IdleTimeState,
-    now_epoch: int,
-) -> bool:
-    """
-    @brief Evaluate Claude OAuth refresh-block activity against hardcoded TTL.
-    @details Returns true only when `oauth_refresh_blocked` is true and current
-    epoch is not greater than `last_success_timestamp + 86400`.
-    @param claude_state {IdleTimeState} Claude provider idle-time state.
-    @param now_epoch {int} Current epoch seconds.
-    @return {bool} True when refresh-block flag remains active.
-    @satisfies REQ-105
-    """
-    if not claude_state.oauth_refresh_blocked:
-        return False
-    return now_epoch <= (
-        int(claude_state.last_success_timestamp) + _CLAUDE_OAUTH_BLOCK_TTL_SECONDS
-    )
-
-
-def _is_claude_authentication_error_result(result: ProviderResult) -> bool:
-    """
-    @brief Detect Claude result carrying canonical OAuth authentication-expired error.
-    @details Matches provider key `claude`, error-state flag, and canonical error
-    text `Invalid or expired OAuth token` for deterministic renewal triggering.
-    @param result {ProviderResult} Provider result candidate.
-    @return {bool} True when result is Claude auth-expired failure.
-    @satisfies REQ-102
-    """
-    return (
-        result.provider == ProviderName.CLAUDE
-        and result.is_error
-        and _is_claude_oauth_authentication_error(result.error)
-    )
-
-
-def _handle_claude_oauth_refresh_on_auth_error(
-    claude_provider: ClaudeOAuthProvider,
-    runtime_config: RuntimeConfig,
-    throttle_state: dict[str, float | int] | None,
-) -> tuple[ProviderResult, ProviderResult, bool]:
-    """
-    @brief Execute Claude auth-error renewal-and-retry control flow.
-    @details Runs one in-process Claude token-renewal routine, reloads provider
-    token from current environment/CLI credentials, and then executes exactly one
-    Claude dual-window API retry via `_fetch_claude_dual`.
-    @param runtime_config {RuntimeConfig} Runtime delay/timeout configuration.
-    @param throttle_state {dict[str, float | int] | None} Shared API-delay state.
-    @return {tuple[ProviderResult, ProviderResult, bool]} Tuple
-    `(retry_result_5h, retry_result_7d, retry_auth_failed)`.
-    @satisfies REQ-103
-    @satisfies REQ-104
-    """
-    _run_claude_oauth_token_refresh(runtime_config)
-    # Rebind provider token after renewal so retry uses refreshed credentials.
-    refreshed_token = (
-        os.environ.get(ClaudeOAuthProvider.TOKEN_ENV_VAR) or extract_claude_cli_token()
-    )
-    if refreshed_token:
-        claude_provider._token = refreshed_token
-    retry_result_5h, retry_result_7d = _fetch_claude_dual(
-        claude_provider,
-        throttle_state=throttle_state,
-    )
-    retry_auth_failed = _is_claude_authentication_error_result(
-        retry_result_5h
-    ) or _is_claude_authentication_error_result(retry_result_7d)
-    return (retry_result_5h, retry_result_7d, retry_auth_failed)
-
-
-def _update_claude_refresh_block_state(
-    idle_time_by_provider: dict[str, IdleTimeState],
-    blocked: bool,
-) -> bool:
-    """
-    @brief Persist Claude OAuth refresh-block boolean in idle-time state map.
-    @details Creates missing Claude idle-time entry when needed using current UTC
-    timestamps, then updates `oauth_refresh_blocked` only when value changes.
-    @param idle_time_by_provider {dict[str, IdleTimeState]} Provider idle-time map.
-    @param blocked {bool} Target flag value for `claude.oauth_refresh_blocked`.
-    @return {bool} True when state map changed.
-    @satisfies REQ-104
-    @satisfies REQ-105
-    """
-    claude_key = ProviderName.CLAUDE.value
-    claude_state = idle_time_by_provider.get(claude_key)
-    if claude_state is None:
-        now_utc = datetime.now(timezone.utc)
-        claude_state = build_idle_time_state(
-            last_success_at=now_utc, idle_until=now_utc
-        )
-        idle_time_by_provider[claude_key] = claude_state
-    if claude_state.oauth_refresh_blocked == blocked:
-        return False
-    idle_time_by_provider[claude_key] = claude_state.model_copy(
-        update={"oauth_refresh_blocked": blocked}
-    )
-    return True
-
-
-def _fetch_claude_dual_with_auth_recovery(
-    provider: ClaudeOAuthProvider,
-    throttle_state: dict[str, float | int] | None,
-) -> tuple[ProviderResult, ProviderResult]:
-    """
-    @brief Fetch Claude dual-window results with auth-expired recovery policy.
-    @details Executes one dual-window Claude fetch. When canonical auth-expired
-    error appears, checks `claude.oauth_refresh_blocked` in idle-time state with
-    hardcoded 86400-second TTL from `last_success_timestamp`; when unblocked,
-    performs one token-renewal routine and one dual-window retry. On repeated
-    auth failure, persists `oauth_refresh_blocked=true`; on success, clears flag.
-    @param provider {ClaudeOAuthProvider} Claude provider instance.
-    @param throttle_state {dict[str, float | int] | None} Shared API-delay state.
-    @return {tuple[ProviderResult, ProviderResult]} Final Claude `(5h, 7d)` results.
-    @satisfies REQ-102
-    @satisfies REQ-103
-    @satisfies REQ-104
-    @satisfies REQ-105
-    """
-    result_5h, result_7d = _fetch_claude_dual(
-        provider,
-        throttle_state=throttle_state,
-    )
-    if not (
-        _is_claude_authentication_error_result(result_5h)
-        or _is_claude_authentication_error_result(result_7d)
-    ):
-        return (result_5h, result_7d)
-
-    idle_time_by_provider = load_idle_time()
-    claude_state = idle_time_by_provider.get(ProviderName.CLAUDE.value)
-    now_epoch = int(time.time())
-    if claude_state is not None and claude_state.oauth_refresh_blocked:
-        if _is_claude_refresh_block_active(claude_state, now_epoch):
-            return (result_5h, result_7d)
-        if _clear_claude_refresh_block_flag(idle_time_by_provider):
-            save_idle_time(idle_time_by_provider)
-
-    runtime_config = load_runtime_config()
-    retry_5h, retry_7d, retry_auth_failed = _handle_claude_oauth_refresh_on_auth_error(
-        claude_provider=provider,
-        runtime_config=runtime_config,
-        throttle_state=throttle_state,
-    )
-
-    did_change = _update_claude_refresh_block_state(
-        idle_time_by_provider=idle_time_by_provider,
-        blocked=retry_auth_failed,
-    )
-    if did_change:
-        save_idle_time(idle_time_by_provider)
-
-    return (retry_5h, retry_7d)
-
-
-def _clear_expired_claude_refresh_block(
-    idle_time_by_provider: dict[str, IdleTimeState],
-) -> bool:
-    """
-    @brief Auto-clear expired Claude OAuth refresh-block state.
-    @details Clears `claude.oauth_refresh_blocked` when current epoch is greater
-    than `last_success_timestamp + 86400` using hardcoded TTL policy.
-    @param idle_time_by_provider {dict[str, IdleTimeState]} Provider idle-time map.
-    @return {bool} True when state map changed.
-    @satisfies REQ-105
-    """
-    claude_state = idle_time_by_provider.get(ProviderName.CLAUDE.value)
-    if claude_state is None or not claude_state.oauth_refresh_blocked:
-        return False
-    now_epoch = int(time.time())
-    if _is_claude_refresh_block_active(claude_state, now_epoch):
-        return False
-    return _clear_claude_refresh_block_flag(idle_time_by_provider)
 
 
 def _is_http_429_result(result: ProviderResult) -> bool:
@@ -1699,22 +1379,6 @@ def _record_attempt_status(
         provider_status = {}
         status_section[provider_key] = provider_status
     provider_status[result.window.value] = _serialize_attempt_status(result)
-
-
-def _extract_claude_snapshot_from_cache_document(
-    cache_document: dict[str, object],
-) -> dict[str, object] | None:
-    """
-    @brief Extract persisted Claude dual-window payload from cache document.
-    @details Reads Claude entry from cache `payload` section and normalizes it into
-    a dual-window raw payload (`five_hour`, `seven_day`) for HTTP 429 restoration.
-    @param cache_document {dict[str, object]} Canonical cache document.
-    @return {dict[str, object] | None} Normalized dual-window payload or None.
-    @satisfies REQ-047
-    """
-    payload_section = _cache_payload_section(cache_document)
-    claude_payload = payload_section.get(ProviderName.CLAUDE.value)
-    return _normalize_claude_dual_payload(claude_payload)
 
 
 def _get_window_attempt_status(
@@ -2183,8 +1847,6 @@ def _update_idle_time_after_refresh(
             idle_until=idle_until,
         )
         previous_state = updated_idle_time_state.get(provider_key)
-        if previous_state is not None and previous_state.oauth_refresh_blocked:
-            next_state = next_state.model_copy(update={"oauth_refresh_blocked": True})
         if previous_state is not None and previous_state == next_state:
             continue
         updated_idle_time_state[provider_key] = next_state
@@ -2268,7 +1930,7 @@ def get_providers() -> dict[ProviderName, BaseProvider]:
     @return {dict[ProviderName, BaseProvider]} Function return value.
     """
     return {
-        ProviderName.CLAUDE: ClaudeOAuthProvider(),
+        ProviderName.AGY: AntigravityProvider(),
         ProviderName.OPENAI: OpenAIUsageProvider(),
         ProviderName.OPENROUTER: OpenRouterUsageProvider(),
         ProviderName.COPILOT: CopilotProvider(),
@@ -2397,9 +2059,7 @@ def _fetch_result(
     """
     @brief Execute one provider refresh call without legacy TTL cache reuse.
     @details Executes throttled provider fetch and returns normalized success/error
-    results. Claude 5h/7d requests are routed through
-    `_fetch_claude_dual_with_auth_recovery` so one API request can provide
-    deterministic dual-window normalization with OAuth auth-error recovery.
+    results for the requested window.
     @param provider {BaseProvider} Provider instance to fetch from.
     @param window {WindowPeriod} Time window for the fetch.
     @param throttle_state {dict[str, float | int] | None} Mutable throttling state
@@ -2415,31 +2075,6 @@ def _fetch_result(
     append_runtime_log_line(
         f"provider.fetch.start provider={provider.name.value} window={window.value}"
     )
-    if isinstance(provider, ClaudeOAuthProvider) and window in {
-        WindowPeriod.HOUR_5,
-        WindowPeriod.DAY_7,
-    }:
-        result_5h, result_7d = _fetch_claude_dual_with_auth_recovery(
-            provider,
-            throttle_state=throttle_state,
-        )
-        if window == WindowPeriod.HOUR_5:
-            append_runtime_log_line(
-                "provider.fetch.end "
-                f"provider={provider.name.value} window={window.value} status="
-                f"{_ATTEMPT_RESULT_FAIL if result_5h.is_error else _ATTEMPT_RESULT_OK}"
-            )
-            _append_provider_failure_runtime_log(result_5h)
-            _append_provider_debug_runtime_log(result_5h)
-            return result_5h
-        append_runtime_log_line(
-            "provider.fetch.end "
-            f"provider={provider.name.value} window={window.value} status="
-            f"{_ATTEMPT_RESULT_FAIL if result_7d.is_error else _ATTEMPT_RESULT_OK}"
-        )
-        _append_provider_failure_runtime_log(result_7d)
-        _append_provider_debug_runtime_log(result_7d)
-        return result_7d
 
     try:
         _apply_api_call_delay(throttle_state)
@@ -2467,255 +2102,6 @@ def _fetch_result(
     _append_provider_failure_runtime_log(result)
     _append_provider_debug_runtime_log(result)
     return result
-
-
-def _fetch_claude_dual(
-    provider: ClaudeOAuthProvider,
-    throttle_state: dict[str, float | int] | None = None,
-) -> tuple[ProviderResult, ProviderResult]:
-    """
-    @brief Fetch Claude 5h and 7d results via a single API call.
-    @details Executes ClaudeOAuthProvider.fetch_all_windows for 5h and 7d on each invocation.
-    Returns normalized provider results exactly as fetched (or synthesized error
-    results on exception) without partial-window metric fallback.
-    @param provider {ClaudeOAuthProvider} Claude provider instance.
-    @param throttle_state {dict[str, float | int] | None} Mutable throttling state
-        used to enforce inter-call spacing for live API requests.
-    @return {tuple[ProviderResult, ProviderResult]} (5h_result, 7d_result).
-    @satisfies REQ-002, REQ-036, REQ-037, CTN-004, REQ-040, REQ-043
-    @satisfies REQ-112
-    @satisfies REQ-114
-    """
-    append_runtime_log_line("provider.fetch.start provider=claude window=5h,7d")
-    _apply_api_call_delay(throttle_state)
-    windows = [WindowPeriod.HOUR_5, WindowPeriod.DAY_7]
-    try:
-        fetched = asyncio.run(provider.fetch_all_windows(windows))
-    except ProviderError as exc:
-        append_runtime_log_line(
-            f"provider.fetch.error provider=claude window=5h,7d error={exc}"
-        )
-        fetched = {
-            w: provider._make_error_result(
-                window=w,
-                error=str(exc),
-                raw={
-                    "retry_after_unavailable": True,
-                },
-            )
-            for w in windows
-        }
-    except Exception as exc:
-        append_runtime_log_line(
-            "provider.fetch.error "
-            f"provider=claude window=5h,7d error=Unexpected error: {exc}"
-        )
-        fetched = {
-            w: provider._make_error_result(
-                window=w,
-                error=f"Unexpected error: {exc}",
-                raw={
-                    "retry_after_unavailable": True,
-                },
-            )
-            for w in windows
-        }
-
-    result_5h = fetched.get(WindowPeriod.HOUR_5) or provider._make_error_result(
-        window=WindowPeriod.HOUR_5, error="Missing 5h result"
-    )
-    result_7d = fetched.get(WindowPeriod.DAY_7) or provider._make_error_result(
-        window=WindowPeriod.DAY_7, error="Missing 7d result"
-    )
-    # Ensure fallback retry-after policy can be applied for Claude OAuth/rate-limit
-    # errors when provider payload does not include Retry-After metadata.
-    for _result in (result_5h, result_7d):
-        if not _result.is_error:
-            continue
-        if _coerce_retry_after_seconds(_result.raw.get("retry_after_seconds")) is not None:
-            continue
-        if _result.raw.get("retry_after_unavailable") is True:
-            continue
-        _result.raw["retry_after_unavailable"] = True
-
-    append_runtime_log_line(
-        "provider.fetch.end provider=claude window=5h "
-        f"status={_ATTEMPT_RESULT_FAIL if result_5h.is_error else _ATTEMPT_RESULT_OK}"
-    )
-    append_runtime_log_line(
-        "provider.fetch.end provider=claude window=7d "
-        f"status={_ATTEMPT_RESULT_FAIL if result_7d.is_error else _ATTEMPT_RESULT_OK}"
-    )
-    _append_provider_debug_runtime_log(result_5h)
-    _append_provider_debug_runtime_log(result_7d)
-    return result_5h, result_7d
-
-
-def _extract_claude_dual_payload(
-    result_5h: ProviderResult,
-    result_7d: ProviderResult,
-) -> dict[str, object] | None:
-    """
-    @brief Extract dual-window Claude payload dictionary from successful results.
-    @details Returns first raw payload containing both `five_hour` and `seven_day`
-    mapping objects. Returns None when payload shape is invalid.
-    @param result_5h {ProviderResult} Claude five-hour result.
-    @param result_7d {ProviderResult} Claude seven-day result.
-    @return {dict[str, object] | None} Serializable payload or None.
-    @satisfies CTN-004
-    @satisfies REQ-047
-    """
-    for payload in (result_7d.raw, result_5h.raw):
-        if not isinstance(payload, dict):
-            continue
-        if isinstance(payload.get("five_hour"), dict) and isinstance(
-            payload.get("seven_day"), dict
-        ):
-            return payload
-    return None
-
-
-def _normalize_claude_dual_payload(payload: object) -> dict[str, object] | None:
-    """
-    @brief Normalize persisted Claude payload shape into dual-window raw dictionary.
-    @details Accepts either direct dual-window payload (`five_hour`/`seven_day`) or
-    serialized ProviderResult dictionaries containing a `raw` field with that shape.
-    @param payload {object} Decoded JSON object from snapshot candidate file.
-    @return {dict[str, object] | None} Normalized dual-window payload or None.
-    @satisfies REQ-036
-    """
-    if not isinstance(payload, dict):
-        return None
-
-    raw_payload = payload
-    if "raw" in payload and isinstance(payload.get("raw"), dict):
-        raw_payload = payload["raw"]
-
-    if not isinstance(raw_payload.get("five_hour"), dict):
-        return None
-    if not isinstance(raw_payload.get("seven_day"), dict):
-        return None
-    return raw_payload
-
-
-def _extract_snapshot_reset_at(
-    snapshot_payload: dict[str, object] | None,
-    window: WindowPeriod,
-) -> datetime | None:
-    """
-    @brief Resolve projected reset timestamp from persisted Claude snapshot payload.
-    @details Uses window-specific `resets_at` string from persisted payload and
-    projects next reset boundary through `_project_next_reset`.
-    @param snapshot_payload {dict[str, object] | None} Persisted dual-window payload.
-    @param window {WindowPeriod} Target window period.
-    @return {datetime | None} Projected reset timestamp or None.
-    @satisfies REQ-036
-    """
-    if snapshot_payload is None:
-        return None
-    window_key = "seven_day" if window == WindowPeriod.DAY_7 else "five_hour"
-    window_data = snapshot_payload.get(window_key)
-    if not isinstance(window_data, dict):
-        return None
-    resets_at = window_data.get("resets_at")
-    if not isinstance(resets_at, str) or not resets_at:
-        return None
-    return _project_next_reset(resets_at, window)
-
-
-def _extract_snapshot_utilization(
-    snapshot_payload: dict[str, object] | None,
-    window: WindowPeriod,
-) -> float | None:
-    """
-    @brief Resolve utilization percentage from persisted Claude snapshot payload.
-    @details Reads window-specific `utilization`, validates finite range, and clamps
-    values to [0.0, 100.0] for deterministic percentage rendering.
-    @param snapshot_payload {dict[str, object] | None} Persisted dual-window payload.
-    @param window {WindowPeriod} Target window period.
-    @return {float | None} Clamped utilization percentage or None.
-    @satisfies REQ-036
-    """
-    if snapshot_payload is None:
-        return None
-    window_key = "seven_day" if window == WindowPeriod.DAY_7 else "five_hour"
-    window_data = snapshot_payload.get(window_key)
-    if not isinstance(window_data, dict):
-        return None
-    value = window_data.get("utilization")
-    if not isinstance(value, (int, float, str)):
-        return None
-    try:
-        utilization = float(value)
-    except (TypeError, ValueError):
-        return None
-    if not math.isfinite(utilization):
-        return None
-    return max(0.0, min(100.0, utilization))
-
-
-def _is_claude_rate_limited_result(result: ProviderResult) -> bool:
-    """
-    @brief Check whether a ProviderResult represents Claude HTTP 429.
-    @details Matches normalized Claude error payloads by provider identity,
-    error-state flag, and `raw.status_code == 429`.
-    @param result {ProviderResult} Result to classify.
-    @return {bool} True when result is Claude 429.
-    @satisfies REQ-036
-    """
-    return (
-        result.provider == ProviderName.CLAUDE
-        and result.is_error
-        and result.raw.get("status_code") == 429
-    )
-
-
-def _build_claude_rate_limited_partial_result(
-    window: WindowPeriod,
-    include_error: bool,
-    snapshot_payload: dict[str, object] | None = None,
-) -> ProviderResult:
-    """
-    @brief Build Claude 429 partial-window result using persisted payload when available.
-    @details For 5h window, usage is always forced to 100.0% while reset time is read
-    from persisted payload (`five_hour.resets_at`) when possible. For 7d window,
-    utilization and reset are restored from persisted payload (`seven_day`) when
-    available; otherwise synthetic window-based fallback values are used.
-    @param window {WindowPeriod} Window associated with the synthetic result.
-    @param include_error {bool} True to include `Rate limited...` error text.
-    @param snapshot_payload {dict[str, object] | None} Persisted Claude payload for
-        429 restoration.
-    @return {ProviderResult} Claude result suitable for partial-window display.
-    @satisfies REQ-036
-    @satisfies REQ-037
-    """
-    reset_at = _extract_snapshot_reset_at(snapshot_payload, window)
-    if reset_at is None:
-        reset_at = datetime.now(timezone.utc) + _WINDOW_PERIOD_TIMEDELTA[window]
-
-    utilization = 100.0
-    if window == WindowPeriod.DAY_7:
-        persisted_utilization = _extract_snapshot_utilization(snapshot_payload, window)
-        if persisted_utilization is not None:
-            utilization = persisted_utilization
-
-    remaining = max(0.0, min(100.0, 100.0 - utilization))
-    return ProviderResult(
-        provider=ProviderName.CLAUDE,
-        window=window,
-        metrics=UsageMetrics(
-            remaining=remaining,
-            limit=100.0,
-            reset_at=reset_at,
-        ),
-        raw={
-            "status_code": 429,
-            "rate_limit_partial": True,
-            "snapshot_restored": snapshot_payload is not None,
-            "snapshot_payload": snapshot_payload,
-        },
-        error="Rate limited. Try again later." if include_error else None,
-    )
 
 
 def _refresh_and_persist_cache_payload(
@@ -2770,36 +2156,6 @@ def _refresh_and_persist_cache_payload(
             append_runtime_log_line(
                 f"refresh.pipeline.skip provider={provider_name.value} reason=not_configured"
             )
-            continue
-
-        if isinstance(provider, ClaudeOAuthProvider) and target_window in {
-            WindowPeriod.HOUR_5,
-            WindowPeriod.DAY_7,
-        }:
-            result_5h, result_7d = _fetch_claude_dual_with_auth_recovery(
-                provider=provider,
-                throttle_state=throttle_state,
-            )
-            fetched_results.extend([result_5h, result_7d])
-            _record_attempt_status(status_section, result_5h)
-            _record_attempt_status(status_section, result_7d)
-            _append_provider_failure_runtime_log(result_5h)
-            _append_provider_failure_runtime_log(result_7d)
-
-            preferred_success: ProviderResult | None = None
-            if target_window == WindowPeriod.HOUR_5:
-                if not result_5h.is_error:
-                    preferred_success = result_5h
-                elif not result_7d.is_error:
-                    preferred_success = result_7d
-            else:
-                if not result_7d.is_error:
-                    preferred_success = result_7d
-                elif not result_5h.is_error:
-                    preferred_success = result_5h
-
-            if preferred_success is not None:
-                successful_payload_results[provider_name.value] = preferred_success
             continue
 
         effective_window = _fixed_effective_window(provider_name) or target_window
@@ -2883,13 +2239,6 @@ def retrieve_results_via_cache_pipeline(
         )
 
     idle_state_by_provider = load_idle_time()
-    if force_refresh:
-        if _clear_claude_refresh_block_flag(idle_state_by_provider):
-            save_idle_time(idle_state_by_provider)
-            idle_state_by_provider = load_idle_time()
-    elif _clear_expired_claude_refresh_block(idle_state_by_provider):
-        save_idle_time(idle_state_by_provider)
-        idle_state_by_provider = load_idle_time()
     now_utc = datetime.now(timezone.utc)
     if provider_filter is None:
         selected_providers = providers
@@ -3037,7 +2386,7 @@ def _build_cached_dual_window_results(
     providers: dict[ProviderName, BaseProvider],
 ) -> tuple[ProviderResult, ProviderResult] | None:
     """
-    @brief Build Claude/Codex dual-window display results from cached payload data.
+    @brief Build Codex dual-window display results from cached payload data.
     @details Attempts parser-based 5h/7d projection from cached raw payload when
     provider parser is available.
     @param provider_name {ProviderName} Provider associated with cached result.
@@ -3173,7 +2522,7 @@ def main(ctx: click.Context) -> None:
     "--provider",
     "-p",
     default="all",
-    help="Provider to query (claude, openai, openrouter, copilot, codex, geminiai, zai, all)",
+    help="Provider to query (agy, openai, openrouter, copilot, codex, geminiai, zai, all)",
 )
 @click.option(
     "--window",
@@ -3316,7 +2665,11 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
                         _provider_display_name(name),
                         [
                             "Status: NOT CONFIGURED",
-                            f"Missing env: {config.ENV_VARS.get(name)}",
+                            (
+                                f"Missing env: {config.ENV_VARS.get(name)}"
+                                if config.ENV_VARS.get(name)
+                                else "Missing CLI: agy (Antigravity) not found in PATH"
+                            ),
                         ],
                     )
                 )
@@ -3329,7 +2682,7 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
         provider_name = ProviderName(provider_key)
         show_dual_windows = (
             window_source == ParameterSource.DEFAULT
-            and provider_name in {ProviderName.CLAUDE, ProviderName.CODEX}
+            and provider_name == ProviderName.CODEX
         )
         if show_dual_windows:
             dual_results = _build_cached_dual_window_results(
@@ -3423,7 +2776,7 @@ def _provider_display_name(provider_name: ProviderName) -> str:
 def _provider_panel_sort_key(provider_name: ProviderName) -> tuple[int, str]:
     """
     @brief Build deterministic provider sort key for CLI `show` panel ordering.
-    @details Applies canonical provider order `claude/openrouter/copilot/codex/openai/geminiai`;
+    @details Applies canonical provider order `agy/openrouter/copilot/codex/openai/geminiai`;
     unknown providers are appended after known providers using lexical fallback.
     @param provider_name {ProviderName} Provider enum key.
     @return {tuple[int, str]} `(rank, provider_name.value)` sort key.
@@ -3442,7 +2795,7 @@ def _ordered_rendered_panels(
     """
     @brief Order rendered CLI provider panels by canonical provider sequence.
     @details Sorts the already-filtered CLI render queue with `_provider_panel_sort_key(...)`
-    so visible panels keep stable `claude/openrouter/copilot/codex/openai/geminiai`
+    so visible panels keep stable `agy/openrouter/copilot/codex/openai/geminiai`
     ordering regardless of which disabled providers were removed earlier. Time
     complexity O(P log P). Space complexity O(P).
     @param rendered_panels {list[tuple[ProviderName, str, list[str]]]} CLI render queue after provider filtering.
@@ -3483,7 +2836,7 @@ def _should_render_cli_progress_bar(provider_name: ProviderName) -> bool:
     """
     @brief Determine whether one CLI usage row must include a progress bar.
     @details Returns true only for providers whose CLI `show` rows use the
-    fixed-width bracketed progress-bar surface: `claude`, `openrouter`,
+    fixed-width bracketed progress-bar surface: `agy`, `openrouter`,
     `copilot`, `codex`, and `zai`. Returns false for `openai` and `geminiai`,
     which render text-only usage rows. Time complexity O(1). Space complexity O(1).
     @param provider_name {ProviderName} Provider enum key.
@@ -3493,9 +2846,10 @@ def _should_render_cli_progress_bar(provider_name: ProviderName) -> bool:
     @satisfies REQ-131
     @satisfies REQ-132
     @satisfies REQ-140
+    @satisfies REQ-168
     """
     return provider_name in (
-        ProviderName.CLAUDE,
+        ProviderName.AGY,
         ProviderName.OPENROUTER,
         ProviderName.COPILOT,
         ProviderName.CODEX,
@@ -3509,7 +2863,7 @@ def _build_cli_usage_line(
     """
     @brief Build one CLI usage row with provider-specific progress-bar policy.
     @details Uses `_should_render_cli_progress_bar(...)` to emit
-    `Usage: <window> <progress_bar> <percent>%` for `claude`, `openrouter`,
+    `Usage: <window> <progress_bar> <percent>%` for `agy`, `openrouter`,
     `copilot`, and `codex`. Returns `Usage: <window> <percent>%` for
     `openai/geminiai` so those providers omit progress-bar glyphs while
     preserving explicit window and percentage text. Time complexity O(W) when a
@@ -3886,7 +3240,7 @@ def _build_zai_quota_lines(result: ProviderResult) -> list[str]:
     Quotas without a parseable percentage normalize to `0.0%`; quotas without a
     future reset time omit the reset row. Usage rows delegate to
     `_build_cli_usage_line(ProviderName.ZAI, ...)` so Z.ai renders the standard
-    fixed-width bracketed progress bar like `claude/openrouter/copilot/codex`.
+    fixed-width bracketed progress bar like `agy/openrouter/copilot/codex`.
     Quota labels resolve from the `label` field with the round-trip-safe
     `quota_key` fallback and a legacy `key` fallback tolerated for pre-migration
     cached payloads; sanitizer-redacted legacy values normalize to `Quota`.
@@ -3929,6 +3283,39 @@ def _build_zai_quota_lines(result: ProviderResult) -> list[str]:
                 )
     return lines
 
+def _build_agy_quota_lines(result: ProviderResult) -> list[str]:
+    """
+    @brief Build Antigravity per-quota usage rows for CLI text panels.
+    @details Projects the normalized `raw.agy_quotas` array into one
+    `Usage: <label> <progress_bar> <percent>%` row per quota. Quotas without a
+    parseable percentage normalize to `0.0%`. Usage rows delegate to
+    `_build_cli_usage_line(ProviderName.AGY, ...)` so Antigravity renders the
+    standard fixed-width bracketed progress bar like the other bar providers.
+    Quota labels resolve from the `label` field with the round-trip-safe
+    `quota_key` fallback and a `Quota` terminal fallback.
+    @param result {ProviderResult} Antigravity provider result.
+    @return {list[str]} Ordered quota usage detail lines.
+    @satisfies REQ-168
+    """
+    lines: list[str] = []
+    quotas = result.raw.get("agy_quotas") if isinstance(result.raw, dict) else None
+    if not isinstance(quotas, list):
+        return lines
+    for quota in quotas:
+        if not isinstance(quota, dict):
+            continue
+        label = (
+            quota.get("label")
+            or quota.get("quota_key")
+            or "Quota"
+        )
+        percentage = quota.get("percentage")
+        percentage_value = (
+            float(percentage) if isinstance(percentage, (int, float)) else 0.0
+        )
+        lines.append(_build_cli_usage_line(ProviderName.AGY, str(label), percentage_value))
+    return lines
+
 def _build_result_panel(
     name: ProviderName,
     result: ProviderResult,
@@ -3941,7 +3328,7 @@ def _build_result_panel(
     preserves provider-specific metrics/error rendering rules used by `show`.
     `FAIL` states emit `Status: FAIL`, `Reason: <reason>`, and `Updated/Next`
     separated by blank lines. `OK` states emit `Status: OK` first, render
-    `claude/openrouter/copilot/codex` usage rows as
+    `agy/openrouter/copilot/codex` usage rows as
     `Usage: <window> <progress_bar> <percent>%`, render `openai/geminiai`
     usage rows as `Usage: <window> <percent>%`, default OpenRouter usage display
     to `0.0%` when quota inputs are unavailable so the CLI stays aligned with
@@ -4000,6 +3387,15 @@ def _build_result_panel(
             freshness_line,
         ]
 
+    if name == ProviderName.AGY:
+        return title, [
+            "Status: OK",
+            "",
+            *_build_agy_quota_lines(result),
+            "",
+            freshness_line,
+        ]
+
     m = result.metrics
     usage_percent = m.usage_percent
     if usage_percent is None and name == ProviderName.OPENROUTER:
@@ -4022,13 +3418,10 @@ def _build_result_panel(
         if delta.total_seconds() > 0:
             reset_value = _format_reset_duration(delta.total_seconds())
             detail_lines.append(f"Resets in: {reset_value}")
-    elif _should_print_claude_reset_pending_hint(name, m):
-        detail_lines.append(f"Resets in: {_RESET_PENDING_MESSAGE}")
 
     if (
         name
         in (
-            ProviderName.CLAUDE,
             ProviderName.CODEX,
             ProviderName.COPILOT,
         )
@@ -4214,7 +3607,7 @@ def _build_dual_window_section(
     """
     @brief Build one labeled dual-window CLI section.
     @details Prepends the raw window label (`5h` or `7d`) to the ordered detail
-    lines for one Claude/Codex section. The helper intentionally preserves
+    lines for one dual-window provider section. The helper intentionally preserves
     duplicate metric text across sections so identical `Usage` or `Resets in`
     rows remain visible in both windows.
     @param window_label {str} Window label text rendered as the section heading.
@@ -4300,7 +3693,7 @@ def _build_dual_window_panel(
     metric_prefixes = ("Cost: ", "Requests: ", "Tokens: ")
     remaining_prefix = "Remaining credits: "
     shared_remaining_line: str | None = None
-    if name in {ProviderName.CLAUDE, ProviderName.CODEX}:
+    if name == ProviderName.CODEX:
         if not result_5h.is_error and not result_7d.is_error:
             shared_remaining_line = next(
                 (line for line in details_7d if line.startswith(remaining_prefix)),
@@ -4374,45 +3767,6 @@ def _format_reset_duration(seconds: float) -> str:
     if days > 0:
         return f"{days}d {hours}h {minutes}m"
     return f"{hours}h {minutes}m"
-
-
-def _should_print_claude_reset_pending_hint(
-    provider_name: ProviderName,
-    metrics: UsageMetrics,
-) -> bool:
-    """
-    @brief Determine whether CLI output must render the reset-pending fallback hint.
-    @details The hint is only valid for Claude windows when no reset timestamp is
-    available yet and usage is exactly zero, which indicates the rate-limit timer has
-    not started. This preserves the normal countdown path for non-zero usage and for
-    providers other than Claude.
-    @param provider_name {ProviderName} Provider associated with the rendered result.
-    @param metrics {UsageMetrics} Normalized quota metrics for the rendered result.
-    @return {bool} True when CLI must print `Resets in: Starts when the first message is sent`.
-    @satisfies REQ-002
-    """
-    if provider_name != ProviderName.CLAUDE:
-        return False
-    if metrics.reset_at is not None:
-        return False
-    return _is_displayed_zero_percent(metrics.usage_percent)
-
-
-def _is_displayed_zero_percent(percent: float | None) -> bool:
-    """
-    @brief Check whether a percentage renders as `0.0%` in one-decimal UI output.
-    @details Uses the same one-decimal rounding semantic as output formatting. This
-    treats small non-zero percentages (e.g. 0.04) as displayed zero, which is required
-    for consistent reset-pending fallback visibility between CLI and GNOME UI.
-    @param percent {float | None} Raw percentage value.
-    @return {bool} True when `percent` is finite, non-negative, and rounds to `0.0`.
-    @satisfies REQ-002
-    """
-    if percent is None or not math.isfinite(percent):
-        return False
-    if percent < 0:
-        return False
-    return round(percent, 1) == 0.0
 
 
 def _progress_bar_layout(percent: float, width: int) -> tuple[int, int, int]:
@@ -4502,7 +3856,10 @@ def doctor() -> None:
             )
         else:
             click.echo(f"  Config:     {click.style('MISSING', fg='red')}")
-            click.echo(f"              Set: {info['env_var']}")
+            if info["env_var"]:
+                click.echo(f"              Set: {info['env_var']}")
+            else:
+                click.echo("              Install: Antigravity CLI (agy) and log in")
             all_ok = False
             click.echo()
             continue
@@ -4598,7 +3955,7 @@ def setup() -> None:
     click.echo("  Configure whether each provider participates in refresh and UI output.")
     configured_enabled_providers = resolve_enabled_providers(runtime_config)
     activation_provider_order = [
-        ProviderName.CLAUDE,
+        ProviderName.AGY,
         ProviderName.OPENROUTER,
         ProviderName.COPILOT,
         ProviderName.CODEX,
@@ -4683,7 +4040,9 @@ def setup() -> None:
     click.echo(click.style("Currency symbols", bold=True))
     click.echo("  Configure the default currency symbol for cost display per provider.")
     click.echo(f"  Valid choices: {', '.join(VALID_CURRENCY_SYMBOLS)}")
-    _currency_provider_names = [p.value for p in ProviderName]
+    _currency_provider_names = [
+        p.value for p in ProviderName if p != ProviderName.AGY
+    ]
     currency_symbols: dict[str, str] = {}
     for _provider_name in _currency_provider_names:
         _current_symbol = runtime_config.currency_symbols.get(_provider_name, "$")
@@ -4855,12 +4214,12 @@ def setup() -> None:
         click.echo("  -> Skipped")
     click.echo()
 
-    # Claude - print instructions only
-    click.echo(click.style("Claude Code", bold=True))
-    click.echo("  Uses Claude CLI credentials automatically.")
+    # Antigravity - print instructions only
+    click.echo(click.style("Antigravity (AGY)", bold=True))
+    click.echo("  Uses the local Antigravity CLI credentials automatically.")
     click.echo("  To set up:")
-    click.echo("    npm install -g @anthropics/claude")
-    click.echo("    claude setup-token")
+    click.echo("    Install the Antigravity CLI and ensure 'agy' is in PATH")
+    click.echo("    Log in once with the Antigravity CLI")
     click.echo()
 
     # Codex - print instructions only
@@ -4926,13 +4285,13 @@ def setup() -> None:
 
 @main.command(
     short_help="Authenticate provider accounts.",
-    help="Authenticate supported providers (claude, copilot, geminiai).",
+    help="Authenticate supported providers (copilot, geminiai).",
 )
 @click.option(
     "--provider",
     "-p",
-    default="claude",
-    help="Provider to login to (claude, copilot, geminiai)",
+    default="copilot",
+    help="Provider to login to (copilot, geminiai)",
 )
 def login(provider: str) -> None:
     """
@@ -4941,64 +4300,13 @@ def login(provider: str) -> None:
     @param provider {str} Input parameter `provider`.
     @return {None} Function return value.
     """
-    if provider == "claude":
-        _login_claude()
-    elif provider == "copilot":
+    if provider == "copilot":
         _login_copilot()
     elif provider == "geminiai":
         _login_geminiai()
     else:
         click.echo(f"Login not supported for provider: {provider}")
-        click.echo("Supported providers: claude, copilot, geminiai")
-        sys.exit(1)
-
-
-def _login_claude() -> None:
-    """
-    @brief Execute login claude.
-    @details Applies login claude logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
-    @return {None} Function return value.
-    """
-    from aibar.claude_cli_auth import ClaudeCLIAuth
-
-    auth = ClaudeCLIAuth()
-
-    if not auth.is_available():
-        click.echo(click.style("\n Claude CLI credentials not found", fg="red"))
-        click.echo()
-        click.echo("To set up Claude CLI:")
-        click.echo("  1. Install: npm install -g @anthropics/claude")
-        click.echo("  2. Authenticate: claude setup-token")
-        click.echo("  3. Then run 'aibar login' again")
-        sys.exit(1)
-
-    info = auth.get_token_info()
-
-    if info["expired"]:
-        click.echo(click.style("\n Token expired", fg="yellow"))
-        click.echo()
-        click.echo("Run this to refresh:")
-        click.echo("  claude setup-token")
-        sys.exit(1)
-
-    token = auth.get_access_token()
-
-    if token:
-        click.echo()
-        click.echo("=" * 60)
-        click.echo(click.style(" Token extracted successfully!", fg="green", bold=True))
-        click.echo()
-        click.echo(f"  Token:      {token[:15]}...")
-        if expires_in := info.get("expires_in_hours"):
-            click.echo(f"  Expires in: {expires_in} hours")
-        if scopes := info.get("scopes"):
-            click.echo(f"  Scopes:     {', '.join(scopes)}")
-        click.echo()
-        click.echo("Token auto-loaded from ~/.claude/.credentials.json")
-        click.echo("You can now run: aibar show --provider claude")
-        click.echo("=" * 60)
-    else:
-        click.echo(click.style("\n Could not extract token", fg="red"))
+        click.echo("Supported providers: copilot, geminiai")
         sys.exit(1)
 
 

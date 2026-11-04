@@ -172,7 +172,7 @@ def test_show_omits_disabled_provider_from_refresh_and_output(
     config_module.save_runtime_config(
         config_module.RuntimeConfig(
             enabled_providers={
-                "claude": True,
+                "agy": True,
                 "openrouter": True,
                 "copilot": True,
                 "codex": True,
@@ -219,6 +219,7 @@ def test_show_omits_disabled_provider_from_refresh_and_output(
     assert "openai" not in output_doc["payload"]
     assert output_doc["enabled_providers"]["openai"] is False
     assert output_doc["extension"]["window_labels"] == {
+        "agy": "30d",
         "copilot": "30d",
         "openrouter": "30d",
         "geminiai": "30d",

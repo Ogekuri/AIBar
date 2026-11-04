@@ -110,7 +110,7 @@ def test_print_result_keeps_panel_rows_aligned_with_colored_progress_bar(
 ) -> None:
     """
     @brief Verify ANSI-colored progress bar rows preserve panel border alignment.
-    @details Renders the Claude 5h partial-window failed path and asserts every
+    @details Renders the Codex 5h partial-window failed path and asserts every
     non-empty panel row has identical visible width after ANSI stripping and no
     reset line contains the `⚠️` suffix glyph.
     @param capsys {pytest.CaptureFixture} Pytest stdout/stderr capture fixture.
@@ -120,14 +120,14 @@ def test_print_result_keeps_panel_rows_aligned_with_colored_progress_bar(
     """
     metrics = UsageMetrics(remaining=0.0, limit=100.0)
     result = ProviderResult(
-        provider=ProviderName.CLAUDE,
+        provider=ProviderName.CODEX,
         window=WindowPeriod.HOUR_5,
         error="Rate limited. Try again later.",
         metrics=metrics,
         raw={"status_code": 429},
     )
 
-    _print_result(ProviderName.CLAUDE, result, label="5h")
+    _print_result(ProviderName.CODEX, result, label="5h")
     panel_rows = [
         _strip_ansi_sequences(line)
         for line in capsys.readouterr().out.splitlines()
@@ -268,8 +268,8 @@ def test_show_default_window_groups_dual_windows_into_one_panel_per_provider(
     monkeypatch,
 ) -> None:
     """
-    @brief Verify default-window `show` groups Claude/Codex dual windows in single provider panels.
-    @details Mocks Claude and Codex parser paths so each provider emits one grouped
+    @brief Verify default-window `show` groups AGY quotas and Codex dual windows in single provider panels.
+    @details Mocks AGY and Codex parser paths so each provider emits one grouped
     panel with shared `Updated/Next` metadata rendered once per provider panel.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
     @return {None} Function return value.
@@ -323,9 +323,8 @@ def test_show_default_window_groups_dual_windows_into_one_panel_per_provider(
 
         return _parse
 
-    claude_provider = MagicMock()
-    claude_provider.is_configured.return_value = True
-    claude_provider._parse_response = _build_dual_parser(ProviderName.CLAUDE)
+    agy_provider = MagicMock()
+    agy_provider.is_configured.return_value = True
 
     codex_provider = MagicMock()
     codex_provider.is_configured.return_value = True
@@ -334,7 +333,7 @@ def test_show_default_window_groups_dual_windows_into_one_panel_per_provider(
     monkeypatch.setattr(
         "aibar.cli.get_providers",
         lambda: {
-            ProviderName.CLAUDE: claude_provider,
+            ProviderName.AGY: agy_provider,
             ProviderName.CODEX: codex_provider,
         },
     )
@@ -343,12 +342,27 @@ def test_show_default_window_groups_dual_windows_into_one_panel_per_provider(
         lambda **_: RetrievalPipelineOutput(
             payload={},
             results={
-                ProviderName.CLAUDE.value: ProviderResult(
-                    provider=ProviderName.CLAUDE,
-                    window=WindowPeriod.DAY_7,
-                    metrics=UsageMetrics(remaining=65.0, limit=100.0),
+                ProviderName.AGY.value: ProviderResult(
+                    provider=ProviderName.AGY,
+                    window=WindowPeriod.DAY_30,
+                    metrics=UsageMetrics(remaining=42.5, limit=100.0),
                     updated_at=shared_updated_at,
-                    raw={"status_code": 200},
+                    raw={
+                        "agy_quotas": [
+                            {
+                                "quota_key": "gemini_weekly",
+                                "label": "G 7d",
+                                "remaining_percent": 42.5,
+                                "percentage": 57.5,
+                            },
+                            {
+                                "quota_key": "gemini_five_hour",
+                                "label": "G 5h",
+                                "remaining_percent": 10.0,
+                                "percentage": 90.0,
+                            },
+                        ]
+                    },
                 ),
                 ProviderName.CODEX.value: ProviderResult(
                     provider=ProviderName.CODEX,
@@ -369,9 +383,9 @@ def test_show_default_window_groups_dual_windows_into_one_panel_per_provider(
     assert result.exit_code == 0
 
     panel_data = _extract_panel_titles_and_bodies(result.output)
-    assert [title for title, _body in panel_data] == ["CLAUDE", "CODEX"]
-    assert "CLAUDE (5h)" not in result.output
-    assert "CLAUDE (7d)" not in result.output
+    assert [title for title, _body in panel_data] == ["AGY", "CODEX"]
+    assert "AGY (5h)" not in result.output
+    assert "AGY (7d)" not in result.output
     assert "CODEX (5h)" not in result.output
     assert "CODEX (7d)" not in result.output
     assert result.output.count("Window 5h:") == 0
@@ -409,12 +423,11 @@ def test_show_default_window_keeps_dual_section_labels_when_other_providers_are_
     monkeypatch,
 ) -> None:
     """
-    @brief Verify disabled single-window providers do not remove Claude/Codex `5h` and `7d` section labels.
+    @brief Verify disabled single-window providers do not remove Codex `5h` and `7d` section labels.
     @details Reproduces the user-reported surface where `openrouter` and `openai`
-    are disabled and Claude/Codex are the only rendered providers. Both dual-window
-    providers return identical `5h` and `7d` usage values so panel assembly MUST
-    preserve explicit `5h`/`7d` section labels and two usage rows instead of
-    collapsing one row away.
+    are disabled and Codex is the only rendered dual-window provider. Codex returns
+    identical `5h` and `7d` usage values so panel assembly MUST preserve explicit
+    `5h`/`7d` section labels and two usage rows instead of collapsing one row away.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
     @return {None} Function return value.
     @satisfies REQ-002
@@ -451,10 +464,6 @@ def test_show_default_window_keeps_dual_section_labels_when_other_providers_are_
 
         return _parse
 
-    claude_provider = MagicMock()
-    claude_provider.is_configured.return_value = True
-    claude_provider._parse_response = _build_equal_dual_parser(ProviderName.CLAUDE)
-
     codex_provider = MagicMock()
     codex_provider.is_configured.return_value = True
     codex_provider._parse_response = _build_equal_dual_parser(ProviderName.CODEX)
@@ -462,7 +471,6 @@ def test_show_default_window_keeps_dual_section_labels_when_other_providers_are_
     monkeypatch.setattr(
         "aibar.cli.get_providers",
         lambda: {
-            ProviderName.CLAUDE: claude_provider,
             ProviderName.CODEX: codex_provider,
         },
     )
@@ -470,7 +478,7 @@ def test_show_default_window_keeps_dual_section_labels_when_other_providers_are_
         "aibar.cli.load_runtime_config",
         lambda: RuntimeConfig(
             enabled_providers={
-                "claude": True,
+                "agy": True,
                 "openrouter": False,
                 "copilot": False,
                 "codex": True,
@@ -484,13 +492,6 @@ def test_show_default_window_keeps_dual_section_labels_when_other_providers_are_
         lambda **_: RetrievalPipelineOutput(
             payload={},
             results={
-                ProviderName.CLAUDE.value: ProviderResult(
-                    provider=ProviderName.CLAUDE,
-                    window=WindowPeriod.DAY_7,
-                    metrics=UsageMetrics(remaining=50.0, limit=100.0),
-                    updated_at=shared_updated_at,
-                    raw={"status_code": 200},
-                ),
                 ProviderName.CODEX.value: ProviderResult(
                     provider=ProviderName.CODEX,
                     window=WindowPeriod.DAY_7,
@@ -512,16 +513,12 @@ def test_show_default_window_keeps_dual_section_labels_when_other_providers_are_
     assert "OPENAI" not in result.output
 
     panel_data = _extract_panel_titles_and_bodies(result.output)
-    assert [title for title, _body in panel_data] == ["CLAUDE", "CODEX"]
+    assert [title for title, _body in panel_data] == ["CODEX"]
     codex_body = [line.strip() for title, body in panel_data if title == "CODEX" for line in body]
-    claude_body = [line.strip() for title, body in panel_data if title == "CLAUDE" for line in body]
 
     assert codex_body.count("5h") == 1
     assert codex_body.count("7d") == 1
-    assert claude_body.count("5h") == 1
-    assert claude_body.count("7d") == 1
     assert sum(line.startswith("Usage:") for line in codex_body) == 2
-    assert sum(line.startswith("Usage:") for line in claude_body) == 2
 
 
 def test_show_fail_panel_uses_status_reason_updated_layout(monkeypatch) -> None:
@@ -576,7 +573,7 @@ def test_show_orders_provider_panels_status_first_and_updated_last(monkeypatch) 
     """
     @brief Verify `show` panel order and per-panel status/freshness row placement.
     @details Forces explicit `7d` rendering across all providers with shuffled input maps
-    and asserts output panel order `CLAUDE, OPENROUTER, COPILOT, CODEX, OPENAI, GEMINIAI`
+    and asserts output panel order `AGY, OPENROUTER, COPILOT, CODEX, OPENAI, GEMINIAI`
     while each panel body starts with `Status:` and ends with `Updated: ..., Next: ...`,
     and Copilot inserts one blank line between `Remaining credits` and `Cost`.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
@@ -594,7 +591,7 @@ def test_show_orders_provider_panels_status_first_and_updated_last(monkeypatch) 
             ProviderName.CODEX: provider_stub,
             ProviderName.COPILOT: provider_stub,
             ProviderName.OPENROUTER: provider_stub,
-            ProviderName.CLAUDE: provider_stub,
+            ProviderName.AGY: provider_stub,
         },
     )
 
@@ -621,7 +618,7 @@ def test_show_orders_provider_panels_status_first_and_updated_last(monkeypatch) 
             results={
                 ProviderName.OPENAI.value: _build_result(ProviderName.OPENAI),
                 ProviderName.COPILOT.value: _build_result(ProviderName.COPILOT),
-                ProviderName.CLAUDE.value: _build_result(ProviderName.CLAUDE),
+                ProviderName.AGY.value: _build_result(ProviderName.AGY),
                 ProviderName.GEMINIAI.value: _build_result(ProviderName.GEMINIAI),
                 ProviderName.OPENROUTER.value: _build_result(ProviderName.OPENROUTER),
                 ProviderName.CODEX.value: _build_result(ProviderName.CODEX),
@@ -638,7 +635,7 @@ def test_show_orders_provider_panels_status_first_and_updated_last(monkeypatch) 
 
     panel_data = _extract_panel_titles_and_bodies(result.output)
     assert [title for title, _body in panel_data] == [
-        "CLAUDE",
+        "AGY",
         "OPENROUTER",
         "COPILOT",
         "CODEX",

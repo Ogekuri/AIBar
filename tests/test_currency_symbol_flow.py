@@ -82,7 +82,7 @@ class TestResolveCurrencySymbol:
         @return {None} Function return value.
         @satisfies REQ-050
         """
-        result = resolve_currency_symbol({"currency": "USD"}, "claude")
+        result = resolve_currency_symbol({"currency": "USD"}, "codex")
         assert result == "$"
 
     def test_iso_gbp_maps_to_pound(self) -> None:
@@ -91,7 +91,7 @@ class TestResolveCurrencySymbol:
         @return {None} Function return value.
         @satisfies REQ-050
         """
-        result = resolve_currency_symbol({"currency": "GBP"}, "claude")
+        result = resolve_currency_symbol({"currency": "GBP"}, "codex")
         assert result == "£"
 
     def test_iso_eur_maps_to_euro(self) -> None:
@@ -160,7 +160,7 @@ class TestResolveCurrencySymbol:
         @return {None} Function return value.
         @satisfies REQ-050
         """
-        result = resolve_currency_symbol(None, "claude")
+        result = resolve_currency_symbol(None, "codex")
         assert result == "$"
 
 
@@ -182,11 +182,11 @@ class TestCliPrintResultUsesCurrencySymbol:
 
         metrics = UsageMetrics(cost=1.2345, currency_symbol="£")
         result = ProviderResult(
-            provider=ProviderName.CLAUDE,
+            provider=ProviderName.CODEX,
             window=WindowPeriod.DAY_7,
             metrics=metrics,
         )
-        _print_result(ProviderName.CLAUDE, result)
+        _print_result(ProviderName.CODEX, result)
 
         captured = capsys.readouterr()
         assert "£1.2345" in captured.out
@@ -225,11 +225,21 @@ class TestCliPrintResultUsesCurrencySymbol:
 
         metrics = UsageMetrics(limit=100.0, remaining=75.0, currency_symbol="$")
         result = ProviderResult(
-            provider=ProviderName.CLAUDE,
+            provider=ProviderName.AGY,
             window=WindowPeriod.DAY_7,
             metrics=metrics,
+            raw={
+                "agy_quotas": [
+                    {
+                        "quota_key": "gemini_weekly",
+                        "label": "G 7d",
+                        "remaining_percent": 42.5,
+                        "percentage": 57.5,
+                    }
+                ]
+            },
         )
-        _print_result(ProviderName.CLAUDE, result)
+        _print_result(ProviderName.AGY, result)
         captured = capsys.readouterr()
 
         assert "┌" in captured.out

@@ -20,9 +20,9 @@ const IDLE_DELAY_SECONDS = 300;
 const ENV_FILE_PATH = GLib.get_home_dir() + '/.config/aibar/env';
 const RESET_PENDING_MESSAGE = 'Starts when the first message is sent';
 const RATE_LIMIT_ERROR_MESSAGE = 'Rate limited. Try again later.';
-const CLAUDE_OAUTH_ERROR_MESSAGE = 'Invalid or expired OAuth token';
+const AUTH_ERROR_MARKER = 'authentication failed';
 const PROVIDER_PROGRESS_CLASSES = {
-    claude: 'aibar-progress-provider-claude',
+    agy: 'aibar-progress-provider-agy',
     openrouter: 'aibar-progress-provider-openrouter',
     copilot: 'aibar-progress-provider-copilot',
     codex: 'aibar-progress-provider-codex',
@@ -42,10 +42,12 @@ const PROVIDER_DISPLAY_NAMES = {
     zai: 'Z.AI',
 };
 const API_COUNTER_PROVIDERS = new Set(['openai', 'codex', 'geminiai']);
-const PROGRESS_BAR_PROVIDERS = new Set(['claude', 'openrouter', 'copilot', 'codex', 'zai']);
+const PROGRESS_BAR_PROVIDERS = new Set(['agy', 'openrouter', 'copilot', 'codex', 'zai']);
+const AGY_QUOTA_LABELS = Object.freeze(['G 7d', 'G 5h', 'CG 7d', 'CG 5h', 'A 7d']);
 const TEXT_USAGE_PROVIDERS = new Set(['openai', 'geminiai']);
 const WINDOW_BAR_30D_PROVIDERS = new Set(['copilot', 'openrouter']);
 const DEFAULT_WINDOW_LABELS = Object.freeze({
+    agy: '30d',
     copilot: '30d',
     openrouter: '30d',
     openai: '30d',
@@ -53,7 +55,7 @@ const DEFAULT_WINDOW_LABELS = Object.freeze({
     zai: '30d',
 });
 const ALL_PROVIDER_NAMES = Object.freeze([
-    'claude',
+    'agy',
     'openrouter',
     'copilot',
     'codex',
@@ -62,7 +64,7 @@ const ALL_PROVIDER_NAMES = Object.freeze([
     'zai',
 ]);
 const DEFAULT_ENABLED_PROVIDERS = Object.freeze({
-    claude: true,
+    agy: true,
     openrouter: true,
     copilot: true,
     codex: true,
@@ -152,7 +154,7 @@ function _filterProviderObjectByEnabledProviders(providerData, enabledProviders)
  * @brief Order visible provider names by canonical extension surface sequence.
  * @details Returns provider keys present in `providerData`, excludes keys whose
  * normalized enable-state is `false`, preserves canonical order
- * `claude/openrouter/copilot/codex/openai/geminiai`, and appends unknown keys
+ * `agy/openrouter/copilot/codex/openai/geminiai`, and appends unknown keys
  * in lexical order. Time complexity O(P log P). Space complexity O(P).
  * @param {string[]} providerOrder Canonical provider order array.
  * @param {Object<string, boolean>} enabledProviders Normalized provider-enabled mapping.
@@ -316,7 +318,8 @@ function _classifyPanelFailureCategory(statusEntry) {
     const errorText = typeof statusEntry.error === 'string'
         ? statusEntry.error
         : '';
-    if (errorText.includes(CLAUDE_OAUTH_ERROR_MESSAGE))
+    const normalizedErrorText = errorText.toLowerCase();
+    if (normalizedErrorText.includes(AUTH_ERROR_MARKER) || normalizedErrorText.includes('oauth'))
         return 'oauth';
     if (errorText.includes(RATE_LIMIT_ERROR_MESSAGE) || statusCode === 429)
         return 'rate_limit';
@@ -744,7 +747,7 @@ class AIBarIndicator extends PanelMenu.Button {
         this._windowLabels = {...DEFAULT_WINDOW_LABELS};
         this._copilotExtraPremiumRequestCost = DEFAULT_COPILOT_EXTRA_PREMIUM_REQUEST_COST;
         this._activeProvider = null;
-        this._providerOrder = ['claude', 'openrouter', 'copilot', 'codex', 'openai', 'geminiai', 'zai'];
+        this._providerOrder = ['agy', 'openrouter', 'copilot', 'codex', 'openai', 'geminiai', 'zai'];
         this._iconBlinkTimeout = null;
         this._iconBlinkOn = false;
 
@@ -781,22 +784,16 @@ class AIBarIndicator extends PanelMenu.Button {
             style_class: 'aibar-panel-percentages',
         });
 
-        this._panelClaudePctLabel = new St.Label({
+        this._panelAgyPctLabel = new St.Label({
             text: '',
             y_align: Clutter.ActorAlign.CENTER,
-            style_class: 'aibar-panel-pct aibar-panel-pct-primary aibar-tab-label-claude',
+            style_class: 'aibar-panel-pct aibar-panel-pct-primary aibar-tab-label-agy',
         });
 
-        this._panelClaude7dPctLabel = new St.Label({
+        this._panelAgy7dPctLabel = new St.Label({
             text: '',
             y_align: Clutter.ActorAlign.CENTER,
-            style_class: 'aibar-panel-pct aibar-panel-pct-secondary aibar-tab-label-claude',
-        });
-
-        this._panelClaudeCostLabel = new St.Label({
-            text: '',
-            y_align: Clutter.ActorAlign.CENTER,
-            style_class: 'aibar-panel-pct aibar-panel-cost aibar-tab-label-claude',
+            style_class: 'aibar-panel-pct aibar-panel-pct-secondary aibar-tab-label-agy',
         });
 
         this._panelOpenRouterCostLabel = new St.Label({
@@ -859,9 +856,8 @@ class AIBarIndicator extends PanelMenu.Button {
             style_class: 'aibar-panel-pct aibar-panel-pct-primary aibar-tab-label-zai',
         });
 
-        this._panelClaudePctLabel.hide();
-        this._panelClaude7dPctLabel.hide();
-        this._panelClaudeCostLabel.hide();
+        this._panelAgyPctLabel.hide();
+        this._panelAgy7dPctLabel.hide();
         this._panelOpenRouterCostLabel.hide();
         this._panelCopilotPctLabel.hide();
         this._panelCopilotExtraCostLabel.hide();
@@ -874,9 +870,8 @@ class AIBarIndicator extends PanelMenu.Button {
         this._panelZaiWeeklyPctLabel.hide();
         this._panelLabel.hide();
 
-        this._panelPercentages.add_child(this._panelClaudePctLabel);
-        this._panelPercentages.add_child(this._panelClaude7dPctLabel);
-        this._panelPercentages.add_child(this._panelClaudeCostLabel);
+        this._panelPercentages.add_child(this._panelAgyPctLabel);
+        this._panelPercentages.add_child(this._panelAgy7dPctLabel);
         this._panelPercentages.add_child(this._panelOpenRouterCostLabel);
         this._panelPercentages.add_child(this._panelCopilotPctLabel);
         this._panelPercentages.add_child(this._panelCopilotExtraCostLabel);
@@ -1006,6 +1001,13 @@ class AIBarIndicator extends PanelMenu.Button {
 
                 if (Array.isArray(card._barData.zaiQuotas)) {
                     for (const entry of card._barData.zaiQuotas) {
+                        if (entry && entry.bar)
+                            _applyProgressFillGeometry(entry.bar.barFill, entry.bar.barBg, entry.pct);
+                    }
+                }
+
+                if (Array.isArray(card._barData.agyQuotas)) {
+                    for (const entry of card._barData.agyQuotas) {
                         if (entry && entry.bar)
                             _applyProgressFillGeometry(entry.bar.barFill, entry.bar.barBg, entry.pct);
                     }
@@ -1249,6 +1251,7 @@ class AIBarIndicator extends PanelMenu.Button {
         let fiveHourBar = null;
         let sevenDayBar = null;
         let zaiQuotaBars = [];
+        let agyQuotaBars = [];
         if (providerName === 'zai') {
             zaiQuotaBars = [
                 createWindowBar('5h'),
@@ -1256,6 +1259,10 @@ class AIBarIndicator extends PanelMenu.Button {
                 createWindowBar('1m'),
             ];
             for (const bar of zaiQuotaBars)
+                windowBars.add_child(bar.container);
+        } else if (providerName === 'agy') {
+            agyQuotaBars = AGY_QUOTA_LABELS.map(label => createWindowBar(label));
+            for (const bar of agyQuotaBars)
                 windowBars.add_child(bar.container);
         } else {
             fiveHourBar = createWindowBar('5h');
@@ -1322,6 +1329,7 @@ class AIBarIndicator extends PanelMenu.Button {
             fiveHourBar,
             sevenDayBar,
             zaiQuotaBars,
+            agyQuotaBars,
             costLabel,
             byokLabel,
             requestsLabel,
@@ -1340,7 +1348,7 @@ class AIBarIndicator extends PanelMenu.Button {
      * while keeping `Updated: ..., Next: ...` freshness output and suppressing
      * usage/reset/quota/cost rows. Successful states render metrics using
      * existing provider-specific card rules, including Copilot
-     * `Cost: <currency_symbol><value>` row. `claude/openrouter/copilot/codex/zai`
+     * `Cost: <currency_symbol><value>` row. `agy/openrouter/copilot/codex/zai`
      * keep progress bars, while `openai/geminiai` render
      * `Usage: <window> <percent>%` text without bar widgets. Z.ai renders one
      * per-quota progress bar with its `Reset in:` label in the same location as
@@ -1431,6 +1439,10 @@ class AIBarIndicator extends PanelMenu.Button {
                 card.sevenDayBar.container.hide();
             if (card.zaiQuotaBars) {
                 for (const bar of card.zaiQuotaBars)
+                    bar.container.hide();
+            }
+            if (card.agyQuotaBars) {
+                for (const bar of card.agyQuotaBars)
                     bar.container.hide();
             }
             card.progressContainer.hide();
@@ -1527,6 +1539,70 @@ class AIBarIndicator extends PanelMenu.Button {
             card.tokensLabel.hide();
             return;
         }
+        if (providerName === 'agy') {
+            card.progressContainer.hide();
+            card.progressBg.hide();
+            card.progressFill.style_class = 'aibar-progress-fill aibar-progress-none';
+            card.progressFill.set_width(0);
+            if (card.progressFill._aibarMarkerActor) {
+                card.progressFill._aibarMarkerActor.set_width(0);
+                card.progressFill._aibarMarkerActor.hide();
+            }
+            if (card.progressFill._aibarOverLimitActor) {
+                card.progressFill._aibarOverLimitActor.set_width(0);
+                card.progressFill._aibarOverLimitActor.hide();
+            }
+            if (card.fiveHourBar)
+                card.fiveHourBar.container.hide();
+            if (card.sevenDayBar)
+                card.sevenDayBar.container.hide();
+            if (card.zaiQuotaBars) {
+                for (const bar of card.zaiQuotaBars)
+                    bar.container.hide();
+            }
+            const agyQuotas = Array.isArray(raw.agy_quotas) ? raw.agy_quotas : [];
+            const agyBars = Array.isArray(card.agyQuotaBars) ? card.agyQuotaBars : [];
+            const agyBarData = [];
+            const agyProgressClass = _getProviderProgressClass('agy');
+            for (let i = 0; i < agyBars.length; i++) {
+                const bar = agyBars[i];
+                const quota = agyQuotas[i];
+                if (!quota || typeof quota !== 'object') {
+                    bar.container.hide();
+                    continue;
+                }
+                const quotaLabel = quota.label || quota.quota_key || 'Quota';
+                const quotaPercentage = (
+                    typeof quota.percentage === 'number' &&
+                    Number.isFinite(quota.percentage)
+                ) ? quota.percentage : 0;
+                bar.label.set_text(quotaLabel);
+                bar.pctLabel.set_text(`${quotaPercentage.toFixed(1)}%`);
+                bar.barFill.style_class = `aibar-progress-fill ${agyProgressClass}`;
+                bar.resetLabel.text = '';
+                bar.resetLabel.hide();
+                const pctValue = quotaPercentage;
+                GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+                    _applyProgressFillGeometry(bar.barFill, bar.barBg, pctValue);
+                    return GLib.SOURCE_REMOVE;
+                });
+                bar.container.show();
+                agyBarData.push({bar, pct: quotaPercentage});
+            }
+            card._barData = {fiveHour: null, sevenDay: null, progress: null, agyQuotas: agyBarData};
+            card.windowBars.show();
+            card.resetsLabel.text = '';
+            card.resetsLabel.hide();
+            card.costLabel.text = '';
+            card.costLabel.hide();
+            card.byokLabel.text = '';
+            card.byokLabel.hide();
+            card.requestsLabel.text = '';
+            card.requestsLabel.hide();
+            card.tokensLabel.text = '';
+            card.tokensLabel.hide();
+            return;
+        }
         const fiveHourUtil = raw.five_hour && raw.five_hour.utilization !== null && raw.five_hour.utilization !== undefined
             ? raw.five_hour.utilization
             : (raw.rate_limit && raw.rate_limit.primary_window && raw.rate_limit.primary_window.used_percent !== null && raw.rate_limit.primary_window.used_percent !== undefined
@@ -1537,7 +1613,7 @@ class AIBarIndicator extends PanelMenu.Button {
             : (raw.rate_limit && raw.rate_limit.secondary_window && raw.rate_limit.secondary_window.used_percent !== null && raw.rate_limit.secondary_window.used_percent !== undefined
                 ? raw.rate_limit.secondary_window.used_percent
                 : null);
-        const allowLimitReached = providerName === 'claude' || providerName === 'codex' || providerName === 'copilot';
+        const allowLimitReached = providerName === 'codex' || providerName === 'copilot';
 
         const updateWindowBar = (bar, pct, resetTime, useDays, allowResetPendingHint = true) => {
             bar.pctLabel.text = `${pct.toFixed(1)}%`;
@@ -1777,7 +1853,7 @@ class AIBarIndicator extends PanelMenu.Button {
         }
 
         const shouldRenderRemainingCredits = (
-            (providerName === 'claude' || providerName === 'codex' || providerName === 'copilot') &&
+            (providerName === 'codex' || providerName === 'copilot') &&
             metrics.remaining !== null &&
             metrics.remaining !== undefined &&
             metrics.limit !== null &&
@@ -2227,9 +2303,9 @@ class AIBarIndicator extends PanelMenu.Button {
      */
     _updateUI() {
         const usageLabels = {
-            claude5h: this._panelClaudePctLabel,
-            claude7d: this._panelClaude7dPctLabel,
-            claudeCost: this._panelClaudeCostLabel,
+            agy: this._panelAgyPctLabel,
+            agy5h: this._panelAgyPctLabel,
+            agy7d: this._panelAgy7dPctLabel,
             openrouterCost: this._panelOpenRouterCostLabel,
             copilot: this._panelCopilotPctLabel,
             copilotExtraCost: this._panelCopilotExtraCostLabel,
@@ -2322,6 +2398,52 @@ class AIBarIndicator extends PanelMenu.Button {
                 return {primary: null, secondary: null};
             }
 
+            if (providerName === 'agy') {
+                const quotas = raw.agy_quotas;
+                if (Array.isArray(quotas) && quotas.length > 0) {
+                    let maxPct = null;
+                    let fiveHourPct = null;
+                    let weeklyPct = null;
+                    for (const quota of quotas) {
+                        if (
+                            quota &&
+                            typeof quota.percentage === 'number' &&
+                            Number.isFinite(quota.percentage)
+                        ) {
+                            if (maxPct === null || quota.percentage > maxPct)
+                                maxPct = quota.percentage;
+                            const quotaKey = quota.quota_key || '';
+                            if (quotaKey === 'gemini_five_hour' && fiveHourPct === null)
+                                fiveHourPct = quota.percentage;
+                            else if (quotaKey === 'gemini_weekly' && weeklyPct === null)
+                                weeklyPct = quota.percentage;
+                        }
+                    }
+                    // Positional fallback mirrors the canonical AGY quota order
+                    // (`G 7d`, `G 5h`, ...) and the index-based card bars.
+                    if (
+                        fiveHourPct === null &&
+                        quotas[1] &&
+                        typeof quotas[1].percentage === 'number' &&
+                        Number.isFinite(quotas[1].percentage)
+                    )
+                        fiveHourPct = quotas[1].percentage;
+                    if (
+                        weeklyPct === null &&
+                        quotas[0] &&
+                        typeof quotas[0].percentage === 'number' &&
+                        Number.isFinite(quotas[0].percentage)
+                    )
+                        weeklyPct = quotas[0].percentage;
+                    return {
+                        primary: toPercent(fiveHourPct),
+                        secondary: toPercent(weeklyPct),
+                        max: toPercent(maxPct),
+                    };
+                }
+                return {primary: null, secondary: null, max: null};
+            }
+
             if (providerName === 'copilot') {
                 if (metrics.usage_percent !== null && metrics.usage_percent !== undefined)
                     return {primary: toPercent(metrics.usage_percent), secondary: null};
@@ -2373,15 +2495,15 @@ class AIBarIndicator extends PanelMenu.Button {
             return {primary: fiveHourPct, secondary: sevenDayPct};
         };
 
-        const claudeUsage = getPanelUsageValues('claude', this._usageData.claude);
+        const agyUsage = getPanelUsageValues('agy', this._usageData.agy);
         const copilotUsage = getPanelUsageValues('copilot', this._usageData.copilot);
         const codexUsage = getPanelUsageValues('codex', this._usageData.codex);
         const zaiUsage = getPanelUsageValues('zai', this._usageData.zai);
 
         const panelValues = {
-            claude5h: claudeUsage.primary,
-            claude7d: claudeUsage.secondary,
-            claudeCost: this._panelCostText(this._usageData.claude),
+            agy5h: agyUsage.primary,
+            agy7d: agyUsage.secondary,
+            agyMax: agyUsage.max,
             openrouterCost: this._panelCostText(this._usageData.openrouter),
             copilot: copilotUsage.primary,
             copilotExtraCost: this._panelCopilotExtraCostText(this._usageData.copilot),
@@ -2395,7 +2517,7 @@ class AIBarIndicator extends PanelMenu.Button {
             zaiMax: zaiUsage.max,
         };
         const providerFailureStates = {
-            claude: _panelProviderFailureState(this._statusData, 'claude', ['5h', '7d']),
+            agy: _panelProviderFailureState(this._statusData, 'agy', ['30d']),
             openrouter: _panelProviderFailureState(this._statusData, 'openrouter', ['30d']),
             copilot: _panelProviderFailureState(this._statusData, 'copilot', ['30d']),
             codex: _panelProviderFailureState(this._statusData, 'codex', ['5h', '7d']),
@@ -2404,7 +2526,7 @@ class AIBarIndicator extends PanelMenu.Button {
             zai: _panelProviderFailureState(this._statusData, 'zai', ['30d']),
         };
         const providerErrClassNames = {
-            claude: 'aibar-tab-label-claude',
+            agy: 'aibar-tab-label-agy',
             openrouter: 'aibar-tab-label-openrouter',
             copilot: 'aibar-tab-label-copilot',
             codex: 'aibar-tab-label-codex',
@@ -2412,7 +2534,7 @@ class AIBarIndicator extends PanelMenu.Button {
             geminiai: 'aibar-tab-label-geminiai',
             zai: 'aibar-tab-label-zai',
         };
-        const providerErrPriority = ['claude', 'openrouter', 'copilot', 'codex', 'openai', 'geminiai', 'zai'];
+        const providerErrPriority = ['agy', 'openrouter', 'copilot', 'codex', 'openai', 'geminiai', 'zai'];
         const errProviders = [];
         for (const providerName of providerErrPriority) {
             if (this._enabledProviders[providerName] === false)
@@ -2484,8 +2606,7 @@ class AIBarIndicator extends PanelMenu.Button {
         }
 
         const panelPercents = [
-            panelValues.claude5h,
-            panelValues.claude7d,
+            panelValues.agyMax,
             panelValues.copilot,
             panelValues.codex5h,
             panelValues.codex7d,
@@ -2554,9 +2675,8 @@ class AIBarIndicator extends PanelMenu.Button {
      */
     _handleError(message) {
         console.debug(`aibar Error: ${message}`);
-        this._panelClaudePctLabel.set_text('');
-        this._panelClaude7dPctLabel.set_text('');
-        this._panelClaudeCostLabel.set_text('');
+        this._panelAgyPctLabel.set_text('');
+        this._panelAgy7dPctLabel.set_text('');
         this._panelOpenRouterCostLabel.set_text('');
         this._panelCopilotPctLabel.set_text('');
         this._panelCopilotExtraCostLabel.set_text('');
@@ -2567,9 +2687,8 @@ class AIBarIndicator extends PanelMenu.Button {
         this._panelGeminiaiCostLabel.set_text('');
         this._panelZaiPctLabel.set_text('');
         this._panelZaiWeeklyPctLabel.set_text('');
-        this._panelClaudePctLabel.hide();
-        this._panelClaude7dPctLabel.hide();
-        this._panelClaudeCostLabel.hide();
+        this._panelAgyPctLabel.hide();
+        this._panelAgy7dPctLabel.hide();
         this._panelOpenRouterCostLabel.hide();
         this._panelCopilotPctLabel.hide();
         this._panelCopilotExtraCostLabel.hide();

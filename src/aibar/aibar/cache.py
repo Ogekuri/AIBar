@@ -1,7 +1,7 @@
 """
 @file
 @brief Provider result caching primitives.
-@details Implements in-memory and disk cache entries, TTL invalidation, and raw-payload sanitization for non-Claude provider metrics.
+@details Implements in-memory and disk cache entries, TTL invalidation, and raw-payload sanitization for provider metrics.
 """
 
 import json
@@ -39,7 +39,7 @@ class CacheEntry(BaseModel):
 class ResultCache:
     """
     @brief Define result cache component.
-    @details Encapsulates result cache state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces. Caching behavior is disabled for Claude provider results.
+    @details Encapsulates result cache state and operations for AIBar runtime flows with deterministic behavior and explicit interfaces.
     """
 
     DEFAULT_TTL = 120  # 2 minutes
@@ -102,12 +102,13 @@ class ResultCache:
     def _is_cacheable_provider(self, provider: ProviderName) -> bool:
         """
         @brief Check whether result-cache read/write logic is enabled for a provider.
-        @details Returns False for Claude to enforce fresh API reads without memory/disk reuse and rate-limit cooldown markers. Returns True for all other providers.
+        @details Returns True for all providers; the legacy result-cache surface is
+        no longer consumed by the shared show retrieval pipeline.
         @param provider {ProviderName} Provider identifier to classify.
         @return {bool} True when provider caching is enabled.
         @satisfies CTN-004
         """
-        return provider != ProviderName.CLAUDE
+        return True
 
     def get(self, provider: ProviderName, window: WindowPeriod) -> ProviderResult | None:
         """

@@ -93,6 +93,7 @@ def test_show_json_emits_extension_section_with_default_gnome_refresh_interval(
     assert doc["extension"]["gnome_refresh_interval_seconds"] == 60
     assert doc["extension"]["idle_delay_seconds"] == 300
     assert doc["extension"]["window_labels"] == {
+        "agy": "30d",
         "copilot": "30d",
         "openrouter": "30d",
         "openai": "30d",
@@ -100,7 +101,7 @@ def test_show_json_emits_extension_section_with_default_gnome_refresh_interval(
         "zai": "30d",
     }
     assert doc["enabled_providers"] == {
-        "claude": True,
+        "agy": True,
         "openai": True,
         "openrouter": True,
         "copilot": True,
@@ -133,7 +134,7 @@ def test_show_json_emits_extension_section_with_configured_gnome_refresh_interva
             gnome_refresh_interval_seconds=120,
             idle_delay_seconds=420,
             enabled_providers={
-                "claude": True,
+                "agy": True,
                 "openrouter": False,
                 "copilot": True,
                 "codex": True,
@@ -173,12 +174,13 @@ def test_show_json_emits_extension_section_with_configured_gnome_refresh_interva
     assert doc["extension"]["gnome_refresh_interval_seconds"] == 120
     assert doc["extension"]["idle_delay_seconds"] == 420
     assert doc["extension"]["window_labels"] == {
+        "agy": "30d",
         "copilot": "30d",
         "geminiai": "30d",
         "zai": "30d",
     }
     assert doc["enabled_providers"] == {
-        "claude": True,
+        "agy": True,
         "openrouter": False,
         "copilot": True,
         "codex": True,
@@ -233,6 +235,7 @@ def test_show_json_extension_section_does_not_appear_in_cache_payload(
     assert "freshness" in doc
     assert doc["extension"]["idle_delay_seconds"] == 300
     assert doc["extension"]["window_labels"] == {
+        "agy": "30d",
         "copilot": "30d",
         "openrouter": "30d",
         "openai": "30d",
