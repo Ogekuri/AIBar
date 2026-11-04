@@ -2292,9 +2292,13 @@ class AIBarIndicator extends PanelMenu.Button {
      * @details Applies update u i logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
      * Resolves provider-window failure metadata from cache `status` section and forwards it
      * to card renderers. Panel status row renders fixed-order percentages and per-provider costs.
+     * Icon threshold aggregation derives the maximum panel percentage from AGY, OpenRouter,
+     * Copilot, Codex, and Z.ai inputs so the icon reacts to any rendered percentage,
+     * including OpenRouter over-credit values above 100 (REQ-069, REQ-149, REQ-150).
      * After card refresh, re-sizes the popup provider viewport to the visible card height.
      * @returns {any} Function return value.
      * @satisfies REQ-021
+     * @satisfies REQ-149
      * @satisfies REQ-053
      * @satisfies REQ-069
      * @satisfies REQ-118
@@ -2324,6 +2328,26 @@ class AIBarIndicator extends PanelMenu.Button {
             const numeric = Number(value);
             return Number.isFinite(numeric) ? numeric : null;
         };
+        /**
+         * @brief Resolve panel icon threshold percentage inputs for one provider payload.
+         * @details Returns `{primary, secondary[, max]}` percentages consumed by the
+         * `_updateUI(...)` panel aggregation. Provider sources: AGY reads
+         * `raw.agy_quotas` (five-hour, weekly, maximum), Z.ai reads `raw.zai_quotas`
+         * (five-hour, weekly, maximum), OpenRouter and Copilot read
+         * `metrics.usage_percent` first with a `metrics.limit`/`metrics.remaining`
+         * fallback computing `(limit - remaining) / limit * 100` (values above 100
+         * are preserved for over-credit/over-quota icon thresholds), Codex reads
+         * Codex rate-limit window utilization fields. Null, undefined, and
+         * non-finite inputs yield `null` percentages. Time complexity O(Q) over
+         * provider quotas Q. Space complexity O(1).
+         * @param {string} providerName Provider key from JSON payload.
+         * @param {Object<string, any> | null} data Provider payload object.
+         * @return {{primary: number | null, secondary: number | null, max?: number | null}} Panel percentage inputs.
+         * @satisfies REQ-069
+         * @satisfies REQ-139
+         * @satisfies REQ-149
+         * @satisfies REQ-170
+         */
         const getPanelUsageValues = (providerName, data) => {
             if (!data) {
                 return {primary: null, secondary: null};
@@ -2444,6 +2468,24 @@ class AIBarIndicator extends PanelMenu.Button {
                 return {primary: null, secondary: null, max: null};
             }
 
+            if (providerName === 'openrouter') {
+                if (metrics.usage_percent !== null && metrics.usage_percent !== undefined)
+                    return {primary: toPercent(metrics.usage_percent), secondary: null};
+                if (
+                    metrics.limit !== null && metrics.limit !== undefined &&
+                    metrics.remaining !== null && metrics.remaining !== undefined &&
+                    Number(metrics.limit) !== 0
+                ) {
+                    return {
+                        primary: toPercent(
+                            ((Number(metrics.limit) - Number(metrics.remaining)) / Number(metrics.limit)) * 100
+                        ),
+                        secondary: null,
+                    };
+                }
+                return {primary: null, secondary: null};
+            }
+
             if (providerName === 'copilot') {
                 if (metrics.usage_percent !== null && metrics.usage_percent !== undefined)
                     return {primary: toPercent(metrics.usage_percent), secondary: null};
@@ -2496,6 +2538,7 @@ class AIBarIndicator extends PanelMenu.Button {
         };
 
         const agyUsage = getPanelUsageValues('agy', this._usageData.agy);
+        const openrouterUsage = getPanelUsageValues('openrouter', this._usageData.openrouter);
         const copilotUsage = getPanelUsageValues('copilot', this._usageData.copilot);
         const codexUsage = getPanelUsageValues('codex', this._usageData.codex);
         const zaiUsage = getPanelUsageValues('zai', this._usageData.zai);
@@ -2504,6 +2547,7 @@ class AIBarIndicator extends PanelMenu.Button {
             agy5h: agyUsage.primary,
             agy7d: agyUsage.secondary,
             agyMax: agyUsage.max,
+            openrouterMax: openrouterUsage.primary,
             openrouterCost: this._panelCostText(this._usageData.openrouter),
             copilot: copilotUsage.primary,
             copilotExtraCost: this._panelCopilotExtraCostText(this._usageData.copilot),
@@ -2607,6 +2651,7 @@ class AIBarIndicator extends PanelMenu.Button {
 
         const panelPercents = [
             panelValues.agyMax,
+            panelValues.openrouterMax,
             panelValues.copilot,
             panelValues.codex5h,
             panelValues.codex7d,

@@ -638,6 +638,29 @@ def test_panel_icon_color_thresholds_and_blink_logic_are_defined() -> None:
     assert "PANEL_ICON_COLORS.redDim" in source
 
 
+def test_panel_icon_threshold_aggregates_openrouter_usage_percent() -> None:
+    """
+    @brief Verify panel icon threshold aggregation includes the OpenRouter usage percentage.
+    @details Source-level Level-0 regression pinning the aggregated provider set that
+    feeds `_updateIconColor(...)`: OpenRouter contributes its `metrics.usage_percent`
+    value (REQ-149) through the `openrouterMax` panel aggregate so the icon threshold
+    reacts to any rendered percentage per REQ-069, including over-credit >100 values
+    (REQ-150). Panel label rendering and canonical provider order stay unchanged
+    (REQ-021, REQ-022, REQ-133).
+    @satisfies REQ-069
+    @satisfies REQ-149
+    @satisfies REQ-150
+    @satisfies TST-007
+    """
+    source = EXTENSION_PATH.read_text(encoding="utf-8")
+    assert (
+        "const openrouterUsage = getPanelUsageValues('openrouter',"
+        " this._usageData.openrouter);" in source
+    )
+    assert "openrouterMax: openrouterUsage.primary," in source
+    assert "panelValues.openrouterMax," in source
+
+
 def test_provider_color_palette_is_applied_to_tabs_cards_and_progress_fills() -> None:
     """
     @brief Verify provider bright color palette is applied consistently in stylesheet.

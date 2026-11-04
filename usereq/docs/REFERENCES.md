@@ -1911,7 +1911,7 @@ Invalid map entries are skipped.
 
 ---
 
-# extension.js | JavaScript | 2779L | 53 symbols | 9 imports | 68 comments
+# extension.js | JavaScript | 2824L | 53 symbols | 9 imports | 69 comments
 > Path: `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`
 - @brief GNOME Shell panel extension for aibar metrics.
 - @details Collects usage JSON from the aibar CLI and renders provider-specific quota/cost cards in the GNOME panel popup.
@@ -2218,23 +2218,45 @@ from `metrics.total_cost` in the removed counters position.
 
 ### fn `const showResetPendingHint = () =>` (L1637-1639)
 
-### fn `const toPercent = (value) =>` (L2321-2326)
+### fn `const toPercent = (value) =>` (L2325-2330)
 - @brief Execute update u i.
 - @details Applies update u i logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 Resolves provider-window failure metadata from cache `status` section and forwards it
 to card renderers. Panel status row renders fixed-order percentages and per-provider costs.
+Icon threshold aggregation derives the maximum panel percentage from AGY, OpenRouter,
+Copilot, Codex, and Z.ai inputs so the icon reacts to any rendered percentage,
+including OpenRouter over-credit values above 100 (REQ-069, REQ-149, REQ-150).
 After card refresh, re-sizes the popup provider viewport to the visible card height.
 - @return s {any} Function return value.
 - @satisfies REQ-021
+- @satisfies REQ-149
 - @satisfies REQ-053
 - @satisfies REQ-069
 - @satisfies REQ-118
 - @satisfies REQ-120
 - @satisfies REQ-127
 
-### fn `const getPanelUsageValues = (providerName, data) =>` (L2327-2496)
+### fn `const getPanelUsageValues = (providerName, data) =>` (L2351-2538)
+- @brief Resolve panel icon threshold percentage inputs for one provider payload.
+- @details Returns `{primary, secondary[, max]}` percentages consumed by the
+`_updateUI(...)` panel aggregation. Provider sources: AGY reads
+`raw.agy_quotas` (five-hour, weekly, maximum), Z.ai reads `raw.zai_quotas`
+(five-hour, weekly, maximum), OpenRouter and Copilot read
+`metrics.usage_percent` first with a `metrics.limit`/`metrics.remaining`
+fallback computing `(limit - remaining) / limit * 100` (values above 100
+are preserved for over-credit/over-quota icon thresholds), Codex reads
+Codex rate-limit window utilization fields. Null, undefined, and
+non-finite inputs yield `null` percentages. Time complexity O(Q) over
+provider quotas Q. Space complexity O(1).
+- @param {string} providerName Provider key from JSON payload.
+- @param {Object<string, any> | null} data Provider payload object.
+- @return {{primary: number | null, secondary: number | null, max?: number | null}} Panel percentage inputs.
+- @satisfies REQ-069
+- @satisfies REQ-139
+- @satisfies REQ-149
+- @satisfies REQ-170
 
-### class `export default class AIBarExtension extends Extension` : Extension (L2753-2779)
+### class `export default class AIBarExtension extends Extension` : Extension (L2798-2824)
 - @brief GNOME extension lifecycle adapter for AIBarIndicator registration.
 - @brief Execute enable.
 - @details Extends Extension (GNOME Shell 45+ API) to integrate with the extension lifecycle.
@@ -2296,9 +2318,9 @@ Uses this.uuid (provided by the Extension base class) as the status-area key.
 |`updateWindowBar`|fn||1618-1682|const updateWindowBar = (bar, pct, resetTime, useDays, al...|
 |`setResetLabel`|fn||1624-1630|const setResetLabel = (baseText) =>|
 |`showResetPendingHint`|fn||1637-1639|const showResetPendingHint = () =>|
-|`toPercent`|fn||2321-2326|const toPercent = (value) =>|
-|`getPanelUsageValues`|fn||2327-2496|const getPanelUsageValues = (providerName, data) =>|
-|`AIBarExtension`|class||2753-2779|export default class AIBarExtension extends Extension|
+|`toPercent`|fn||2325-2330|const toPercent = (value) =>|
+|`getPanelUsageValues`|fn||2351-2538|const getPanelUsageValues = (providerName, data) =>|
+|`AIBarExtension`|class||2798-2824|export default class AIBarExtension extends Extension|
 
 
 ---
