@@ -86,7 +86,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **PRJ-004**: MUST provide GNOME Shell extension `AIBar Monitor` that executes `aibar show --json`, renders provider-specific cards, exposes owner metadata `url=https://github.com/Ogekuri/AIBar` and `donations.github=Ogekuri`, and forces `scripts/test-gnome-extension.sh` resolution to `1280x720` via `MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720`.
 - **PRJ-005**: MUST maintain a machine-readable symbol inventory in `pi-usereq/docs/REFERENCES.md` for symbols discovered from configured source directories.
 - **PRJ-006**: MUST provide a PEP 621-compliant `pyproject.toml` at repository root enabling `uv tool install` distribution execution and `uv run`/`uvx` live execution without external virtualenv bootstrap scripts.
-- **PRJ-007**: MUST document in `README.md` dedicated sections for `uv`-based requirements, installation/removal, `uv run`/`uvx` execution, and optional `requirements.txt` export command, plus GeminiAI prerequisites.
+- **PRJ-007**: MUST document in `README.md` dedicated sections for `uv`-based requirements including the Python >= 3.12 floor, installation/removal, `uv run`/`uvx` execution, and optional `requirements.txt` export command, plus GeminiAI prerequisites.
 - **PRJ-008**: MUST provide `aibar gnome-install` CLI command that detects install/update mode for `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/`, copies package extension files, disables extension before update copy, and enables extension after copy.
 - **PRJ-009**: MUST execute startup update checks and lifecycle flags `--upgrade`, `--uninstall`, `--version`, `--ver`, `--enable-log`, `--disable-log`, `--enable-debug`, and `--disable-debug` for program `aibar`.
 - **PRJ-010**: MUST package all runtime files required by `aibar` so local execution and `uv tool install` execution remain behaviorally equivalent.
@@ -109,6 +109,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **CTN-014**: MUST perform at most one startup update HTTP check per 300 seconds unless `~/.cache/aibar/check_version_idle-time.json` is missing or expired.
 - **CTN-015**: MUST use lifecycle command strings exactly as `uv tool install aibar --force --from git+https://github.com/Ogekuri/AIBar.git` and `uv tool uninstall aibar`.
 - **CTN-017**: MUST persist `enabled_providers` in `~/.config/aibar/config.json` as provider-keyed booleans for `agy`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, and `zai`; missing keys MUST default to `true`.
+- **CTN-018**: MUST declare `requires-python >= 3.12` in `pyproject.toml` and pin `.python-version` to a Python 3.12+ interpreter so `uv run` never resolves Python 3.11.
 
 ## 3. Requirements
 
@@ -297,7 +298,8 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-005**: MUST verify Copilot provider always returns effective `window=30d` and computes `premium_requests_extra_cost = max(premium_requests - premium_requests_included, 0) * copilot_extra_premium_request_cost` in payload, CLI text, and `show --json`.
 - **TST-006**: MUST verify `pi-usereq/docs/REFERENCES.md` covers configured-source symbols and preserves extracted Doxygen fields for documented declarations.
 - **TST-007**: MUST verify GNOME panel status labels render exactly one provider-colored bold `Err` for OAuth/rate-limit failures, hide normal percentage/cost labels in that state, keep provider order styling, verify icon thresholds, preserve zero-cost currency rendering, and place Copilot cost between Copilot percentages and Codex labels.
-- **TST-008**: MUST verify `pyproject.toml` declares `[build-system]` with `hatchling`, `[project.scripts]` entry `aibar = "aibar.cli:main"`, `requires-python`, and `dependencies` list containing `pytest`.
+- **TST-008**: MUST verify `pyproject.toml` declares `[build-system]` with `hatchling`, `[project.scripts]` entry `aibar = "aibar.cli:main"`, `requires-python >= 3.12`, and `dependencies` list containing `pytest`.
+- **TST-065**: MUST verify repository root tracks `.python-version` with content `3.12` and `.github/workflows/release-uvx+extension.yml` pins `python-version: "3.12"`.
 - **TST-009**: MUST verify `gnome-install` resolves package source, validates source directory, branches install/update by target-directory presence, executes update disable→copy→enable ordering, masks extension-absence disable failures, and exits non-zero on missing source; MUST verify `gnome-uninstall` disables extension then removes directory and exits non-zero when directory is missing.
 - **TST-010**: MUST verify `Remaining credits: <remaining> / <limit>` appears for Codex and Copilot only when corresponding status is `OK`, appears after one blank line following `Resets in`, and renders `<remaining>` as bold bright white.
 - **TST-011**: MUST verify every provider refresh failure updates provider-scoped idle-time using `idle_until = last_attempt_at + max(idle_delay_seconds, retry_after_seconds_or_0)`, including HTTP `429` and authentication failures without `retry_after` metadata.
@@ -358,8 +360,8 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | PRJ-002 | `src/aibar/aibar/cli.py` + `get_providers` + returns Antigravity/OpenAI/OpenRouter/Copilot/Codex provider instances keyed by `ProviderName`. |
 | PRJ-004 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/metadata.json` + `name = AIBar Monitor`, `url = https://github.com/Ogekuri/AIBar`, and `donations.github = Ogekuri`; `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + provider-card rendering path; `scripts/test-gnome-extension.sh` + `MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720`. |
 | PRJ-005 | `pi-usereq/docs/REFERENCES.md` + machine-readable symbol sections for configured-source files. |
-| PRJ-006 | `pyproject.toml` + `[build-system]`/`[project]`/`[project.scripts]` sections + `aibar = "aibar.cli:main"` console entry point used by `uv tool install`, `uv run`, and `uvx` execution without external virtualenv bootstrap. |
-| PRJ-007 | `README.md` + dedicated `Requirements (uv)` and `Installation (uv)` sections + `uv tool`/`uv run`/`uvx` instructions and optional `uv export --format requirements-txt > requirements.txt` snippet. |
+| PRJ-006 | `pyproject.toml` + `[build-system]`/`[project]`/`[project.scripts]` sections + `aibar = "aibar.cli:main"` console entry point used by `uv tool install`, `uv run`, and `uvx` execution without external virtualenv bootstrap; `requires-python = ">= 3.12"` floor per CTN-018. |
+| PRJ-007 | `README.md` + dedicated `Requirements (uv)` and `Installation (uv)` sections stating the Python >= 3.12 floor + `uv tool`/`uv run`/`uvx` instructions and optional `uv export --format requirements-txt > requirements.txt` snippet. |
 | PRJ-011 | `pi-usereq/docs/REQUIREMENTS.md`, `pi-usereq/docs/WORKFLOW.md`, and `pi-usereq/docs/REFERENCES.md` + GNOME contract documentation sources; repository tree excludes `src/aibar/plans/Gnome.plan.md`. |
 | CTN-001 | `src/aibar/aibar/config.py` + `Config.get_token` + env var -> env file -> provider-specific stores (`CodexCredentialStore`, `CopilotCredentialStore`); provider `agy` resolves the local `agy` CLI from `PATH` via `AntigravityProvider.is_configured`. |
 | CTN-002 | `src/aibar/aibar/providers/base.py` + `ProviderResult` model + fields `provider/window/metrics/updated_at/raw/error`; `UsageMetrics` + `currency_symbol` field. |
@@ -367,7 +369,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | CTN-004 | `src/aibar/aibar/cache.py` + cache schema helpers and `src/aibar/aibar/cli.py` + `cache.json` as canonical store for payload snapshots and attempt statuses. |
 | CTN-005 | `src/aibar/aibar/config.py` + `PROVIDER_INFO` notes + entries describing unofficial/internal usage for Copilot and Codex plus local-CLI usage for `agy`. |
 | CTN-006 | `pi-usereq/docs/REFERENCES.md` + configured-source symbol index regenerated from repository source files. |
-| CTN-007 | `pyproject.toml` + `[build-system] requires = ["hatchling"]` + `[project]` metadata fields `name`, `version`, `requires-python`, `dependencies` (including `pytest`), and `[project.scripts]`. |
+| CTN-007 | `pyproject.toml` + `[build-system] requires = ["hatchling"]` + `[project]` metadata fields `name`, `version`, `requires-python = ">= 3.12"`, `dependencies` (including `pytest`), and `[project.scripts]`. |
 | CTN-008 | `src/aibar/aibar/config.py` + `RuntimeConfig` model + `idle_delay_seconds`, `api_call_delay_milliseconds`, `api_call_timeout_milliseconds`, `gnome_refresh_interval_seconds`, and `currency_symbols` fields persisted in `~/.config/aibar/config.json`. |
 | CTN-009 | `src/aibar/aibar/config.py` + `build_idle_time_state/load_idle_time/save_idle_time` + provider-scoped idle-time epoch fields and local-timezone `*_human` serialization in `~/.cache/aibar/idle-time.json`. |
 | CTN-010 | `src/aibar/aibar/cache.py` + conditional payload-write helpers guarantee payload replacement only on successful provider/window fetch and payload preservation on failed attempts including HTTP `429`. |
@@ -481,8 +483,8 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | TST-052 | `tests/test_extension_quota_label.py` + source assertions verify progress-bar geometry remains only for `agy/openrouter/copilot/codex/zai`, while `openai/geminiai` render text-only usage without bar widgets. |
 | TST-054 | `tests/test_cli_show_panel_alignment.py` + output assertions verify bar providers keep `Usage: <window> <progress_bar> <percent>%`, while `openai/geminiai` render `Usage: <window> <percent>%` and preserve shared panel width. |
 | TST-059 | `tests/test_cli_show_status_messages.py` + `_build_result_panel` assertions verify `openrouter` renders `Usage: <window> <progress_bar> <percent>%` with the standard fixed-width CLI bar glyphs. |
-| REQ-086 | `scripts/aibar.sh` + launcher executes `uv run python -m aibar.cli "$@"` and removes repository virtualenv bootstrap/install commands. |
-| REQ-087 | `.gitignore` + allowlist tracks `uv.lock` and drops `requirements.txt`; repository root no longer includes `requirements.txt`; `README.md` includes optional `uv export --format requirements-txt > requirements.txt` command. |
+| REQ-086 | `scripts/aibar.sh` + launcher executes `uv run python -m aibar.cli "$@"` and removes repository virtualenv bootstrap/install commands; `uv run` resolves the interpreter from the `.python-version` pin (CTN-018). |
+| REQ-087 | `.gitignore` + allowlist tracks `uv.lock` and drops `requirements.txt`; repository root no longer includes `requirements.txt`; `README.md` includes optional `uv export --format requirements-txt > requirements.txt` command; `uv.lock` regenerated with `requires-python = ">=3.12"`. |
 | TST-039 | `tests/test_launcher_uv_only.py` + source-level assertions for `scripts/aibar.sh` uv-run invocation and absence of virtualenv/pip install logic. |
 | TST-040 | `tests/test_uv_requirements_surface.py` + assertions for `.gitignore` allowlist change, `requirements.txt` absence, and README uv requirements/export command content. |
 | REQ-091 | `src/aibar/aibar/cli.py` + `retrieve_results_via_cache_pipeline` + sequential execution: idle-time check, modular API calls, in-memory collection, locked cache write, locked cache read, presentation. |
@@ -523,3 +525,5 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-170 | `src/aibar/aibar/gnome-extension/.../extension.js` + `_buildPanelButton` AGY 5h/7d panel labels and `_updateUI` `panelValues.agy5h`/`agy7d`/`agyMax` including `agyMax` in `panelPercents`. |
 | REQ-171 | `src/aibar/aibar/cli.py` + `setup` currency prompt list excludes `ProviderName.AGY`; AGY panels/cards render no cost rows. |
 | TST-064 | `src/aibar/aibar/providers/agy.py` + `_parse_tsv_rows`/`_extract_quotas`/`_find_remaining_percent` map TSV rows to five quota records with normalized used percentages and auth-error classification; dedicated standalone test pending (no existing test maps to this module). |
+| CTN-018 | `pyproject.toml` + `requires-python = ">= 3.12"`; `.python-version` + `3.12` interpreter pin; `.github/workflows/release-uvx+extension.yml` + `python-version: "3.12"` setup pin; `uv.lock` + `requires-python = ">=3.12"`. |
+| TST-065 | `.python-version` + content `3.12` and `.github/workflows/release-uvx+extension.yml` + `python-version: "3.12"`; dedicated standalone test pending (no existing test maps to this surface). |

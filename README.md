@@ -1,7 +1,7 @@
 # AIBar/aibar (0.50.0)
 
 <p align="center">
-  <img src="https://img.shields.io/badge/python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.11+">
+  <img src="https://img.shields.io/badge/python-3.12%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.12+">
   <img src="https://img.shields.io/badge/license-GPL--3.0-491?style=flat-square" alt="License: GPL-3.0">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-6A7EC2?style=flat-square&logo=terminal&logoColor=white" alt="Platforms">
   <img src="https://img.shields.io/badge/docs-live-b31b1b" alt="Docs">
@@ -66,6 +66,8 @@ scripts/aibar.sh show --json
 
 AIBar requires [Astral uv](https://docs.astral.sh/uv/) for all local launcher/runtime workflows.
 Do not create or manage external virtual environments for repository execution.
+AIBar requires Python >= 3.12; the repository pins the interpreter via `.python-version`
+and `uv run` resolves a Python 3.12+ interpreter for every launcher execution.
 
 
 ## Installation (uv)

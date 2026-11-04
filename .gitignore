@@ -26,6 +26,7 @@
 !setup.py
 !pyproject.toml
 !pyrightconfig.json
+!.python-version
 !uv.lock
 !.g.conf
 !package-lock.json

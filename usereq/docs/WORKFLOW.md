@@ -55,7 +55,7 @@
     - launcher delegation: `exec uv run --project "$project_root" python -m aibar.cli "$@"` [`scripts/aibar.sh`]
       - External boundary: `uv` subprocess resolves project environment and starts CLI runtime (`PROC:main`).
 - `External Boundaries`
-  - `uv` CLI runtime orchestration.
+  - `uv` CLI runtime orchestration resolving a Python 3.12+ interpreter via the repository `.python-version` pin (CTN-018).
 
 ### PROC:test-ext
 - `Entrypoints`
