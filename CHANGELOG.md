@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.52.0](https://github.com/Ogekuri/AIBar/compare/v0.51.0..v0.52.0) - 2026-11-04
+### 🐛  Bug Fixes
+- include OpenRouter usage percent in panel icon threshold [useReq] *(gnome-extension)*
+  - getPanelUsageValues now resolves 'openrouter' from metrics.usage_percent with metrics.limit/metrics.remaining fallback, preserving over-credit values above 100 (REQ-149, REQ-150).
+  - _updateUI panelValues gains openrouterMax and feeds panelPercents/_updateIconColor so the panel icon reacts to any rendered percentage (REQ-069).
+  - Panel label order, styling, and AGY/Copilot/Codex/Z.ai icon inputs unchanged (REQ-021, REQ-022, REQ-118, REQ-133, REQ-143, REQ-170).
+  - Add failing-then-passing reproducer test pinning the aggregated icon-threshold provider set (TST-007).
+  - Update WORKFLOW.md _updateUI call-trace node and regenerate REFERENCES.md.
+
 ## [0.51.0](https://github.com/Ogekuri/AIBar/compare/v0.50.0..v0.51.0) - 2026-11-04
 ### 🐛  Bug Fixes
 - bound in-process 429 retry sleeps to unblock show [useReq] *(claude_oauth)*
@@ -1411,6 +1420,7 @@
 - \[0.49.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.49.0
 - \[0.50.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.50.0
 - \[0.51.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.51.0
+- \[0.52.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.52.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1463,3 +1473,4 @@
 [0.49.0]: https://github.com/Ogekuri/AIBar/compare/v0.48.0..v0.49.0
 [0.50.0]: https://github.com/Ogekuri/AIBar/compare/v0.49.0..v0.50.0
 [0.51.0]: https://github.com/Ogekuri/AIBar/compare/v0.50.0..v0.51.0
+[0.52.0]: https://github.com/Ogekuri/AIBar/compare/v0.51.0..v0.52.0
