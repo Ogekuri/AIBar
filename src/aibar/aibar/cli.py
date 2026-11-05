@@ -118,7 +118,7 @@ _FIXED_WINDOW_BY_PROVIDER: dict[ProviderName, WindowPeriod] = {
     ProviderName.ZAI: WindowPeriod.DAY_30,
 }
 _STARTUP_UPDATE_PROGRAM = "aibar"
-_STARTUP_UPDATE_URL = "https://api.github.com/repos/Ogekuri/AIBar/releases/latest"
+_STARTUP_UPDATE_URL = "https://pypi.org/pypi/aibar/json"
 _STARTUP_IDLE_DELAY_SECONDS = 300
 _STARTUP_HTTP_TIMEOUT_SECONDS = 2
 _STARTUP_FORCE_IGNORE_IDLE_UNTIL_ACTIVE = False
@@ -137,8 +137,6 @@ _UPGRADE_LIFECYCLE_COMMAND: list[str] = [
     "install",
     "aibar",
     "--force",
-    "--from",
-    "git+https://github.com/Ogekuri/AIBar.git",
 ]
 _UNINSTALL_LIFECYCLE_COMMAND: list[str] = ["uv", "tool", "uninstall", "aibar"]
 _LOG_FAILURE_CATEGORY_OAUTH = "oauth"
@@ -179,7 +177,7 @@ class RetrievalPipelineOutput:
 @dataclass(frozen=True)
 class StartupReleaseCheckResponse:
     """
-    @brief Represent one startup GitHub release-check execution result.
+    @brief Represent one startup PyPI release-check execution result.
     @details Encodes normalized response state for startup preflight control-flow.
     `latest_version` is populated only on successful metadata retrieval.
     `status_code`, `error_message`, and `retry_after_seconds` carry normalized
@@ -381,10 +379,10 @@ def _parse_retry_after_header(retry_after_raw: str | None) -> int:
 
 def _normalize_release_version(raw_version: object) -> str | None:
     """
-    @brief Normalize release tag text extracted from GitHub API payload.
+    @brief Normalize release version text extracted from PyPI JSON API payload.
     @details Accepts string-like values, trims whitespace, and returns None for
     empty/invalid payload values.
-    @param raw_version {object} Decoded `tag_name` value from release JSON.
+    @param raw_version {object} Decoded `info.version` value from PyPI project JSON.
     @return {str | None} Normalized release version string.
     @satisfies REQ-073
     """
@@ -398,9 +396,10 @@ def _normalize_release_version(raw_version: object) -> str | None:
 
 def _fetch_startup_latest_release() -> StartupReleaseCheckResponse:
     """
-    @brief Fetch latest GitHub release metadata for startup preflight.
-    @details Executes one HTTP request to the canonical releases/latest endpoint
-    with hardcoded timeout. Success returns normalized latest version tag.
+    @brief Fetch latest PyPI release metadata for startup preflight.
+    @details Executes one HTTP request to the canonical PyPI JSON API endpoint
+    `https://pypi.org/pypi/aibar/json` with hardcoded timeout. Success returns
+    the normalized latest version parsed from the `info.version` field.
     Failures return status/error metadata and parsed retry-after delay.
     @return {StartupReleaseCheckResponse} Normalized startup release-check result.
     @satisfies CTN-011
@@ -412,7 +411,7 @@ def _fetch_startup_latest_release() -> StartupReleaseCheckResponse:
     request = urllib_request.Request(
         _STARTUP_UPDATE_URL,
         headers={
-            "Accept": "application/vnd.github+json",
+            "Accept": "application/json",
             "User-Agent": f"{_STARTUP_UPDATE_PROGRAM}/{__version__}",
         },
     )
@@ -437,7 +436,13 @@ def _fetch_startup_latest_release() -> StartupReleaseCheckResponse:
             retry_after_seconds=0,
         )
 
-    latest_version = _normalize_release_version(decoded_payload.get("tag_name"))
+    info_payload = (
+        decoded_payload.get("info") if isinstance(decoded_payload, dict) else None
+    )
+    version_raw = (
+        info_payload.get("version") if isinstance(info_payload, dict) else None
+    )
+    latest_version = _normalize_release_version(version_raw)
     if latest_version is None:
         return StartupReleaseCheckResponse(
             latest_version=None,
@@ -2432,7 +2437,7 @@ def _build_cached_dual_window_results(
         "  aibar gnome-install          Install GNOME extension\n"
         "  aibar gnome-uninstall        Remove GNOME extension\n"
         "  aibar --version              Show installed version\n"
-        "  aibar --upgrade              Upgrade via uv\n"
+        "  aibar --upgrade              Upgrade from PyPI via uv\n"
         "  aibar --uninstall            Uninstall via uv\n"
         "  aibar --enable-log           Enable runtime execution log\n"
         "  aibar --disable-log          Disable runtime execution log\n"

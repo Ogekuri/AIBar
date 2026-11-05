@@ -11,12 +11,14 @@ option behavior for `--version` and `--ver`.
 @satisfies TST-035
 @satisfies TST-041
 @satisfies TST-036
+@satisfies TST-070
 """
 
 import json
 from pathlib import Path
 import subprocess
 import time
+import urllib.request
 
 import click
 from click.testing import CliRunner
@@ -221,8 +223,6 @@ def test_http_429_uses_max_retry_after_and_idle_delay_floor(
                 "install",
                 "aibar",
                 "--force",
-                "--from",
-                "git+https://github.com/Ogekuri/AIBar.git",
             ],
         ),
         (
@@ -294,8 +294,6 @@ def test_lifecycle_flags_execute_uv_commands_and_propagate_exit_code(
                 "install",
                 "aibar",
                 "--force",
-                "--from",
-                "git+https://github.com/Ogekuri/AIBar.git",
             ],
             "Darwin",
         ),
@@ -430,3 +428,66 @@ def test_version_flags_force_startup_online_check_bypassing_idle_gate(
     assert version_result.exit_code == 0
     assert short_version_result.exit_code == 0
     assert fetch_calls == ["called", "called"]
+
+
+def test_startup_fetch_queries_pypi_json_and_parses_info_version(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    @brief Verify startup fetch targets the PyPI JSON API and parses info.version.
+    @details Mocks `urllib.request.urlopen` to capture the outbound request and
+    return a PyPI-shaped JSON payload; asserts the request URL equals the
+    canonical PyPI JSON endpoint and the normalized latest version equals the
+    `info.version` field, with no git-hosted fallback request issued.
+    @param monkeypatch {pytest.MonkeyPatch} Pytest monkeypatch fixture.
+    @return {None} Function return value.
+    @satisfies TST-070
+    @satisfies CTN-011
+    """
+    observed_urls: list[str] = []
+
+    class _FakeResponse:
+        """
+        @brief Minimal urlopen response stub for PyPI JSON payload.
+        """
+
+        def __enter__(self) -> "_FakeResponse":
+            """
+            @brief Enter the response context manager.
+            @return {_FakeResponse} Self reference.
+            """
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            """
+            @brief Exit the response context manager.
+            @param args {object} Context exception details (unused).
+            """
+
+        def read(self) -> bytes:
+            """
+            @brief Return the serialized PyPI JSON document.
+            @return {bytes} UTF-8 encoded JSON payload.
+            """
+            return json.dumps({"info": {"version": "9.9.9"}}).encode("utf-8")
+
+    def _fake_urlopen(
+        request: urllib.request.Request, timeout: float
+    ) -> _FakeResponse:
+        """
+        @brief Capture the outbound startup-check request.
+        @param request {urllib.request.Request} urllib request carrying the target URL.
+        @param timeout {float} Configured HTTP timeout (unused).
+        @return {_FakeResponse} Response stub.
+        """
+        observed_urls.append(request.full_url)
+        return _FakeResponse()
+
+    monkeypatch.setattr(cli_module.urllib_request, "urlopen", _fake_urlopen)
+
+    response = cli_module._fetch_startup_latest_release()
+
+    assert observed_urls == ["https://pypi.org/pypi/aibar/json"]
+    assert response.latest_version == "9.9.9"
+    assert response.status_code == 200
+    assert response.error_message is None

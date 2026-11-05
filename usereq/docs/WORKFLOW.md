@@ -92,9 +92,9 @@
     - `_run_startup_update_preflight(...)`: startup release-check idle gate and diagnostics pipeline with per-invocation idle-gate bypass for `--version`/`--ver` [`src/aibar/aibar/cli.py`]
       - `_load_startup_idle_state(...)`: load startup idle-state JSON from `~/.cache/aibar/check_version_idle-time.json` [`src/aibar/aibar/cli.py`]
       - `_startup_idle_epochs(...)`: normalize `last_success_at_epoch` and `idle_until_epoch` from startup idle-state payload [`src/aibar/aibar/cli.py`]
-      - `_fetch_startup_latest_release(...)`: fetch and normalize latest GitHub release metadata with hardcoded timeout [`src/aibar/aibar/cli.py`]
+      - `_fetch_startup_latest_release(...)`: fetch and normalize latest PyPI release metadata (`https://pypi.org/pypi/aibar/json`, `info.version`) with hardcoded timeout [`src/aibar/aibar/cli.py`]
         - `_parse_retry_after_header(...)`: normalize Retry-After values for HTTP 429 handling [`src/aibar/aibar/cli.py`]
-        - `_normalize_release_version(...)`: normalize release `tag_name` payload text [`src/aibar/aibar/cli.py`]
+        - `_normalize_release_version(...)`: normalize PyPI `info.version` payload text [`src/aibar/aibar/cli.py`]
       - `_is_newer_release(...)`: semantic-version compare between installed and latest release tags [`src/aibar/aibar/cli.py`]
         - `_parse_version_triplet(...)`: parse `major.minor.patch` tuple from version text [`src/aibar/aibar/cli.py`]
       - `_save_startup_idle_state(...)`: persist startup idle-state JSON with epoch and human-readable fields [`src/aibar/aibar/cli.py`]
@@ -297,8 +297,8 @@
     - `main(...)`: CLI command router [`src/aibar/aibar/cli.py`]
 - `External Boundaries`
   - Click command parsing and dispatch.
-  - GitHub Releases latest endpoint (`https://api.github.com/repos/Ogekuri/AIBar/releases/latest`) for startup update checks.
-  - Linux-only `uv` subprocess execution for lifecycle flags (`--upgrade`, `--uninstall`) plus non-Linux stderr guidance output.
+  - PyPI JSON API endpoint (`https://pypi.org/pypi/aibar/json`) for startup update checks; installed PyPI package at `https://pypi.org/project/aibar/`.
+  - Linux-only `uv` subprocess execution for lifecycle flags (`--upgrade` installs the latest `aibar` from the PyPI index, `--uninstall`) plus non-Linux stderr guidance output.
   - Runtime execution log file appends under `~/.cache/aibar/aibar.log` controlled by persisted `log_enabled` and `debug_enabled` flags in `~/.config/aibar/config.json`.
   - HTTP network interactions through provider endpoints.
   - Browser-based OAuth consent flow and loopback callback for GeminiAI Google credentials.
@@ -379,7 +379,7 @@
 - `External Boundaries`
   - GitHub Actions runtime and hosted runners.
   - `uv`, `python`, `git`, `zip`, and GitHub release APIs/actions.
-  - PyPI Trusted Publishing (OIDC) endpoint authenticated via workflow-level `id-token: write` permission; pending publisher matches project `aibar`, repository `Ogekuri/AiBar`, workflow `release-pypi.yml`.
+  - PyPI Trusted Publishing (OIDC) endpoint authenticated via workflow-level `id-token: write` permission; Trusted Publisher registered for project `aibar`, repository `Ogekuri/AiBar`, workflow `release-pypi.yml`; the project is published at `https://pypi.org/project/aibar/`.
 
 ## Communication Edges
 

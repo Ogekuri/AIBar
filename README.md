@@ -70,13 +70,30 @@ AIBar requires Python >= 3.12; the repository pins the interpreter via `.python-
 and `uv run` resolves a Python 3.12+ interpreter for every launcher execution.
 
 
-## Installation (uv)
+## Installation
 
-[uv](https://docs.astral.sh/uv/) is the recommended tool for installing and running AIBar.
+AIBar is published on [PyPI](https://pypi.org/project/aibar/) as `aibar`.
+PyPI is the single source used by the program for version checks and self-upgrades (`aibar --upgrade`).
 
-### Install from PyPI
+### Install from PyPI (pip, primary)
 
-AIBar is published on [PyPI](https://pypi.org/project/aibar/) as `aibar`:
+```bash
+pip install aibar
+```
+
+After installation the `aibar` command is available system-wide:
+
+```bash
+aibar --help
+aibar setup
+aibar show
+```
+
+### Install with Astral uv / uvx (alternative)
+
+[uv](https://docs.astral.sh/uv/) is the recommended tool for repository-local
+launcher/runtime workflows and a fully supported alternative installer for the
+same PyPI package:
 
 ```bash
 uv tool install aibar
@@ -89,21 +106,13 @@ uvx aibar --help
 uvx aibar show --json
 ```
 
-### Install from Git
+### Install from Git (alternative)
 
 ```bash
 uv tool install aibar --force --from git+https://github.com/Ogekuri/AIBar.git
 ```
 
-After installation the `aibar` command is available system-wide:
-
-```bash
-aibar --help
-aibar setup
-aibar show
-```
-
-### Live Execution (no install)
+### Live Execution from Git (no install)
 
 Run AIBar directly from the repository without a local clone using `uvx`:
 

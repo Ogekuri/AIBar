@@ -1,7 +1,7 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.3.36"
+version: "0.3.37"
 date: "2026-11-05"
 author: "req-new"
 scope:
@@ -95,6 +95,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **PRJ-013**: MUST publish sdist and wheel to PyPI project `aibar` via GitHub Actions Trusted Publishing with OIDC `id-token: write` on tagged `master` releases.
 - **PRJ-014**: MUST declare `[project.urls]` and trove `classifiers` in `pyproject.toml` to complete PyPI project metadata.
 - **PRJ-015**: MUST document PyPI installation (`uv tool install aibar`, `uvx aibar`) in `README.md` beside existing git-based instructions.
+- **PRJ-016**: MUST document `pip install aibar` as primary installation in `README.md`, retaining `uv`/`uvx` as alternative installation methods.
 
 ### 2.2 Project Constraints
 - **CTN-001**: MUST resolve provider credentials with precedence: environment variable, then `~/.config/aibar/env`, then provider-specific local credential stores.
@@ -107,11 +108,11 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **CTN-008**: MUST persist runtime configuration in `~/.config/aibar/config.json` with keys `idle_delay_seconds`, `api_call_delay_milliseconds`, `api_call_timeout_milliseconds`, `gnome_refresh_interval_seconds`, `billing_data`, `copilot_extra_premium_request_cost`, `currency_symbols`, `log_enabled`, and `debug_enabled`.
 - **CTN-009**: MUST persist provider-scoped idle-time state in `~/.cache/aibar/idle-time.json` with `last_success_timestamp` and `idle_until_timestamp` (epoch seconds) and `last_success_human` and `idle_until_human` (local-timezone ISO-8601).
 - **CTN-010**: MUST update `cache.json` payload fields only after successful fetch for the same provider/window and MUST preserve previous payload fields on failed fetch attempts, including HTTP `429`.
-- **CTN-011**: MUST fetch latest release metadata from `https://api.github.com/repos/Ogekuri/AIBar/releases/latest` for startup update checks.
+- **CTN-011**: MUST fetch latest release metadata from `https://pypi.org/pypi/aibar/json` for startup update checks.
 - **CTN-012**: MUST use hardcoded startup update-check constants `idle_delay_seconds=300` and `http_timeout_seconds=2`.
 - **CTN-013**: MUST persist startup update-check idle state in `~/.cache/aibar/check_version_idle-time.json` JSON with epoch and human-readable `last_success_at` and `idle_until`.
 - **CTN-014**: MUST perform at most one startup update HTTP check per 300 seconds unless `~/.cache/aibar/check_version_idle-time.json` is missing or expired.
-- **CTN-015**: MUST use lifecycle command strings exactly as `uv tool install aibar --force --from git+https://github.com/Ogekuri/AIBar.git` and `uv tool uninstall aibar`.
+- **CTN-015**: MUST use lifecycle command strings exactly as `uv tool install aibar --force` (PyPI index) and `uv tool uninstall aibar`.
 - **CTN-017**: MUST persist `enabled_providers` in `~/.config/aibar/config.json` as provider-keyed booleans for `agy`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, and `zai`; missing keys MUST default to `true`.
 - **CTN-018**: MUST declare `requires-python >= 3.12` in `pyproject.toml` and pin `.python-version` to a Python 3.12+ interpreter so `uv run` never resolves Python 3.11.
 - **CTN-019**: MUST declare `pytest` under `[dependency-groups]` `dev` in `pyproject.toml`, outside runtime `[project]` `dependencies`.
@@ -240,10 +241,10 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-070**: MUST execute startup update-check preflight before CLI argument validation and command dispatch.
 - **REQ-071**: MUST skip startup update HTTP calls while current epoch is lower than persisted `idle_until` in `~/.cache/aibar/check_version_idle-time.json`, except when invocation includes `--version` or `--ver`.
 - **REQ-072**: MUST create missing `~/.cache/aibar/` and create or overwrite `check_version_idle-time.json` after successful startup update checks with epoch and human-readable `last_success_at=now` and `idle_until=now+300`.
-- **REQ-073**: MUST print a bright-green message containing installed version and latest available version when the latest GitHub release is newer.
+- **REQ-073**: MUST print a bright-green message containing installed version and latest available version when the latest PyPI release is newer.
 - **REQ-074**: MUST print bright-red error diagnostics when startup update checks fail, including HTTP status details such as `403`.
 - **REQ-075**: MUST process startup update HTTP `429` responses by updating idle-time with `max(300, max_retry_after_seconds_observed)`.
-- **REQ-076**: MUST execute `uv tool install aibar --force --from git+https://github.com/Ogekuri/AIBar.git` only on Linux when `--upgrade` is provided and MUST propagate subprocess exit status.
+- **REQ-076**: MUST execute `uv tool install aibar --force` (PyPI index) only on Linux when `--upgrade` is provided and MUST propagate subprocess exit status.
 - **REQ-077**: MUST execute `uv tool uninstall aibar` only on Linux when `--uninstall` is provided, MUST propagate subprocess exit status, and MUST delete `~/.cache/aibar/check_version_idle-time.json` and `~/.cache/aibar/`.
 - **REQ-088**: MUST NOT execute lifecycle `uv tool` subprocess commands for `--upgrade` or `--uninstall` on non-Linux operating systems.
 - **REQ-089**: MUST print explicit manual command guidance for the current non-Linux operating system when `--upgrade` or `--uninstall` is provided.
@@ -338,7 +339,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-032**: MUST verify startup update idle-time gating skips HTTP calls until `idle_until` expires and resumes checks when the idle-state file is missing or expired, except for invocations containing `--version` or `--ver`.
 - **TST-033**: MUST verify successful startup update checks create `~/.cache/aibar/` when missing and write `check_version_idle-time.json` with epoch and human-readable `last_success_at` and `idle_until`.
 - **TST-034**: MUST verify repeated startup update HTTP `429` responses compute idle-time using `max(300, max(retry-after values))`.
-- **TST-035**: MUST verify Linux `--upgrade` and `--uninstall` invoke required `uv tool` subprocess commands, propagate subprocess exit codes, and during `--uninstall` delete `~/.cache/aibar/check_version_idle-time.json` and `~/.cache/aibar/`.
+- **TST-035**: MUST verify Linux `--upgrade` executes `uv tool install aibar --force` (PyPI), `--uninstall` executes `uv tool uninstall aibar`, exit codes propagate, and `--uninstall` deletes `~/.cache/aibar/`.
 - **TST-041**: MUST verify non-Linux `--upgrade` and `--uninstall` skip lifecycle subprocess execution and print manual command guidance.
 - **TST-046**: MUST verify GeminiAI CLI text renders `Billing services: <count> (<service1>, <service2>, ...)` using billing `service_description` values, preserving order, and printing all discovered services without truncation markers.
 - **TST-047**: MUST verify `--enable-log`, `--disable-log`, `--enable-debug`, and `--disable-debug` persist `log_enabled` and `debug_enabled` in `~/.config/aibar/config.json` without cross-flag side effects.
@@ -364,6 +365,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-067**: MUST verify `aibar login` without `--provider` exits 0 with an informational message when no login-capable provider is in error state and exits non-zero when a login flow fails.
 - **TST-068**: MUST verify `.github/workflows/release-pypi.yml` exists, `release-uvx+extension.yml` is absent, and the workflow declares PyPI Trusted Publishing via `pypa/gh-action-pypi-publish` with `id-token: write`.
 - **TST-069**: MUST verify `README.md` documents PyPI installation commands `uv tool install aibar` and `uvx aibar`.
+- **TST-070**: MUST verify startup update checks query `https://pypi.org/pypi/aibar/json` and parse `info.version` as the latest version.
 
 ## 5. Evidence
 
@@ -551,5 +553,12 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | PRJ-013 | `.github/workflows/release-pypi.yml` + `publish-pypi` job uploading `dist/*.tar.gz`/`dist/*.whl` via `pypa/gh-action-pypi-publish@release/v1` Trusted Publishing under top-level `id-token: write` permission, gated on `master` through `needs: build-release`. |
 | PRJ-014 | `pyproject.toml` + `[project.urls]` (Homepage/Repository/Issues/Changelog) and `classifiers` declaring console, Linux, Python 3.12/3.13, and monitoring categories. |
 | PRJ-015 | `README.md` + Installation section documenting `uv tool install aibar` and `uvx aibar` from PyPI beside git-based commands. |
+| PRJ-016 | `README.md` + Installation section documenting `pip install aibar` as primary method with `uv`/`uvx` retained as alternatives. |
+| CTN-011 | `src/aibar/aibar/cli.py` + `_STARTUP_UPDATE_URL = "https://pypi.org/pypi/aibar/json"` + `_fetch_startup_latest_release` reads `info.version` from the PyPI JSON API. |
+| CTN-015 | `src/aibar/aibar/cli.py` + `_UPGRADE_LIFECYCLE_COMMAND = ["uv", "tool", "install", "aibar", "--force"]` (PyPI index) and `_UNINSTALL_LIFECYCLE_COMMAND = ["uv", "tool", "uninstall", "aibar"]`. |
+| REQ-073 | `src/aibar/aibar/cli.py` + `_run_startup_update_preflight` prints the bright-green update notice comparing installed `__version__` with the latest PyPI release version. |
+| REQ-076 | `src/aibar/aibar/cli.py` + `_handle_upgrade_option` executes `_UPGRADE_LIFECYCLE_COMMAND` on Linux with exit-code propagation. |
+| TST-035 | `tests/test_cli_startup_update_preflight.py` + lifecycle parametrize asserting exact argv `uv tool install aibar --force` and `uv tool uninstall aibar` with exit-code propagation and cache cleanup. |
+| TST-070 | `tests/test_cli_startup_update_preflight.py` + fetch test asserting request URL `https://pypi.org/pypi/aibar/json` and `info.version` parsing. |
 | TST-068 | `tests/test_release_pypi_workflow.py` + assertions that `release-pypi.yml` exists, `release-uvx+extension.yml` is absent, and the workflow declares `pypa/gh-action-pypi-publish` and `id-token: write`. |
 | TST-069 | `tests/test_release_pypi_workflow.py` + README assertions for PyPI installation commands `uv tool install aibar` and `uvx aibar`. |
