@@ -139,6 +139,14 @@ _UPGRADE_LIFECYCLE_COMMAND: list[str] = [
     "--force",
 ]
 _UNINSTALL_LIFECYCLE_COMMAND: list[str] = ["uv", "tool", "uninstall", "aibar"]
+_GITHUB_RELEASE_API_URL = "https://api.github.com/repos/Ogekuri/AIBar/releases/latest"
+_GITHUB_UPGRADE_LIFECYCLE_COMMAND: list[str] = [
+    "uv",
+    "tool",
+    "install",
+    "--force",
+    "git+https://github.com/Ogekuri/AIBar",
+]
 _LOG_FAILURE_CATEGORY_OAUTH = "oauth"
 _LOG_FAILURE_CATEGORY_RATE_LIMIT = "rate_limit"
 
@@ -193,6 +201,14 @@ class StartupReleaseCheckResponse:
     status_code: int | None
     error_message: str | None
     retry_after_seconds: int
+
+
+# @brief Cache of the most recent startup PyPI release-check response.
+# @details Module-level mutable state written by `_run_startup_update_preflight`
+# after each online fetch so `_handle_version_option` reuses the forced
+# preflight result without issuing a duplicate PyPI HTTP request.
+# @satisfies REQ-078
+_LAST_PYPI_RELEASE_CHECK: StartupReleaseCheckResponse | None = None
 
 
 def _startup_idle_state_path() -> Path:
@@ -394,6 +410,24 @@ def _normalize_release_version(raw_version: object) -> str | None:
     return normalized
 
 
+def _normalize_github_release_tag(raw_tag: object) -> str | None:
+    """
+    @brief Normalize GitHub release tag text for version reporting.
+    @details Trims whitespace, strips one optional leading `v` prefix so tags
+    such as `v0.54.0` normalize to `0.54.0`, and returns None for empty or
+    non-string payload values. Complexity O(1); space O(1).
+    @param raw_tag {object} Decoded `tag_name` value from GitHub release JSON.
+    @return {str | None} Normalized release version string.
+    @satisfies CTN-020
+    """
+    normalized = _normalize_release_version(raw_tag)
+    if normalized is None:
+        return None
+    if normalized.startswith("v") and len(normalized) > 1:
+        return normalized[1:]
+    return normalized
+
+
 def _fetch_startup_latest_release() -> StartupReleaseCheckResponse:
     """
     @brief Fetch latest PyPI release metadata for startup preflight.
@@ -458,6 +492,68 @@ def _fetch_startup_latest_release() -> StartupReleaseCheckResponse:
     )
 
 
+def _fetch_github_latest_release() -> StartupReleaseCheckResponse:
+    """
+    @brief Fetch latest GitHub release metadata for version reporting.
+    @details Executes one HTTP request to the GitHub releases API endpoint
+    `https://api.github.com/repos/Ogekuri/AIBar/releases/latest` with the
+    hardcoded startup timeout. Success returns the normalized latest release
+    tag parsed from the `tag_name` field. Failures return status/error
+    metadata so callers render an explicit unavailable label.
+    @return {StartupReleaseCheckResponse} Normalized GitHub release-check result.
+    @satisfies CTN-020
+    @satisfies REQ-078
+    """
+    request = urllib_request.Request(
+        _GITHUB_RELEASE_API_URL,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "User-Agent": f"{_STARTUP_UPDATE_PROGRAM}/{__version__}",
+        },
+    )
+    try:
+        with urllib_request.urlopen(
+            request, timeout=_STARTUP_HTTP_TIMEOUT_SECONDS
+        ) as response:
+            decoded_payload = json.loads(response.read().decode("utf-8"))
+    except urllib_error.HTTPError as exc:
+        retry_after_seconds = _parse_retry_after_header(exc.headers.get("Retry-After"))
+        return StartupReleaseCheckResponse(
+            latest_version=None,
+            status_code=exc.code,
+            error_message=(
+                f"GitHub release check failed: HTTP {exc.code} {exc.reason}."
+            ),
+            retry_after_seconds=retry_after_seconds,
+        )
+    except (urllib_error.URLError, TimeoutError, ValueError) as exc:
+        return StartupReleaseCheckResponse(
+            latest_version=None,
+            status_code=None,
+            error_message=f"GitHub release check failed: {exc}.",
+            retry_after_seconds=0,
+        )
+    tag_raw = (
+        decoded_payload.get("tag_name") if isinstance(decoded_payload, dict) else None
+    )
+    latest_version = _normalize_github_release_tag(tag_raw)
+    if latest_version is None:
+        return StartupReleaseCheckResponse(
+            latest_version=None,
+            status_code=200,
+            error_message=(
+                "GitHub release check failed: invalid release metadata payload."
+            ),
+            retry_after_seconds=0,
+        )
+    return StartupReleaseCheckResponse(
+        latest_version=latest_version,
+        status_code=200,
+        error_message=None,
+        retry_after_seconds=0,
+    )
+
+
 def _parse_version_triplet(version_text: str) -> tuple[int, int, int] | None:
     """
     @brief Parse semantic version tuple from version text.
@@ -511,7 +607,9 @@ def _run_startup_update_preflight() -> None:
     @satisfies REQ-074
     @satisfies REQ-075
     @satisfies REQ-112
+    @satisfies REQ-078
     """
+    global _LAST_PYPI_RELEASE_CHECK
     now_epoch = int(time.time())
     state = _load_startup_idle_state()
     last_success_epoch, idle_until_epoch = _startup_idle_epochs(state)
@@ -526,6 +624,7 @@ def _run_startup_update_preflight() -> None:
 
     append_runtime_log_line("startup.update.fetch.start")
     response = _fetch_startup_latest_release()
+    _LAST_PYPI_RELEASE_CHECK = response
     append_runtime_log_line(
         "startup.update.fetch.end "
         f"status_code={response.status_code} "
@@ -598,6 +697,39 @@ def _startup_force_ignore_idle_from_args(args: Sequence[str] | None) -> bool:
     )
 
 
+def _github_upgrade_requested_from_args(args: Sequence[str] | None) -> bool:
+    """
+    @brief Detect whether `--upgrade` must use the GitHub package source.
+    @details Returns true when invocation arguments contain the literal token
+    `--github`, independent of ordering relative to the eager `--upgrade`
+    callback execution. Complexity O(A) over argv tokens A; space O(A).
+    @param args {Sequence[str] | None} CLI argv sequence; `None` uses `sys.argv[1:]`.
+    @return {bool} True when the GitHub package source is requested.
+    @satisfies REQ-176
+    """
+    argument_tokens = list(args) if args is not None else list(sys.argv[1:])
+    return any(
+        token == "--github" for token in argument_tokens if isinstance(token, str)
+    )
+
+
+def _resolve_upgrade_lifecycle_command() -> list[str]:
+    """
+    @brief Resolve the `--upgrade` lifecycle command source from argv.
+    @details Returns a copy of the GitHub-hosted uv install command when argv
+    contains `--github`; otherwise returns a copy of the default PyPI install
+    command. Complexity O(A) over argv tokens A; space O(1) beyond constants.
+    @return {list[str]} Lifecycle command argv for `--upgrade`.
+    @satisfies CTN-015
+    @satisfies REQ-076
+    @satisfies REQ-176
+    @satisfies REQ-177
+    """
+    if _github_upgrade_requested_from_args(None):
+        return list(_GITHUB_UPGRADE_LIFECYCLE_COMMAND)
+    return list(_UPGRADE_LIFECYCLE_COMMAND)
+
+
 def _execute_lifecycle_subprocess(command: list[str]) -> int:
     """
     @brief Execute lifecycle subprocess command for upgrade/uninstall options.
@@ -666,27 +798,30 @@ def _handle_upgrade_option(
 ) -> None:
     """
     @brief Handle eager `--upgrade` lifecycle option callback.
-    @details Executes required lifecycle subprocess on Linux and exits with
-    propagated subprocess code; on non-Linux emits manual command guidance and
-    exits without subprocess execution.
+    @details Resolves the upgrade command source (PyPI by default; GitHub when
+    argv contains `--github`), executes the lifecycle subprocess on Linux, and
+    exits with propagated subprocess code; on non-Linux emits manual command
+    guidance for the resolved command and exits without subprocess execution.
     @param ctx {click.Context} Active Click context.
     @param param {click.Parameter} Option metadata (unused).
     @param value {bool} Parsed `--upgrade` flag value.
     @return {None} Function return value.
     @satisfies CTN-015
     @satisfies REQ-076
+    @satisfies REQ-177
     @satisfies REQ-088
     @satisfies REQ-089
     """
     del param
     if not value or ctx.resilient_parsing:
         return
+    upgrade_command = _resolve_upgrade_lifecycle_command()
     if _is_linux_runtime():
-        exit_code = _execute_lifecycle_subprocess(_UPGRADE_LIFECYCLE_COMMAND)
+        exit_code = _execute_lifecycle_subprocess(upgrade_command)
     else:
         exit_code = _emit_non_linux_lifecycle_guidance(
             option_name="--upgrade",
-            command=_UPGRADE_LIFECYCLE_COMMAND,
+            command=upgrade_command,
         )
     ctx.exit(exit_code)
 
@@ -725,12 +860,54 @@ def _handle_uninstall_option(
     ctx.exit(exit_code)
 
 
+def _format_release_report_value(response: StartupReleaseCheckResponse) -> str:
+    """
+    @brief Render one release-check response as version-report value text.
+    @details Returns the normalized latest version on success; returns
+    `unavailable (<reason>)` text when the check failed or metadata was absent.
+    Complexity O(1); space O(1).
+    @param response {StartupReleaseCheckResponse} Release-check result to render.
+    @return {str} Human-readable version-report value.
+    @satisfies REQ-078
+    """
+    if response.latest_version is not None:
+        return response.latest_version
+    reason = response.error_message or "release metadata unavailable"
+    return f"unavailable ({reason})"
+
+
+def _emit_version_option_release_report() -> None:
+    """
+    @brief Emit labeled latest-release availability lines for `--version`.
+    @details Reuses the cached startup PyPI release-check response when the
+    forced preflight already fetched it (falling back to one direct fetch),
+    executes one GitHub release fetch, and prints one labeled line per
+    repository to stderr so stdout remains the parseable installed version.
+    Complexity O(1) beyond one HTTP request per repository.
+    @return {None} Function return value.
+    @satisfies CTN-011
+    @satisfies CTN-020
+    @satisfies REQ-078
+    """
+    pypi_response = _LAST_PYPI_RELEASE_CHECK or _fetch_startup_latest_release()
+    github_response = _fetch_github_latest_release()
+    click.echo(
+        f"Latest PyPI release: {_format_release_report_value(pypi_response)}",
+        err=True,
+    )
+    click.echo(
+        f"Latest GitHub release: {_format_release_report_value(github_response)}",
+        err=True,
+    )
+
+
 def _handle_version_option(
     ctx: click.Context, param: click.Parameter, value: bool
 ) -> None:
     """
     @brief Handle eager `--version` and `--ver` option callback.
-    @details Prints installed package version and exits before command dispatch
+    @details Prints installed package version to stdout, emits the PyPI and
+    GitHub latest-release report to stderr, and exits before command dispatch
     when either version flag is present.
     @param ctx {click.Context} Active Click context.
     @param param {click.Parameter} Option metadata (unused).
@@ -742,6 +919,7 @@ def _handle_version_option(
     if not value or ctx.resilient_parsing:
         return
     click.echo(__version__)
+    _emit_version_option_release_report()
     ctx.exit(0)
 
 
@@ -2438,6 +2616,7 @@ def _build_cached_dual_window_results(
         "  aibar gnome-uninstall        Remove GNOME extension\n"
         "  aibar --version              Show installed version\n"
         "  aibar --upgrade              Upgrade from PyPI via uv\n"
+        "  aibar --upgrade --github     Upgrade from GitHub via uv\n"
         "  aibar --uninstall            Uninstall via uv\n"
         "  aibar --enable-log           Enable runtime execution log\n"
         "  aibar --disable-log          Disable runtime execution log\n"
@@ -2461,7 +2640,13 @@ def _build_cached_dual_window_results(
     is_eager=True,
     expose_value=False,
     callback=_handle_upgrade_option,
-    help="Upgrade aibar using uv and exit.",
+    help="Upgrade aibar from PyPI using uv and exit.",
+)
+@click.option(
+    "--github",
+    is_flag=True,
+    expose_value=False,
+    help="With --upgrade: install the GitHub package instead of PyPI.",
 )
 @click.option(
     "--uninstall",
