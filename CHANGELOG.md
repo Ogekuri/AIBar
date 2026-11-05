@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.55.0](https://github.com/Ogekuri/AIBar/compare/v0.54.0..v0.55.0) - 2026-11-05
+### 🚜  Changes
+- gate PyPI publish on master and build releases for develop tags [useReq] *(release)*
+  - check-branch resolves is_master plus is_release_branch for master/develop tags
+  - build-release and GitHub Release now run for tags on master or develop
+  - publish-pypi gated on master only: develop tags skip PyPI publication
+  - Requirements: PRJ-012/PRJ-013 updated, new PRJ-019 and TST-073
+- add --github upgrade source and dual-repo version report [useReq] *(cli)*
+  - Default --upgrade and startup checks keep PyPI as the only version source
+  - New --github flag forces uv tool install --force git+https://github.com/Ogekuri/AIBar
+  - --version/--ver print installed version plus latest PyPI and GitHub releases
+  - README: PyPI-first uv/uvx docs kept, dedicated non-primary GitHub section
+  - Requirements: REQ-076/078, CTN-015/020, new REQ-176/177, PRJ-018, TST-036/072
+
+### 📚  Documentation
+- Update README.md file.
+
 ## [0.54.0](https://github.com/Ogekuri/AIBar/compare/v0.53.0..v0.54.0) - 2026-11-05
 ### 🚜  Changes
 - document pipx as primary install method [useReq] *(readme)*
@@ -1453,6 +1470,7 @@
 - \[0.52.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.52.0
 - \[0.53.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.53.0
 - \[0.54.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.54.0
+- \[0.55.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.55.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1508,3 +1526,4 @@
 [0.52.0]: https://github.com/Ogekuri/AIBar/compare/v0.51.0..v0.52.0
 [0.53.0]: https://github.com/Ogekuri/AIBar/compare/v0.52.0..v0.53.0
 [0.54.0]: https://github.com/Ogekuri/AIBar/compare/v0.53.0..v0.54.0
+[0.55.0]: https://github.com/Ogekuri/AIBar/compare/v0.54.0..v0.55.0
