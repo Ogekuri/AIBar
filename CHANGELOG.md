@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.54.0](https://github.com/Ogekuri/AIBar/compare/v0.53.0..v0.54.0) - 2026-11-05
+### 🚜  Changes
+- document pipx as primary install method [useReq] *(readme)*
+  - README Install section: pipx primary flow (sudo apt install pipx,
+  - pipx ensurepath, pipx install aibar) with pip and uv/uvx alternatives
+  - update requirements PRJ-016, add PRJ-017 and TST-071 with evidence rows
+  - add README pipx assertions to tests/test_release_pypi_workflow.py
+- switch version check and self-upgrade to PyPI [useReq] *(update)*
+  - startup update check queries https://pypi.org/pypi/aibar/json and parses
+  - info.version instead of the GitHub releases/latest endpoint
+  - --upgrade now runs uv tool install aibar --force from the PyPI index
+  - README: pip install aibar as primary, uv/uvx kept as alternatives
+  - update requirements CTN-011, CTN-015, REQ-073, REQ-076, TST-035; add
+  - PRJ-016 and TST-070 with evidence rows
+  - update lifecycle tests, add PyPI fetch regression test, regenerate docs
+
 ## [0.53.0](https://github.com/Ogekuri/AIBar/compare/v0.52.0..v0.53.0) - 2026-11-05
 ### 🚜  Changes
 - rename workflow to release-pypi and add PyPI publishing [useReq] *(release)*
@@ -1436,6 +1452,7 @@
 - \[0.51.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.51.0
 - \[0.52.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.52.0
 - \[0.53.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.53.0
+- \[0.54.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.54.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1490,3 +1507,4 @@
 [0.51.0]: https://github.com/Ogekuri/AIBar/compare/v0.50.0..v0.51.0
 [0.52.0]: https://github.com/Ogekuri/AIBar/compare/v0.51.0..v0.52.0
 [0.53.0]: https://github.com/Ogekuri/AIBar/compare/v0.52.0..v0.53.0
+[0.54.0]: https://github.com/Ogekuri/AIBar/compare/v0.53.0..v0.54.0
