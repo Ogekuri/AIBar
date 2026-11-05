@@ -1,7 +1,7 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.3.37"
+version: "0.3.38"
 date: "2026-11-05"
 author: "req-new"
 scope:
@@ -95,7 +95,8 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **PRJ-013**: MUST publish sdist and wheel to PyPI project `aibar` via GitHub Actions Trusted Publishing with OIDC `id-token: write` on tagged `master` releases.
 - **PRJ-014**: MUST declare `[project.urls]` and trove `classifiers` in `pyproject.toml` to complete PyPI project metadata.
 - **PRJ-015**: MUST document PyPI installation (`uv tool install aibar`, `uvx aibar`) in `README.md` beside existing git-based instructions.
-- **PRJ-016**: MUST document `pip install aibar` as primary installation in `README.md`, retaining `uv`/`uvx` as alternative installation methods.
+- **PRJ-016**: MUST document `sudo apt install pipx`, `pipx ensurepath`, and `pipx install aibar` as the primary installation method in `README.md`.
+- **PRJ-017**: MUST document `pip install aibar` and `uv`/`uvx` installations in `README.md` as alternative methods after the primary pipx flow.
 
 ### 2.2 Project Constraints
 - **CTN-001**: MUST resolve provider credentials with precedence: environment variable, then `~/.config/aibar/env`, then provider-specific local credential stores.
@@ -366,6 +367,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-068**: MUST verify `.github/workflows/release-pypi.yml` exists, `release-uvx+extension.yml` is absent, and the workflow declares PyPI Trusted Publishing via `pypa/gh-action-pypi-publish` with `id-token: write`.
 - **TST-069**: MUST verify `README.md` documents PyPI installation commands `uv tool install aibar` and `uvx aibar`.
 - **TST-070**: MUST verify startup update checks query `https://pypi.org/pypi/aibar/json` and parse `info.version` as the latest version.
+- **TST-071**: MUST verify `README.md` documents `sudo apt install pipx`, `pipx ensurepath`, and `pipx install aibar` as the primary installation flow before alternative methods.
 
 ## 5. Evidence
 
@@ -553,7 +555,9 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | PRJ-013 | `.github/workflows/release-pypi.yml` + `publish-pypi` job uploading `dist/*.tar.gz`/`dist/*.whl` via `pypa/gh-action-pypi-publish@release/v1` Trusted Publishing under top-level `id-token: write` permission, gated on `master` through `needs: build-release`. |
 | PRJ-014 | `pyproject.toml` + `[project.urls]` (Homepage/Repository/Issues/Changelog) and `classifiers` declaring console, Linux, Python 3.12/3.13, and monitoring categories. |
 | PRJ-015 | `README.md` + Installation section documenting `uv tool install aibar` and `uvx aibar` from PyPI beside git-based commands. |
-| PRJ-016 | `README.md` + Installation section documenting `pip install aibar` as primary method with `uv`/`uvx` retained as alternatives. |
+| PRJ-016 | `README.md` + Installation section documenting the pipx primary flow `sudo apt install pipx`, `pipx ensurepath`, `pipx install aibar`. |
+| PRJ-017 | `README.md` + Installation section documenting `pip install aibar` and `uv`/`uvx` as alternative methods after the pipx primary flow. |
+| TST-071 | `tests/test_release_pypi_workflow.py` + README assertions for the pipx primary flow commands and their ordering before alternative methods. |
 | CTN-011 | `src/aibar/aibar/cli.py` + `_STARTUP_UPDATE_URL = "https://pypi.org/pypi/aibar/json"` + `_fetch_startup_latest_release` reads `info.version` from the PyPI JSON API. |
 | CTN-015 | `src/aibar/aibar/cli.py` + `_UPGRADE_LIFECYCLE_COMMAND = ["uv", "tool", "install", "aibar", "--force"]` (PyPI index) and `_UNINSTALL_LIFECYCLE_COMMAND = ["uv", "tool", "uninstall", "aibar"]`. |
 | REQ-073 | `src/aibar/aibar/cli.py` + `_run_startup_update_preflight` prints the bright-green update notice comparing installed `__version__` with the latest PyPI release version. |

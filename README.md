@@ -75,18 +75,28 @@ and `uv run` resolves a Python 3.12+ interpreter for every launcher execution.
 AIBar is published on [PyPI](https://pypi.org/project/aibar/) as `aibar`.
 PyPI is the single source used by the program for version checks and self-upgrades (`aibar --upgrade`).
 
-### Install from PyPI (pip, primary)
+### Install with pipx (primary)
+
+Install pipx and use it to install AIBar in an isolated environment:
 
 ```bash
-pip install aibar
+sudo apt install pipx
+pipx ensurepath
+pipx install aibar
 ```
 
-After installation the `aibar` command is available system-wide:
+After installation (and starting a new shell so `pipx ensurepath` takes effect) the `aibar` command is available system-wide:
 
 ```bash
 aibar --help
 aibar setup
 aibar show
+```
+
+### Install from PyPI with pip (alternative)
+
+```bash
+pip install aibar
 ```
 
 ### Install with Astral uv / uvx (alternative)

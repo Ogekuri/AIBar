@@ -10,6 +10,7 @@ isolated, and free of network/filesystem side effects beyond repository reads.
 @satisfies TST-065
 @satisfies TST-068
 @satisfies TST-069
+@satisfies TST-071
 @satisfies PRJ-012
 @satisfies PRJ-013
 """
@@ -191,4 +192,60 @@ class TestReadmePyPIInstallDocs:
         )
         assert "uvx aibar" in readme_text, (
             "README must document uvx aibar live execution from PyPI"
+        )
+
+
+class TestReadmePipxPrimaryInstallDocs:
+    """
+    @brief Validates README pipx primary installation documentation.
+    @details Ensures the README documents the canonical pipx bootstrap flow
+    (`sudo apt install pipx`, `pipx ensurepath`, `pipx install aibar`) as the
+    primary installation method, ordered before alternative pip and uv/uvx
+    methods, per PRJ-016 and PRJ-017.
+    """
+
+    def test_readme_documents_pipx_primary_install_flow(
+        self, readme_text: str
+    ) -> None:
+        """
+        @brief Verify README contains the canonical pipx install commands.
+        @details Asserts the exact pipx bootstrap sequence `sudo apt install
+        pipx`, `pipx ensurepath`, and `pipx install aibar` appears in the
+        README installation section.
+        @param readme_text {str} README content.
+        @return {None} Function return value.
+        @satisfies TST-071
+        @satisfies PRJ-016
+        """
+        assert "sudo apt install pipx" in readme_text, (
+            "README must document sudo apt install pipx"
+        )
+        assert "pipx ensurepath" in readme_text, (
+            "README must document pipx ensurepath"
+        )
+        assert "pipx install aibar" in readme_text, (
+            "README must document pipx install aibar as primary method"
+        )
+
+    def test_pipx_flow_precedes_alternative_methods(
+        self, readme_text: str
+    ) -> None:
+        """
+        @brief Verify pipx primary flow is documented before alternatives.
+        @details Asserts the `pipx install aibar` command index precedes the
+        alternative `pip install aibar` and `uv tool install aibar` command
+        indexes so the README presents pipx as the primary method.
+        @param readme_text {str} README content.
+        @return {None} Function return value.
+        @satisfies TST-071
+        @satisfies PRJ-017
+        """
+        pipx_index = readme_text.index("pipx install aibar")
+        pip_index = readme_text.index("pip install aibar")
+        uv_index = readme_text.index("uv tool install aibar")
+        assert pipx_index < pip_index, (
+            "pipx install must be documented before the pip alternative"
+        )
+        assert pipx_index < uv_index, (
+            "pipx install must be documented before the uv alternative"
         )
