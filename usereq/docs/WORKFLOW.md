@@ -32,12 +32,12 @@
   - `defining_files: scripts/test-gnome-extension.sh`
   - `thread_model: no explicit threads detected`
 
-- `id: PROC:release-uvx-extension`
+- `id: PROC:release-pypi`
   - `type: Process`
   - `parent_process: null`
-  - `role: GitHub Actions release pipeline for Python package and GNOME extension assets`
-  - `entrypoint_symbols: workflow trigger (push tag), check-branch job, build-release job`
-  - `defining_files: .github/workflows/release-uvx+extension.yml`
+  - `role: GitHub Actions release pipeline for PyPI publication, Python package, and GNOME extension assets`
+  - `entrypoint_symbols: workflow trigger (push tag), check-branch job, build-release job, publish-pypi job`
+  - `defining_files: .github/workflows/release-pypi.yml`
   - `thread_model: no explicit threads detected`
 
 ## Execution Units
@@ -361,22 +361,25 @@
   - Subprocess creation and asynchronous stdio communication.
   - Terminal emulator process launch.
 
-### PROC:release-uvx-extension
+### PROC:release-pypi
 - `Entrypoints`
-  - workflow trigger: push tags matching `v[0-9]+.[0-9]+.[0-9]+` [`.github/workflows/release-uvx+extension.yml`]
+  - workflow trigger: push tags matching `v[0-9]+.[0-9]+.[0-9]+` [`.github/workflows/release-pypi.yml`]
 - `Lifecycle/Trigger`
   - Starts when a matching release tag is pushed.
-  - Runs `check-branch` gate job and, when tag SHA is on `master`, runs `build-release` packaging job.
+  - Runs `check-branch` gate job and, when tag SHA is on `master`, runs `build-release` packaging job, then runs `publish-pypi` Trusted Publishing job.
 - `Internal Call-Trace Tree`
-  - workflow trigger dispatch [`.github/workflows/release-uvx+extension.yml`]
-    - `check-branch` job: checkout + `git branch -r --contains ${GITHUB_SHA}` gate [`.github/workflows/release-uvx+extension.yml`]
-    - `build-release` job: checkout + python/uv setup [`.github/workflows/release-uvx+extension.yml`]
-      - build step: `uv run --with build --with setuptools --with wheel python -m build` [`.github/workflows/release-uvx+extension.yml`]
-      - extension asset step: zip `src/aibar/aibar/gnome-extension/aibar@aibar.panel` into release artifact [`.github/workflows/release-uvx+extension.yml`]
-      - release publication steps: attest provenance and publish GitHub release assets [`.github/workflows/release-uvx+extension.yml`]
+  - workflow trigger dispatch [`.github/workflows/release-pypi.yml`]
+    - `check-branch` job: checkout + `git branch -r --contains ${GITHUB_SHA}` gate [`.github/workflows/release-pypi.yml`]
+    - `build-release` job: checkout + python/uv setup [`.github/workflows/release-pypi.yml`]
+      - build step: `uv run --with build --with setuptools --with wheel python -m build` [`.github/workflows/release-pypi.yml`]
+      - extension asset step: zip `src/aibar/aibar/gnome-extension/aibar@aibar.panel` into release artifact [`.github/workflows/release-pypi.yml`]
+      - release publication steps: attest provenance and publish GitHub release assets [`.github/workflows/release-pypi.yml`]
+      - distribution artifact upload step: upload `dist/*.tar.gz` and `dist/*.whl` (excluding the GNOME extension zip) as workflow artifact [`.github/workflows/release-pypi.yml`]
+    - `publish-pypi` job (needs `build-release`): download distribution artifact and publish sdist+wheel to PyPI project `aibar` [`.github/workflows/release-pypi.yml`]
 - `External Boundaries`
   - GitHub Actions runtime and hosted runners.
   - `uv`, `python`, `git`, `zip`, and GitHub release APIs/actions.
+  - PyPI Trusted Publishing (OIDC) endpoint authenticated via workflow-level `id-token: write` permission; pending publisher matches project `aibar`, repository `Ogekuri/AiBar`, workflow `release-pypi.yml`.
 
 ## Communication Edges
 

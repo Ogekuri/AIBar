@@ -1,8 +1,8 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.3.35"
-date: "2026-11-04"
+version: "0.3.36"
+date: "2026-11-05"
 author: "req-new"
 scope:
   paths:
@@ -45,7 +45,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 .
 ├── .github/
 │   └── workflows/
-│       └── .place-holder
+│       └── release-pypi.yml
 ├── pi-usereq/
 │   └── docs/
 │       ├── REFERENCES.md
@@ -91,6 +91,10 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **PRJ-009**: MUST execute startup update checks and lifecycle flags `--upgrade`, `--uninstall`, `--version`, `--ver`, `--enable-log`, `--disable-log`, `--enable-debug`, and `--disable-debug` for program `aibar`.
 - **PRJ-010**: MUST package all runtime files required by `aibar` so local execution and `uv tool install` execution remain behaviorally equivalent.
 - **PRJ-011**: MUST keep GNOME extension contract documentation in `pi-usereq/docs/REQUIREMENTS.md`, `pi-usereq/docs/WORKFLOW.md`, and `pi-usereq/docs/REFERENCES.md`; repository source tree MUST NOT contain `src/aibar/plans/Gnome.plan.md`.
+- **PRJ-012**: MUST maintain release automation in `.github/workflows/release-pypi.yml`, replacing `release-uvx+extension.yml`, preserving branch gating, build, extension zip, changelog, and GitHub Release.
+- **PRJ-013**: MUST publish sdist and wheel to PyPI project `aibar` via GitHub Actions Trusted Publishing with OIDC `id-token: write` on tagged `master` releases.
+- **PRJ-014**: MUST declare `[project.urls]` and trove `classifiers` in `pyproject.toml` to complete PyPI project metadata.
+- **PRJ-015**: MUST document PyPI installation (`uv tool install aibar`, `uvx aibar`) in `README.md` beside existing git-based instructions.
 
 ### 2.2 Project Constraints
 - **CTN-001**: MUST resolve provider credentials with precedence: environment variable, then `~/.config/aibar/env`, then provider-specific local credential stores.
@@ -99,7 +103,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **CTN-004**: MUST persist `~/.cache/aibar/cache.json` as the canonical store for per-provider, per-window last-success payload snapshots and last-attempt status metadata.
 - **CTN-005**: MAY depend on unofficial/internal endpoints when official usage APIs are unavailable for Copilot or Codex integrations; provider `agy` MUST use the local `agy` CLI subprocess instead of remote HTTP endpoints.
 - **CTN-006**: MUST keep `pi-usereq/docs/REFERENCES.md` synchronized with symbols discovered from configured source directories.
-- **CTN-007**: MUST declare `hatchling` as `[build-system]` backend in `pyproject.toml` with `[project]` metadata including `name`, `version`, `requires-python`, `[project.scripts]`, and `dependencies` containing `pytest`.
+- **CTN-007**: MUST declare `hatchling` as `[build-system]` backend in `pyproject.toml` with `[project]` metadata including `name`, `version`, `requires-python`, `[project.scripts]`, and runtime `dependencies`.
 - **CTN-008**: MUST persist runtime configuration in `~/.config/aibar/config.json` with keys `idle_delay_seconds`, `api_call_delay_milliseconds`, `api_call_timeout_milliseconds`, `gnome_refresh_interval_seconds`, `billing_data`, `copilot_extra_premium_request_cost`, `currency_symbols`, `log_enabled`, and `debug_enabled`.
 - **CTN-009**: MUST persist provider-scoped idle-time state in `~/.cache/aibar/idle-time.json` with `last_success_timestamp` and `idle_until_timestamp` (epoch seconds) and `last_success_human` and `idle_until_human` (local-timezone ISO-8601).
 - **CTN-010**: MUST update `cache.json` payload fields only after successful fetch for the same provider/window and MUST preserve previous payload fields on failed fetch attempts, including HTTP `429`.
@@ -110,6 +114,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **CTN-015**: MUST use lifecycle command strings exactly as `uv tool install aibar --force --from git+https://github.com/Ogekuri/AIBar.git` and `uv tool uninstall aibar`.
 - **CTN-017**: MUST persist `enabled_providers` in `~/.config/aibar/config.json` as provider-keyed booleans for `agy`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, and `zai`; missing keys MUST default to `true`.
 - **CTN-018**: MUST declare `requires-python >= 3.12` in `pyproject.toml` and pin `.python-version` to a Python 3.12+ interpreter so `uv run` never resolves Python 3.11.
+- **CTN-019**: MUST declare `pytest` under `[dependency-groups]` `dev` in `pyproject.toml`, outside runtime `[project]` `dependencies`.
 
 ## 3. Requirements
 
@@ -243,7 +248,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-088**: MUST NOT execute lifecycle `uv tool` subprocess commands for `--upgrade` or `--uninstall` on non-Linux operating systems.
 - **REQ-089**: MUST print explicit manual command guidance for the current non-Linux operating system when `--upgrade` or `--uninstall` is provided.
 - **REQ-078**: MUST print installed program version and exit when `--version` or `--ver` is provided, and MUST force one online startup release check ignoring `check_version_idle-time.json` content.
-- **REQ-079**: MUST include runtime files required by startup update-check behavior in `pyproject.toml` package configuration used by `.github/workflows/release-uvx+extension.yml`.
+- **REQ-079**: MUST include runtime files required by startup update-check behavior in `pyproject.toml` package configuration used by `.github/workflows/release-pypi.yml`.
 - **REQ-080**: MUST disable the extension via `gnome-extensions disable aibar@aibar.panel` before removing files in `gnome-uninstall` with colored status output.
 - **REQ-081**: MUST remove the extension directory `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/` and all its contents in `gnome-uninstall`.
 - **REQ-082**: MUST exit with non-zero status and descriptive error message when the extension directory does not exist in `gnome-uninstall`.
@@ -302,8 +307,8 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-005**: MUST verify Copilot provider always returns effective `window=30d` and computes `premium_requests_extra_cost = max(premium_requests - premium_requests_included, 0) * copilot_extra_premium_request_cost` in payload, CLI text, and `show --json`.
 - **TST-006**: MUST verify `pi-usereq/docs/REFERENCES.md` covers configured-source symbols and preserves extracted Doxygen fields for documented declarations.
 - **TST-007**: MUST verify GNOME panel status labels render exactly one provider-colored bold `Err` for OAuth/rate-limit failures, hide normal percentage/cost labels in that state, keep provider order styling, verify icon thresholds, preserve zero-cost currency rendering, and place Copilot cost between Copilot percentages and Codex labels.
-- **TST-008**: MUST verify `pyproject.toml` declares `[build-system]` with `hatchling`, `[project.scripts]` entry `aibar = "aibar.cli:main"`, `requires-python >= 3.12`, and `dependencies` list containing `pytest`.
-- **TST-065**: MUST verify repository root tracks `.python-version` with content `3.12` and `.github/workflows/release-uvx+extension.yml` pins `python-version: "3.12"`.
+- **TST-008**: MUST verify `pyproject.toml` declares `[build-system]` with `hatchling`, `[project.scripts]` entry `aibar = "aibar.cli:main"`, `requires-python >= 3.12`, `[project.urls]`, `classifiers`, runtime `dependencies`, and dev-group `pytest` per CTN-019.
+- **TST-065**: MUST verify repository root tracks `.python-version` with content `3.12` and `.github/workflows/release-pypi.yml` pins `python-version: "3.12"`.
 - **TST-009**: MUST verify `gnome-install` resolves package source, validates source directory, branches install/update by target-directory presence, executes update disable→copy→enable ordering, masks extension-absence disable failures, and exits non-zero on missing source; MUST verify `gnome-uninstall` disables extension then removes directory and exits non-zero when directory is missing.
 - **TST-010**: MUST verify `Remaining credits: <remaining> / <limit>` appears for Codex and Copilot only when corresponding status is `OK`, appears after one blank line following `Resets in`, and renders `<remaining>` as bold bright white.
 - **TST-011**: MUST verify every provider refresh failure updates provider-scoped idle-time using `idle_until = last_attempt_at + max(idle_delay_seconds, retry_after_seconds_or_0)`, including HTTP `429` and authentication failures without `retry_after` metadata.
@@ -354,9 +359,11 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-042**: MUST verify CLI `show` and GNOME provider cards render equivalent failed-provider blocks formatted as `Status: FAIL`, blank line, `Reason: <reason>`, blank line, and `Updated/Next`, without `Window 5h:/7d:/30d:` headings.
 - **TST-039**: MUST verify `scripts/aibar.sh` invokes `uv run python -m aibar.cli`, forwards CLI arguments, and contains no virtualenv creation/activation or `pip install -r requirements.txt` commands.
 - **TST-040**: MUST verify `.gitignore` includes `uv.lock` and excludes `requirements.txt` from allowlist, repository file `requirements.txt` is absent, and README contains uv-tool requirement plus export command snippet.
-- **TST-037**: MUST verify `pyproject.toml` wheel `packages` setting includes the `aibar` package containing `gnome-extension/` subtree, and sdist `include` covers `src/aibar/aibar/gnome-extension/**` and `scripts/**` for `.github/workflows/release-uvx+extension.yml` builds.
+- **TST-037**: MUST verify `pyproject.toml` wheel `packages` setting includes the `aibar` package containing `gnome-extension/` subtree, and sdist `include` covers `src/aibar/aibar/gnome-extension/**` and `scripts/**` for `.github/workflows/release-pypi.yml` builds.
 - **TST-066**: MUST verify `aibar login` without `--provider` executes login flows exactly for login-capable providers whose cached status contains `result=FAIL` and skips providers with `OK` or absent cached status.
 - **TST-067**: MUST verify `aibar login` without `--provider` exits 0 with an informational message when no login-capable provider is in error state and exits non-zero when a login flow fails.
+- **TST-068**: MUST verify `.github/workflows/release-pypi.yml` exists, `release-uvx+extension.yml` is absent, and the workflow declares PyPI Trusted Publishing via `pypa/gh-action-pypi-publish` with `id-token: write`.
+- **TST-069**: MUST verify `README.md` documents PyPI installation commands `uv tool install aibar` and `uvx aibar`.
 
 ## 5. Evidence
 
@@ -375,7 +382,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | CTN-004 | `src/aibar/aibar/cache.py` + cache schema helpers and `src/aibar/aibar/cli.py` + `cache.json` as canonical store for payload snapshots and attempt statuses. |
 | CTN-005 | `src/aibar/aibar/config.py` + `PROVIDER_INFO` notes + entries describing unofficial/internal usage for Copilot and Codex plus local-CLI usage for `agy`. |
 | CTN-006 | `pi-usereq/docs/REFERENCES.md` + configured-source symbol index regenerated from repository source files. |
-| CTN-007 | `pyproject.toml` + `[build-system] requires = ["hatchling"]` + `[project]` metadata fields `name`, `version`, `requires-python = ">= 3.12"`, `dependencies` (including `pytest`), and `[project.scripts]`. |
+| CTN-007 | `pyproject.toml` + `[build-system] requires = ["hatchling"]` + `[project]` metadata fields `name`, `version`, `requires-python = ">= 3.12"`, runtime `dependencies`, and `[project.scripts]`; `pytest` relocated to `[dependency-groups]` dev per CTN-019. |
 | CTN-008 | `src/aibar/aibar/config.py` + `RuntimeConfig` model + `idle_delay_seconds`, `api_call_delay_milliseconds`, `api_call_timeout_milliseconds`, `gnome_refresh_interval_seconds`, and `currency_symbols` fields persisted in `~/.config/aibar/config.json`. |
 | CTN-009 | `src/aibar/aibar/config.py` + `build_idle_time_state/load_idle_time/save_idle_time` + provider-scoped idle-time epoch fields and local-timezone `*_human` serialization in `~/.cache/aibar/idle-time.json`. |
 | CTN-010 | `src/aibar/aibar/cache.py` + conditional payload-write helpers guarantee payload replacement only on successful provider/window fetch and payload preservation on failed attempts including HTTP `429`. |
@@ -438,7 +445,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | TST-005 | `src/aibar/aibar/providers/copilot.py` + `fetch` hard-codes `effective_window` to `WindowPeriod.DAY_30`. |
 | TST-006 | `pi-usereq/docs/REFERENCES.md` + generated configured-source symbol coverage validates documentation inventory completeness. |
 | TST-007 | `tests/test_extension_quota_label.py` + single `Err` projection assertions for OAuth/rate-limit failures, provider-color bold-style assertions, normal-state order/style assertions, and zero-cost/missing-metric behavior checks. |
-| TST-008 | `tests/test_pyproject_metadata.py` + assertions for `[build-system]` backend, `[project.scripts]` entry, `requires-python`, and `dependencies` list containing `pytest` in `pyproject.toml`. |
+| TST-008 | `tests/test_pyproject_metadata.py` + assertions for `[build-system]` backend, `[project.scripts]` entry, `requires-python`, `[project.urls]`, `classifiers`, runtime `dependencies` excluding `pytest`, and `[dependency-groups]` dev `pytest` in `pyproject.toml`. |
 | TST-010 | `src/aibar/aibar/cli.py` + `_build_result_panel` remaining-credits rendering path appears only for successful Codex/Copilot states. |
 | TST-011 | `tests/test_cli_idle_time_429.py` + provider failure scenarios verify provider-scoped `idle_until = last_attempt_at + max(idle_delay_seconds, retry_after_seconds_or_0)` updates across HTTP `429` and auth failures without retry-after metadata. |
 | TST-013 | `tests/test_setup_runtime_config.py` + setup prompt-order/default assertions and `~/.config/aibar/config.json` persistence checks for idle delay, API delay, and gnome_refresh_interval_seconds. |
@@ -531,11 +538,18 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-170 | `src/aibar/aibar/gnome-extension/.../extension.js` + `_buildPanelButton` AGY 5h/7d panel labels and `_updateUI` `panelValues.agy5h`/`agy7d`/`agyMax` including `agyMax` in `panelPercents`. |
 | REQ-171 | `src/aibar/aibar/cli.py` + `setup` currency prompt list excludes `ProviderName.AGY`; AGY panels/cards render no cost rows. |
 | TST-064 | `src/aibar/aibar/providers/agy.py` + `_parse_tsv_rows`/`_extract_quotas`/`_find_remaining_percent` map TSV rows to five quota records with normalized used percentages and auth-error classification; dedicated standalone test pending (no existing test maps to this module). |
-| CTN-018 | `pyproject.toml` + `requires-python = ">= 3.12"`; `.python-version` + `3.12` interpreter pin; `.github/workflows/release-uvx+extension.yml` + `python-version: "3.12"` setup pin; `uv.lock` + `requires-python = ">=3.12"`. |
-| TST-065 | `.python-version` + content `3.12` and `.github/workflows/release-uvx+extension.yml` + `python-version: "3.12"`; dedicated standalone test pending (no existing test maps to this surface). |
+| CTN-018 | `pyproject.toml` + `requires-python = ">= 3.12"`; `.python-version` + `3.12` interpreter pin; `.github/workflows/release-pypi.yml` + `python-version: "3.12"` setup pin; `uv.lock` + `requires-python = ">=3.12"`. |
+| CTN-019 | `pyproject.toml` + `[dependency-groups] dev = ["pytest"]` with runtime `[project] dependencies` excluding test-only packages; `uv.lock` regenerated for the dependency-group split. |
+| TST-065 | `.python-version` + content `3.12` and `.github/workflows/release-pypi.yml` + `python-version: "3.12"`; verified by `tests/test_release_pypi_workflow.py`. |
 | REQ-172 | `src/aibar/aibar/cli.py` + `login`/`_login_error_state_providers`/`_select_login_error_providers` + bare-login branch selects login-capable providers with cached `result=FAIL` status via locked `load_cli_cache` read. |
 | REQ-173 | `src/aibar/aibar/cli.py` + `_select_login_error_providers` + provider selection requires at least one cached window status entry with `result=FAIL`. |
 | REQ-174 | `src/aibar/aibar/cli.py` + `_login_error_state_providers` + empty-selection branch prints informational message and returns with exit status 0. |
 | REQ-175 | `src/aibar/aibar/cli.py` + `_login_error_state_providers` + per-flow `SystemExit`/exception capture records failed flows and exits non-zero when any flow fails. |
 | TST-066 | `tests/test_login_error_state.py` + bare-login targeting assertions for cached `FAIL`-only execution and `OK`/absent/non-login-capable skip. |
 | TST-067 | `tests/test_login_error_state.py` + zero-exit informational message and non-zero flow-failure exit assertions. |
+| PRJ-012 | `.github/workflows/release-pypi.yml` + renamed release automation preserving `check-branch` master gating, sdist/wheel build, GNOME extension zip, changelog build, and GitHub Release publication steps. |
+| PRJ-013 | `.github/workflows/release-pypi.yml` + `publish-pypi` job uploading `dist/*.tar.gz`/`dist/*.whl` via `pypa/gh-action-pypi-publish@release/v1` Trusted Publishing under top-level `id-token: write` permission, gated on `master` through `needs: build-release`. |
+| PRJ-014 | `pyproject.toml` + `[project.urls]` (Homepage/Repository/Issues/Changelog) and `classifiers` declaring console, Linux, Python 3.12/3.13, and monitoring categories. |
+| PRJ-015 | `README.md` + Installation section documenting `uv tool install aibar` and `uvx aibar` from PyPI beside git-based commands. |
+| TST-068 | `tests/test_release_pypi_workflow.py` + assertions that `release-pypi.yml` exists, `release-uvx+extension.yml` is absent, and the workflow declares `pypa/gh-action-pypi-publish` and `id-token: write`. |
+| TST-069 | `tests/test_release_pypi_workflow.py` + README assertions for PyPI installation commands `uv tool install aibar` and `uvx aibar`. |

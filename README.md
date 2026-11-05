@@ -74,6 +74,21 @@ and `uv run` resolves a Python 3.12+ interpreter for every launcher execution.
 
 [uv](https://docs.astral.sh/uv/) is the recommended tool for installing and running AIBar.
 
+### Install from PyPI
+
+AIBar is published on [PyPI](https://pypi.org/project/aibar/) as `aibar`:
+
+```bash
+uv tool install aibar
+```
+
+Live execution without installation:
+
+```bash
+uvx aibar --help
+uvx aibar show --json
+```
+
 ### Install from Git
 
 ```bash
