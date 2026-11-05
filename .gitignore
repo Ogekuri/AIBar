@@ -28,7 +28,7 @@
 !pyrightconfig.json
 !.python-version
 !uv.lock
-!.g.conf
+!.galias.conf
 !package-lock.json
 !package.json
 !src/
