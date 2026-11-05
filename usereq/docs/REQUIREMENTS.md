@@ -91,13 +91,14 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **PRJ-009**: MUST execute startup update checks and lifecycle flags `--upgrade`, `--uninstall`, `--version`, `--ver`, `--enable-log`, `--disable-log`, `--enable-debug`, and `--disable-debug` for program `aibar`.
 - **PRJ-010**: MUST package all runtime files required by `aibar` so local execution and `uv tool install` execution remain behaviorally equivalent.
 - **PRJ-011**: MUST keep GNOME extension contract documentation in `pi-usereq/docs/REQUIREMENTS.md`, `pi-usereq/docs/WORKFLOW.md`, and `pi-usereq/docs/REFERENCES.md`; repository source tree MUST NOT contain `src/aibar/plans/Gnome.plan.md`.
-- **PRJ-012**: MUST maintain release automation in `.github/workflows/release-pypi.yml`, replacing `release-uvx+extension.yml`, preserving branch gating, build, extension zip, changelog, and GitHub Release.
-- **PRJ-013**: MUST publish sdist and wheel to PyPI project `aibar` via GitHub Actions Trusted Publishing with OIDC `id-token: write` on tagged `master` releases.
+- **PRJ-012**: MUST maintain release automation in `.github/workflows/release-pypi.yml`, replacing `release-uvx+extension.yml`, preserving build, extension zip, changelog, and GitHub Release for version tags on `master` or `develop`.
+- **PRJ-013**: MUST publish sdist and wheel to PyPI project `aibar` via GitHub Actions Trusted Publishing with OIDC `id-token: write` only for tagged `master` releases.
 - **PRJ-014**: MUST declare `[project.urls]` and trove `classifiers` in `pyproject.toml` to complete PyPI project metadata.
 - **PRJ-015**: MUST document PyPI installation (`uv tool install aibar`, `uvx aibar`) in `README.md` beside existing git-based instructions.
 - **PRJ-016**: MUST document `sudo apt install pipx`, `pipx ensurepath`, and `pipx install aibar` as the primary installation method in `README.md`.
 - **PRJ-017**: MUST document `pip install aibar` and `uv`/`uvx` installations in `README.md` as alternative methods after the primary pipx flow.
 - **PRJ-018**: MUST document in `README.md` a dedicated non-primary GitHub section covering GitHub package installation, `--upgrade --github`, and dual-repository `--version` reporting.
+- **PRJ-019**: MUST skip PyPI publication when a version tag is on `develop` and not on `master`, while the release workflow still builds artifacts and publishes the GitHub Release.
 
 ### 2.2 Project Constraints
 - **CTN-001**: MUST resolve provider credentials with precedence: environment variable, then `~/.config/aibar/env`, then provider-specific local credential stores.
@@ -373,6 +374,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-070**: MUST verify startup update checks query `https://pypi.org/pypi/aibar/json` and parse `info.version` as the latest version.
 - **TST-071**: MUST verify `README.md` documents `sudo apt install pipx`, `pipx ensurepath`, and `pipx install aibar` as the primary installation flow before alternative methods.
 - **TST-072**: MUST verify default `--upgrade` executes the PyPI lifecycle command and `--upgrade` with `--github` executes the GitHub lifecycle command.
+- **TST-073**: MUST verify `.github/workflows/release-pypi.yml` gates `publish-pypi` on the `master` branch output and runs `build-release` for version tags on `master` or `develop`.
 
 ## 5. Evidence
 
@@ -556,8 +558,8 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-175 | `src/aibar/aibar/cli.py` + `_login_error_state_providers` + per-flow `SystemExit`/exception capture records failed flows and exits non-zero when any flow fails. |
 | TST-066 | `tests/test_login_error_state.py` + bare-login targeting assertions for cached `FAIL`-only execution and `OK`/absent/non-login-capable skip. |
 | TST-067 | `tests/test_login_error_state.py` + zero-exit informational message and non-zero flow-failure exit assertions. |
-| PRJ-012 | `.github/workflows/release-pypi.yml` + renamed release automation preserving `check-branch` master gating, sdist/wheel build, GNOME extension zip, changelog build, and GitHub Release publication steps. |
-| PRJ-013 | `.github/workflows/release-pypi.yml` + `publish-pypi` job uploading `dist/*.tar.gz`/`dist/*.whl` via `pypa/gh-action-pypi-publish@release/v1` Trusted Publishing under top-level `id-token: write` permission, gated on `master` through `needs: build-release`. |
+| PRJ-012 | `.github/workflows/release-pypi.yml` + release automation running `build-release` (sdist/wheel build, GNOME extension zip, changelog, GitHub Release publication) for version tags on `master` or `develop` via `check-branch` outputs `is_master`/`is_release_branch`. |
+| PRJ-013 | `.github/workflows/release-pypi.yml` + `publish-pypi` job gated by `if: needs.build-release.outputs.is_master == 'true'` uploading `dist/*.tar.gz`/`dist/*.whl` via `pypa/gh-action-pypi-publish@release/v1` Trusted Publishing under top-level `id-token: write` permission. |
 | PRJ-014 | `pyproject.toml` + `[project.urls]` (Homepage/Repository/Issues/Changelog) and `classifiers` declaring console, Linux, Python 3.12/3.13, and monitoring categories. |
 | PRJ-015 | `README.md` + Installation section documenting `uv tool install aibar` and `uvx aibar` from PyPI beside git-based commands. |
 | PRJ-016 | `README.md` + Installation section documenting the pipx primary flow `sudo apt install pipx`, `pipx ensurepath`, `pipx install aibar`. |
@@ -576,3 +578,5 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-177 | `src/aibar/aibar/cli.py` + `_resolve_upgrade_lifecycle_command`/`_handle_upgrade_option` execute `_GITHUB_UPGRADE_LIFECYCLE_COMMAND` on Linux when `--github` is present, propagating exit status. |
 | PRJ-018 | `README.md` + dedicated non-primary "Install from GitHub" section documenting the GitHub install command, `aibar --upgrade --github`, and dual-repository `--version` reporting. |
 | TST-072 | `tests/test_cli_startup_update_preflight.py` + default `--upgrade` lifecycle argv assertions cover the PyPI branch; GitHub-branch assertions pending (test file not modified by change workflow). |
+| PRJ-019 | `.github/workflows/release-pypi.yml` + `check-branch` step `Resolve tagged release branch` sets `is_master=false` with `is_release_branch=true` for develop-only tags, so `build-release` runs while `publish-pypi` is skipped. |
+| TST-073 | `tests/test_release_pypi_workflow.py` + static workflow assertions for the `master`-gated publish job; develop-branch gate assertions pending (test file not modified by change workflow). |

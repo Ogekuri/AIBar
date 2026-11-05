@@ -373,16 +373,16 @@
   - workflow trigger: push tags matching `v[0-9]+.[0-9]+.[0-9]+` [`.github/workflows/release-pypi.yml`]
 - `Lifecycle/Trigger`
   - Starts when a matching release tag is pushed.
-  - Runs `check-branch` gate job and, when tag SHA is on `master`, runs `build-release` packaging job, then runs `publish-pypi` Trusted Publishing job.
+  - Runs `check-branch` gate job resolving whether the tag SHA is on `master` or `develop`; runs `build-release` packaging job for version tags on either branch; runs `publish-pypi` Trusted Publishing job only for `master` tags.
 - `Internal Call-Trace Tree`
   - workflow trigger dispatch [`.github/workflows/release-pypi.yml`]
-    - `check-branch` job: checkout + `git branch -r --contains ${GITHUB_SHA}` gate [`.github/workflows/release-pypi.yml`]
-    - `build-release` job: checkout + python/uv setup [`.github/workflows/release-pypi.yml`]
+    - `check-branch` job: checkout + `git branch -r --contains ${GITHUB_SHA}` gate resolving `is_master` and `is_release_branch` outputs from `origin/master`/`origin/develop` tag containment [`.github/workflows/release-pypi.yml`]
+    - `build-release` job (gated on `check-branch` output `is_release_branch == 'true'`, re-exporting `is_master` for the publish gate): checkout + python/uv setup [`.github/workflows/release-pypi.yml`]
       - build step: `uv run --with build --with setuptools --with wheel python -m build` [`.github/workflows/release-pypi.yml`]
       - extension asset step: zip `src/aibar/aibar/gnome-extension/aibar@aibar.panel` into release artifact [`.github/workflows/release-pypi.yml`]
       - release publication steps: attest provenance and publish GitHub release assets [`.github/workflows/release-pypi.yml`]
       - distribution artifact upload step: upload `dist/*.tar.gz` and `dist/*.whl` (excluding the GNOME extension zip) as workflow artifact [`.github/workflows/release-pypi.yml`]
-    - `publish-pypi` job (needs `build-release`): download distribution artifact and publish sdist+wheel to PyPI project `aibar` [`.github/workflows/release-pypi.yml`]
+    - `publish-pypi` job (needs `build-release`, gated on `needs.build-release.outputs.is_master == 'true'` so `develop`-only tags build the release but skip PyPI publication): download distribution artifact and publish sdist+wheel to PyPI project `aibar` [`.github/workflows/release-pypi.yml`]
 - `External Boundaries`
   - GitHub Actions runtime and hosted runners.
   - `uv`, `python`, `git`, `zip`, and GitHub release APIs/actions.

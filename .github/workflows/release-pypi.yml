@@ -16,29 +16,39 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       is_master: ${{ steps.check.outputs.is_master }}
+      is_release_branch: ${{ steps.check.outputs.is_release_branch }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0 
 
-      - name: Check if tag is on master
+      - name: Resolve tagged release branch
         id: check
         run: |
           git fetch origin master
-          if git branch -r --contains ${GITHUB_SHA} | grep -q "origin/master"; then
-            echo "✅ Tag ${{ github.ref }} is on master branch. Proceeding with release."
+          git fetch origin develop || echo "origin/develop not found on remote"
+          if git branch -r --contains "${GITHUB_SHA}" | grep -q "origin/master"; then
+            echo "✅ Tag ${{ github.ref }} is on master branch: release build and PyPI publication enabled."
             echo "is_master=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "❌ Tag ${{ github.ref }} is not on master branch. Skipping release."
+            echo "is_release_branch=true" >> "$GITHUB_OUTPUT"
+          elif git branch -r --contains "${GITHUB_SHA}" | grep -q "origin/develop"; then
+            echo "ℹ️ Tag ${{ github.ref }} is on develop branch: release build enabled, PyPI publication skipped."
             echo "is_master=false" >> "$GITHUB_OUTPUT"
+            echo "is_release_branch=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "❌ Tag ${{ github.ref }} is not on master or develop branch: skipping release."
+            echo "is_master=false" >> "$GITHUB_OUTPUT"
+            echo "is_release_branch=false" >> "$GITHUB_OUTPUT"
           fi
 
   # 2. Effetua la build
   build-release:
     needs: check-branch
-    # Esegue questo job SOLO se l'output del job precedente è 'true'
-    if: needs.check-branch.outputs.is_master == 'true'
+    # Runs for version tags on either the master or the develop branch
+    if: needs.check-branch.outputs.is_release_branch == 'true'
+    outputs:
+      is_master: ${{ needs.check-branch.outputs.is_master }}
     runs-on: ubuntu-latest
 
     steps:
@@ -142,6 +152,8 @@ jobs:
   # 3. Pubblica il pacchetto Python su PyPI via Trusted Publishing (OIDC)
   publish-pypi:
     needs: build-release
+    # Publishes to PyPI only for version tags on the master branch
+    if: needs.build-release.outputs.is_master == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Download distribution artifacts
