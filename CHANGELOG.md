@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.53.0](https://github.com/Ogekuri/AIBar/compare/v0.52.0..v0.53.0) - 2026-11-05
+### 🚜  Changes
+- rename workflow to release-pypi and add PyPI publishing [useReq] *(release)*
+  - rename release-uvx+extension.yml to release-pypi.yml preserving tag trigger,
+  - master-branch gate, build, extension zip, attestation, and GitHub Release
+  - add publish-pypi job uploading sdist+wheel to PyPI via Trusted Publishing
+  - (pypa/gh-action-pypi-publish, id-token: write, no environment per publisher)
+  - add [project.urls] and trove classifiers; move pytest to [dependency-groups]
+  - dev and regenerate uv.lock
+  - document PyPI install (uv tool install aibar, uvx aibar) in README
+  - add requirements PRJ-012..PRJ-015, CTN-019, TST-068/TST-069 and update
+  - CTN-007, REQ-079, TST-008, TST-037, TST-065 with evidence rows
+  - update tests: pyproject metadata suite plus new release workflow suite
+
 ## [0.52.0](https://github.com/Ogekuri/AIBar/compare/v0.51.0..v0.52.0) - 2026-11-04
 ### 🐛  Bug Fixes
 - include OpenRouter usage percent in panel icon threshold [useReq] *(gnome-extension)*
@@ -1421,6 +1435,7 @@
 - \[0.50.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.50.0
 - \[0.51.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.51.0
 - \[0.52.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.52.0
+- \[0.53.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.53.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1474,3 +1489,4 @@
 [0.50.0]: https://github.com/Ogekuri/AIBar/compare/v0.49.0..v0.50.0
 [0.51.0]: https://github.com/Ogekuri/AIBar/compare/v0.50.0..v0.51.0
 [0.52.0]: https://github.com/Ogekuri/AIBar/compare/v0.51.0..v0.52.0
+[0.53.0]: https://github.com/Ogekuri/AIBar/compare/v0.52.0..v0.53.0
