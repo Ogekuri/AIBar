@@ -21,7 +21,7 @@ def test_script_includes_1280x720_dummy_mode_spec() -> None:
     """
     source = DEV_SCRIPT_PATH.read_text(encoding="utf-8")
     assert (
-        "env MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720 dbus-run-session -- gnome-shell --nested --wayland"
+        "env MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720 dbus-run-session -- scripts/aibar-observe-nested-session.sh gnome-shell --nested --wayland"
         in source
     )
 
@@ -71,11 +71,11 @@ def test_script_falls_back_to_headless_when_nested_option_removed() -> None:
     assert "gnome-shell --help-all" in source
     assert "grep -q -- --nested" in source
     assert (
-        "env MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720 dbus-run-session -- gnome-shell --headless"
+        "env MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720 dbus-run-session -- scripts/aibar-observe-nested-session.sh gnome-shell --headless"
         in source
     )
     assert (
-        "env MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720 dbus-run-session -- gnome-shell --nested --wayland"
+        "env MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720 dbus-run-session -- scripts/aibar-observe-nested-session.sh gnome-shell --nested --wayland"
         in source
     )
 
@@ -93,7 +93,19 @@ def test_script_prefers_virtual_monitor_in_headless_fallback() -> None:
     source = DEV_SCRIPT_PATH.read_text(encoding="utf-8")
     assert "grep -q -- --virtual-monitor" in source
     assert (
-        "env MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720 dbus-run-session -- gnome-shell --headless --virtual-monitor=1280x720"
+        "env MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720 dbus-run-session -- scripts/aibar-observe-nested-session.sh gnome-shell --headless --virtual-monitor=1280x720"
         in source
     )
     assert "virtual-monitor unavailable" in source
+
+
+def test_script_routes_all_branches_through_observer() -> None:
+    """
+    @brief Verify every nested launch branch routes through the observation wrapper.
+    @details REQ-178 requires the observer inside the nested session bus for the
+    legacy, virtual-monitor, and plain-headless branches alike; the wrapper keeps
+    gnome-install-first ordering (REQ-031) and the parameterless flow (REQ-033).
+    @satisfies REQ-178, REQ-031, REQ-033
+    """
+    source = DEV_SCRIPT_PATH.read_text(encoding="utf-8")
+    assert source.count("dbus-run-session -- scripts/aibar-observe-nested-session.sh gnome-shell") == 3

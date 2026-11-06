@@ -62,7 +62,7 @@
   - main script body: direct execution [`scripts/test-gnome-extension.sh`]
 - `Lifecycle/Trigger`
   - Starts when user invokes `scripts/test-gnome-extension.sh` (no arguments required).
-  - Synchronizes the installed extension through `scripts/aibar.sh gnome-install`, then launches a nested Wayland GNOME Shell at `1280x720`.
+  - Synchronizes the installed extension through `scripts/aibar.sh gnome-install`, then launches a nested Wayland GNOME Shell at `1280x720` through the observation wrapper.
 - `Internal Call-Trace Tree`
   - main script body: direct execution [`scripts/test-gnome-extension.sh`]
     - path resolution block: derive `full_path`, `script_dir`, and `project_root` [`scripts/test-gnome-extension.sh`]
@@ -70,15 +70,22 @@
     - extension sync step: `scripts/aibar.sh gnome-install` [`scripts/test-gnome-extension.sh`]
       - External boundary: subprocess launch of repository launcher (`PROC:aibar-launcher`).
     - nested-shell capability probe: `gnome-shell --help-all` probed for the legacy `--nested` option and then for `--virtual-monitor` [`scripts/test-gnome-extension.sh`]
-    - nested shell launch (legacy branch, `--nested` advertised): `MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720 dbus-run-session -- gnome-shell --nested --wayland` [`scripts/test-gnome-extension.sh`]
-      - External boundary: `dbus-run-session -- gnome-shell --nested --wayland`.
-    - nested shell launch (virtual-monitor fallback, `--virtual-monitor` advertised): `MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720 dbus-run-session -- gnome-shell --headless --virtual-monitor=1280x720` [`scripts/test-gnome-extension.sh`]
-      - External boundary: `dbus-run-session -- gnome-shell --headless --virtual-monitor=1280x720`.
-    - nested shell launch (plain-headless fallback, `--virtual-monitor` unavailable): informational notice plus `MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720 dbus-run-session -- gnome-shell --headless` [`scripts/test-gnome-extension.sh`]
-      - External boundary: `dbus-run-session -- gnome-shell --headless`.
+    - nested shell launch (legacy branch, `--nested` advertised): `MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720 dbus-run-session -- scripts/aibar-observe-nested-session.sh gnome-shell --nested --wayland` [`scripts/test-gnome-extension.sh`]
+      - observation wrapper: launch argv as nested shell, trap SIGINT/SIGTERM, snapshot loop via `org.gnome.Shell.Screenshot.Screenshot` to `~/.cache/aibar/nested-shell/nested-shell-snapshot.png` [`scripts/aibar-observe-nested-session.sh`]
+        - External boundary: `org.gnome.Shell.Screenshot.Screenshot` D-Bus call on the nested session bus.
+      - External boundary: `dbus-run-session -- scripts/aibar-observe-nested-session.sh gnome-shell --nested --wayland`.
+    - nested shell launch (virtual-monitor fallback, `--virtual-monitor` advertised): `MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720 dbus-run-session -- scripts/aibar-observe-nested-session.sh gnome-shell --headless --virtual-monitor=1280x720` [`scripts/test-gnome-extension.sh`]
+      - observation wrapper: launch argv as nested shell, trap SIGINT/SIGTERM, snapshot loop via `org.gnome.Shell.Screenshot.Screenshot` to `~/.cache/aibar/nested-shell/nested-shell-snapshot.png` [`scripts/aibar-observe-nested-session.sh`]
+        - External boundary: `org.gnome.Shell.Screenshot.Screenshot` D-Bus call on the nested session bus.
+      - External boundary: `dbus-run-session -- scripts/aibar-observe-nested-session.sh gnome-shell --headless --virtual-monitor=1280x720`.
+    - nested shell launch (plain-headless fallback, `--virtual-monitor` unavailable): informational notice plus `MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720 dbus-run-session -- scripts/aibar-observe-nested-session.sh gnome-shell --headless` [`scripts/test-gnome-extension.sh`]
+      - observation wrapper: launch argv as nested shell, trap SIGINT/SIGTERM, snapshot loop via `org.gnome.Shell.Screenshot.Screenshot` to `~/.cache/aibar/nested-shell/nested-shell-snapshot.png` [`scripts/aibar-observe-nested-session.sh`]
+        - External boundary: `org.gnome.Shell.Screenshot.Screenshot` D-Bus call on the nested session bus.
+      - External boundary: `dbus-run-session -- scripts/aibar-observe-nested-session.sh gnome-shell --headless`.
 - `External Boundaries`
   - `scripts/aibar.sh` subprocess delegation for extension synchronization.
   - `dbus-run-session` and `gnome-shell` for nested shell (legacy `--nested --wayland`, `--headless --virtual-monitor=1280x720`, or plain `--headless` fallback selected by capability probe).
+  - `scripts/aibar-observe-nested-session.sh` observation wrapper issuing `org.gnome.Shell.Screenshot.Screenshot` D-Bus calls and writing PNG snapshots under `~/.cache/aibar/nested-shell/`.
 
 ### PROC:main
 - `Entrypoints`

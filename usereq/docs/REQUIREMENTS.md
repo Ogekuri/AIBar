@@ -303,6 +303,13 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-170**: MUST render the AGY GNOME panel status bar with the `G 5h` quota percentage followed by the `G 7d` quota percentage, and MUST drive panel icon thresholds from the maximum AGY quota percentage.
 - **REQ-171**: MUST exclude `agy` from `setup` currency-symbol prompts and monetary rendering because the AGY surface exposes no cost metrics.
 
+### 3.5 Nested Session Observation
+- **REQ-178**: `scripts/test-gnome-extension.sh` MUST launch every nested GNOME Shell branch through `scripts/aibar-observe-nested-session.sh` executing inside the same session bus as the nested shell.
+- **REQ-179**: `scripts/aibar-observe-nested-session.sh` MUST launch its argv as the nested GNOME Shell command and MUST terminate it on SIGINT or SIGTERM.
+- **REQ-180**: `scripts/aibar-observe-nested-session.sh` MUST capture session snapshots via the `org.gnome.Shell.Screenshot.Screenshot` D-Bus method on the nested session bus.
+- **REQ-181**: `scripts/aibar-observe-nested-session.sh` MUST write each snapshot to `~/.cache/aibar/nested-shell/nested-shell-snapshot.png` and print the snapshot path after every capture.
+- **REQ-182**: `scripts/aibar-observe-nested-session.sh` MUST capture the first snapshot after a 3-second settle delay and repeat captures every 5 seconds until the nested shell exits.
+
 ## 4. Test Requirements
 
 Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HDT principles: deterministic, isolated, and behavior-focused.
@@ -375,6 +382,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-071**: MUST verify `README.md` documents `sudo apt install pipx`, `pipx ensurepath`, and `pipx install aibar` as the primary installation flow before alternative methods.
 - **TST-072**: MUST verify default `--upgrade` executes the PyPI lifecycle command and `--upgrade` with `--github` executes the GitHub lifecycle command.
 - **TST-073**: MUST verify `.github/workflows/release-pypi.yml` gates `publish-pypi` on the `master` branch output and runs `build-release` for version tags on `master` or `develop`.
+- **TST-074**: MUST verify `scripts/aibar-observe-nested-session.sh` launches argv as the nested shell, traps SIGINT/SIGTERM, captures via the Screenshot D-Bus method to the mandated path with settle and interval defaults, and that `scripts/test-gnome-extension.sh` routes all launch branches through the observer preserving `MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720`.
 
 ## 5. Evidence
 
