@@ -78,3 +78,22 @@ def test_script_falls_back_to_headless_when_nested_option_removed() -> None:
         "env MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720 dbus-run-session -- gnome-shell --nested --wayland"
         in source
     )
+
+
+def test_script_prefers_virtual_monitor_in_headless_fallback() -> None:
+    """
+    @brief Verify headless fallback provisions an explicit 1280x720 virtual monitor.
+    @details A bare `--headless` session boots without any visible window, so the
+    launcher must probe `gnome-shell --help-all` for `--virtual-monitor` and prefer
+    `--headless --virtual-monitor=1280x720` (the visible nested-style replacement
+    on GNOME Shell builds supporting windowed virtual monitors), degrading to the
+    plain headless session with an informational notice when unsupported.
+    @satisfies REQ-031, PRJ-004
+    """
+    source = DEV_SCRIPT_PATH.read_text(encoding="utf-8")
+    assert "grep -q -- --virtual-monitor" in source
+    assert (
+        "env MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720 dbus-run-session -- gnome-shell --headless --virtual-monitor=1280x720"
+        in source
+    )
+    assert "virtual-monitor unavailable" in source

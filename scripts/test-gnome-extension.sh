@@ -4,9 +4,12 @@
 # @details Starts a nested GNOME Shell at 1280x720 resolution via
 # `MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720 dbus-run-session -- gnome-shell --nested --wayland`.
 # Newer GNOME Shell releases removed the `--nested` option; when `gnome-shell
-# --help-all` no longer advertises `--nested`, the launcher falls back to
-# `gnome-shell --headless`, which starts the equivalent nested Wayland session
-# whose dummy monitors honor `MUTTER_DEBUG_DUMMY_MODE_SPECS`.
+# --help-all` no longer advertises `--nested`, the launcher prefers
+# `gnome-shell --headless --virtual-monitor=1280x720`, which provisions an
+# explicit 1280x720 virtual monitor (rendered in a window on builds supporting
+# windowed virtual monitors), and degrades to a plain `gnome-shell --headless`
+# session (display-less, functional but without a local window) when
+# `--virtual-monitor` is unavailable.
 # No subcommand parameter required; executes directly on invocation without
 # invoking extension update commands.
 # @satisfies PRJ-004, REQ-031, REQ-033
@@ -25,8 +28,11 @@ scripts/aibar.sh gnome-install
 echo "Starting nested GNOME Shell at 1280x720..."
 if gnome-shell --help-all 2>/dev/null | grep -q -- --nested; then
     env MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720 dbus-run-session -- gnome-shell --nested --wayland
+elif gnome-shell --help-all 2>/dev/null | grep -q -- --virtual-monitor; then
+    # --nested was removed from newer GNOME Shell releases; an explicit 1280x720
+    # virtual monitor in the headless session restores a nested-style test view.
+    env MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720 dbus-run-session -- gnome-shell --headless --virtual-monitor=1280x720
 else
-    # --nested was removed from newer GNOME Shell releases; --headless starts
-    # the equivalent Wayland session with dummy monitors at 1280x720.
+    echo "[INFO] gnome-shell --virtual-monitor unavailable; starting headless session without window."
     env MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720 dbus-run-session -- gnome-shell --headless
 fi

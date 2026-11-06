@@ -69,14 +69,16 @@
     - project-root switch: `cd "$project_root"` [`scripts/test-gnome-extension.sh`]
     - extension sync step: `scripts/aibar.sh gnome-install` [`scripts/test-gnome-extension.sh`]
       - External boundary: subprocess launch of repository launcher (`PROC:aibar-launcher`).
-    - nested-shell capability probe: `gnome-shell --help-all` probed for the legacy `--nested` option [`scripts/test-gnome-extension.sh`]
+    - nested-shell capability probe: `gnome-shell --help-all` probed for the legacy `--nested` option and then for `--virtual-monitor` [`scripts/test-gnome-extension.sh`]
     - nested shell launch (legacy branch, `--nested` advertised): `MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720 dbus-run-session -- gnome-shell --nested --wayland` [`scripts/test-gnome-extension.sh`]
       - External boundary: `dbus-run-session -- gnome-shell --nested --wayland`.
-    - nested shell launch (fallback branch, `--nested` removed by newer GNOME Shell): `MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720 dbus-run-session -- gnome-shell --headless` [`scripts/test-gnome-extension.sh`]
+    - nested shell launch (virtual-monitor fallback, `--virtual-monitor` advertised): `MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720 dbus-run-session -- gnome-shell --headless --virtual-monitor=1280x720` [`scripts/test-gnome-extension.sh`]
+      - External boundary: `dbus-run-session -- gnome-shell --headless --virtual-monitor=1280x720`.
+    - nested shell launch (plain-headless fallback, `--virtual-monitor` unavailable): informational notice plus `MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720 dbus-run-session -- gnome-shell --headless` [`scripts/test-gnome-extension.sh`]
       - External boundary: `dbus-run-session -- gnome-shell --headless`.
 - `External Boundaries`
   - `scripts/aibar.sh` subprocess delegation for extension synchronization.
-  - `dbus-run-session` and `gnome-shell` for nested shell (legacy `--nested --wayland` or `--headless` fallback selected by capability probe).
+  - `dbus-run-session` and `gnome-shell` for nested shell (legacy `--nested --wayland`, `--headless --virtual-monitor=1280x720`, or plain `--headless` fallback selected by capability probe).
 
 ### PROC:main
 - `Entrypoints`
