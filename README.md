@@ -10,7 +10,7 @@
 > * **No Support or Feature Requests:** Please **do not** open issues, bug reports, or feature requests. They will not be addressed or accepted at this stage of development.
 > * **No Warranty:** This software is provided **"AS IS"**, without warranty of any kind, express or implied. You may use it strictly for **testing and evaluation purposes** at your own sole risk.
 
-# AIBar/aibar (0.55.0)
+# AIBar / aibar (0.55.0)
 
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.12%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.12+">
@@ -22,16 +22,14 @@
 
 <p align="center">
 <strong>Monitor AI usage and quota in one CLI.</strong><br>
-AIBar aggregates usage metrics for Antigravity (agy), OpenAI, OpenRouter, GitHub Copilot, Codex, GeminiAI, and Z.ai, with terminal output and a GNOME panel extension.
+AIBar aggregates usage metrics for Antigravity (agy), OpenAI, OpenRouter, GitHub Copilot, Codex, GeminiAI, and Z.ai, with colored terminal panels and a GNOME Shell panel extension.
+It caches provider results locally, gates refreshes with idle-time windows, throttles provider API calls, and exposes both human-readable text output and a stable machine-readable JSON contract.
 </p>
 
 <p align="center">
-  <a href="#quick-start">Quick Start</a> |
-  <a href="#requirements-uv">Requirements (uv)</a> |
-  <a href="#installation-uv">Installation (uv)</a> |
-  <a href="#configuration">Configuration</a> |
   <a href="#feature-highlights">Feature Highlights</a> |
-  <a href="#usage">Usage</a> |
+  <a href="#quick-start">Quick Start</a> |
+  <a href="#users-guide">User's Guide</a> |
   <a href="#acknowledgments">Acknowledgments</a>
 </p>
 
@@ -42,8 +40,10 @@ AIBar aggregates usage metrics for Antigravity (agy), OpenAI, OpenRouter, GitHub
 <br>
 </p>
 
+# Feature Highlights
 
-## Feature Highlights
+AIBar brings every supported AI provider quota and cost into one place, on the terminal and in the GNOME panel.
+
 - Unified `show` command for multiple providers (`agy`, `openai`, `openrouter`, `copilot`, `codex`, `geminiai`, `zai`).
 - Text output and machine output (`show --json`) with stable top-level sections (`payload`, `status`, `idle_time`, `freshness`, `extension`, `enabled_providers`).
 - Per-run refresh override with `show --force` (bypasses idle-time gating for that execution).
@@ -52,16 +52,14 @@ AIBar aggregates usage metrics for Antigravity (agy), OpenAI, OpenRouter, GitHub
 - Startup release preflight that can emit update notices or fetch diagnostics before normal command output.
 - GNOME Shell extension support via `gnome-install` / `gnome-uninstall`, popup `Refresh Now`, and JSON-driven refresh/window metadata.
 
-### Screenshot
+# Quick Start
 
-[![Screenshot10](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot10.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot10.png)
-
-
-
-## Quick Start
+Bring-up follows three steps: install, configure, run. AIBar is published on
+[PyPI](https://pypi.org/project/aibar/); installation and execution use
+[Astral uv](https://docs.astral.sh/uv/) exclusively.
 
 ```bash
-# 1) Install from PyPI (requires Python >= 3.12 and Astral uv)
+# 1) Install from PyPI (requires Python >= 3.12 and uv)
 uv tool install aibar
 
 # 2) Configure credentials and runtime settings
@@ -75,24 +73,34 @@ aibar show
 aibar show --json
 ```
 
-Running from a repository clone instead of an installed tool? Use the
-repository launcher (it delegates to `uv run python -m aibar.cli`):
+To place usage in the GNOME top panel, run `aibar gnome-install` and enable the
+*AIBar Monitor* extension. All optional configuration (GitHub installs, provider
+credentials details, throttling, currencies, logging, JSON contract) is covered
+in the [User's Guide](#users-guide).
 
-```bash
-scripts/aibar.sh --help
-scripts/aibar.sh setup
-scripts/aibar.sh show
-```
+# Requirements
 
-## Requirements (uv)
+- Python >= 3.12; the repository pins the interpreter via `.python-version` and `uv run` resolves a Python 3.12+ interpreter automatically.
+- [Astral uv](https://docs.astral.sh/uv/): `uv` for installation/removal and `uvx` for live execution; no external virtualenv bootstrap is required.
+- Published package on [PyPI](https://pypi.org/project/aibar/) (project `aibar`) as the default distribution source.
+- Network access to `pypi.org` and `api.github.com` for startup update checks and `--version` reporting, plus each provider's API endpoint.
+- Linux for the lifecycle flags `--upgrade` and `--uninstall` (on non-Linux platforms AIBar prints the equivalent manual `uv` command).
+- GNOME Shell `45`, `46`, `47`, or `48` with the `gnome-extensions` CLI, for the panel extension.
+- Provider-specific prerequisites:
 
-AIBar requires [Astral uv](https://docs.astral.sh/uv/) for all local launcher/runtime workflows.
-Do not create or manage external virtual environments for repository execution.
-AIBar requires Python >= 3.12; the repository pins the interpreter via `.python-version`
-and `uv run` resolves a Python 3.12+ interpreter for every launcher execution.
+| Provider | Prerequisite |
+|---|---|
+| `agy` (Antigravity) | Local `agy` CLI available on `PATH` (no API key required) |
+| `openai` | `OPENAI_ADMIN_KEY` (organization admin API key) |
+| `openrouter` | `OPENROUTER_API_KEY` |
+| `copilot` | GitHub account for the device-flow login (`aibar login --provider copilot`) |
+| `codex` | Existing Codex login read from `~/.codex/auth.json` |
+| `geminiai` | Google Cloud project with Desktop OAuth 2.0 client, Cloud Monitoring API, BigQuery API, and a billing export dataset (details in the User's Guide) |
+| `zai` | `ZAI_API_KEY` |
 
+# User's Guide
 
-## Installation (uv)
+## Installation
 
 AIBar is published on [PyPI](https://pypi.org/project/aibar/) as `aibar`.
 PyPI is the default source used by the program for version checks and self-upgrades (`aibar --upgrade`).
@@ -158,20 +166,6 @@ uvx --from "git+https://github.com/Ogekuri/AIBar.git" aibar doctor
 ```bash
 uv export --format requirements-txt > requirements.txt
 ```
-
-### Uninstall
-
-```bash
-uv tool uninstall aibar
-```
-
-Equivalent self-removal (Linux only; also clears cached runtime data
-under `~/.cache/aibar/`):
-
-```bash
-aibar --uninstall
-```
-
 
 ## Configuration
 
@@ -240,8 +234,7 @@ To enable GeminiAI features, configure Google Cloud before running `aibar setup`
    - Cloud Monitoring API
    - BigQuery API
 
-
-## Usage
+## Running the CLI
 
 ### Core commands
 
@@ -337,17 +330,14 @@ aibar --disable-debug
 - Usage above 100% on any quota renders the shared over-limit bar segment with the 100% boundary marker.
 - In the GNOME extension, Z.ai renders as the last provider tab/card (cyan accent): one progress bar per quota with `Reset in: <duration>`, and the panel status bar shows the `5h` quota percentage followed by the bold `1w` quota percentage.
 
-### `show --json` contract
+## GNOME Shell extension
 
-Top-level keys:
-- `payload`: normalized provider results keyed by provider id.
-- `status`: per-provider, per-window fetch outcomes (`OK` / `FAIL`) and cached error metadata.
-- `idle_time`: provider idle-time timestamps used for refresh gating.
-- `freshness`: provider `Updated` / `Next` timestamps used by CLI and GNOME views.
-- `extension`: GNOME-facing metadata (`gnome_refresh_interval_seconds`, `idle_delay_seconds`, `copilot_extra_premium_request_cost`, `window_labels`).
-- `enabled_providers`: normalized provider enable/disable map consumed by CLI and GNOME surfaces.
+Install, update, or remove the panel extension with the dedicated commands:
 
-### GNOME extension behavior
+```bash
+aibar gnome-install      # install or update, then enable aibar@aibar.panel
+aibar gnome-uninstall    # disable the extension and remove its files
+```
 
 - Installed path: `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/`.
 - Supported GNOME Shell versions: `45`, `46`, `47`, `48`.
@@ -357,7 +347,20 @@ Top-level keys:
 - Provider cards show `Updated: ..., Next: ...` freshness labels.
 - Auto-refresh interval follows `gnome_refresh_interval_seconds` from `aibar setup` / `config.json`.
 
-### Repository helper scripts
+## Uninstall
+
+```bash
+uv tool uninstall aibar
+```
+
+Equivalent self-removal (Linux only; also clears cached runtime data
+under `~/.cache/aibar/`):
+
+```bash
+aibar --uninstall
+```
+
+## Repository helper scripts
 
 ```bash
 # Repository launcher (delegates to uv run --project ... python -m aibar.cli)
@@ -368,15 +371,68 @@ scripts/aibar.sh --help
 scripts/test-gnome-extension.sh
 ```
 
+# Documentation
 
+## Architecture overview
 
-## Acknowledgments
+- `aibar` runs as a single CLI process exposing the subcommands `show`, `doctor`, `env`, `setup`, `login`, `gnome-install`, and `gnome-uninstall`.
+- The GNOME extension (`aibar@aibar.panel`) runs inside the GNOME Shell process and spawns `aibar show --json` as a subprocess (and `aibar show --json --force` for popup `Refresh Now`), injecting variables from `~/.config/aibar/env` into the child environment.
+- The extension parses the JSON output sections `payload`, `status`, `freshness`, `extension`, and `enabled_providers` to render provider tabs, cards, and panel status labels; the auto-refresh interval is read from `extension.gnome_refresh_interval_seconds`.
+- The extension resolves the `aibar` executable from `PATH`, with an `AIBAR_PATH` override accepted in `~/.config/aibar/env`.
 
-- Thanks to **Shobhit Narayanan** for creating [GnomeCodexBar](https://github.com/shenron0101/GnomeCodexBar).
+## Runtime data layout
 
+| Path | Purpose |
+|---|---|
+| `~/.config/aibar/env` | Provider credentials written by `aibar setup`; loaded by the CLI and the GNOME extension |
+| `~/.config/aibar/config.json` | Runtime settings persisted by `aibar setup` (schema above) |
+| `~/.config/aibar/copilot.json` | Copilot device-flow token |
+| `~/.config/aibar/geminiai_oauth_client.json` | GeminiAI OAuth desktop-client JSON |
+| `~/.config/aibar/geminiai_oauth_token.json` | GeminiAI authorized-user credentials |
+| `~/.cache/aibar/cache.json` | Per-provider, per-window last-success payload snapshots and last-attempt status (`OK`/`FAIL`) |
+| `~/.cache/aibar/idle-time.json` | Provider refresh-gating timestamps (`Updated`/`Next`) |
+| `~/.cache/aibar/check_version_idle-time.json` | Startup update-check gate |
+| `~/.cache/aibar/aibar.log` | Execution log (written when `log_enabled` is `true`) |
 
+## Caching and refresh model
 
-## License
+- `show` refreshes only providers whose idle-time gate has expired; all other providers are served from `~/.cache/aibar/cache.json` (single cache read per execution).
+- `show --force` deletes `idle-time.json`, bypasses the gate for that execution, refreshes providers, and regenerates the idle-time metadata.
+- Successful fetches overwrite the cached payload; failed fetches (including HTTP `429`) preserve the previous payload and are surfaced as `Status: FAIL` with `Reason:` and the `Updated/Next` line.
+- Consecutive provider API calls are spaced by `api_call_delay_milliseconds` (default `100` ms); each provider HTTP call uses the `api_call_timeout_milliseconds` timeout (default `5000` ms).
+- Concurrent executions are coordinated with lock files; a lock blocked for more than 5 seconds fails with an explicit error.
 
-- This program is licensed under the terms in [`LICENSE`](./LICENSE).
+## `show --json` integration contract
+
+Top-level keys:
+- `payload`: normalized provider results keyed by provider id.
+- `status`: per-provider, per-window fetch outcomes (`OK` / `FAIL`) and cached error metadata.
+- `idle_time`: provider idle-time timestamps used for refresh gating.
+- `freshness`: provider `Updated` / `Next` timestamps used by CLI and GNOME views.
+- `extension`: GNOME-facing metadata (`gnome_refresh_interval_seconds`, `idle_delay_seconds`, `copilot_extra_premium_request_cost`, `window_labels`).
+- `enabled_providers`: normalized provider enable/disable map consumed by CLI and GNOME surfaces.
+
+## Startup update preflight
+
+- Every CLI invocation runs a latest-release check against `https://pypi.org/pypi/aibar/json` before argument validation and command dispatch.
+- Results are idle-cached for about `300` seconds in `check_version_idle-time.json`; invocations containing `--version` or `--ver` force one online check regardless of the gate.
+- A newer PyPI release prints a bright-green update notice; failed checks print bright-red diagnostics, and HTTP `429` responses extend the idle gate using the reported retry delay.
+
+## Logging and diagnostics
+
+- `--enable-log` / `--disable-log` toggle append-only execution logging to `~/.cache/aibar/aibar.log`; each entry line starts with a `%Y-%m-%d %H:%M:%S` timestamp, and execution blocks are separated by a blank line.
+- `--enable-debug` / `--disable-debug` toggle API debug rows; debug rows are emitted only when both `log_enabled` and `debug_enabled` are `true`, and failed API calls log the unmodified JSON response payload.
+- Both flags persist in `~/.config/aibar/config.json` (`log_enabled`, `debug_enabled`) until reconfigured.
+
+## Screenshots
+
+[![Screenshot10](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot10.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot10.png)
+
+# License
+
+- This program is licensed under the terms in [`LICENSE`](./LICENSE) (GPL-3.0).
 - This project includes modified files from **GnomeCodexBar**; those files are covered by the license provided in `LICENSE_GnomeCodexBar`, as required by the original license terms.
+
+# Acknowledgments
+
+- Thanks to **Shobhit Narayanan** for creating [GnomeCodexBar](https://github.com/shenron0101/GnomeCodexBar), the project AIBar derives its GNOME panel styling and layout from.
