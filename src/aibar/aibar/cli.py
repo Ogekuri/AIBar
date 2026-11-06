@@ -4705,7 +4705,7 @@ def gnome_install() -> None:
     click.echo()
 
     src_dir = _resolve_extension_source_dir()
-    click.echo(click.style("  [1/4] ", bold=True) + "Validating extension source...")
+    click.echo(click.style("  [1/5] ", bold=True) + "Validating extension source...")
     if not src_dir.is_dir():
         click.echo(
             click.style("  [FAIL] ", fg="red")

@@ -55,3 +55,26 @@ def test_script_does_not_require_arguments() -> None:
     source = DEV_SCRIPT_PATH.read_text(encoding="utf-8")
     assert '"${1:-}"' not in source
     assert "$1" not in source
+
+
+def test_script_falls_back_to_headless_when_nested_option_removed() -> None:
+    """
+    @brief Verify launcher probes --nested support and falls back to --headless.
+    @details Newer GNOME Shell releases removed the `--nested` option, so the
+    launcher must probe `gnome-shell --help-all`, retain the legacy
+    `--nested --wayland` launch when the option is advertised, and start
+    `gnome-shell --headless` otherwise, with
+    `MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720` applied in both branches.
+    @satisfies REQ-031, PRJ-004
+    """
+    source = DEV_SCRIPT_PATH.read_text(encoding="utf-8")
+    assert "gnome-shell --help-all" in source
+    assert "grep -q -- --nested" in source
+    assert (
+        "env MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720 dbus-run-session -- gnome-shell --headless"
+        in source
+    )
+    assert (
+        "env MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720 dbus-run-session -- gnome-shell --nested --wayland"
+        in source
+    )
