@@ -1,12 +1,12 @@
 > [!CAUTION]
 > ### 🚨 STRICTLY EXPERIMENTAL — PROOF OF CONCEPT (PRE-ALPHA)
-> 
+>
 > ![Status: Proof of Concept](https://img.shields.io/badge/Status-Proof_of_Concept-red?style=flat-square) ![Stage: Pre-Alpha](https://img.shields.io/badge/Stage-Pre--Alpha-critical?style=flat-square) ![Maintenance: Personal Use Only](https://img.shields.io/badge/Scope-Personal_Use_Only-important?style=flat-square) ![Issues: Closed](https://img.shields.io/badge/Issues_%26_PRs-Not_Accepted-inactive?style=flat-square)
 >
 > **PLEASE READ CAREFULLY BEFORE USING THIS SOFTWARE:**
-> 
+>
 > * **Very Early Stage:** This project is currently a raw **Proof of Concept (PoC)** in a **pre-alpha** state. It is nowhere near production-ready and may contain severe bugs, breaking changes, or incomplete logic.
-> * **Personal Use Only:** This repository is developed, maintained, and shared strictly for **personal use**. 
+> * **Personal Use Only:** This repository is developed, maintained, and shared strictly for **personal use**.
 > * **No Support or Feature Requests:** Please **do not** open issues, bug reports, or feature requests. They will not be addressed or accepted at this stage of development.
 > * **No Warranty:** This software is provided **"AS IS"**, without warranty of any kind, express or implied. You may use it strictly for **testing and evaluation purposes** at your own sole risk.
 
@@ -22,13 +22,14 @@
 
 <p align="center">
 <strong>Monitor AI usage and quota in one CLI.</strong><br>
-AIBar aggregates usage metrics for Claude, OpenAI, OpenRouter, GitHub Copilot, Codex, GeminiAI, and Z.ai, with terminal output and a GNOME panel extension.
+AIBar aggregates usage metrics for Antigravity (agy), OpenAI, OpenRouter, GitHub Copilot, Codex, GeminiAI, and Z.ai, with terminal output and a GNOME panel extension.
 </p>
 
 <p align="center">
   <a href="#quick-start">Quick Start</a> |
   <a href="#requirements-uv">Requirements (uv)</a> |
   <a href="#installation-uv">Installation (uv)</a> |
+  <a href="#configuration">Configuration</a> |
   <a href="#feature-highlights">Feature Highlights</a> |
   <a href="#usage">Usage</a> |
   <a href="#acknowledgments">Acknowledgments</a>
@@ -43,7 +44,7 @@ AIBar aggregates usage metrics for Claude, OpenAI, OpenRouter, GitHub Copilot, C
 
 
 ## Feature Highlights
-- Unified `show` command for multiple providers (`claude`, `openai`, `openrouter`, `copilot`, `codex`, `geminiai`, `zai`).
+- Unified `show` command for multiple providers (`agy`, `openai`, `openrouter`, `copilot`, `codex`, `geminiai`, `zai`).
 - Text output and machine output (`show --json`) with stable top-level sections (`payload`, `status`, `idle_time`, `freshness`, `extension`, `enabled_providers`).
 - Per-run refresh override with `show --force` (bypasses idle-time gating for that execution).
 - Interactive `setup` for provider enable/disable state, runtime throttling, Copilot overage pricing, provider currency symbols, GeminiAI OAuth/project settings, and logging flags.
@@ -60,18 +61,27 @@ AIBar aggregates usage metrics for Claude, OpenAI, OpenRouter, GitHub Copilot, C
 ## Quick Start
 
 ```bash
-# 1) From the repository root, run the repository launcher
-scripts/aibar.sh --help
+# 1) Install from PyPI (requires Python >= 3.12 and Astral uv)
+uv tool install aibar
 
 # 2) Configure credentials and runtime settings
-scripts/aibar.sh setup
+aibar setup
 
 # 3) Verify provider configuration and connectivity
-scripts/aibar.sh doctor
+aibar doctor
 
 # 4) Show usage
+aibar show
+aibar show --json
+```
+
+Running from a repository clone instead of an installed tool? Use the
+repository launcher (it delegates to `uv run python -m aibar.cli`):
+
+```bash
+scripts/aibar.sh --help
+scripts/aibar.sh setup
 scripts/aibar.sh show
-scripts/aibar.sh show --json
 ```
 
 ## Requirements (uv)
@@ -82,23 +92,21 @@ AIBar requires Python >= 3.12; the repository pins the interpreter via `.python-
 and `uv run` resolves a Python 3.12+ interpreter for every launcher execution.
 
 
-## Installation
+## Installation (uv)
 
 AIBar is published on [PyPI](https://pypi.org/project/aibar/) as `aibar`.
 PyPI is the default source used by the program for version checks and self-upgrades (`aibar --upgrade`).
 Intermediate and test releases are available on [GitHub](https://github.com/Ogekuri/AIBar).
 
-### Install with pipx (primary)
+### Install from PyPI with uv
 
-Install pipx and use it to install AIBar in an isolated environment:
+Install AIBar as an isolated `uv` tool:
 
 ```bash
-sudo apt install pipx
-pipx ensurepath
-pipx install aibar
+uv tool install aibar
 ```
 
-After installation (and starting a new shell so `pipx ensurepath` takes effect) the `aibar` command is available system-wide:
+After installation the `aibar` command is available system-wide:
 
 ```bash
 aibar --help
@@ -106,23 +114,9 @@ aibar setup
 aibar show
 ```
 
-### Install from PyPI with pip (alternative)
+### Live execution without installation
 
-```bash
-pip install aibar
-```
-
-### Install with Astral uv / uvx (alternative)
-
-[uv](https://docs.astral.sh/uv/) is the recommended tool for repository-local
-launcher/runtime workflows and a fully supported alternative installer for the
-same PyPI package:
-
-```bash
-uv tool install aibar
-```
-
-Live execution without installation:
+Run AIBar directly with `uvx`, without installing anything:
 
 ```bash
 uvx aibar --help
@@ -171,6 +165,81 @@ uv export --format requirements-txt > requirements.txt
 uv tool uninstall aibar
 ```
 
+Equivalent self-removal (Linux only; also clears cached runtime data
+under `~/.cache/aibar/`):
+
+```bash
+aibar --uninstall
+```
+
+
+## Configuration
+
+### Credentials
+
+Credentials resolve in this order: environment variable, then
+`~/.config/aibar/env`, then provider-specific local credential stores.
+
+| Provider | Credential source |
+|---|---|
+| `agy` (Antigravity) | Local `agy` CLI available on `PATH` (no API key required) |
+| `openai` | `OPENAI_ADMIN_KEY` (organization admin API key) |
+| `openrouter` | `OPENROUTER_API_KEY` |
+| `copilot` | `aibar login --provider copilot` (saves token to `~/.config/aibar/copilot.json`) |
+| `codex` | Existing Codex login read from `~/.codex/auth.json` |
+| `geminiai` | Google OAuth configured during `aibar setup` or `aibar login --provider geminiai` |
+| `zai` | `ZAI_API_KEY` |
+
+API keys entered during `aibar setup` are stored in `~/.config/aibar/env`.
+
+### Setup persistence and config schema
+
+`aibar setup` writes:
+- `~/.config/aibar/env`: credentials entered during setup.
+- `~/.config/aibar/config.json`: runtime settings.
+
+User-editable `config.json` keys surfaced by setup:
+- `idle_delay_seconds` (default `300`)
+- `api_call_delay_milliseconds` (default `100`)
+- `api_call_timeout_milliseconds` (default `5000`)
+- `default_retry_after_seconds` (default `3600`)
+- `gnome_refresh_interval_seconds` (default `60`)
+- `billing_data` (default `billing_data`)
+- `enabled_providers` (missing provider keys default to enabled)
+- `copilot_extra_premium_request_cost` (default `0.04`)
+- `currency_symbols` (per-provider display symbol; setup choices `$`, `£`, `€`, default `$`)
+- `log_enabled`
+- `debug_enabled`
+- `geminiai_project_id`
+
+### Provider login
+
+```bash
+# Copilot GitHub device-flow login
+aibar login --provider copilot
+
+# GeminiAI Google OAuth browser login (requires the OAuth client configured in setup)
+aibar login --provider geminiai
+
+# Re-authenticate only providers currently in cached FAIL state
+aibar login
+```
+
+### GeminiAI prerequisites
+
+To enable GeminiAI features, configure Google Cloud before running `aibar setup`:
+
+1. Create **Desktop Client OAuth 2.0** credentials in the target Google Cloud project.
+2. In `aibar setup`, configure GeminiAI OAuth client JSON (`file` or `paste`) or re-authorize with `login`, then authorize requested scopes:
+   - `https://www.googleapis.com/auth/bigquery.readonly`
+   - `https://www.googleapis.com/auth/monitoring.read`
+   - `https://www.googleapis.com/auth/cloud-platform`
+3. Configure the Gemini project id in setup (`geminiai project id`) or via `GEMINIAI_PROJECT_ID`.
+4. Set setup field `billing_data` to the BigQuery dataset containing billing export tables (`gcp_billing_export_v1_*`, default dataset name: `billing_data`).
+5. Ensure required Google APIs are enabled for the project used by OAuth credentials:
+   - Cloud Monitoring API
+   - BigQuery API
+
 
 ## Usage
 
@@ -178,12 +247,12 @@ uv tool uninstall aibar
 
 ```bash
 # Show all configured providers
-# (default flow renders dual windows for claude/codex when --window is not set)
+# (default flow renders dual windows for codex when --window is not set)
 aibar show
 
 # Provider selection
-# allowed values: claude, openai, openrouter, copilot, codex, geminiai, zai, all
-aibar show --provider claude --window 5h
+# allowed values: agy, openai, openrouter, copilot, codex, geminiai, zai, all
+aibar show --provider codex --window 5h
 
 # JSON output for scripts/integrations
 aibar show --json
@@ -195,11 +264,6 @@ aibar show --force
 aibar doctor
 aibar env
 aibar setup
-
-# Provider login helpers
-aibar login --provider claude
-aibar login --provider copilot
-aibar login --provider geminiai
 
 # GNOME extension lifecycle
 aibar gnome-install
@@ -237,17 +301,25 @@ aibar --disable-debug
 ### `show` window behavior
 
 - Allowed windows: `5h`, `7d`, `30d`.
-- `claude` and `codex` support dual-window rendering (`5h` and `7d`) in default text output when `--window` is not explicitly set.
-- For `copilot`, `openrouter`, `openai`, `geminiai`, and `zai`, the effective window is fixed to `30d` even if another `--window` is provided.
+- `codex` supports dual-window rendering (`5h` and `7d`) in default text output when `--window` is not explicitly set.
+- For `agy`, `copilot`, `openrouter`, `openai`, `geminiai`, and `zai`, the effective window is fixed to `30d` even if another `--window` is provided.
 
 ### Text output layout
 
-- Each provider renders one colored panel in the canonical order `claude`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, `zai`; all panels share the same width.
+- Each provider renders one colored panel in the canonical order `agy`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, `zai`; all panels share the same width.
 - `Status` is the first line on successful panels, and every panel ends with a right-aligned `Updated: <datetime>, Next: <datetime>` freshness line.
-- Usage rows use `Usage: <window> <progress_bar> <percent>%` for `claude`, `openrouter`, `copilot`, `codex`, and `zai`; `openai` and `geminiai` render `Usage: <window> <percent>%` without a bar.
-- `Remaining credits: <remaining> / <limit>` is printed for `claude`, `codex`, and `copilot` when the status is `OK`.
+- Usage rows use `Usage: <window> <progress_bar> <percent>%` for `agy`, `openrouter`, `copilot`, `codex`, and `zai`; `openai` and `geminiai` render `Usage: <window> <percent>%` without a bar.
+- `Remaining credits: <remaining> / <limit>` is printed for `codex` and `copilot` when the status is `OK`.
 - Percentages above 100% render the over-limit segment with the 100% boundary marker.
 - Failed providers render `Status: FAIL`, the failure `Reason:`, and the `Updated/Next` freshness line instead of usage statistics.
+
+### Antigravity (agy)
+
+- Provider key `agy`; reads quota data from the local Antigravity CLI (`agy -p /usage`), so the `agy` executable must be installed and available on `PATH`.
+- One CLI call returns all quotas; the effective window is fixed to `30d`.
+- Text output renders one progress bar per quota with the labels `G 7d`, `G 5h`, `CG 7d`, `CG 5h`, and `A 7d`.
+- No monetary metrics are exposed: `agy` renders no cost rows and is excluded from setup currency-symbol prompts.
+- In the GNOME extension and CLI panels, `agy` renders as the first provider (red accent), and the panel status bar shows the `G 5h` quota percentage followed by the `G 7d` quota percentage.
 
 ### OpenRouter
 
@@ -275,26 +347,6 @@ Top-level keys:
 - `extension`: GNOME-facing metadata (`gnome_refresh_interval_seconds`, `idle_delay_seconds`, `copilot_extra_premium_request_cost`, `window_labels`).
 - `enabled_providers`: normalized provider enable/disable map consumed by CLI and GNOME surfaces.
 
-### Setup persistence and config schema
-
-`aibar setup` writes:
-- `~/.config/aibar/env`: credentials entered during setup.
-- `~/.config/aibar/config.json`: runtime settings.
-
-User-editable `config.json` keys surfaced by setup:
-- `idle_delay_seconds` (default `300`)
-- `api_call_delay_milliseconds` (default `100`)
-- `api_call_timeout_milliseconds` (default `5000`)
-- `default_retry_after_seconds` (default `3600`)
-- `gnome_refresh_interval_seconds` (default `60`)
-- `billing_data` (default `billing_data`)
-- `enabled_providers` (missing provider keys default to enabled)
-- `copilot_extra_premium_request_cost` (default `0.04`)
-- `currency_symbols` (per-provider display symbol; setup choices `$`, `£`, `€`, default `$`)
-- `log_enabled`
-- `debug_enabled`
-- `geminiai_project_id`
-
 ### GNOME extension behavior
 
 - Installed path: `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/`.
@@ -311,35 +363,10 @@ User-editable `config.json` keys surfaced by setup:
 # Repository launcher (delegates to uv run --project ... python -m aibar.cli)
 scripts/aibar.sh --help
 
-# Claude token refresh helper
-scripts/claude_token_refresh.sh {start|stop|status|once|loop}
-
-# Override refresh interval (seconds; default: 1800)
-AIBAR_CLAUDE_REFRESH_INTERVAL_SECONDS=900 scripts/claude_token_refresh.sh start
-
-# Helper state files
-# log: ~/.config/aibar/claude_token_refresh.log
-# pid: ~/.config/aibar/claude_token_refresh.pid
-
 # GNOME nested-shell test helper
 # runs gnome-install, then starts a nested Wayland GNOME Shell (1280x720)
 scripts/test-gnome-extension.sh
 ```
-
-## GeminiAI prerequisites
-
-To enable GeminiAI features, configure Google Cloud before running `aibar setup`:
-
-1. Create **Desktop Client OAuth 2.0** credentials in the target Google Cloud project.
-2. In `aibar setup`, configure GeminiAI OAuth client JSON (`file` or `paste`) or re-authorize with `login`, then authorize requested scopes:
-   - `https://www.googleapis.com/auth/bigquery.readonly`
-   - `https://www.googleapis.com/auth/monitoring.read`
-   - `https://www.googleapis.com/auth/cloud-platform`
-3. Configure the Gemini project id in setup (`geminiai project id`) or via `GEMINIAI_PROJECT_ID`.
-4. Set setup field `billing_data` to the BigQuery dataset containing billing export tables (`gcp_billing_export_v1_*`, default dataset name: `billing_data`).
-5. Ensure required Google APIs are enabled for the project used by OAuth credentials:
-   - Cloud Monitoring API
-   - BigQuery API
 
 
 
@@ -353,37 +380,3 @@ To enable GeminiAI features, configure Google Cloud before running `aibar setup`
 
 - This program is licensed under the terms in [`LICENSE`](./LICENSE).
 - This project includes modified files from **GnomeCodexBar**; those files are covered by the license provided in `LICENSE_GnomeCodexBar`, as required by the original license terms.
-
-
-## Screenshots
-
-### Claude
-
-[![Screenshot01](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot01.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot01.png)
-[![Screenshot02](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot02.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot02.png)
-[![Screenshot03](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot03.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot03.png)
-
-
-### Claude (7d window)
-
-[![Screenshot04](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot04.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot04.png)
-
-### OpenRouter
-
-[![Screenshot05](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot05.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot05.png)
-
-### GitHub Copilot
-
-[![Screenshot06](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot06.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot06.png)
-
-### OpenAI Codex
-
-[![Screenshot07](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot07.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot07.png)
-
-### Gemini AI API
-
-[![Screenshot08](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot08.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot08.png)
-
-### OpenAI API
-
-[![Screenshot09](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot09.png)](https://raw.githubusercontent.com/Ogekuri/AIBar/refs/heads/master/images/Screenshot09.png)
