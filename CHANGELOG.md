@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.58.0](https://github.com/Ogekuri/AIBar/compare/v0.57.0..v0.58.0) - 2026-11-07
+### 🐛  Bug Fixes
+- pin setup-uv to resolvable v10.3.3 tag [useReq] *(release-pypi)*
+  - astral-sh/setup-uv publishes no floating v10 major tag, so the workflow
+  - pin astral-sh/setup-uv@v10 failed runner action resolution (unable to
+  - find version v10). Pin the exact release tag v10.3.3, verified
+  - Node24-native upstream (runs.using: node24), preserving CTN-021.
+  - Add reproducer test asserting a resolvable full-version setup-uv pin
+  - and update the Node24 pin map accordingly (TST-080 scope).
+
+### 🚜  Changes
+- encode GitHub release parity with develop upgrade [useReq] *(version-report)*
+  - Verify --version GitHub reporting against the requested semantics: the
+  - report already performs one fresh, never idle-gated releases/latest
+  - fetch against the program-name endpoint (branch-independent) and its
+  - value is the raw tag minus the leading v of the same release that
+  - --upgrade --develop pins.
+  - Encode the parity normatively with REQ-192 (endpoint + branch
+  - independence) and REQ-193 (identical release to the develop upgrade),
+  - add linkage tags in cli.py docstrings, and cover both with
+  - tests/test_version_github_report_parity.py (TST-083).
+- resolve GitHub tag via program-name URLs [useReq] *(upgrade-develop)*
+  - Parameterize the --upgrade --develop|--dev GitHub source after the
+  - current program name: PROGRAM_NAME (aibar) is now the single source of
+  - truth composing both the releases/latest API endpoint and the
+  - git+https://github.com/Ogekuri/{PROGRAM_NAME} repository URL, removing
+  - duplicated Ogekuri/AIBar literals (new REQ-191; CTN-020/CTN-015/
+  - REQ-177/REQ-189 updated to <program-name> and explicit branch
+  - independence). Add tests/test_github_upgrade_program_name.py covering
+  - URL composition and tag-pinned argv resolution (TST-082; closes
+  - TST-078/TST-079 coverage).
+
 ## [0.57.0](https://github.com/Ogekuri/AIBar/compare/v0.56.0..v0.57.0) - 2026-11-07
 ### 🚜  Changes
 - migrate GitHub Actions to Node24-native versions [useReq] *(release-pypi)*
@@ -1628,6 +1660,7 @@
 - \[0.55.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.55.0
 - \[0.56.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.56.0
 - \[0.57.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.57.0
+- \[0.58.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.58.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1686,3 +1719,4 @@
 [0.55.0]: https://github.com/Ogekuri/AIBar/compare/v0.54.0..v0.55.0
 [0.56.0]: https://github.com/Ogekuri/AIBar/compare/v0.55.0..v0.56.0
 [0.57.0]: https://github.com/Ogekuri/AIBar/compare/v0.56.0..v0.57.0
+[0.58.0]: https://github.com/Ogekuri/AIBar/compare/v0.57.0..v0.58.0
