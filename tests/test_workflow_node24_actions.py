@@ -20,12 +20,14 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "release-pypi.yml"
 
-#: Node24-native upstream major versions, verified against each action's
-#: `action.yml` `runs.using` declaration at the resolved major tag.
+#: Node24-native upstream versions, verified against each action's
+#: `action.yml` `runs.using` declaration at the resolved tag. `setup-uv`
+#: publishes no floating `v10` major tag, so its entry pins the exact release
+#: tag required for runner action resolution.
 NODE24_ACTION_MAJORS: dict[str, str] = {
     "actions/checkout": "actions/checkout@v7",
     "actions/setup-python": "actions/setup-python@v7",
-    "astral-sh/setup-uv": "astral-sh/setup-uv@v10",
+    "astral-sh/setup-uv": "astral-sh/setup-uv@v10.3.3",
     "actions/attest-build-provenance": "actions/attest-build-provenance@v4",
     "mikepenz/release-changelog-builder-action": (
         "mikepenz/release-changelog-builder-action@v6"
@@ -129,6 +131,28 @@ class TestNode24ActionPins:
         )
         unexpected = [pin for pin in workflow_uses_pins if pin not in expected_output]
         assert unexpected == [], f"unexpected action pins found: {unexpected}"
+
+    def test_setup_uv_pin_resolves_to_full_version_tag(
+        self, workflow_text: str
+    ) -> None:
+        """
+        @brief Verify the setup-uv pin references a resolvable full version tag.
+        @details The `astral-sh/setup-uv` repository publishes full-version tags
+        (`v10.0.0`..`v10.3.3`) without a floating `v10` major tag, so the
+        workflow must pin the exact release tag; a floating `@v10` reference
+        fails runner action resolution with `unable to find version`.
+        @param workflow_text {str} Workflow YAML content.
+        @return {None} Function return value.
+        @satisfies TST-080
+        @satisfies CTN-021
+        """
+        expected_output: str = "uses: astral-sh/setup-uv@v10.3.3"
+        assert expected_output in workflow_text, (
+            "workflow must pin astral-sh/setup-uv to a resolvable full version tag"
+        )
+        assert "astral-sh/setup-uv@v10\n" not in workflow_text, (
+            "floating major pin astral-sh/setup-uv@v10 is unresolvable upstream"
+        )
 
     def test_node20_legacy_major_pins_absent(self, workflow_text: str) -> None:
         """
