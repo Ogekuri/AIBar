@@ -55,11 +55,16 @@ AIBar brings every supported AI provider quota and cost into one place, on the t
 # Quick Start
 
 Bring-up follows three steps: install, configure, run. AIBar is published on
-[PyPI](https://pypi.org/project/aibar/); installation and execution use
-[Astral uv](https://docs.astral.sh/uv/) exclusively.
+[PyPI](https://pypi.org/project/aibar/). The primary installation method is
+`pipx`; execution and live runs use [Astral uv](https://docs.astral.sh/uv/).
 
 ```bash
-# 1) Install from PyPI (requires Python >= 3.12 and uv)
+# 1) Primary installation via pipx
+sudo apt install pipx
+pipx ensurepath
+pipx install aibar
+
+# 2) Alternative installation from PyPI (requires Python >= 3.12 and uv)
 uv tool install aibar
 
 # 2) Configure credentials and runtime settings
@@ -120,6 +125,14 @@ After installation the `aibar` command is available system-wide:
 aibar --help
 aibar setup
 aibar show
+```
+
+### Alternative installation with pip
+
+Install AIBar with `pip` as an alternative to the primary `pipx` flow:
+
+```bash
+pip install aibar
 ```
 
 ### Live execution without installation

@@ -1,7 +1,7 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.3.39"
+version: "0.3.40"
 date: "2026-11-07"
 author: "req-new"
 scope:
@@ -119,6 +119,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **CTN-018**: MUST declare `requires-python >= 3.12` in `pyproject.toml` and pin `.python-version` to a Python 3.12+ interpreter so `uv run` never resolves Python 3.11.
 - **CTN-019**: MUST declare `pytest` under `[dependency-groups]` `dev` in `pyproject.toml`, outside runtime `[project]` `dependencies`.
 - **CTN-020**: MUST fetch latest GitHub release metadata from `https://api.github.com/repos/Ogekuri/AIBar/releases/latest` parsing `tag_name`.
+- **CTN-021**: MUST pin every JavaScript-based action referenced by `.github/workflows/release-pypi.yml` to a major version whose upstream `runs.using` runtime is `node24` or later.
 
 ## 3. Requirements
 
@@ -397,6 +398,8 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-077**: MUST verify `--ver` prints installed version plus labeled latest PyPI and GitHub release lines, bypasses subcommand execution, and forces one online startup release check bypassing the idle gate.
 - **TST-078**: MUST verify `--upgrade` with `--develop`/`--dev` resolves the latest GitHub release `tag_name` and executes the pinned GitHub lifecycle command with exit-code propagation.
 - **TST-079**: MUST verify `--upgrade` with `--develop`/`--dev` exits non-zero with a bright-red diagnostic and no lifecycle subprocess when the GitHub release tag is unresolved.
+- **TST-080**: MUST verify every JavaScript-based action pin in `.github/workflows/release-pypi.yml` resolves to a Node24-native upstream major version.
+- **TST-081**: MUST verify `.github/workflows/release-pypi.yml` contains no transitional Node20 opt-out variables `ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION` and `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24`.
 
 ## 5. Evidence
 
@@ -608,3 +611,6 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | TST-077 | `tests/test_cli_startup_update_preflight.py` + `test_ver_alias_prints_installed_version_without_dispatch` asserting `--ver` output equals `--version` output with labeled PyPI/GitHub release lines and dispatch bypass. |
 | TST-078 | pending: `tests/test_cli_startup_update_preflight.py` does not yet assert the tag-pinned GitHub lifecycle argv resolution (test file not modified by change workflow). |
 | TST-079 | pending: `tests/test_cli_startup_update_preflight.py` does not yet assert the unresolved-tag failure exit path (test file not modified by change workflow). |
+| CTN-021 | `.github/workflows/release-pypi.yml` + `actions/checkout@v7`, `actions/setup-python@v7`, `astral-sh/setup-uv@v10`, `actions/attest-build-provenance@v4`, `softprops/action-gh-release@v3`, `actions/upload-artifact@v7`, `actions/download-artifact@v8` (upstream `runs.using: node24` verified); `mikepenz/release-changelog-builder-action@v6` resolves to node24-native `v6.5`; `pypa/gh-action-pypi-publish@release/v1` is Docker-based and Node-independent. |
+| TST-080 | `tests/test_workflow_node24_actions.py` + `TestNode24ActionPins` + Node24-major pin assertions over every workflow `uses:` reference. |
+| TST-081 | `tests/test_workflow_node24_actions.py` + `TestNode24ActionPins` + absence assertions for `ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION` and `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24`. |
