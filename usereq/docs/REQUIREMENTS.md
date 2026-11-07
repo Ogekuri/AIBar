@@ -1,8 +1,8 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.3.38"
-date: "2026-11-05"
+version: "0.3.39"
+date: "2026-11-07"
 author: "req-new"
 scope:
   paths:
@@ -114,7 +114,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **CTN-012**: MUST use hardcoded startup update-check constants `idle_delay_seconds=300` and `http_timeout_seconds=2`.
 - **CTN-013**: MUST persist startup update-check idle state in `~/.cache/aibar/check_version_idle-time.json` JSON with epoch and human-readable `last_success_at` and `idle_until`.
 - **CTN-014**: MUST perform at most one startup update HTTP check per 300 seconds unless `~/.cache/aibar/check_version_idle-time.json` is missing or expired.
-- **CTN-015**: MUST use lifecycle command strings exactly as `uv tool install aibar --force` (PyPI), `uv tool install --force git+https://github.com/Ogekuri/AIBar` (GitHub), and `uv tool uninstall aibar`.
+- **CTN-015**: MUST use lifecycle command strings exactly as `uv tool install aibar --force` (PyPI), `uv tool install --force git+https://github.com/Ogekuri/AIBar@<tag_name>` (GitHub), and `uv tool uninstall aibar`.
 - **CTN-017**: MUST persist `enabled_providers` in `~/.config/aibar/config.json` as provider-keyed booleans for `agy`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, and `zai`; missing keys MUST default to `true`.
 - **CTN-018**: MUST declare `requires-python >= 3.12` in `pyproject.toml` and pin `.python-version` to a Python 3.12+ interpreter so `uv run` never resolves Python 3.11.
 - **CTN-019**: MUST declare `pytest` under `[dependency-groups]` `dev` in `pyproject.toml`, outside runtime `[project]` `dependencies`.
@@ -145,7 +145,9 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-174**: `aibar login` without `--provider` MUST print an informational message and exit with status 0 when no login-capable provider is in error state.
 - **REQ-175**: `aibar login` without `--provider` MUST exit with non-zero status when at least one executed login flow fails.
 - **REQ-176**: MUST expose global flag `--develop` with equivalent alias `--dev` that selects the GitHub package source only for `--upgrade` and has no effect on other invocations.
-- **REQ-177**: MUST execute `uv tool install --force git+https://github.com/Ogekuri/AIBar` on Linux when `--upgrade` is provided with `--develop` or `--dev`, propagating subprocess exit status.
+- **REQ-177**: MUST execute `uv tool install --force git+https://github.com/Ogekuri/AIBar@<tag_name>` on Linux when `--upgrade` is provided with `--develop` or `--dev`, propagating subprocess exit status.
+- **REQ-189**: MUST resolve the `--develop`/`--dev` upgrade source tag by fetching `tag_name` from `https://api.github.com/repos/Ogekuri/AIBar/releases/latest` before executing the GitHub lifecycle install.
+- **REQ-190**: MUST exit `--upgrade` with `--develop`/`--dev` using non-zero status and a bright-red diagnostic, without executing `uv tool install`, when the latest GitHub release tag cannot be resolved.
 - **REQ-009**: MUST execute provider retrieval for `show` in this order: force-flag handling, per-provider idle-time evaluation, per-provider conditional refresh to `~/.cache/aibar/cache.json`, then data load from `~/.cache/aibar/cache.json`.
 - **REQ-124**: `show` refresh execution MUST exclude disabled providers from fetch scheduling and MUST NOT apply idle-time, API-delay, API-timeout, or retry-after handling to disabled providers.
 - **REQ-125**: CLI text `show` MUST omit disabled providers and MUST NOT render panels or not-configured hints for providers whose `enabled_providers.<provider>` flag is `false`.
@@ -386,13 +388,15 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-069**: MUST verify `README.md` documents PyPI installation commands `uv tool install aibar` and `uvx aibar`.
 - **TST-070**: MUST verify startup update checks query `https://pypi.org/pypi/aibar/json` and parse `info.version` as the latest version.
 - **TST-071**: MUST verify `README.md` documents `sudo apt install pipx`, `pipx ensurepath`, and `pipx install aibar` as the primary installation flow before alternative methods.
-- **TST-072**: MUST verify default `--upgrade` executes the PyPI lifecycle command and `--upgrade` with `--develop` or `--dev` executes the GitHub lifecycle command.
+- **TST-072**: MUST verify default `--upgrade` executes the PyPI lifecycle command and `--upgrade` with `--develop` or `--dev` executes the GitHub lifecycle command pinned to the resolved latest GitHub release tag.
 - **TST-073**: MUST verify `.github/workflows/release-pypi.yml` gates `publish-pypi` on the `master` branch output and runs `build-release` for version tags on `master` or `develop`.
 - **TST-074**: MUST verify `scripts/aibar-nested-debug-session.sh` launches argv in background, traps SIGINT/SIGTERM, starts an interactive debug shell after the settle delay, prints extension inspection guidance, and that `scripts/test-gnome-extension.sh` routes all launch branches through the wrapper preserving `MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720` without screenshot capture logic.
 
 - **TST-075**: MUST verify GNOME 50 metadata and extension UI construction, refresh, and teardown using GNOME 50 API contracts.
 - **TST-076**: MUST verify windowed-session launch arguments, installation ordering, the `MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720` environment, shared debug-session bus, and non-zero prerequisite failures using isolated subprocess substitutes.
 - **TST-077**: MUST verify `--ver` prints installed version plus labeled latest PyPI and GitHub release lines, bypasses subcommand execution, and forces one online startup release check bypassing the idle gate.
+- **TST-078**: MUST verify `--upgrade` with `--develop`/`--dev` resolves the latest GitHub release `tag_name` and executes the pinned GitHub lifecycle command with exit-code propagation.
+- **TST-079**: MUST verify `--upgrade` with `--develop`/`--dev` exits non-zero with a bright-red diagnostic and no lifecycle subprocess when the GitHub release tag is unresolved.
 
 ## 5. Evidence
 
@@ -584,7 +588,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | PRJ-017 | `README.md` + Installation section documenting `pip install aibar` and `uv`/`uvx` as alternative methods after the pipx primary flow. |
 | TST-071 | `tests/test_release_pypi_workflow.py` + README assertions for the pipx primary flow commands and their ordering before alternative methods. |
 | CTN-011 | `src/aibar/aibar/cli.py` + `_STARTUP_UPDATE_URL = "https://pypi.org/pypi/aibar/json"` + `_fetch_startup_latest_release` reads `info.version` from the PyPI JSON API. |
-| CTN-015 | `src/aibar/aibar/cli.py` + `_UPGRADE_LIFECYCLE_COMMAND = ["uv", "tool", "install", "aibar", "--force"]` (PyPI index), `_GITHUB_UPGRADE_LIFECYCLE_COMMAND = ["uv", "tool", "install", "--force", "git+https://github.com/Ogekuri/AIBar"]` (GitHub), and `_UNINSTALL_LIFECYCLE_COMMAND = ["uv", "tool", "uninstall", "aibar"]`. |
+| CTN-015 | `src/aibar/aibar/cli.py` + `_UPGRADE_LIFECYCLE_COMMAND = ["uv", "tool", "install", "aibar", "--force"]` (PyPI index), `_GITHUB_UPGRADE_BASE_COMMAND = ["uv", "tool", "install", "--force"]` + `_GITHUB_UPGRADE_REPO_URL = "git+https://github.com/Ogekuri/AIBar"` completed with the `@<tag_name>` suffix by `_resolve_github_upgrade_lifecycle_command` (GitHub), and `_UNINSTALL_LIFECYCLE_COMMAND = ["uv", "tool", "uninstall", "aibar"]`. |
 | REQ-073 | `src/aibar/aibar/cli.py` + `_run_startup_update_preflight` prints the bright-green update notice comparing installed `__version__` with the latest PyPI release version. |
 | REQ-076 | `src/aibar/aibar/cli.py` + `_handle_upgrade_option`/`_resolve_upgrade_lifecycle_command` executes `_UPGRADE_LIFECYCLE_COMMAND` (PyPI) on Linux when `--develop`/`--dev` is absent, with exit-code propagation. |
 | TST-035 | `tests/test_cli_startup_update_preflight.py` + lifecycle parametrize asserting exact argv `uv tool install aibar --force` and `uv tool uninstall aibar` with exit-code propagation and cache cleanup. |
@@ -593,10 +597,14 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | TST-069 | `tests/test_release_pypi_workflow.py` + README assertions for PyPI installation commands `uv tool install aibar` and `uvx aibar`. |
 | CTN-020 | `src/aibar/aibar/cli.py` + `_GITHUB_RELEASE_API_URL = "https://api.github.com/repos/Ogekuri/AIBar/releases/latest"` and `_fetch_github_latest_release` parsing `tag_name` via `_normalize_github_release_tag`. |
 | REQ-176 | `src/aibar/aibar/cli.py` + `--develop`/`--dev` group option declaration and `_github_upgrade_requested_from_args` argv-token detection consumed only by `_resolve_upgrade_lifecycle_command` for `--upgrade`. |
-| REQ-177 | `src/aibar/aibar/cli.py` + `_resolve_upgrade_lifecycle_command`/`_handle_upgrade_option` execute `_GITHUB_UPGRADE_LIFECYCLE_COMMAND` on Linux when `--develop`/`--dev` is present, propagating exit status. |
+| REQ-177 | `src/aibar/aibar/cli.py` + `_resolve_github_upgrade_lifecycle_command`/`_resolve_upgrade_lifecycle_command`/`_handle_upgrade_option` execute the tag-pinned `uv tool install --force git+https://github.com/Ogekuri/AIBar@<tag_name>` command on Linux when `--develop`/`--dev` is present, propagating exit status. |
+| REQ-189 | `src/aibar/aibar/cli.py` + `_resolve_github_upgrade_lifecycle_command` + `_fetch_github_latest_release` resolve `tag_name` (captured in `StartupReleaseCheckResponse.raw_tag`) from `https://api.github.com/repos/Ogekuri/AIBar/releases/latest` before building the pinned install argv. |
+| REQ-190 | `src/aibar/aibar/cli.py` + `_resolve_github_upgrade_lifecycle_command` unresolved-tag branch emits the `_ANSI_BRIGHT_RED` diagnostic and returns None; `_handle_upgrade_option` exits non-zero via `ctx.exit(1)` without subprocess execution. |
 | PRJ-018 | `README.md` + dedicated non-primary "Install from GitHub" section documenting the GitHub install command, `aibar --upgrade --develop`, and dual-repository `--version` reporting. |
 | TST-072 | `tests/test_cli_startup_update_preflight.py` + default `--upgrade` lifecycle argv assertions cover the PyPI branch; GitHub-branch assertions pending (test file not modified by change workflow). |
 | PRJ-019 | `.github/workflows/release-pypi.yml` + `check-branch` step `Resolve tagged release branch` sets `is_master=false` with `is_release_branch=true` for develop-only tags, so `build-release` runs while `publish-pypi` is skipped. |
 | TST-073 | `tests/test_release_pypi_workflow.py` + static workflow assertions for the `master`-gated publish job; develop-branch gate assertions pending (test file not modified by change workflow). |
 | REQ-188 | `src/aibar/aibar/cli.py` + group option declaration `["--version", "--ver", "show_version"]` and `_startup_force_ignore_idle_from_args` token set `{"--version", "--ver"}` driving identical version output and idle-gate bypass. |
 | TST-077 | `tests/test_cli_startup_update_preflight.py` + `test_ver_alias_prints_installed_version_without_dispatch` asserting `--ver` output equals `--version` output with labeled PyPI/GitHub release lines and dispatch bypass. |
+| TST-078 | pending: `tests/test_cli_startup_update_preflight.py` does not yet assert the tag-pinned GitHub lifecycle argv resolution (test file not modified by change workflow). |
+| TST-079 | pending: `tests/test_cli_startup_update_preflight.py` does not yet assert the unresolved-tag failure exit path (test file not modified by change workflow). |

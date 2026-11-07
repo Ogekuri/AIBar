@@ -140,13 +140,26 @@ _UPGRADE_LIFECYCLE_COMMAND: list[str] = [
 ]
 _UNINSTALL_LIFECYCLE_COMMAND: list[str] = ["uv", "tool", "uninstall", "aibar"]
 _GITHUB_RELEASE_API_URL = "https://api.github.com/repos/Ogekuri/AIBar/releases/latest"
-_GITHUB_UPGRADE_LIFECYCLE_COMMAND: list[str] = [
+# @brief Base argv prefix of the GitHub upgrade lifecycle command.
+# @details Completed by `_resolve_github_upgrade_lifecycle_command` with the
+# release-tag-pinned repository URL `git+https://github.com/Ogekuri/AIBar@<tag_name>`
+# resolved from the GitHub releases API so `--upgrade --develop`/`--dev`
+# always installs the most recently tagged release, independent of branch.
+# @satisfies CTN-015
+# @satisfies REQ-189
+_GITHUB_UPGRADE_BASE_COMMAND: list[str] = [
     "uv",
     "tool",
     "install",
     "--force",
-    "git+https://github.com/Ogekuri/AIBar",
 ]
+# @brief GitHub repository URL used by the `--upgrade --develop` lifecycle.
+# @details Installed with an `@<tag_name>` suffix pinning the latest GitHub
+# release tag (raw `tag_name`, leading `v` preserved) resolved via
+# `_fetch_github_latest_release` (REQ-189).
+# @satisfies CTN-015
+# @satisfies REQ-189
+_GITHUB_UPGRADE_REPO_URL = "git+https://github.com/Ogekuri/AIBar"
 _LOG_FAILURE_CATEGORY_OAUTH = "oauth"
 _LOG_FAILURE_CATEGORY_RATE_LIMIT = "rate_limit"
 
@@ -191,16 +204,21 @@ class StartupReleaseCheckResponse:
     `status_code`, `error_message`, and `retry_after_seconds` carry normalized
     failure metadata used by 429 idle-time expansion and bright-red diagnostics.
     @note Immutable dataclass to keep preflight decisions deterministic.
+    @note `raw_tag` carries the unmodified GitHub `tag_name` (leading `v`
+    preserved) so `--upgrade --develop` can pin the uv install ref to the
+    exact release tag; None for PyPI checks and failed GitHub checks.
     @satisfies REQ-070
     @satisfies REQ-073
     @satisfies REQ-074
     @satisfies REQ-075
+    @satisfies REQ-189
     """
 
     latest_version: str | None
     status_code: int | None
     error_message: str | None
     retry_after_seconds: int
+    raw_tag: str | None = None
 
 
 # @brief Cache of the most recent startup PyPI release-check response.
@@ -498,11 +516,15 @@ def _fetch_github_latest_release() -> StartupReleaseCheckResponse:
     @details Executes one HTTP request to the GitHub releases API endpoint
     `https://api.github.com/repos/Ogekuri/AIBar/releases/latest` with the
     hardcoded startup timeout. Success returns the normalized latest release
-    tag parsed from the `tag_name` field. Failures return status/error
-    metadata so callers render an explicit unavailable label.
+    tag parsed from the `tag_name` field plus the unmodified `tag_name` in
+    `raw_tag` so `--upgrade --develop` can pin the uv install ref (REQ-189).
+    Failures return status/error metadata with `raw_tag=None` so callers
+    render an explicit unavailable label and skip tag-pinned upgrades
+    (REQ-190).
     @return {StartupReleaseCheckResponse} Normalized GitHub release-check result.
     @satisfies CTN-020
     @satisfies REQ-078
+    @satisfies REQ-189
     """
     request = urllib_request.Request(
         _GITHUB_RELEASE_API_URL,
@@ -525,6 +547,7 @@ def _fetch_github_latest_release() -> StartupReleaseCheckResponse:
                 f"GitHub release check failed: HTTP {exc.code} {exc.reason}."
             ),
             retry_after_seconds=retry_after_seconds,
+            raw_tag=None,
         )
     except (urllib_error.URLError, TimeoutError, ValueError) as exc:
         return StartupReleaseCheckResponse(
@@ -532,6 +555,7 @@ def _fetch_github_latest_release() -> StartupReleaseCheckResponse:
             status_code=None,
             error_message=f"GitHub release check failed: {exc}.",
             retry_after_seconds=0,
+            raw_tag=None,
         )
     tag_raw = (
         decoded_payload.get("tag_name") if isinstance(decoded_payload, dict) else None
@@ -545,12 +569,14 @@ def _fetch_github_latest_release() -> StartupReleaseCheckResponse:
                 "GitHub release check failed: invalid release metadata payload."
             ),
             retry_after_seconds=0,
+            raw_tag=None,
         )
     return StartupReleaseCheckResponse(
         latest_version=latest_version,
         status_code=200,
         error_message=None,
         retry_after_seconds=0,
+        raw_tag=str(tag_raw).strip(),
     )
 
 
@@ -717,21 +743,62 @@ def _github_upgrade_requested_from_args(args: Sequence[str] | None) -> bool:
     )
 
 
-def _resolve_upgrade_lifecycle_command() -> list[str]:
+def _resolve_github_upgrade_lifecycle_command() -> list[str] | None:
+    """
+    @brief Build the GitHub upgrade argv pinned to the latest GitHub release tag.
+    @details Fetches the latest GitHub release metadata from
+    `https://api.github.com/repos/Ogekuri/AIBar/releases/latest`, reads the
+    raw `tag_name`, and returns the base `uv tool install --force` argv
+    completed with `git+https://github.com/Ogekuri/AIBar@<tag_name>` so
+    `--upgrade --develop`/`--dev` always installs the most recently tagged
+    release regardless of the branch carrying the tag (REQ-189). When
+    `tag_name` is unavailable or unparsable, emits one bright-red diagnostic
+    on stderr and returns None so the caller exits without executing any
+    install command (REQ-190). Complexity O(1) beyond one HTTP request;
+    space O(1).
+    @return {list[str] | None} Tag-pinned GitHub upgrade argv, or None when the
+    latest release tag is unresolved.
+    @satisfies CTN-015
+    @satisfies REQ-177
+    @satisfies REQ-189
+    @satisfies REQ-190
+    """
+    response = _fetch_github_latest_release()
+    if not response.raw_tag:
+        reason = response.error_message or "unknown error"
+        _emit_startup_preflight_message(
+            message=(
+                f"GitHub latest release tag unavailable ({reason}); "
+                "--upgrade --develop aborted."
+            ),
+            color_code=_ANSI_BRIGHT_RED,
+            err=True,
+        )
+        return None
+    return _GITHUB_UPGRADE_BASE_COMMAND + [
+        f"{_GITHUB_UPGRADE_REPO_URL}@{response.raw_tag}"
+    ]
+
+
+def _resolve_upgrade_lifecycle_command() -> list[str] | None:
     """
     @brief Resolve the `--upgrade` lifecycle command source from argv.
-    @details Returns a copy of the GitHub-hosted uv install command when argv
-    contains `--develop` or `--dev`; otherwise returns a copy of the default
-    PyPI install command. Complexity O(A) over argv tokens A; space O(1)
-    beyond constants.
-    @return {list[str]} Lifecycle command argv for `--upgrade`.
+    @details Returns a copy of the tag-pinned GitHub uv install command when
+    argv contains `--develop` or `--dev`; otherwise returns a copy of the
+    default PyPI install command. Returns None when the GitHub source is
+    requested but the latest GitHub release tag cannot be resolved (REQ-190).
+    Complexity O(A) over argv tokens A; space O(1) beyond constants.
+    @return {list[str] | None} Lifecycle command argv for `--upgrade`, or None
+    when the GitHub release tag is unresolved.
     @satisfies CTN-015
     @satisfies REQ-076
     @satisfies REQ-176
     @satisfies REQ-177
+    @satisfies REQ-189
+    @satisfies REQ-190
     """
     if _github_upgrade_requested_from_args(None):
-        return list(_GITHUB_UPGRADE_LIFECYCLE_COMMAND)
+        return _resolve_github_upgrade_lifecycle_command()
     return list(_UPGRADE_LIFECYCLE_COMMAND)
 
 
@@ -803,11 +870,13 @@ def _handle_upgrade_option(
 ) -> None:
     """
     @brief Handle eager `--upgrade` lifecycle option callback.
-    @details Resolves the upgrade command source (PyPI by default; GitHub when
-    argv contains `--develop`/`--dev`), executes the lifecycle subprocess on
-    Linux, and exits with propagated subprocess code; on non-Linux emits manual
-    command guidance for the resolved command and exits without subprocess
-    execution.
+    @details Resolves the upgrade command source (PyPI by default; tag-pinned
+    GitHub when argv contains `--develop`/`--dev`), executes the lifecycle
+    subprocess on Linux, and exits with propagated subprocess code; on
+    non-Linux emits manual command guidance for the resolved command and
+    exits without subprocess execution. When the latest GitHub release tag
+    cannot be resolved, exits non-zero with the bright-red diagnostic emitted
+    by the resolver and without executing any install command (REQ-190).
     @param ctx {click.Context} Active Click context.
     @param param {click.Parameter} Option metadata (unused).
     @param value {bool} Parsed `--upgrade` flag value.
@@ -817,11 +886,15 @@ def _handle_upgrade_option(
     @satisfies REQ-177
     @satisfies REQ-088
     @satisfies REQ-089
+    @satisfies REQ-189
+    @satisfies REQ-190
     """
     del param
     if not value or ctx.resilient_parsing:
         return
     upgrade_command = _resolve_upgrade_lifecycle_command()
+    if upgrade_command is None:
+        ctx.exit(1)
     if _is_linux_runtime():
         exit_code = _execute_lifecycle_subprocess(upgrade_command)
     else:

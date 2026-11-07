@@ -107,9 +107,13 @@
         - `_fetch_github_latest_release(...)`: fetch and normalize latest GitHub release metadata (`https://api.github.com/repos/Ogekuri/AIBar/releases/latest`, `tag_name`) [`src/aibar/aibar/cli.py`]
           - `_normalize_github_release_tag(...)`: normalize GitHub release tag text stripping one optional leading `v` [`src/aibar/aibar/cli.py`]
         - `_format_release_report_value(...)`: render release-check response as report value text with unavailable fallback [`src/aibar/aibar/cli.py`]
-    - `_handle_upgrade_option(...)`: eager `--upgrade` callback with Linux-gated lifecycle execution and non-Linux guidance; resolves PyPI or GitHub command source from the `--develop`/`--dev` argv tokens [`src/aibar/aibar/cli.py`]
-      - `_resolve_upgrade_lifecycle_command(...)`: select PyPI or GitHub upgrade command from the `--develop`/`--dev` argv tokens [`src/aibar/aibar/cli.py`]
+    - `_handle_upgrade_option(...)`: eager `--upgrade` callback with Linux-gated lifecycle execution and non-Linux guidance; resolves PyPI or tag-pinned GitHub command source from the `--develop`/`--dev` argv tokens and exits non-zero without subprocess execution when the GitHub release tag is unresolved [`src/aibar/aibar/cli.py`]
+      - `_resolve_upgrade_lifecycle_command(...)`: select PyPI or tag-pinned GitHub upgrade command from the `--develop`/`--dev` argv tokens; returns None when the GitHub release tag is unresolved [`src/aibar/aibar/cli.py`]
         - `_github_upgrade_requested_from_args(...)`: detect `--develop`/`--dev` invocation tokens independent of argument order [`src/aibar/aibar/cli.py`]
+        - `_resolve_github_upgrade_lifecycle_command(...)`: fetch the latest GitHub release `tag_name` and build `uv tool install --force git+https://github.com/Ogekuri/AIBar@<tag_name>` pinned to the most recently tagged release regardless of branch; emits a bright-red diagnostic and returns None when the tag is unavailable [`src/aibar/aibar/cli.py`]
+          - `_fetch_github_latest_release(...)`: fetch latest GitHub release metadata capturing normalized version and raw `tag_name` (`StartupReleaseCheckResponse.raw_tag`) [`src/aibar/aibar/cli.py`]
+            - `_normalize_github_release_tag(...)`: normalize GitHub release tag text stripping one optional leading `v` [`src/aibar/aibar/cli.py`]
+          - `_emit_startup_preflight_message(...)`: emit bright-red unresolved-tag diagnostic to stderr [`src/aibar/aibar/cli.py`]
       - `_is_linux_runtime(...)`: runtime platform gate for lifecycle subprocess execution [`src/aibar/aibar/cli.py`]
       - `_execute_lifecycle_subprocess(...)`: Linux branch subprocess execution wrapper with exit-code propagation [`src/aibar/aibar/cli.py`]
       - `_emit_non_linux_lifecycle_guidance(...)`: non-Linux branch warning with manual command text [`src/aibar/aibar/cli.py`]
@@ -306,8 +310,8 @@
 - `External Boundaries`
   - Click command parsing and dispatch.
   - PyPI JSON API endpoint (`https://pypi.org/pypi/aibar/json`) for startup update checks; installed PyPI package at `https://pypi.org/project/aibar/`.
-  - GitHub releases API endpoint (`https://api.github.com/repos/Ogekuri/AIBar/releases/latest`) for `--version`/`--ver` latest-release reporting; intermediate/test releases published at `https://github.com/Ogekuri/AIBar`.
-  - Linux-only `uv` subprocess execution for lifecycle flags (`--upgrade` installs the latest `aibar` from the PyPI index by default or from GitHub via `git+https://github.com/Ogekuri/AIBar` when `--develop`/`--dev` is present, `--uninstall`) plus non-Linux stderr guidance output.
+  - GitHub releases API endpoint (`https://api.github.com/repos/Ogekuri/AIBar/releases/latest`) for `--version`/`--ver` latest-release reporting and for `--upgrade --develop`/`--dev` release-tag pinning (`tag_name`); intermediate/test releases published at `https://github.com/Ogekuri/AIBar`.
+  - Linux-only `uv` subprocess execution for lifecycle flags (`--upgrade` installs the latest `aibar` from the PyPI index by default or from GitHub via the release-tag-pinned `git+https://github.com/Ogekuri/AIBar@<tag_name>` resolved from the GitHub releases API when `--develop`/`--dev` is present, `--uninstall`) plus non-Linux stderr guidance output.
   - Runtime execution log file appends under `~/.cache/aibar/aibar.log` controlled by persisted `log_enabled` and `debug_enabled` flags in `~/.config/aibar/config.json`.
   - HTTP network interactions through provider endpoints.
   - Browser-based OAuth consent flow and loopback callback for GeminiAI Google credentials.
