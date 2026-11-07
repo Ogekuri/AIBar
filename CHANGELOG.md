@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.56.1](https://github.com/Ogekuri/AIBar/compare/v0.56.0..v0.56.1) - 2026-11-07
+### 🚜  Changes
+- BREAKING CHANGE: rename --github to --develop and add --dev equivalent alias [useReq] *(cli)*
+  - Rename the upgrade-source flag from --github to --develop and add --dev
+  - as an equivalent alias (REQ-176), both selecting the GitHub package
+  - source only for --upgrade (REQ-177, REQ-076, CTN-015 unchanged
+  - lifecycle command strings).
+  - Update the --help options list and examples epilog (REQ-068) and the
+  - README lifecycle flag list, GitHub upgrade section, and CLI reference
+  - (PRJ-018).
+  - Update REQUIREMENTS.md, WORKFLOW.md, and regenerate REFERENCES.md.
+  - Change-ID: useReq-change-20261107115749
+
 ## [0.56.0](https://github.com/Ogekuri/AIBar/compare/v0.55.0..v0.56.0) - 2026-11-07
 ### ⛰️  Features
 - add --ver alias equivalent to --version [useReq] *(cli)*
@@ -1596,6 +1609,7 @@
 - \[0.54.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.54.0
 - \[0.55.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.55.0
 - \[0.56.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.56.0
+- \[0.56.1\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.56.1
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1653,3 +1667,4 @@
 [0.54.0]: https://github.com/Ogekuri/AIBar/compare/v0.53.0..v0.54.0
 [0.55.0]: https://github.com/Ogekuri/AIBar/compare/v0.54.0..v0.55.0
 [0.56.0]: https://github.com/Ogekuri/AIBar/compare/v0.55.0..v0.56.0
+[0.56.1]: https://github.com/Ogekuri/AIBar/compare/v0.56.0..v0.56.1
