@@ -540,6 +540,7 @@ def _fetch_github_latest_release() -> StartupReleaseCheckResponse:
     @satisfies CTN-020
     @satisfies REQ-078
     @satisfies REQ-189
+    @satisfies REQ-192
     """
     request = urllib_request.Request(
         _GITHUB_RELEASE_API_URL,
@@ -960,10 +961,14 @@ def _format_release_report_value(response: StartupReleaseCheckResponse) -> str:
     @brief Render one release-check response as version-report value text.
     @details Returns the normalized latest version on success; returns
     `unavailable (<reason>)` text when the check failed or metadata was absent.
-    Complexity O(1); space O(1).
+    For GitHub responses the returned value equals the raw tag minus its
+    leading `v` prefix (`_normalize_github_release_tag`), so the reported
+    version is exactly the release pinned by `--upgrade --develop`/`--dev`
+    (REQ-193). Complexity O(1); space O(1).
     @param response {StartupReleaseCheckResponse} Release-check result to render.
     @return {str} Human-readable version-report value.
     @satisfies REQ-078
+    @satisfies REQ-193
     """
     if response.latest_version is not None:
         return response.latest_version
@@ -976,13 +981,18 @@ def _emit_version_option_release_report() -> None:
     @brief Emit labeled latest-release availability lines for `--version`.
     @details Reuses the cached startup PyPI release-check response when the
     forced preflight already fetched it (falling back to one direct fetch),
-    executes one GitHub release fetch, and prints one labeled line per
-    repository to stderr so stdout remains the parseable installed version.
+    executes exactly one fresh GitHub release fetch per invocation (never
+    idle-gated, REQ-192) against the program-name releases/latest endpoint,
+    and prints one labeled line per repository to stderr so stdout remains
+    the parseable installed version. The GitHub line reports the same
+    release that `--upgrade --develop`/`--dev` installs (REQ-193).
     Complexity O(1) beyond one HTTP request per repository.
     @return {None} Function return value.
     @satisfies CTN-011
     @satisfies CTN-020
     @satisfies REQ-078
+    @satisfies REQ-192
+    @satisfies REQ-193
     """
     pypi_response = _LAST_PYPI_RELEASE_CHECK or _fetch_startup_latest_release()
     github_response = _fetch_github_latest_release()

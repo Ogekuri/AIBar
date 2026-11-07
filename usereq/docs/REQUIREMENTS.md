@@ -1,7 +1,7 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.3.41"
+version: "0.3.42"
 date: "2026-11-07"
 author: "req-new"
 scope:
@@ -150,6 +150,8 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-189**: MUST resolve the `--develop`/`--dev` upgrade source tag by fetching `tag_name` from `https://api.github.com/repos/Ogekuri/<program-name>/releases/latest`, independent of the branch carrying the tag, before executing the GitHub lifecycle install.
 - **REQ-190**: MUST exit `--upgrade` with `--develop`/`--dev` using non-zero status and a bright-red diagnostic, without executing `uv tool install`, when the latest GitHub release tag cannot be resolved.
 - **REQ-191**: MUST define the GitHub program name once as the current program name `aibar` and compose all GitHub release and upgrade URLs from it without duplicated repository literals.
+- **REQ-192**: MUST report the `--version` GitHub latest-release version from `https://api.github.com/repos/Ogekuri/<program-name>/releases/latest`, independent of the branch carrying the tag.
+- **REQ-193**: MUST report under `--version` the GitHub release identical to the release installed by `--upgrade --develop`/`--dev`, sourced from the same releases/latest fetch.
 - **REQ-009**: MUST execute provider retrieval for `show` in this order: force-flag handling, per-provider idle-time evaluation, per-provider conditional refresh to `~/.cache/aibar/cache.json`, then data load from `~/.cache/aibar/cache.json`.
 - **REQ-124**: `show` refresh execution MUST exclude disabled providers from fetch scheduling and MUST NOT apply idle-time, API-delay, API-timeout, or retry-after handling to disabled providers.
 - **REQ-125**: CLI text `show` MUST omit disabled providers and MUST NOT render panels or not-configured hints for providers whose `enabled_providers.<provider>` flag is `false`.
@@ -402,6 +404,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-080**: MUST verify every JavaScript-based action pin in `.github/workflows/release-pypi.yml` resolves to a Node24-native upstream major version.
 - **TST-081**: MUST verify `.github/workflows/release-pypi.yml` contains no transitional Node20 opt-out variables `ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION` and `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24`.
 - **TST-082**: MUST verify GitHub release and upgrade URLs compose from the program-name constant and the `--develop` upgrade argv pins the fetched `tag_name`.
+- **TST-083**: MUST verify the `--version` GitHub report performs one fresh releases/latest fetch per invocation and its reported version equals the tag pinned by the `--develop` upgrade argv.
 
 ## 5. Evidence
 
@@ -614,6 +617,9 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | TST-078 | `tests/test_github_upgrade_program_name.py` + `test_develop_upgrade_pins_fetched_tag_name` asserting the `--develop` argv equals `uv tool install --force git+https://github.com/Ogekuri/aibar@<fetched tag_name>` with exit-code propagation retained by `_handle_upgrade_option`. |
 | TST-079 | `tests/test_github_upgrade_program_name.py` + `test_unresolved_tag_returns_none_without_argv` asserting the None resolver return so `_handle_upgrade_option` exits non-zero without executing any install command. |
 | TST-082 | `tests/test_github_upgrade_program_name.py` + `TestGithubUpgradeProgramName` + URL-composition assertions from `PROGRAM_NAME` and tag-pinned argv assertions. |
+| REQ-192 | `src/aibar/aibar/cli.py` + `_emit_version_option_release_report` + unconditional `_fetch_github_latest_release()` call against `_GITHUB_RELEASE_API_URL = f"https://api.github.com/repos/Ogekuri/{PROGRAM_NAME}/releases/latest"` with no branch filtering. |
+| REQ-193 | `src/aibar/aibar/cli.py` + `_format_release_report_value(github_response)` rendering `latest_version` (raw tag minus leading `v` via `_normalize_github_release_tag`) from the same `StartupReleaseCheckResponse` consumed by `_resolve_github_upgrade_lifecycle_command` pinning `@{raw_tag}`. |
+| TST-083 | `tests/test_version_github_report_parity.py` + `TestVersionGithubReportParity` + one-fetch-per-invocation assertion and report-value/tag-parity assertions under deterministic fetch substitutes. |
 | CTN-021 | `.github/workflows/release-pypi.yml` + `actions/checkout@v7`, `actions/setup-python@v7`, `astral-sh/setup-uv@v10`, `actions/attest-build-provenance@v4`, `softprops/action-gh-release@v3`, `actions/upload-artifact@v7`, `actions/download-artifact@v8` (upstream `runs.using: node24` verified); `mikepenz/release-changelog-builder-action@v6` resolves to node24-native `v6.5`; `pypa/gh-action-pypi-publish@release/v1` is Docker-based and Node-independent. |
 | TST-080 | `tests/test_workflow_node24_actions.py` + `TestNode24ActionPins` + Node24-major pin assertions over every workflow `uses:` reference. |
 | TST-081 | `tests/test_workflow_node24_actions.py` + `TestNode24ActionPins` + absence assertions for `ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION` and `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24`. |
