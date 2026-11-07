@@ -1,7 +1,16 @@
 # Changelog
 
-## [0.56.2](https://github.com/Ogekuri/AIBar/compare/v0.56.0..v0.56.2) - 2026-11-07
+## [0.57.0](https://github.com/Ogekuri/AIBar/compare/v0.56.0..v0.57.0) - 2026-11-07
 ### 🚜  Changes
+- migrate GitHub Actions to Node24-native versions [useReq] *(release-pypi)*
+  - Migrate all JavaScript-based release workflow actions to Node24-native
+  - majors (checkout v7, setup-python v7, setup-uv v10, attest v4, gh-release
+  - v3, upload-artifact v7, download-artifact v8) preserving step names,
+  - inputs, job gating, and Trusted Publishing behavior.
+  - Add CTN-021 mandating node24+ upstream runtimes, TST-080/TST-081 tests
+  - verifying pins and absence of transitional Node20 opt-out variables
+  - (ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION, FORCE_JAVASCRIPT_ACTIONS_TO_NODE24).
+  - Document primary pipx installation flow per PRJ-016/PRJ-017/TST-071.
 - pin --upgrade --develop install to latest GitHub release tag [useReq] *(cli)*
   - Resolve --develop/--dev upgrade source by fetching tag_name from the
   - GitHub releases API and execute uv tool install --force
@@ -1618,7 +1627,7 @@
 - \[0.54.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.54.0
 - \[0.55.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.55.0
 - \[0.56.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.56.0
-- \[0.56.2\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.56.2
+- \[0.57.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.57.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1676,4 +1685,4 @@
 [0.54.0]: https://github.com/Ogekuri/AIBar/compare/v0.53.0..v0.54.0
 [0.55.0]: https://github.com/Ogekuri/AIBar/compare/v0.54.0..v0.55.0
 [0.56.0]: https://github.com/Ogekuri/AIBar/compare/v0.55.0..v0.56.0
-[0.56.2]: https://github.com/Ogekuri/AIBar/compare/v0.56.0..v0.56.2
+[0.57.0]: https://github.com/Ogekuri/AIBar/compare/v0.56.0..v0.57.0
