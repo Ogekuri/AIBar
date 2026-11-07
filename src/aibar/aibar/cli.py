@@ -680,8 +680,8 @@ def _run_startup_update_preflight() -> None:
 def _startup_force_ignore_idle_from_args(args: Sequence[str] | None) -> bool:
     """
     @brief Detect whether startup preflight must bypass idle gating from argv.
-    @details Returns true when invocation arguments contain `--version` or
-    `--ver`, forcing one online startup release check regardless of persisted
+    @details Returns true when invocation arguments contain `--version`,
+    forcing one online startup release check regardless of persisted
     startup idle-time file state.
     @param args {Sequence[str] | None} CLI argv sequence excluding executable
         name when provided by Click group main.
@@ -691,7 +691,7 @@ def _startup_force_ignore_idle_from_args(args: Sequence[str] | None) -> bool:
     """
     argument_tokens = list(args) if args is not None else list(sys.argv[1:])
     return any(
-        token in {"--version", "--ver"}
+        token == "--version"
         for token in argument_tokens
         if isinstance(token, str)
     )
@@ -905,10 +905,10 @@ def _handle_version_option(
     ctx: click.Context, param: click.Parameter, value: bool
 ) -> None:
     """
-    @brief Handle eager `--version` and `--ver` option callback.
+    @brief Handle eager `--version` option callback.
     @details Prints installed package version to stdout, emits the PyPI and
     GitHub latest-release report to stderr, and exits before command dispatch
-    when either version flag is present.
+    when the version flag is present.
     @param ctx {click.Context} Active Click context.
     @param param {click.Parameter} Option metadata (unused).
     @param value {bool} Parsed version-option flag value.
@@ -1085,7 +1085,7 @@ class StartupPreflightGroup(click.Group):
         delegates to Click parser/dispatcher, and appends execution-end outcome
         plus one trailing separator line when runtime logging is enabled.
         The preflight bypasses startup idle gating when invocation includes
-        eager `--version` or `--ver` options.
+        the eager `--version` option.
         @param args {Sequence[str] | None} Optional argv sequence.
         @param prog_name {str | None} Program display name override.
         @param complete_var {str | None} Shell-completion environment variable.
@@ -2626,7 +2626,6 @@ def _build_cached_dual_window_results(
 )
 @click.option(
     "--version",
-    "--ver",
     "show_version",
     is_flag=True,
     is_eager=True,
@@ -3432,8 +3431,7 @@ def _build_zai_quota_lines(result: ProviderResult) -> list[str]:
     `_build_cli_usage_line(ProviderName.ZAI, ...)` so Z.ai renders the standard
     fixed-width bracketed progress bar like `agy/openrouter/copilot/codex`.
     Quota labels resolve from the `label` field with the round-trip-safe
-    `quota_key` fallback and a legacy `key` fallback tolerated for pre-migration
-    cached payloads; sanitizer-redacted legacy values normalize to `Quota`.
+    `quota_key` fallback.
     Reset datetimes are resolved via `_coerce_zai_quota_reset_at` from the
     round-trip-safe `reset_at_epoch_ms` field (with `datetime`/ISO-string
     `reset_at` fallback) so cached `show` executions render `Resets in:` rows
@@ -3450,13 +3448,9 @@ def _build_zai_quota_lines(result: ProviderResult) -> list[str]:
     for quota in quotas:
         if not isinstance(quota, dict):
             continue
-        legacy_key = quota.get("key")
-        if not isinstance(legacy_key, str) or legacy_key == "[REDACTED]":
-            legacy_key = None
         label = (
             quota.get("label")
             or quota.get("quota_key")
-            or legacy_key
             or "Quota"
         )
         percentage = quota.get("percentage")

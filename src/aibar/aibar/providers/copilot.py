@@ -138,13 +138,15 @@ class CopilotCredentialStore:
 
     CONFIG_DIR = Path.home() / ".config" / "aibar"
     CREDS_FILE = CONFIG_DIR / "copilot.json"
-    CODEXBAR_CONFIG = Path.home() / ".codexbar" / "config.json"
 
     def load_token(self) -> str | None:
         """
-        @brief Execute load token.
-        @details Applies load token logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
-        @return {str | None} Function return value.
+        @brief Resolve the stored Copilot API token.
+        @details Applies two-step precedence with O(1) filesystem access per
+        step: (1) `GITHUB_TOKEN` environment variable, (2) `access_token` field
+        in `~/.config/aibar/copilot.json`. Unreadable or malformed JSON files
+        normalize to no token. Time complexity O(1); space complexity O(1).
+        @return {str | None} Resolved token or None when unavailable.
         """
         # 1. Environment variable
         if token := os.environ.get("GITHUB_TOKEN"):
@@ -156,17 +158,6 @@ class CopilotCredentialStore:
                 data = json.loads(self.CREDS_FILE.read_text())
                 if token := data.get("access_token"):
                     return token
-            except Exception:
-                pass
-
-        # 3. CodexBar config
-        if self.CODEXBAR_CONFIG.exists():
-            try:
-                data = json.loads(self.CODEXBAR_CONFIG.read_text())
-                for provider in data.get("providers", []):
-                    if provider.get("id") == "copilot":
-                        if token := provider.get("apiKey"):
-                            return token
             except Exception:
                 pass
 

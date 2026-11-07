@@ -126,32 +126,29 @@ def test_zai_quota_keys_survive_cache_sanitizer_roundtrip() -> None:
 
 def test_extension_consume_round_trip_safe_quota_key_field() -> None:
     """
-    @brief Verify the GNOME extension reads quota identifiers shape-tolerantly.
-    @details Asserts the panel usage matcher prefers the sanitizer-safe
-    `quota_key` field, accepts the legacy `key` field emitted by pre-migration
-    CLI builds and cached payloads, and that the card label fallback uses the
-    same identifier chain, so panel and card stay consistent for every payload
-    shape.
+    @brief Verify the GNOME extension reads quota identifiers from `quota_key`.
+    @details Asserts the panel usage matcher reads the sanitizer-safe
+    `quota_key` field and the card label fallback uses the same identifier
+    chain, so panel and card stay consistent for every emitted payload shape.
     @return {None} Function return value.
     @satisfies REQ-143
     @satisfies REQ-137
     """
     source = EXTENSION_PATH.read_text(encoding="utf-8")
 
-    assert "const quotaKey = quota.quota_key || quota.key || '';" in source
-    assert "quota.label || quota.quota_key || quota.key || 'Quota';" in source
+    assert "const quotaKey = quota.quota_key || '';" in source
+    assert "quota.label || quota.quota_key || 'Quota';" in source
 
 
 def test_zai_panel_values_render_for_all_payload_shapes() -> None:
     """
-    @brief Verify Z.ai panel percentages render for every quota payload shape.
+    @brief Verify Z.ai panel percentages render for supported payload shapes.
     @details Executes the real `getPanelUsageValues` extracted from
-    `extension.js` under node against three payload shapes: the current
-    `quota_key` shape, the legacy `key` shape emitted by pre-migration CLI
-    builds, and a sanitizer-redacted shape. The panel matcher MUST return the
-    canonical 5h/weekly percentages in every case, mirroring the card, which
-    renders from `label` fields and array order and therefore never hides Z.ai
-    quota bars.
+    `extension.js` under node against two payload shapes: the canonical
+    `quota_key` shape and a sanitizer-redacted shape. The panel matcher MUST
+    return the canonical 5h/weekly percentages in every case, mirroring the
+    card, which renders from `label` fields and array order and therefore never
+    hides Z.ai quota bars.
     @return {None} Function return value.
     @satisfies REQ-143
     @satisfies REQ-140
@@ -184,9 +181,8 @@ const buildData = (identifierField, identifierValue) => ({
     ]},
 });
 const fresh = getPanelUsageValues('zai', buildData('quota_key', '5h'));
-const legacy = getPanelUsageValues('zai', buildData('key', '5h'));
 const redacted = getPanelUsageValues('zai', buildData('key', '[REDACTED]'));
-console.log(JSON.stringify({fresh, legacy, redacted}));
+console.log(JSON.stringify({fresh, redacted}));
 """
     with tempfile.NamedTemporaryFile(
         "w", suffix=".js", encoding="utf-8", delete=False
@@ -205,7 +201,7 @@ console.log(JSON.stringify({fresh, legacy, redacted}));
         Path(harness_path).unlink(missing_ok=True)
 
     rendered = json.loads(completed.stdout.strip().splitlines()[-1])
-    for shape in ("fresh", "legacy", "redacted"):
+    for shape in ("fresh", "redacted"):
         assert rendered[shape]["primary"] == pytest.approx(11.0), shape
         assert rendered[shape]["secondary"] == pytest.approx(7.0), shape
         assert rendered[shape]["max"] == pytest.approx(11.0), shape

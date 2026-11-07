@@ -406,8 +406,8 @@ function _boldWhiteMarkup(value) {
 /**
  * @brief Build provider freshness fallback from cache-status `updated_at` metadata.
  * @details Converts `statusEntry.updated_at` to epoch seconds and derives
- * `idle_until_timestamp` using configured idle-delay seconds when `freshness`/`idle_time`
- * sections are unavailable from CLI JSON output.
+ * `idle_until_timestamp` using configured idle-delay seconds when the `freshness`
+ * section is unavailable from CLI JSON output.
  * @param {any} statusEntry Window-specific cache status entry.
  * @param {number} idleDelaySeconds Active idle delay in seconds.
  * @returns {{last_success_timestamp: number, idle_until_timestamp: number} | null} Fallback freshness state or null.
@@ -438,8 +438,7 @@ function _buildFallbackFreshnessState(statusEntry, idleDelaySeconds) {
 
 /**
  * @brief Resolve provider freshness state from canonical CLI freshness source.
- * @details Uses `freshness.<provider>` (or `idle_time.<provider>` compatibility
- * alias populated by parser) and falls back to status-derived timestamps only
+ * @details Uses `freshness.<provider>` and falls back to status-derived timestamps only
  * when freshness state is unavailable in CLI JSON.
  * @param {Object<string, any>} freshnessData Provider-keyed freshness object.
  * @param {string} providerName Provider key from usage payload.
@@ -1494,10 +1493,9 @@ class AIBarIndicator extends PanelMenu.Button {
                     bar.container.hide();
                     continue;
                 }
-                // Identifier chain prefers the sanitizer-safe `quota_key` field
-                // and tolerates the legacy `key` field from pre-migration
-                // payloads; `label` takes precedence for display text.
-                const quotaLabel = quota.label || quota.quota_key || quota.key || 'Quota';
+                // Identifier chain prefers the sanitizer-safe `quota_key` field;
+                // `label` takes precedence for display text.
+                const quotaLabel = quota.label || quota.quota_key || 'Quota';
                 const quotaPercentage = (
                     typeof quota.percentage === 'number' &&
                     Number.isFinite(quota.percentage)
@@ -2067,8 +2065,9 @@ class AIBarIndicator extends PanelMenu.Button {
     /**
      * @brief Execute parse output.
      * @details Parses CLI JSON output supporting canonical cache schema sections
-     * (`payload`, `status`, `idle_time`, `freshness`, `extension`,
-     * `enabled_providers`). Parses `enabled_providers` before provider data
+     * (`payload`, `status`, `freshness`, `extension`, `enabled_providers`).
+     * Freshness state is read exclusively from the `freshness` section.
+     * Parses `enabled_providers` before provider data
      * extraction so disabled providers are removed from all downstream UI
      * projections. Reads `extension.gnome_refresh_interval_seconds` to update
      * the auto-refresh interval,
@@ -2120,11 +2119,6 @@ class AIBarIndicator extends PanelMenu.Button {
                     typeof json.freshness === 'object' &&
                     !Array.isArray(json.freshness)
                 );
-                const hasIdleTimeSection = (
-                    json.idle_time &&
-                    typeof json.idle_time === 'object' &&
-                    !Array.isArray(json.idle_time)
-                );
                 const extensionData = (
                     json.extension &&
                     typeof json.extension === 'object' &&
@@ -2135,11 +2129,6 @@ class AIBarIndicator extends PanelMenu.Button {
                 if (hasFreshnessSection) {
                     this._freshnessData = _filterProviderObjectByEnabledProviders(
                         json.freshness,
-                        this._enabledProviders,
-                    );
-                } else if (hasIdleTimeSection) {
-                    this._freshnessData = _filterProviderObjectByEnabledProviders(
-                        json.idle_time,
                         this._enabledProviders,
                     );
                 } else {
@@ -2381,12 +2370,10 @@ class AIBarIndicator extends PanelMenu.Button {
                         ) {
                             if (maxPct === null || quota.percentage > maxPct)
                                 maxPct = quota.percentage;
-                            // Identifier chain prefers the sanitizer-safe
-                            // `quota_key` field and tolerates the legacy `key`
-                            // field emitted by pre-migration CLI builds and
-                            // cached payloads; when both are missing or redacted,
+                            // Identifier chain uses the sanitizer-safe
+                            // `quota_key` field; when missing or redacted,
                             // the positional fallback below mirrors the card.
-                            const quotaKey = quota.quota_key || quota.key || '';
+                            const quotaKey = quota.quota_key || '';
                             if (quotaKey === '5h' && fiveHourPct === null)
                                 fiveHourPct = quota.percentage;
                             else if (quotaKey === 'weekly' && weeklyPct === null)

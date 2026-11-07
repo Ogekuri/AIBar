@@ -3,7 +3,7 @@
 @brief Startup update-check and lifecycle-option regression tests.
 @details Verifies startup preflight ordering, idle-time gating and persistence,
 HTTP 429 retry-after handling, lifecycle uv command execution, and version
-option behavior for `--version` and `--ver`.
+option behavior for `--version`.
 @satisfies TST-031
 @satisfies TST-032
 @satisfies TST-033
@@ -357,25 +357,47 @@ def test_lifecycle_flags_on_non_linux_emit_manual_guidance_without_subprocess(
     assert startup_cache_sentinel_path.exists()
 
 
-def test_version_and_ver_print_installed_version_without_dispatch() -> None:
+def test_version_prints_installed_version_without_dispatch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """
-    @brief Verify `--version` and `--ver` print installed version and exit.
-    @details Invokes both version flags and asserts output is the installed
-    package version text with successful exit status.
+    @brief Verify `--version` prints installed version, release report, and exits.
+    @details Replaces both release fetch boundaries with deterministic responses,
+    invokes `--version` standalone and before a subcommand, and asserts the first
+    output line equals the installed version, labeled PyPI/GitHub release lines
+    follow, exit status is zero, and subcommand dispatch is bypassed.
+    expected_output: `<version>\nLatest PyPI release: 9.9.9\nLatest GitHub
+    release: 9.9.9` with exit status 0 for both invocations.
+    @param monkeypatch {pytest.MonkeyPatch} Pytest monkeypatch fixture.
     @return {None} Function return value.
     @satisfies TST-036
+    @satisfies REQ-078
     """
+    def _fake_fetch() -> cli_module.StartupReleaseCheckResponse:
+        """
+        @brief Return deterministic successful release-check response.
+        @return {StartupReleaseCheckResponse} Mock success response.
+        """
+        return cli_module.StartupReleaseCheckResponse(
+            latest_version="9.9.9",
+            status_code=200,
+            error_message=None,
+            retry_after_seconds=0,
+        )
+
+    monkeypatch.setattr(cli_module, "_fetch_startup_latest_release", _fake_fetch)
+    monkeypatch.setattr(cli_module, "_fetch_github_latest_release", _fake_fetch)
+    monkeypatch.setattr(cli_module, "_LAST_PYPI_RELEASE_CHECK", None)
+
     runner = CliRunner()
     version_result = runner.invoke(main, ["--version"])
-    short_version_result = runner.invoke(main, ["--ver"])
     bypass_result = runner.invoke(main, ["--version", "show"])
 
-    assert version_result.exit_code == 0
-    assert version_result.output.strip() == __version__
-    assert short_version_result.exit_code == 0
-    assert short_version_result.output.strip() == __version__
-    assert bypass_result.exit_code == 0
-    assert bypass_result.output.strip() == __version__
+    for result in (version_result, bypass_result):
+        assert result.exit_code == 0
+        assert result.output.splitlines()[0] == __version__
+        assert "Latest PyPI release: 9.9.9" in result.output
+        assert "Latest GitHub release: 9.9.9" in result.output
 
 
 def test_version_flags_force_startup_online_check_bypassing_idle_gate(
@@ -383,10 +405,11 @@ def test_version_flags_force_startup_online_check_bypassing_idle_gate(
     tmp_path: Path,
 ) -> None:
     """
-    @brief Verify version flags force online startup check bypassing idle-time gate.
+    @brief Verify the version flag forces online startup check bypassing idle gate.
     @details Persists startup idle-state with future `idle_until`, invokes
-    `--version` and `--ver`, and asserts startup release fetch executes once per
-    invocation despite active idle gate.
+    `--version`, and asserts startup release fetch executes once despite the
+    active idle gate.
+    expected_output: exit status 0 with exactly one recorded startup fetch.
     @param monkeypatch {pytest.MonkeyPatch} Pytest monkeypatch fixture.
     @param tmp_path {Path} Temporary filesystem root for HOME isolation.
     @return {None} Function return value.
@@ -411,6 +434,25 @@ def test_version_flags_force_startup_online_check_bypassing_idle_gate(
         )
 
     monkeypatch.setattr(cli_module, "_fetch_startup_latest_release", _fake_fetch)
+    monkeypatch.setattr(cli_module, "_LAST_PYPI_RELEASE_CHECK", None)
+
+    def _fake_github_fetch() -> cli_module.StartupReleaseCheckResponse:
+        """
+        @brief Return deterministic GitHub release-check response.
+        @return {StartupReleaseCheckResponse} Mock success response.
+        """
+        return cli_module.StartupReleaseCheckResponse(
+            latest_version=__version__,
+            status_code=200,
+            error_message=None,
+            retry_after_seconds=0,
+        )
+
+    monkeypatch.setattr(
+        cli_module,
+        "_fetch_github_latest_release",
+        _fake_github_fetch,
+    )
     monkeypatch.setattr(
         cli_module,
         "_run_startup_update_preflight",
@@ -423,11 +465,9 @@ def test_version_flags_force_startup_online_check_bypassing_idle_gate(
     )
     runner = CliRunner()
     version_result = runner.invoke(main, ["--version"])
-    short_version_result = runner.invoke(main, ["--ver"])
 
     assert version_result.exit_code == 0
-    assert short_version_result.exit_code == 0
-    assert fetch_calls == ["called", "called"]
+    assert fetch_calls == ["called"]
 
 
 def test_startup_fetch_queries_pypi_json_and_parses_info_version(

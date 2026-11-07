@@ -64,7 +64,6 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 │       │       └── stylesheet.css
 │       └── aibar/
 │           ├── __main__.py
-│           ├── cache.py
 │           ├── cli.py
 │           ├── config.py
 │           └── providers/
@@ -88,7 +87,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **PRJ-006**: MUST provide a PEP 621-compliant `pyproject.toml` at repository root enabling `uv tool install` distribution execution and `uv run`/`uvx` live execution without external virtualenv bootstrap scripts.
 - **PRJ-007**: MUST document in `README.md` dedicated sections for `uv`-based requirements including the Python >= 3.12 floor, installation/removal, `uv run`/`uvx` execution, and optional `requirements.txt` export command, plus GeminiAI prerequisites.
 - **PRJ-008**: MUST provide `aibar gnome-install` CLI command that detects install/update mode for `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/`, copies package extension files, disables extension before update copy, and enables extension after copy.
-- **PRJ-009**: MUST execute startup update checks and lifecycle flags `--upgrade`, `--uninstall`, `--version`, `--ver`, `--enable-log`, `--disable-log`, `--enable-debug`, and `--disable-debug` for program `aibar`.
+- **PRJ-009**: MUST execute startup update checks and lifecycle flags `--upgrade`, `--uninstall`, `--version`, `--enable-log`, `--disable-log`, `--enable-debug`, and `--disable-debug` for program `aibar`.
 - **PRJ-010**: MUST package all runtime files required by `aibar` so local execution and `uv tool install` execution remain behaviorally equivalent.
 - **PRJ-011**: MUST keep GNOME extension contract documentation in `pi-usereq/docs/REQUIREMENTS.md`, `pi-usereq/docs/WORKFLOW.md`, and `pi-usereq/docs/REFERENCES.md`; repository source tree MUST NOT contain `src/aibar/plans/Gnome.plan.md`.
 - **PRJ-012**: MUST maintain release automation in `.github/workflows/release-pypi.yml`, replacing `release-uvx+extension.yml`, preserving build, extension zip, changelog, and GitHub Release for version tags on `master` or `develop`.
@@ -242,10 +241,10 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-129**: CLI `show` text mode MUST render Copilot `Cost: <currency_symbol><value>` after one blank line following `Remaining credits` and MUST NOT render `Window <window>` heading text.
 - **REQ-117**: GNOME Copilot card MUST render `Cost: <currency_symbol><value>` from `metrics.cost` (fallback `premium_requests_extra_cost`), including `0`, preserving existing Copilot typography and spacing.
 - **REQ-118**: GNOME panel status bar MUST place Copilot `<currency_symbol><cost>` immediately after Copilot percentages and before Codex status labels when Copilot cost is available.
-- **REQ-068**: Bare `aibar` and `aibar --help` MUST print human-readable usage text listing all commands and global or command-specific options, including `show --force`, `show --json`, `gnome-install`, `gnome-uninstall`, `--version`/`--ver`, `--upgrade`, `--uninstall`, `--enable-log`/`--disable-log`, and `--enable-debug`/`--disable-debug` examples, without Doxygen tags.
+- **REQ-068**: Bare `aibar` and `aibar --help` MUST print human-readable usage text listing all commands and global or command-specific options, including `show --force`, `show --json`, `gnome-install`, `gnome-uninstall`, `--version`, `--upgrade`, `--uninstall`, `--enable-log`/`--disable-log`, and `--enable-debug`/`--disable-debug` examples, without Doxygen tags.
 - **REQ-069**: GNOME panel icon MUST be bright white when all percentages are <= 25, bright yellow when any percentage > 25, bright orange when any percentage > 50, bright red when any percentage > 75, and blinking bright-red/dim-red when any percentage > 90.
 - **REQ-070**: MUST execute startup update-check preflight before CLI argument validation and command dispatch.
-- **REQ-071**: MUST skip startup update HTTP calls while current epoch is lower than persisted `idle_until` in `~/.cache/aibar/check_version_idle-time.json`, except when invocation includes `--version` or `--ver`.
+- **REQ-071**: MUST skip startup update HTTP calls while current epoch is lower than persisted `idle_until` in `~/.cache/aibar/check_version_idle-time.json`, except when invocation includes `--version`.
 - **REQ-072**: MUST create missing `~/.cache/aibar/` and create or overwrite `check_version_idle-time.json` after successful startup update checks with epoch and human-readable `last_success_at=now` and `idle_until=now+300`.
 - **REQ-073**: MUST print a bright-green message containing installed version and latest available version when the latest PyPI release is newer.
 - **REQ-074**: MUST print bright-red error diagnostics when startup update checks fail, including HTTP status details such as `403`.
@@ -254,7 +253,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-077**: MUST execute `uv tool uninstall aibar` only on Linux when `--uninstall` is provided, MUST propagate subprocess exit status, and MUST delete `~/.cache/aibar/check_version_idle-time.json` and `~/.cache/aibar/`.
 - **REQ-088**: MUST NOT execute lifecycle `uv tool` subprocess commands for `--upgrade` or `--uninstall` on non-Linux operating systems.
 - **REQ-089**: MUST print explicit manual command guidance for the current non-Linux operating system when `--upgrade` or `--uninstall` is provided.
-- **REQ-078**: MUST print installed program version, then labeled latest-release versions for PyPI and GitHub, when `--version` or `--ver` is provided; startup release check MUST ignore `check_version_idle-time.json`.
+- **REQ-078**: MUST print installed program version, then labeled latest-release versions for PyPI and GitHub, when `--version` is provided; startup release check MUST ignore `check_version_idle-time.json`.
 - **REQ-079**: MUST include runtime files required by startup update-check behavior in `pyproject.toml` package configuration used by `.github/workflows/release-pypi.yml`.
 - **REQ-080**: MUST disable the extension via `gnome-extensions disable aibar@aibar.panel` before removing files in `gnome-uninstall` with colored status output.
 - **REQ-081**: MUST remove the extension directory `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/` and all its contents in `gnome-uninstall`.
@@ -355,7 +354,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-058**: MUST verify CLI `show` renders Copilot `Cost: <currency_symbol><value>` after one blank line following `Remaining credits`.
 - **TST-053**: MUST verify GNOME Copilot card renders `Cost: <currency_symbol><value>` and panel status bar renders Copilot `<currency_symbol><cost>` between Copilot percentages and Codex labels.
 - **TST-031**: MUST verify startup update preflight executes before invalid-argument diagnostics and before subcommand handlers run.
-- **TST-032**: MUST verify startup update idle-time gating skips HTTP calls until `idle_until` expires and resumes checks when the idle-state file is missing or expired, except for invocations containing `--version` or `--ver`.
+- **TST-032**: MUST verify startup update idle-time gating skips HTTP calls until `idle_until` expires and resumes checks when the idle-state file is missing or expired, except for invocations containing `--version`.
 - **TST-033**: MUST verify successful startup update checks create `~/.cache/aibar/` when missing and write `check_version_idle-time.json` with epoch and human-readable `last_success_at` and `idle_until`.
 - **TST-034**: MUST verify repeated startup update HTTP `429` responses compute idle-time using `max(300, max(retry-after values))`.
 - **TST-035**: MUST verify Linux `--upgrade` executes `uv tool install aibar --force` (PyPI), `--uninstall` executes `uv tool uninstall aibar`, exit codes propagate, and `--uninstall` deletes `~/.cache/aibar/`.
@@ -374,7 +373,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-062**: MUST verify ZaiProvider derives the `5h` quota `reset_at_epoch_ms` from the next UTC 5-hour boundary when the 5 Hours limit entry omits `nextResetTime`.
 - **TST-063**: MUST verify OpenRouter progress-bar percentage equals `cost / (cost + remaining) * 100` from API credit total `data.limit`, over-credit bars render >100 identically to Copilot, and `setup` prompts no budget.
 - **TST-064**: MUST verify AGY provider parses `agy -p /usage` TSV rows into the five quota records with normalized used percentages, classifies authentication failures, and omits missing quota rows; dedicated standalone test pending (no existing test maps to this module).
-- **TST-036**: MUST verify `--version` and `--ver` print installed version plus labeled latest PyPI and GitHub release lines, bypass subcommand execution, and force one online startup release check even when `check_version_idle-time.json` contains future `idle_until`.
+- **TST-036**: MUST verify `--version` prints installed version plus labeled latest PyPI and GitHub release lines, bypasses subcommand execution, and forces one online startup release check even when `check_version_idle-time.json` contains future `idle_until`.
 - **TST-038**: MUST verify CLI text `show` renders `FAIL` blocks as `Status: FAIL`, blank line, `Reason: <reason>`, blank line, and right-aligned `Updated/Next`, never renders `Window 5h:/7d:/30d:` headings, and preserves `show --json` freshness, API-counter, cost, and GeminiAI effective-window behaviors.
 - **TST-042**: MUST verify CLI `show` and GNOME provider cards render equivalent failed-provider blocks formatted as `Status: FAIL`, blank line, `Reason: <reason>`, blank line, and `Updated/Next`, without `Window 5h:/7d:/30d:` headings.
 - **TST-039**: MUST verify `scripts/aibar.sh` invokes `uv run python -m aibar.cli`, forwards CLI arguments, and contains no virtualenv creation/activation or `pip install -r requirements.txt` commands.
@@ -407,17 +406,17 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | CTN-001 | `src/aibar/aibar/config.py` + `Config.get_token` + env var -> env file -> provider-specific stores (`CodexCredentialStore`, `CopilotCredentialStore`); provider `agy` resolves the local `agy` CLI from `PATH` via `AntigravityProvider.is_configured`. |
 | CTN-002 | `src/aibar/aibar/providers/base.py` + `ProviderResult` model + fields `provider/window/metrics/updated_at/raw/error`; `UsageMetrics` + `currency_symbol` field. |
 | CTN-003 | `src/aibar/aibar/providers/*.py` + `fetch` methods + `httpx.AsyncClient(timeout=api_call_timeout_milliseconds/1000.0)` in all providers using `RuntimeConfig.api_call_timeout_milliseconds`. |
-| CTN-004 | `src/aibar/aibar/cache.py` + cache schema helpers and `src/aibar/aibar/cli.py` + `cache.json` as canonical store for payload snapshots and attempt statuses. |
+| CTN-004 | `src/aibar/aibar/config.py` + `save_cli_cache` persisting `cache.json` as canonical store for payload snapshots and attempt statuses. |
 | CTN-005 | `src/aibar/aibar/config.py` + `PROVIDER_INFO` notes + entries describing unofficial/internal usage for Copilot and Codex plus local-CLI usage for `agy`. |
 | CTN-006 | `pi-usereq/docs/REFERENCES.md` + configured-source symbol index regenerated from repository source files. |
 | CTN-007 | `pyproject.toml` + `[build-system] requires = ["hatchling"]` + `[project]` metadata fields `name`, `version`, `requires-python = ">= 3.12"`, runtime `dependencies`, and `[project.scripts]`; `pytest` relocated to `[dependency-groups]` dev per CTN-019. |
 | CTN-008 | `src/aibar/aibar/config.py` + `RuntimeConfig` model + `idle_delay_seconds`, `api_call_delay_milliseconds`, `api_call_timeout_milliseconds`, `gnome_refresh_interval_seconds`, and `currency_symbols` fields persisted in `~/.config/aibar/config.json`. |
 | CTN-009 | `src/aibar/aibar/config.py` + `build_idle_time_state/load_idle_time/save_idle_time` + provider-scoped idle-time epoch fields and local-timezone `*_human` serialization in `~/.cache/aibar/idle-time.json`. |
-| CTN-010 | `src/aibar/aibar/cache.py` + conditional payload-write helpers guarantee payload replacement only on successful provider/window fetch and payload preservation on failed attempts including HTTP `429`. |
+| CTN-010 | `src/aibar/aibar/cli.py` + `_refresh_and_persist_cache_payload` upserts payload only on successful provider/window fetch and preserves previous payload on failed attempts including HTTP `429`. |
 | DES-001 | `src/aibar/aibar/providers/base.py` + `class BaseProvider(ABC)` + abstract methods `fetch`, `is_configured`, `get_config_help`. |
 | DES-002 | `src/aibar/aibar/providers/base.py` + `WindowPeriod/ProviderName` + enum literals `5h/7d/30d/code_review` and provider names. |
 | DES-003 | `src/aibar/aibar/cli.py` + `parse_window/parse_provider` + raises `click.BadParameter` for invalid inputs. |
-| DES-004 | `src/aibar/aibar/cache.py` + `_sanitize_raw` + redacts keys in sensitive set before file write. |
+| DES-004 | `src/aibar/aibar/config.py` + `_sanitize_cache_payload` redacts keys in the sensitive set before `cache.json` writes. |
 | DES-005 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_loadEnvFromFile` + parses `export KEY=VALUE`, handles quotes/comments/semicolon cleanup. |
 | DES-006 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + scheduler-driven `_startAutoRefresh/_refreshData` using `this._refreshIntervalSeconds` read from `json.extension.gnome_refresh_interval_seconds`, popup `Refresh Now` command uses `aibar show --json --force`, interval updated on each successful refresh. |
 | REQ-001 | `src/aibar/aibar/cli.py` + `show` loop + `if not prov.is_configured(): ... continue` and text hint `Set {config.ENV_VARS.get(name)}`. |
@@ -462,10 +461,10 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-041 | `src/aibar/aibar/cli.py` + refresh-failure handling computes provider-scoped `idle_until = last_attempt_at + max(idle_delay_seconds, resolved_retry_after_seconds)` where `resolved_retry_after_seconds` is parsed from API metadata or falls back to `default_retry_after_seconds` when `retry_after_unavailable=true`, then persists provider state in `~/.cache/aibar/idle-time.json`. |
 | REQ-042 | `src/aibar/aibar/cli.py` + retrieval pipeline uses only `cache.json` and `idle-time.json` persisted artifacts for idle-time-gated API minimization. |
 | REQ-043 | `src/aibar/aibar/cli.py` + shared cache refresh/load helpers provide one retrieval implementation for CLI retrieval and render flows. |
-| REQ-044 | `src/aibar/aibar/cache.py` + cache status-write helpers persist per-provider/window `result` (`OK`/`FAIL`), `error`, and `updated_at` fields. |
-| REQ-045 | `src/aibar/aibar/cache.py` + provider/window upsert path only writes payload on successful fetch outcomes. |
-| REQ-046 | `src/aibar/aibar/cache.py` + failed provider/window upsert path preserves existing payload while updating failure status metadata. |
-| REQ-047 | `src/aibar/aibar/cli.py` + `src/aibar/aibar/cache.py` + fallback and refresh flows use only `cache.json` and no legacy per-provider snapshot files. |
+| REQ-044 | `src/aibar/aibar/cli.py` + `_serialize_attempt_status`/`_record_attempt_status` persist per-provider/window `result` (`OK`/`FAIL`), `error`, and `updated_at` fields. |
+| REQ-045 | `src/aibar/aibar/cli.py` + `_refresh_and_persist_cache_payload` upsert path writes payload only on successful fetch outcomes. |
+| REQ-046 | `src/aibar/aibar/cli.py` + `_refresh_and_persist_cache_payload` failed upsert path preserves existing payload while updating failure status metadata. |
+| REQ-047 | `src/aibar/aibar/cli.py` + `src/aibar/aibar/config.py` + fallback and refresh flows use only `cache.json` and no legacy per-provider snapshot files. |
 | TST-001 | `src/aibar/aibar/cli.py` + `parse_window/parse_provider` provide validation points for invalid input diagnostics. |
 | TST-002 | `src/aibar/aibar/config.py` + `get_token` implements explicit precedence chain requiring regression coverage. |
 | TST-003 | `tests/test_cli_idle_cache.py` and `tests/test_cli_idle_force.py` + assertions for cache schema parity with `show --json` and provider-keyed idle-time epoch/human-readable field persistence under `~/.cache/aibar/`. |
