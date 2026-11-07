@@ -1,5 +1,129 @@
 # Changelog
 
+## [0.56.0](https://github.com/Ogekuri/AIBar/compare/v0.55.0..v0.56.0) - 2026-11-07
+### ⛰️  Features
+- add --ver alias equivalent to --version [useReq] *(cli)*
+  - Change-ID: NEW-VER-ALIAS-20261107
+  - Add REQ-188/TST-077 declaring --ver as an exact alias of --version.
+  - Register --ver on the eager version option, include it in the startup
+  - idle-gate bypass argv scan, and document equivalence in README and the
+  - runtime model. Add a test asserting identical output, exit status, and
+  - dispatch bypass for both flags.
+  - Validation: full suite 233 passed with the 3 known pre-existing README
+  - doc failures; static-check clean.
+
+### 🐛  Bug Fixes
+- end session when devkit window closes [useReq] *(aibar-nested-debug-session)*
+  - Change-ID: FIX-NESTED-CLOSE-20261107
+  - Closing the Devkit window terminated only the nested GNOME Shell while
+  - the wrapper waited solely on the debug shell, leaving a residual
+  - interactive bash-5.3$ prompt after the debug session ended.
+  - Reap the first terminated background job with wait -n, SIGKILL the
+  - surviving debug shell when the nested shell exits first, and exit with
+  - the nested-shell status; add a behavioral reproducer test and PTY
+  - evidence; update WORKFLOW.md. REQUIREMENTS.md unchanged.
+  - Validation: 10/10 nested-session tests pass; static-check clean; full
+  - suite 231 passed with the 4 known pre-existing failures.
+- restore debug shell stdin after backgrounding [useReq] *(aibar-nested-debug-session)*
+  - Change-ID: FIX-NESTED-STDIN-20261107
+  - Regression from 260b3f0: without job control bash assigns /dev/null as
+  - stdin to background commands, so the interactive debug shell hit EOF and
+  - the nested debug session terminated immediately after startup.
+  - Duplicate wrapper stdin onto descriptor 3 and launch the debug shell with
+  - <&3; add a stdin-inheritance reproducer test; update WORKFLOW.md.
+  - Validation: 9/9 nested-session tests pass; PTY run executes input and
+  - propagates exit 7; static-check clean; full suite 230 passed with the 4
+  - known pre-existing README/version-report failures.
+- terminate whole debug session on interrupt [useReq] *(aibar-nested-debug-session)*
+  - Change-ID: FIX-NESTED-INT-20261107
+  - SIGINT/SIGTERM now SIGKILL the debug shell and nested shell and the wrapper
+  - exits 130/143 immediately, returning control to the invoking terminal instead
+  - of leaving a residual intermediate shell.
+  - Run the debug shell in background with job control disabled (+m).
+  - Add behavioral reproducer tests for both interrupt phases and exit-status path.
+  - Update WORKFLOW.md runtime model; REQUIREMENTS.md unchanged.
+  - Validation: 8/8 nested-session tests pass; static-check clean; full suite 229
+  - passed with 4 pre-existing unrelated README/version-report failures.
+- prefer virtual-monitor in headless fallback [useReq] *(test-ext)*
+  - Bare gnome-shell --headless boots a display-less session, so the nested
+  - test session appeared not to start (no window; shell attached to the
+  - live session X display and GDM/logind session).
+  - Probe gnome-shell --help-all for --virtual-monitor and prefer
+  - gnome-shell --headless --virtual-monitor=1280x720, which provisions an
+  - explicit 1280x720 virtual monitor rendered in a window on builds with
+  - windowed virtual monitors; degrade to plain --headless with an
+  - informational notice when unsupported (REQ-031, PRJ-004).
+  - Extend reproducer test asserting the virtual-monitor probe/launch and
+  - the plain-headless degradation tier; update WORKFLOW.md PROC:test-ext
+  - call-trace with the three-tier launch branches.
+- add headless fallback for nested shell launch [useReq] *(test-ext)*
+  - Probe gnome-shell --help-all for the legacy --nested option before
+  - launching the nested Wayland test session; retain --nested --wayland
+  - when advertised and fall back to gnome-shell --headless on newer GNOME
+  - Shell releases where the option was removed (REQ-031, PRJ-004).
+  - Fix inconsistent gnome-install step label [1/4] to [1/5] so all five
+  - installer steps share one step total (REQ-028).
+  - Add failing-first reproducer tests: launcher headless-fallback
+  - assertions (tests/test_extension_dev_script.py) and step-total
+  - consistency assertions (tests/test_gnome_install_step_labels.py).
+  - Update WORKFLOW.md PROC:test-ext call-trace with the capability probe
+  - and fallback branch; regenerate REFERENCES.md symbol inventory.
+
+### 🚜  Changes
+- BREAKING CHANGE: remove legacy ver flag, CodexBar fallback, ResultCache, and legacy payload shapes [useReq] *(cli)*
+  - Change-ID: LEGACY-REMOVAL-20261107
+  - Drop the --ver alias; --version is the sole version flag and help/README
+  - no longer mention --ver. Remove the ~/.codexbar/config.json legacy token
+  - source from the Copilot credential store, delete the unused legacy
+  - ResultCache module src/aibar/aibar/cache.py, stop tolerating the legacy
+  - Z.ai key payload field in CLI/GNOME rendering, and stop reading the
+  - idle_time alias in the GNOME extension freshness parser.
+  - Update requirements, runtime model, references, and affected tests.
+  - Program behavior for current payloads and flags is unchanged.
+  - Validation: full suite 232 passed with 3 known pre-existing README doc
+  - failures; static-check clean.
+- BREAKING CHANGE: target GNOME 50 and update windowed debug specs and tests [useReq] *(gnome-extension)*
+  - Change-ID: GNOME50-20261107-094842
+  - Declare GNOME 50 metadata and use supported widget APIs.
+  - Launch Ubuntu 26.04 debugging through Mutter Devkit with prerequisite checks.
+  - Update requirements, runtime documentation and isolated regression coverage.
+  - Validation: 99 tests pass; static-check reports no diagnostics.
+  - Live GUI validation is blocked by the missing mutter-dev-bin package.
+- replace snapshots with interactive debug session [useReq] *(test-ext)*
+  - Rewrite SRS section 3.5 into Nested Session Debug Environment (REQ-178..
+  - REQ-182) and rewrite TST-074; screenshot capture requirements removed.
+  - Remove scripts/aibar-observe-nested-session.sh and its test file; no
+  - Screenshot D-Bus capture remains in the debug launch surface.
+  - Add scripts/aibar-nested-debug-session.sh: launches the nested shell in
+  - background inside the dedicated D-Bus session, waits a 3s settle, prints
+  - extension inspection guidance (gnome-extensions info/list, aibar show
+  - --json --force, aibar doctor), then starts an interactive bash debug
+  - shell sharing DBUS_SESSION_BUS_ADDRESS; nested shell terminates when the
+  - debug shell exits or SIGINT/SIGTERM arrives (REQ-178..REQ-182).
+  - scripts/test-gnome-extension.sh routes all three launch branches through
+  - the debug wrapper, preserving MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720.
+  - Replace tests/test_nested_session_observer.py with
+  - tests/test_nested_debug_session.py (TST-074) and update the
+  - launch-contract assertions in tests/test_extension_dev_script.py.
+  - Update WORKFLOW.md PROC:test-ext call-trace with the debug wrapper.
+- add nested session snapshot observer [useReq] *(test-ext)*
+  - Add REQ-178..REQ-182 (new SRS section 3.5 Nested Session Observation) and
+  - TST-074.
+  - New scripts/aibar-observe-nested-session.sh launches the nested shell from
+  - argv inside the nested session bus, traps SIGINT/SIGTERM, and captures
+  - whole-screen PNG snapshots via org.gnome.Shell.Screenshot.Screenshot to
+  - ~/.cache/aibar/nested-shell/nested-shell-snapshot.png (3s settle, 5s
+  - interval, env-overridable).
+  - scripts/test-gnome-extension.sh routes all three launch branches (legacy
+  - --nested, --headless --virtual-monitor=1280x720, plain --headless) through
+  - the observer, preserving MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720.
+  - Add tests/test_nested_session_observer.py (TST-074) and update the
+  - launch-contract assertions in tests/test_extension_dev_script.py.
+  - Update WORKFLOW.md PROC:test-ext call-trace with the observation wrapper.
+
+### 📚  Documentation
+- Update TODO.md file.
+
 ## [0.55.0](https://github.com/Ogekuri/AIBar/compare/v0.54.0..v0.55.0) - 2026-11-05
 ### 🚜  Changes
 - gate PyPI publish on master and build releases for develop tags [useReq] *(release)*
@@ -1471,6 +1595,7 @@
 - \[0.53.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.53.0
 - \[0.54.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.54.0
 - \[0.55.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.55.0
+- \[0.56.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.56.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1527,3 +1652,4 @@
 [0.53.0]: https://github.com/Ogekuri/AIBar/compare/v0.52.0..v0.53.0
 [0.54.0]: https://github.com/Ogekuri/AIBar/compare/v0.53.0..v0.54.0
 [0.55.0]: https://github.com/Ogekuri/AIBar/compare/v0.54.0..v0.55.0
+[0.56.0]: https://github.com/Ogekuri/AIBar/compare/v0.55.0..v0.56.0
