@@ -8,7 +8,11 @@
 # shell. On normal debug-shell exit the nested shell is terminated and the debug
 # status is propagated. On SIGINT/SIGTERM the wrapper SIGKILLs every background job
 # (debug shell and nested shell) and exits immediately, so control returns to the
-# invoking terminal instead of a residual intermediate shell. The debug shell runs
+# invoking terminal instead of a residual intermediate shell. When the nested
+# GNOME Shell exits first (Devkit window closed via its X button), the wrapper
+# reaps the first terminated job with `wait -n`, SIGKILLs the still-running
+# debug shell, and exits with the nested-shell status so no interactive shell
+# outlives the session. The debug shell runs
 # in background with job control disabled (`+m`) so it stays in the wrapper's
 # foreground process group and keyboard interrupts reach the wrapper for
 # whole-session termination. Because bash assigns /dev/null as stdin to
@@ -20,7 +24,7 @@
 # Time O(1) orchestration; space O(1); mutates child processes only.
 # @param[in] ... GNOME Shell command with arguments to launch as the nested shell.
 # @env AIBAR_NESTED_SETTLE_SECONDS Delay before the debug shell starts (default: 3).
-# @return Exit status of the interactive debug shell on normal completion; 130 after SIGINT; 143 after SIGTERM.
+# @return Exit status of the first terminated session job: debug-shell status on normal debug exit; nested-shell status when the Devkit window closes; 130 after SIGINT; 143 after SIGTERM.
 # @retval 130 Session terminated by SIGINT (debug shell and nested shell killed).
 # @retval 143 Session terminated by SIGTERM (debug shell and nested shell killed).
 # @satisfies REQ-178, REQ-179, REQ-180, REQ-181, REQ-182
@@ -68,11 +72,18 @@ echo "[INFO] Type 'exit' or press Ctrl+D or Ctrl+C to stop the nested debug sess
 exec 3<&0
 bash --noprofile --norc -i +m <&3 &
 debug_pid=$!
-wait "$debug_pid"
-debug_status=$?
-debug_pid=""
+
+wait -n
+reaped_status=$?
 
 exec 3<&-
+
+if kill -0 "$debug_pid" 2>/dev/null && ! kill -0 "$shell_pid" 2>/dev/null; then
+    kill -KILL "$debug_pid" 2>/dev/null || true
+    wait "$debug_pid" 2>/dev/null || true
+fi
+
+debug_pid=""
 cleanup
 trap - INT TERM EXIT
-exit "$debug_status"
+exit "$reaped_status"

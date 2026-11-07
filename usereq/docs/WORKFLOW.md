@@ -66,6 +66,7 @@
   - Launches `gnome-shell --devkit --wayland` through the dedicated D-Bus debug wrapper; Devkit creates the visible window.
   - Preserves `MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720`; Devkit manages its own viewport dimensions independently.
   - On SIGINT/SIGTERM the debug wrapper SIGKILLs the debug shell and nested shell and exits 130/143 without leaving a residual interactive shell, returning control to the invoking terminal.
+  - When the Devkit window is closed (nested shell exits first), the wrapper reaps the first terminated job, SIGKILLs the still-running debug shell, and exits with the nested-shell status so no interactive shell outlives the session.
 - `Internal Call-Trace Tree`
   - No internal functions defined under `src/`; orchestration occurs at external process boundaries.
 - `External Boundaries`
@@ -74,7 +75,7 @@
   - `gnome-shell --help-all`: capability probe; unsupported windowed backends exit non-zero.
   - `/usr/libexec/mutter-devkit`: Ubuntu 26.04 executable supplied by `mutter-dev-bin`; missing executable exits before installation.
   - `dbus-run-session -- scripts/aibar-nested-debug-session.sh gnome-shell --devkit --wayland`: private session bus shared by Shell and interactive debug shell.
-  - `scripts/aibar-nested-debug-session.sh`: background Shell launch, settle delay, inspection guidance, background interactive debug shell with job control disabled (`+m`) reading the wrapper stdin through duplicated descriptor 3 (`<&3`) because bash otherwise assigns /dev/null to background-command stdin, nested-shell cleanup on debug-shell exit with status propagation, and whole-session termination (SIGKILL of all background jobs with immediate wrapper exit 130/143) on SIGINT/SIGTERM.
+  - `scripts/aibar-nested-debug-session.sh`: background Shell launch, settle delay, inspection guidance, background interactive debug shell with job control disabled (`+m`) reading the wrapper stdin through duplicated descriptor 3 (`<&3`) because bash otherwise assigns /dev/null to background-command stdin, nested-shell cleanup on debug-shell exit with status propagation, whole-session termination (SIGKILL of all background jobs with immediate wrapper exit 130/143) on SIGINT/SIGTERM, and Devkit-window-close termination (first-job reap via `wait -n`, debug-shell SIGKILL, exit with nested-shell status).
 
 ### PROC:main
 - `Entrypoints`

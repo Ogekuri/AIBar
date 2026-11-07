@@ -98,8 +98,9 @@ def test_wrapper_terminates_nested_shell_on_debug_shell_exit() -> None:
     @satisfies REQ-182
     """
     source = read_debug_wrapper_source()
-    assert "debug_status=$?" in source
-    assert 'exit "$debug_status"' in source
+    assert "reaped_status=$?" in source
+    assert 'exit "$reaped_status"' in source
+    assert "wait -n" in source
 
 
 def test_debug_surface_contains_no_screenshot_logic() -> None:
@@ -171,6 +172,9 @@ def debug_session_env(tmp_path: Path) -> tuple[dict[str, str], Path, Path]:
     _write_executable(
         nested,
         'printf "nested-start\\n" >> "$EVENTS"\n'
+        'if [ -n "${DEBUG_NESTED_EXIT_STATUS:-}" ]; then\n'
+        '    exit "$DEBUG_NESTED_EXIT_STATUS"\n'
+        "fi\n"
         "sleep 30\n"
         'printf "nested-end\\n" >> "$EVENTS"\n',
     )
@@ -290,6 +294,41 @@ def test_sigint_during_debug_shell_terminates_whole_session(
     observed = events.read_text(encoding="utf-8").splitlines()
     assert returncode == 130
     assert observed == ["nested-start", "debug-start"]
+
+
+def test_nested_shell_exit_terminates_debug_shell(
+    debug_session_env: tuple[dict[str, str], Path, Path],
+) -> None:
+    """
+    @brief Verify nested-shell exit terminates the debug shell and wrapper.
+    @details Reproducer for the Devkit window-close defect: closing the debug
+    interface terminates the nested GNOME Shell while the wrapper waits only
+    for the debug shell, so the interactive debug shell survived the session
+    and left a residual `bash-5.3$` prompt. The wrapper must reap either
+    background job first, terminate the survivor when the nested shell exits,
+    and return the nested-shell status. Level 1 subprocess boundaries with a
+    PATH-substituted debug shell that sleeps; bounded polling; no GNOME
+    session or network.
+    expected_output: wrapper exits promptly with the nested status (5); no
+    session-end markers are recorded because the debug shell is killed.
+    @param debug_session_env {tuple} Substitution environment, event log, path.
+    @return {None} Assertions complete.
+    @satisfies REQ-179, REQ-182, TST-074
+    """
+    env, events, nested = debug_session_env
+    proc = _start_wrapper(
+        {**env, "DEBUG_NESTED_EXIT_STATUS": "5"}, nested, settle=1
+    )
+    try:
+        _wait_for_event(events, "nested-start")
+        returncode = proc.wait(timeout=EVENT_TIMEOUT_SECONDS)
+    finally:
+        _stop_wrapper(proc)
+    observed = events.read_text(encoding="utf-8").splitlines()
+    assert returncode == 5
+    assert "nested-start" in observed
+    assert "nested-end" not in observed
+    assert "debug-end" not in observed
 
 
 def test_debug_shell_exit_status_propagates_and_nested_shell_stops(
