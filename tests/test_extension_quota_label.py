@@ -284,9 +284,9 @@ def test_extension_builds_freshness_fallback_from_status_updated_at_when_freshne
 def test_popup_scroll_view_uses_gnome_compatible_child_attachment() -> None:
     """
     @brief Verify popup scroll-view child wiring avoids runtime TypeError on GNOME Shell.
-    @details Asserts `_buildPopupMenu` attaches the provider container through GNOME-compatible
-    API checks (`set_child` preferred; guarded `add_actor` fallback) so extension startup does
-    not crash on runtimes where `St.ScrollView.add_actor` is unavailable.
+    @details Level 0: verifies GNOME 50 set_child attachment; O(N) source scan;
+    no GNOME session mutation.
+    @satisfies REQ-187, TST-075
     @return {None} Function return value.
     @satisfies REQ-017
     @satisfies TST-004
@@ -298,12 +298,8 @@ def test_popup_scroll_view_uses_gnome_compatible_child_attachment() -> None:
         "this._providersScrollView.set_policy(St.PolicyType.NEVER, St.PolicyType.AUTOMATIC);"
         in source
     )
-    assert "if (typeof this._providersScrollView.set_child === 'function')" in source
     assert "this._providersScrollView.set_child(this._providersContainer);" in source
-    assert (
-        "else if (typeof this._providersScrollView.add_actor === 'function')" in source
-    )
-    assert "this._providersScrollView.add_actor(this._providersContainer);" in source
+    assert ".add_actor(" not in source
     assert "providersItem.add_child(this._providersScrollView);" in source
 
 

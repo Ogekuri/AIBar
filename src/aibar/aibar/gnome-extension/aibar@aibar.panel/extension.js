@@ -2,7 +2,8 @@
  * @file extension.js
  * @brief GNOME Shell panel extension for aibar metrics.
  * @details Collects usage JSON from the aibar CLI and renders provider-specific quota/cost cards in the GNOME panel popup.
- * @note Targets GNOME Shell 45–48; uses ES module imports (gi:// and resource://) as required by GNOME Shell 45+.
+ * @note Targets GNOME Shell 50.1+ within major 50; later majors require verification.
+ * @satisfies REQ-183, REQ-184, REQ-187
  */
 
 import GLib from 'gi://GLib';
@@ -759,8 +760,10 @@ class AIBarIndicator extends PanelMenu.Button {
 
     /**
      * @brief Execute build panel button.
-     * @details Applies build panel button logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
-     * @returns {any} Function return value.
+     * @details Creates fixed provider labels in horizontal GNOME 50 box layouts;
+     * mutates indicator actor ownership. Time O(P); space O(P) for P providers.
+     * @return {void} No return value.
+     * @satisfies REQ-187
      */
     _buildPanelButton() {
         this._panelBox = new St.BoxLayout({
@@ -780,7 +783,7 @@ class AIBarIndicator extends PanelMenu.Button {
         });
 
         this._panelPercentages = new St.BoxLayout({
-            vertical: false,
+            orientation: Clutter.Orientation.HORIZONTAL,
             style_class: 'aibar-panel-percentages',
         });
 
@@ -891,14 +894,17 @@ class AIBarIndicator extends PanelMenu.Button {
 
     /**
      * @brief Execute build popup menu.
-     * @details Applies build popup menu logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects, including forced CLI refresh wiring for `Refresh Now` and dynamic provider-viewport height control.
-     * @returns {any} Function return value.
+     * @details Creates oriented GNOME 50 layouts and attaches the provider box
+     * with St.ScrollView.set_child; wires forced refresh and viewport sizing.
+     * Mutates menu actors and signal registrations. Time O(1); space O(1).
+     * @return {void} No return value.
+     * @satisfies REQ-187
      * @satisfies REQ-119
      * @satisfies REQ-120
      */
     _buildPopupMenu() {
         let headerBox = new St.BoxLayout({
-            vertical: false,
+            orientation: Clutter.Orientation.HORIZONTAL,
             style_class: 'aibar-header',
         });
 
@@ -921,7 +927,7 @@ class AIBarIndicator extends PanelMenu.Button {
         this.menu.addMenuItem(headerItem);
 
         this._tabBar = new St.BoxLayout({
-            vertical: false,
+            orientation: Clutter.Orientation.HORIZONTAL,
             style_class: 'aibar-tab-bar',
         });
 
@@ -934,7 +940,7 @@ class AIBarIndicator extends PanelMenu.Button {
         this.menu.addMenuItem(separator1);
 
         this._providersContainer = new St.BoxLayout({
-            vertical: true,
+            orientation: Clutter.Orientation.VERTICAL,
             x_expand: true,
             style_class: 'aibar-providers',
         });
@@ -944,12 +950,7 @@ class AIBarIndicator extends PanelMenu.Button {
             style_class: 'aibar-providers-scroll',
         });
         this._providersScrollView.set_policy(St.PolicyType.NEVER, St.PolicyType.AUTOMATIC);
-        if (typeof this._providersScrollView.set_child === 'function')
-            this._providersScrollView.set_child(this._providersContainer);
-        else if (typeof this._providersScrollView.add_actor === 'function')
-            this._providersScrollView.add_actor(this._providersContainer);
-        else
-            throw new Error('St.ScrollView child attachment API unavailable');
+        this._providersScrollView.set_child(this._providersContainer);
 
         let providersItem = new PopupMenu.PopupBaseMenuItem({reactive: false});
         providersItem.add_child(this._providersScrollView);
@@ -1151,13 +1152,15 @@ class AIBarIndicator extends PanelMenu.Button {
 
     /**
      * @brief Execute create provider card.
-     * @details Applies create provider card logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
-     * @param {any} providerName Input parameter `providerName`.
-     * @returns {any} Function return value.
+     * @details Allocates GNOME 50 oriented card, quota and statistics layouts;
+     * attaches actors to the card container. Time O(Q); space O(Q) for Q quotas.
+     * @param {string} providerName Canonical provider identifier.
+     * @return {Object<string, any>} Card actors and quota-bar references.
+     * @satisfies REQ-187
      */
     _createProviderCard(providerName) {
         let container = new St.BoxLayout({
-            vertical: true,
+            orientation: Clutter.Orientation.VERTICAL,
             x_expand: true,
             style_class: `aibar-card aibar-provider-${providerName}`,
         });
@@ -1169,7 +1172,7 @@ class AIBarIndicator extends PanelMenu.Button {
         container.add_child(header);
 
         let progressContainer = new St.BoxLayout({
-            vertical: false,
+            orientation: Clutter.Orientation.HORIZONTAL,
             x_expand: true,
             style_class: 'aibar-progress-row',
         });
@@ -1194,15 +1197,23 @@ class AIBarIndicator extends PanelMenu.Button {
 
         container.add_child(progressContainer);
 
+        /**
+         * @brief Allocate one quota bar with a vertical reset-label container.
+         * @details Uses Clutter.Orientation; allocates actors without I/O.
+         * Time O(1); space O(1).
+         * @param {string} labelText Quota window label.
+         * @return {Object<string, any>} Container, row, fill and label actors.
+         * @satisfies REQ-187
+         */
         const createWindowBar = (labelText) => {
             let barContainer = new St.BoxLayout({
-                vertical: true,
+                orientation: Clutter.Orientation.VERTICAL,
                 x_expand: true,
                 style_class: 'aibar-window-bar',
             });
 
             let row = new St.BoxLayout({
-                vertical: false,
+                orientation: Clutter.Orientation.HORIZONTAL,
                 x_expand: true,
                 style_class: 'aibar-window-row',
             });
@@ -1243,7 +1254,7 @@ class AIBarIndicator extends PanelMenu.Button {
         };
 
         let windowBars = new St.BoxLayout({
-            vertical: true,
+            orientation: Clutter.Orientation.VERTICAL,
             x_expand: true,
             style_class: 'aibar-window-bars',
         });
@@ -1275,7 +1286,7 @@ class AIBarIndicator extends PanelMenu.Button {
         container.add_child(windowBars);
 
         let statsGrid = new St.BoxLayout({
-            vertical: true,
+            orientation: Clutter.Orientation.VERTICAL,
             style_class: 'aibar-stats',
         });
 
@@ -1302,7 +1313,7 @@ class AIBarIndicator extends PanelMenu.Button {
         container.add_child(statsGrid);
 
         let updateAtRow = new St.BoxLayout({
-            vertical: false,
+            orientation: Clutter.Orientation.HORIZONTAL,
             x_expand: true,
             x_align: Clutter.ActorAlign.END,
             style_class: 'aibar-update-at-row',

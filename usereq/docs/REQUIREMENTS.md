@@ -310,6 +310,12 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-181**: `scripts/aibar-nested-debug-session.sh` MUST print extension inspection guidance commands before starting the interactive debug shell.
 - **REQ-182**: `scripts/aibar-nested-debug-session.sh` MUST terminate the nested shell when the interactive debug shell exits.
 
+- **REQ-183**: MUST support GNOME Shell 50.1 and subsequent 50.x releases with extension enable, refresh, popup rendering, and disable behavior preserved.
+- **REQ-184**: MUST declare GNOME major version `50` in extension metadata and add subsequent major versions after compatibility verification.
+- **REQ-185**: MUST launch `scripts/test-gnome-extension.sh` on Ubuntu 26.04 as a visible nested GNOME session using the advertised windowed backend.
+- **REQ-186**: MUST report missing graphical-session prerequisites or windowed-backend capabilities with a non-zero exit before extension installation.
+- **REQ-187**: MUST use GNOME 50-supported widget orientation and child-attachment APIs throughout extension UI construction.
+
 ## 4. Test Requirements
 
 Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HDT principles: deterministic, isolated, and behavior-focused.
@@ -383,6 +389,9 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-072**: MUST verify default `--upgrade` executes the PyPI lifecycle command and `--upgrade` with `--github` executes the GitHub lifecycle command.
 - **TST-073**: MUST verify `.github/workflows/release-pypi.yml` gates `publish-pypi` on the `master` branch output and runs `build-release` for version tags on `master` or `develop`.
 - **TST-074**: MUST verify `scripts/aibar-nested-debug-session.sh` launches argv in background, traps SIGINT/SIGTERM, starts an interactive debug shell after the settle delay, prints extension inspection guidance, and that `scripts/test-gnome-extension.sh` routes all launch branches through the wrapper preserving `MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720` without screenshot capture logic.
+
+- **TST-075**: MUST verify GNOME 50 metadata and extension UI construction, refresh, and teardown using GNOME 50 API contracts.
+- **TST-076**: MUST verify windowed-session launch arguments, installation ordering, the `MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720` environment, shared debug-session bus, and non-zero prerequisite failures using isolated subprocess substitutes.
 
 ## 5. Evidence
 

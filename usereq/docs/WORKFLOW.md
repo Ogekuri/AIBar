@@ -59,33 +59,21 @@
 
 ### PROC:test-ext
 - `Entrypoints`
-  - main script body: direct execution [`scripts/test-gnome-extension.sh`]
+  - External entrypoint: script body [`scripts/test-gnome-extension.sh`].
 - `Lifecycle/Trigger`
-  - Starts when user invokes `scripts/test-gnome-extension.sh` (no arguments required).
-  - Synchronizes the installed extension through `scripts/aibar.sh gnome-install`, then launches a nested Wayland GNOME Shell debug session at `1280x720` through the interactive debug wrapper.
+  - Parameterless invocation validates graphical-session variables, GNOME Shell, D-Bus, Ubuntu Devkit executable and advertised `--devkit` capability before installation.
+  - Synchronizes the installed extension through `scripts/aibar.sh gnome-install`; propagates installation failure without starting a session.
+  - Launches `gnome-shell --devkit --wayland` through the dedicated D-Bus debug wrapper; Devkit creates the visible window.
+  - Preserves `MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720`; Devkit manages its own viewport dimensions independently.
 - `Internal Call-Trace Tree`
-  - main script body: direct execution [`scripts/test-gnome-extension.sh`]
-    - path resolution block: derive `full_path`, `script_dir`, and `project_root` [`scripts/test-gnome-extension.sh`]
-    - project-root switch: `cd "$project_root"` [`scripts/test-gnome-extension.sh`]
-    - extension sync step: `scripts/aibar.sh gnome-install` [`scripts/test-gnome-extension.sh`]
-      - External boundary: subprocess launch of repository launcher (`PROC:aibar-launcher`).
-    - nested-shell capability probe: `gnome-shell --help-all` probed for the legacy `--nested` option and then for `--virtual-monitor` [`scripts/test-gnome-extension.sh`]
-    - nested shell launch (legacy branch, `--nested` advertised): `MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720 dbus-run-session -- scripts/aibar-nested-debug-session.sh gnome-shell --nested --wayland` [`scripts/test-gnome-extension.sh`]
-      - debug wrapper: launch argv as nested shell in background, trap SIGINT/SIGTERM, settle delay, print extension inspection guidance, start interactive debug shell on the nested session bus [`scripts/aibar-nested-debug-session.sh`]
-        - External boundary: interactive `bash -i` debug shell sharing `DBUS_SESSION_BUS_ADDRESS` with the nested shell.
-      - External boundary: `dbus-run-session -- scripts/aibar-nested-debug-session.sh gnome-shell --nested --wayland`.
-    - nested shell launch (virtual-monitor fallback, `--virtual-monitor` advertised): `MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720 dbus-run-session -- scripts/aibar-nested-debug-session.sh gnome-shell --headless --virtual-monitor=1280x720` [`scripts/test-gnome-extension.sh`]
-      - debug wrapper: launch argv as nested shell in background, trap SIGINT/SIGTERM, settle delay, print extension inspection guidance, start interactive debug shell on the nested session bus [`scripts/aibar-nested-debug-session.sh`]
-        - External boundary: interactive `bash -i` debug shell sharing `DBUS_SESSION_BUS_ADDRESS` with the nested shell.
-      - External boundary: `dbus-run-session -- scripts/aibar-nested-debug-session.sh gnome-shell --headless --virtual-monitor=1280x720`.
-    - nested shell launch (plain-headless fallback, `--virtual-monitor` unavailable): informational notice plus `MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720 dbus-run-session -- scripts/aibar-nested-debug-session.sh gnome-shell --headless` [`scripts/test-gnome-extension.sh`]
-      - debug wrapper: launch argv as nested shell in background, trap SIGINT/SIGTERM, settle delay, print extension inspection guidance, start interactive debug shell on the nested session bus [`scripts/aibar-nested-debug-session.sh`]
-        - External boundary: interactive `bash -i` debug shell sharing `DBUS_SESSION_BUS_ADDRESS` with the nested shell.
-      - External boundary: `dbus-run-session -- scripts/aibar-nested-debug-session.sh gnome-shell --headless`.
+  - No internal functions defined under `src/`; orchestration occurs at external process boundaries.
 - `External Boundaries`
-  - `scripts/aibar.sh` subprocess delegation for extension synchronization.
-  - `dbus-run-session` and `gnome-shell` for nested shell (legacy `--nested --wayland`, `--headless --virtual-monitor=1280x720`, or plain `--headless` fallback selected by capability probe).
-  - `scripts/aibar-nested-debug-session.sh` interactive debug wrapper starting a `bash -i` debug shell on the nested session bus and terminating the nested shell on debug-shell exit.
+  - Declaration: `scripts/test-gnome-extension.sh`.
+  - `scripts/aibar.sh`: extension installation subprocess.
+  - `gnome-shell --help-all`: capability probe; unsupported windowed backends exit non-zero.
+  - `/usr/libexec/mutter-devkit`: Ubuntu 26.04 executable supplied by `mutter-dev-bin`; missing executable exits before installation.
+  - `dbus-run-session -- scripts/aibar-nested-debug-session.sh gnome-shell --devkit --wayland`: private session bus shared by Shell and interactive debug shell.
+  - `scripts/aibar-nested-debug-session.sh`: background Shell launch, settle delay, inspection guidance and cleanup on interactive-shell exit.
 
 ### PROC:main
 - `Entrypoints`
@@ -332,7 +320,7 @@
   - `AIBarExtension.enable(...)`: extension activation [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
   - `AIBarExtension.disable(...)`: extension deactivation [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
 - `Lifecycle/Trigger`
-  - Starts in GNOME Shell extension host process.
+  - Starts in GNOME Shell 50.1+ within major 50; metadata declares major 50 and later major versions require compatibility verification.
   - On enable, constructs panel indicator, performs immediate refresh, and schedules periodic refresh timer.
   - On disable, destroys indicator and removes timer source.
 - `Internal Call-Trace Tree`
@@ -340,7 +328,7 @@
     - `AIBarIndicator._init(...)`: indicator runtime bootstrap with panel title `AIBar Monitor` [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
       - provider-order initialization: `_providerOrder = ['agy', 'openrouter', 'copilot', 'codex', 'openai', 'geminiai', 'zai']` plus `_enabledProviders` default map for deterministic tab/card sorting and enable-state gating [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
       - `AIBarIndicator._buildPanelButton(...)`: panel icon/status-label setup with canonical ordered percentage+cost labels (AGY 5h, AGY 7d, OpenRouter cost, Copilot 30d, Copilot cost, Codex 5h, Codex 7d, Codex cost, OpenAI cost, GeminiAI cost, Z.ai `5h` quota percentage (non-bold), Z.ai `1w` quota percentage (bold)) so visible status tokens preserve provider order when disabled providers are hidden [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
-      - `AIBarIndicator._buildPopupMenu(...)`: popup structure and actions setup including tab container scaffold, provider-card `St.ScrollView` guarded child attachment (`set_child` preferred, `add_actor` fallback), content-driven viewport sizing up to fixed maximum height, and `Refresh Now` forced-refresh action wiring [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+      - `AIBarIndicator._buildPopupMenu(...)`: popup structure and actions setup including tab container scaffold, GNOME 50 `Clutter.Orientation` layouts and provider-card `St.ScrollView.set_child` attachment, content-driven viewport sizing up to fixed maximum height, and `Refresh Now` forced-refresh action wiring [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
         - `AIBarIndicator._refreshData(...)`: refresh action handler with forced CLI path (`aibar show --json --force`) for popup `Refresh Now` [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
         - `_resetMenuItemFocusVisualState(...)`: remove `focus` and `active` pseudo classes from `Refresh Now` menu item on activation and key-focus-out so the button color returns to base state after focus loss [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
         - `AIBarIndicator._openTerminalWithCommand(...)`: terminal report-launch action handler [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
@@ -357,7 +345,7 @@
             - `AIBarIndicator._createTab(...)`: provider tab creation [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
               - `_getProviderDisplayName(...)`: provider label resolver with GeminiAI uppercase override (`GEMINIAI`) [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
             - `AIBarIndicator._updateProviderCard(...)`: card lifecycle update with optional window status entry argument [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
-              - `AIBarIndicator._createProviderCard(...)`: card widget graph creation including bottom-right `updateAtLabel` row with expanding right-aligned layout (`x_expand` + `Clutter.ActorAlign.END`), `aibar-reset-label` font/color parity, per-bar over-limit marker/segment actors attached to progress backgrounds, and per-quota window bars (Z.ai: `5h`, `1w`, `1m`; AGY: `G 7d`, `G 5h`, `CG 7d`, `CG 5h`, `A 7d`) replacing the Codex `5h`/`7d` dual-window bars [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
+              - `AIBarIndicator._createProviderCard(...)`: card widget graph creation using GNOME 50 `Clutter.Orientation` for vertical containers and horizontal rows, including bottom-right `updateAtLabel` row with expanding right-aligned layout (`x_expand` + `Clutter.ActorAlign.END`), `aibar-reset-label` font/color parity, per-bar over-limit marker/segment actors attached to progress backgrounds, and per-quota window bars (Z.ai: `5h`, `1w`, `1m`; AGY: `G 7d`, `G 5h`, `CG 7d`, `CG 5h`, `A 7d`) replacing the Codex `5h`/`7d` dual-window bars [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
                 - `_getProviderDisplayName(...)`: provider header label resolver with GeminiAI uppercase override (`GEMINIAI`) [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
                 - `_attachOverLimitActors(...)`: attach bright-neutral 100%-boundary marker and opaque neutral over-limit fill actors for shared geometry updates [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
               - `AIBarIndicator._populateProviderCard(...)`: metrics-to-widget projection with cache-status error precedence (`statusEntry.error` over payload `data.error`); failed states render `Status: FAIL` + `Reason: <message>` and keep bottom-right `Updated/Next` freshness row while hiding usage/reset/quota/cost rows and percentage bars; Z.ai success states render one per-quota progress bar with its `Reset in: <duration>` label from `raw.zai_quotas` (reusing the shared window-bar geometry) and hide cost/counter rows; AGY success states render one per-quota progress bar per `raw.agy_quotas` entry with labels `G 7d`, `G 5h`, `CG 7d`, `CG 5h`, `A 7d` (reusing the shared window-bar geometry, without reset labels); other successful states render provider metrics with existing card rules, preserving dual-window side labels (`5h`, `7d`) for Codex bars, keeping single-window bars only for `copilot/openrouter`, rendering `openai/geminiai` usage as text-only `Usage: <window> <percent>%`, rendering Copilot `Cost: <currency><value>` from `metrics.cost` with fallback overage computed from `remaining` semantics, hiding OpenRouter `requests`/`tokens` labels (the key API exposes no request/token counters) and rendering an OpenRouter `Total cost: <currency><total_cost>` label from `metrics.total_cost` in the removed counters position, and updating cost/counter/reset rows [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
@@ -376,7 +364,7 @@
     - `AIBarIndicator.destroy(...)`: timer teardown + parent destroy [`src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`]
 - `External Boundaries`
   - GNOME Shell extensions API (`Extension` base class providing `uuid`, `metadata`, `dir`).
-  - GNOME Shell UI/runtime APIs (`Main`, `PanelMenu`, `PopupMenu`, `St`, `GLib`, `Gio`, `Clutter`, `GObject`) accessed via ES module imports (`gi://` and `resource://` schemes; GNOME Shell 45+ only).
+  - GNOME Shell UI/runtime APIs (`Main`, `PanelMenu`, `PopupMenu`, `St`, `GLib`, `Gio`, `Clutter`, `GObject`) accessed via ES module imports (`gi://` and `resource://` schemes; GNOME Shell 50 target).
   - Subprocess creation and asynchronous stdio communication.
   - Terminal emulator process launch.
 
@@ -417,7 +405,7 @@
   - `direction: launch-trigger`
   - `mechanism: subprocess spawn`
   - `endpoint_or_channel: argv [scripts/aibar.sh, gnome-install]`
-  - `payload_data_shape: forwarded extension-install command tokens`
+  - `payload_data_shape: extension-install command tokens after successful graphical-session and Devkit prerequisite checks`
   - `declaration_files: scripts/test-gnome-extension.sh, scripts/aibar.sh`
 
 - `id: EDGE-001`
