@@ -1,7 +1,16 @@
 # Changelog
 
-## [0.56.1](https://github.com/Ogekuri/AIBar/compare/v0.56.0..v0.56.1) - 2026-11-07
+## [0.56.2](https://github.com/Ogekuri/AIBar/compare/v0.56.0..v0.56.2) - 2026-11-07
 ### 🚜  Changes
+- pin --upgrade --develop install to latest GitHub release tag [useReq] *(cli)*
+  - Resolve --develop/--dev upgrade source by fetching tag_name from the
+  - GitHub releases API and execute uv tool install --force
+  - git+https://github.com/Ogekuri/AIBar@<tag_name> (REQ-189, REQ-177).
+  - Exit non-zero with a bright-red diagnostic and without executing uv
+  - tool install when the latest release tag cannot be resolved (REQ-190).
+  - Update CTN-015 GitHub lifecycle command and TST-072; add TST-078 and
+  - TST-079 coverage requirements; sync WORKFLOW.md call-trace and
+  - regenerate REFERENCES.md.
 - BREAKING CHANGE: rename --github to --develop and add --dev equivalent alias [useReq] *(cli)*
   - Rename the upgrade-source flag from --github to --develop and add --dev
   - as an equivalent alias (REQ-176), both selecting the GitHub package
@@ -1609,7 +1618,7 @@
 - \[0.54.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.54.0
 - \[0.55.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.55.0
 - \[0.56.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.56.0
-- \[0.56.1\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.56.1
+- \[0.56.2\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.56.2
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1667,4 +1676,4 @@
 [0.54.0]: https://github.com/Ogekuri/AIBar/compare/v0.53.0..v0.54.0
 [0.55.0]: https://github.com/Ogekuri/AIBar/compare/v0.54.0..v0.55.0
 [0.56.0]: https://github.com/Ogekuri/AIBar/compare/v0.55.0..v0.56.0
-[0.56.1]: https://github.com/Ogekuri/AIBar/compare/v0.56.0..v0.56.1
+[0.56.2]: https://github.com/Ogekuri/AIBar/compare/v0.56.0..v0.56.2
