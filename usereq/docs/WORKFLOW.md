@@ -65,6 +65,7 @@
   - Synchronizes the installed extension through `scripts/aibar.sh gnome-install`; propagates installation failure without starting a session.
   - Launches `gnome-shell --devkit --wayland` through the dedicated D-Bus debug wrapper; Devkit creates the visible window.
   - Preserves `MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720`; Devkit manages its own viewport dimensions independently.
+  - On SIGINT/SIGTERM the debug wrapper SIGKILLs the debug shell and nested shell and exits 130/143 without leaving a residual interactive shell, returning control to the invoking terminal.
 - `Internal Call-Trace Tree`
   - No internal functions defined under `src/`; orchestration occurs at external process boundaries.
 - `External Boundaries`
@@ -73,7 +74,7 @@
   - `gnome-shell --help-all`: capability probe; unsupported windowed backends exit non-zero.
   - `/usr/libexec/mutter-devkit`: Ubuntu 26.04 executable supplied by `mutter-dev-bin`; missing executable exits before installation.
   - `dbus-run-session -- scripts/aibar-nested-debug-session.sh gnome-shell --devkit --wayland`: private session bus shared by Shell and interactive debug shell.
-  - `scripts/aibar-nested-debug-session.sh`: background Shell launch, settle delay, inspection guidance and cleanup on interactive-shell exit.
+  - `scripts/aibar-nested-debug-session.sh`: background Shell launch, settle delay, inspection guidance, background interactive debug shell with job control disabled (`+m`), nested-shell cleanup on debug-shell exit with status propagation, and whole-session termination (SIGKILL of all background jobs with immediate wrapper exit 130/143) on SIGINT/SIGTERM.
 
 ### PROC:main
 - `Entrypoints`

@@ -5,10 +5,19 @@
 # the dedicated D-Bus session created by `dbus-run-session`, waits a startup settle
 # delay, prints extension inspection guidance, then starts an interactive debug
 # shell sharing `DBUS_SESSION_BUS_ADDRESS` so inspection commands target the nested
-# shell. When the debug shell exits or SIGINT/SIGTERM arrives, the nested shell and
-# the dedicated session are terminated. No screenshots are captured.
+# shell. On normal debug-shell exit the nested shell is terminated and the debug
+# status is propagated. On SIGINT/SIGTERM the wrapper SIGKILLs every background job
+# (debug shell and nested shell) and exits immediately, so control returns to the
+# invoking terminal instead of a residual intermediate shell. The debug shell runs
+# in background with job control disabled (`+m`) so it stays in the wrapper's
+# foreground process group and keyboard interrupts reach the wrapper for
+# whole-session termination. No screenshots are captured.
+# Time O(1) orchestration; space O(1); mutates child processes only.
 # @param[in] ... GNOME Shell command with arguments to launch as the nested shell.
 # @env AIBAR_NESTED_SETTLE_SECONDS Delay before the debug shell starts (default: 3).
+# @return Exit status of the interactive debug shell on normal completion; 130 after SIGINT; 143 after SIGTERM.
+# @retval 130 Session terminated by SIGINT (debug shell and nested shell killed).
+# @retval 143 Session terminated by SIGTERM (debug shell and nested shell killed).
 # @satisfies REQ-178, REQ-179, REQ-180, REQ-181, REQ-182
 
 set -u
@@ -27,7 +36,19 @@ cleanup() {
     kill "$shell_pid" 2>/dev/null || true
     wait "$shell_pid" 2>/dev/null || true
 }
-trap cleanup INT TERM EXIT
+
+terminate_session() {
+    trap - INT TERM
+    for job_pid in $(jobs -p); do
+        kill -KILL "$job_pid" 2>/dev/null || true
+    done
+    wait 2>/dev/null || true
+    exit "$1"
+}
+
+trap 'terminate_session 130' INT
+trap 'terminate_session 143' TERM
+trap cleanup EXIT
 
 sleep "$SETTLE_SECONDS"
 
@@ -37,10 +58,13 @@ echo "  gnome-extensions info aibar@aibar.panel"
 echo "  gnome-extensions list --enabled"
 echo "  aibar show --json --force"
 echo "  aibar doctor"
-echo "[INFO] Type 'exit' or press Ctrl+D to stop the nested debug session."
+echo "[INFO] Type 'exit' or press Ctrl+D or Ctrl+C to stop the nested debug session."
 
-bash --noprofile --norc -i
+bash --noprofile --norc -i +m &
+debug_pid=$!
+wait "$debug_pid"
 debug_status=$?
+debug_pid=""
 
 cleanup
 trap - INT TERM EXIT
