@@ -400,6 +400,51 @@ def test_version_prints_installed_version_without_dispatch(
         assert "Latest GitHub release: 9.9.9" in result.output
 
 
+def test_ver_alias_prints_installed_version_without_dispatch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    @brief Verify `--ver` behaves as an exact alias of `--version`.
+    @details Replaces both release fetch boundaries with deterministic responses,
+    invokes `--ver` standalone and before a subcommand, and asserts output and
+    exit status equal the `--version` invocation: installed version first,
+    labeled PyPI/GitHub release lines, zero exit, and dispatch bypass.
+    expected_output: `--ver` output identical to `--version` output for both
+    standalone and pre-subcommand invocations.
+    @param monkeypatch {pytest.MonkeyPatch} Pytest monkeypatch fixture.
+    @return {None} Function return value.
+    @satisfies TST-077
+    @satisfies REQ-188
+    """
+    def _fake_fetch() -> cli_module.StartupReleaseCheckResponse:
+        """
+        @brief Return deterministic successful release-check response.
+        @return {StartupReleaseCheckResponse} Mock success response.
+        """
+        return cli_module.StartupReleaseCheckResponse(
+            latest_version="9.9.9",
+            status_code=200,
+            error_message=None,
+            retry_after_seconds=0,
+        )
+
+    monkeypatch.setattr(cli_module, "_fetch_startup_latest_release", _fake_fetch)
+    monkeypatch.setattr(cli_module, "_fetch_github_latest_release", _fake_fetch)
+    monkeypatch.setattr(cli_module, "_LAST_PYPI_RELEASE_CHECK", None)
+
+    runner = CliRunner()
+    version_result = runner.invoke(main, ["--version"])
+    ver_result = runner.invoke(main, ["--ver"])
+    ver_bypass_result = runner.invoke(main, ["--ver", "show"])
+
+    assert ver_result.exit_code == 0
+    assert ver_bypass_result.exit_code == 0
+    assert ver_result.output == version_result.output
+    assert ver_bypass_result.output.splitlines()[0] == __version__
+    assert "Latest PyPI release: 9.9.9" in ver_bypass_result.output
+    assert "Latest GitHub release: 9.9.9" in ver_bypass_result.output
+
+
 def test_version_flags_force_startup_online_check_bypassing_idle_gate(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

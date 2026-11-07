@@ -314,6 +314,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-185**: MUST launch `scripts/test-gnome-extension.sh` on Ubuntu 26.04 as a visible nested GNOME session using the advertised windowed backend.
 - **REQ-186**: MUST report missing graphical-session prerequisites or windowed-backend capabilities with a non-zero exit before extension installation.
 - **REQ-187**: MUST use GNOME 50-supported widget orientation and child-attachment APIs throughout extension UI construction.
+- **REQ-188**: MUST accept global flag `--ver` as an exact alias of `--version`, producing identical version output, release report, pre-dispatch exit, and startup idle-gate bypass.
 
 ## 4. Test Requirements
 
@@ -391,6 +392,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 
 - **TST-075**: MUST verify GNOME 50 metadata and extension UI construction, refresh, and teardown using GNOME 50 API contracts.
 - **TST-076**: MUST verify windowed-session launch arguments, installation ordering, the `MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720` environment, shared debug-session bus, and non-zero prerequisite failures using isolated subprocess substitutes.
+- **TST-077**: MUST verify `--ver` prints installed version plus labeled latest PyPI and GitHub release lines, bypasses subcommand execution, and forces one online startup release check bypassing the idle gate.
 
 ## 5. Evidence
 
@@ -596,3 +598,5 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | TST-072 | `tests/test_cli_startup_update_preflight.py` + default `--upgrade` lifecycle argv assertions cover the PyPI branch; GitHub-branch assertions pending (test file not modified by change workflow). |
 | PRJ-019 | `.github/workflows/release-pypi.yml` + `check-branch` step `Resolve tagged release branch` sets `is_master=false` with `is_release_branch=true` for develop-only tags, so `build-release` runs while `publish-pypi` is skipped. |
 | TST-073 | `tests/test_release_pypi_workflow.py` + static workflow assertions for the `master`-gated publish job; develop-branch gate assertions pending (test file not modified by change workflow). |
+| REQ-188 | `src/aibar/aibar/cli.py` + group option declaration `["--version", "--ver", "show_version"]` and `_startup_force_ignore_idle_from_args` token set `{"--version", "--ver"}` driving identical version output and idle-gate bypass. |
+| TST-077 | `tests/test_cli_startup_update_preflight.py` + `test_ver_alias_prints_installed_version_without_dispatch` asserting `--ver` output equals `--version` output with labeled PyPI/GitHub release lines and dispatch bypass. |

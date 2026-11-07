@@ -85,13 +85,13 @@
 - `Lifecycle/Trigger`
   - Starts when `aibar` is invoked by a user shell, by launcher delegation from `PROC:aibar-launcher`, or by subprocess spawn from `PROC:gnome-shell`.
   - Executes startup update preflight before CLI argument validation and command dispatch.
-  - Executes one command route (`show`, `doctor`, `env`, `setup`, `login`, `gnome-install`, `gnome-uninstall`) or exits early via lifecycle flags (`--version`, `--upgrade` optionally combined with `--github`, `--uninstall`, `--enable-log`, `--disable-log`, `--enable-debug`, `--disable-debug`) with Linux-only subprocess execution and non-Linux manual guidance.
+  - Executes one command route (`show`, `doctor`, `env`, `setup`, `login`, `gnome-install`, `gnome-uninstall`) or exits early via lifecycle flags (`--version`/`--ver`, `--upgrade` optionally combined with `--github`, `--uninstall`, `--enable-log`, `--disable-log`, `--enable-debug`, `--disable-debug`) with Linux-only subprocess execution and non-Linux manual guidance.
   - Exits after command completion.
 - `Internal Call-Trace Tree`
   - `StartupPreflightGroup.main(...)`: startup preflight wrapper around Click parser/dispatcher with execution start/end logging [`src/aibar/aibar/cli.py`]
     - `append_runtime_log_line(...)`: append execution-start and execution-end rows in runtime log [`src/aibar/aibar/config.py`]
-    - `_startup_force_ignore_idle_from_args(...)`: detect `--version` invocations that force one online startup check bypassing persisted startup idle gate [`src/aibar/aibar/cli.py`]
-    - `_run_startup_update_preflight(...)`: startup release-check idle gate and diagnostics pipeline with per-invocation idle-gate bypass for `--version`; caches the fetch response in module state `_LAST_PYPI_RELEASE_CHECK` for `--version` reporting [`src/aibar/aibar/cli.py`]
+    - `_startup_force_ignore_idle_from_args(...)`: detect `--version`/`--ver` invocations that force one online startup check bypassing persisted startup idle gate [`src/aibar/aibar/cli.py`]
+    - `_run_startup_update_preflight(...)`: startup release-check idle gate and diagnostics pipeline with per-invocation idle-gate bypass for `--version`/`--ver`; caches the fetch response in module state `_LAST_PYPI_RELEASE_CHECK` for `--version` reporting [`src/aibar/aibar/cli.py`]
       - `_load_startup_idle_state(...)`: load startup idle-state JSON from `~/.cache/aibar/check_version_idle-time.json` [`src/aibar/aibar/cli.py`]
       - `_startup_idle_epochs(...)`: normalize `last_success_at_epoch` and `idle_until_epoch` from startup idle-state payload [`src/aibar/aibar/cli.py`]
       - `_fetch_startup_latest_release(...)`: fetch and normalize latest PyPI release metadata (`https://pypi.org/pypi/aibar/json`, `info.version`) with hardcoded timeout [`src/aibar/aibar/cli.py`]
@@ -102,7 +102,7 @@
       - `_save_startup_idle_state(...)`: persist startup idle-state JSON with epoch and human-readable fields [`src/aibar/aibar/cli.py`]
       - `_emit_startup_preflight_message(...)`: emit bright-green/bright-red startup diagnostics [`src/aibar/aibar/cli.py`]
       - `append_runtime_log_line(...)`: append startup idle-check and fetch diagnostics rows [`src/aibar/aibar/config.py`]
-    - `_handle_version_option(...)`: eager `--version` callback that prints installed version, emits the PyPI/GitHub latest-release report, and exits [`src/aibar/aibar/cli.py`]
+    - `_handle_version_option(...)`: eager `--version`/`--ver` callback that prints installed version, emits the PyPI/GitHub latest-release report, and exits [`src/aibar/aibar/cli.py`]
       - `_emit_version_option_release_report(...)`: emit labeled latest-release lines for PyPI and GitHub to stderr, reusing the cached preflight PyPI response with one direct-fetch fallback [`src/aibar/aibar/cli.py`]
         - `_fetch_github_latest_release(...)`: fetch and normalize latest GitHub release metadata (`https://api.github.com/repos/Ogekuri/AIBar/releases/latest`, `tag_name`) [`src/aibar/aibar/cli.py`]
           - `_normalize_github_release_tag(...)`: normalize GitHub release tag text stripping one optional leading `v` [`src/aibar/aibar/cli.py`]
@@ -306,7 +306,7 @@
 - `External Boundaries`
   - Click command parsing and dispatch.
   - PyPI JSON API endpoint (`https://pypi.org/pypi/aibar/json`) for startup update checks; installed PyPI package at `https://pypi.org/project/aibar/`.
-  - GitHub releases API endpoint (`https://api.github.com/repos/Ogekuri/AIBar/releases/latest`) for `--version` latest-release reporting; intermediate/test releases published at `https://github.com/Ogekuri/AIBar`.
+  - GitHub releases API endpoint (`https://api.github.com/repos/Ogekuri/AIBar/releases/latest`) for `--version`/`--ver` latest-release reporting; intermediate/test releases published at `https://github.com/Ogekuri/AIBar`.
   - Linux-only `uv` subprocess execution for lifecycle flags (`--upgrade` installs the latest `aibar` from the PyPI index by default or from GitHub via `git+https://github.com/Ogekuri/AIBar` when `--github` is present, `--uninstall`) plus non-Linux stderr guidance output.
   - Runtime execution log file appends under `~/.cache/aibar/aibar.log` controlled by persisted `log_enabled` and `debug_enabled` flags in `~/.config/aibar/config.json`.
   - HTTP network interactions through provider endpoints.

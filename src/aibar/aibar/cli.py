@@ -680,18 +680,19 @@ def _run_startup_update_preflight() -> None:
 def _startup_force_ignore_idle_from_args(args: Sequence[str] | None) -> bool:
     """
     @brief Detect whether startup preflight must bypass idle gating from argv.
-    @details Returns true when invocation arguments contain `--version`,
-    forcing one online startup release check regardless of persisted
+    @details Returns true when invocation arguments contain `--version` or
+    `--ver`, forcing one online startup release check regardless of persisted
     startup idle-time file state.
     @param args {Sequence[str] | None} CLI argv sequence excluding executable
         name when provided by Click group main.
     @return {bool} True when startup preflight must bypass idle-time gating.
     @satisfies REQ-071
     @satisfies REQ-078
+    @satisfies REQ-188
     """
     argument_tokens = list(args) if args is not None else list(sys.argv[1:])
     return any(
-        token == "--version"
+        token in {"--version", "--ver"}
         for token in argument_tokens
         if isinstance(token, str)
     )
@@ -905,15 +906,16 @@ def _handle_version_option(
     ctx: click.Context, param: click.Parameter, value: bool
 ) -> None:
     """
-    @brief Handle eager `--version` option callback.
+    @brief Handle eager `--version` and `--ver` option callback.
     @details Prints installed package version to stdout, emits the PyPI and
     GitHub latest-release report to stderr, and exits before command dispatch
-    when the version flag is present.
+    when either version flag is present.
     @param ctx {click.Context} Active Click context.
     @param param {click.Parameter} Option metadata (unused).
     @param value {bool} Parsed version-option flag value.
     @return {None} Function return value.
     @satisfies REQ-078
+    @satisfies REQ-188
     """
     del param
     if not value or ctx.resilient_parsing:
@@ -1085,7 +1087,7 @@ class StartupPreflightGroup(click.Group):
         delegates to Click parser/dispatcher, and appends execution-end outcome
         plus one trailing separator line when runtime logging is enabled.
         The preflight bypasses startup idle gating when invocation includes
-        the eager `--version` option.
+        the eager `--version` or `--ver` option.
         @param args {Sequence[str] | None} Optional argv sequence.
         @param prog_name {str | None} Program display name override.
         @param complete_var {str | None} Shell-completion environment variable.
@@ -2626,6 +2628,7 @@ def _build_cached_dual_window_results(
 )
 @click.option(
     "--version",
+    "--ver",
     "show_version",
     is_flag=True,
     is_eager=True,
