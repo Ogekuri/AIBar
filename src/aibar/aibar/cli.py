@@ -27,7 +27,7 @@ import click
 from click.core import ParameterSource
 from pydantic import ValidationError
 
-from . import __version__
+from . import PROGRAM_NAME, __version__
 from aibar.config import (
     IdleTimeState,
     LockAcquisitionTimeoutError,
@@ -139,12 +139,24 @@ _UPGRADE_LIFECYCLE_COMMAND: list[str] = [
     "--force",
 ]
 _UNINSTALL_LIFECYCLE_COMMAND: list[str] = ["uv", "tool", "uninstall", "aibar"]
-_GITHUB_RELEASE_API_URL = "https://api.github.com/repos/Ogekuri/AIBar/releases/latest"
+# @brief GitHub releases API endpoint used by release reporting and upgrades.
+# @details Composed from the single program-name constant `PROGRAM_NAME`
+# (current program name, REQ-191) as
+# `https://api.github.com/repos/Ogekuri/{PROGRAM_NAME}/releases/latest`; the
+# endpoint returns the most recent published release regardless of the branch
+# carrying its tag, so `--upgrade --develop`/`--dev` never filters by branch.
+# @satisfies CTN-020
+# @satisfies REQ-189
+# @satisfies REQ-191
+_GITHUB_RELEASE_API_URL = (
+    f"https://api.github.com/repos/Ogekuri/{PROGRAM_NAME}/releases/latest"
+)
 # @brief Base argv prefix of the GitHub upgrade lifecycle command.
 # @details Completed by `_resolve_github_upgrade_lifecycle_command` with the
-# release-tag-pinned repository URL `git+https://github.com/Ogekuri/AIBar@<tag_name>`
-# resolved from the GitHub releases API so `--upgrade --develop`/`--dev`
-# always installs the most recently tagged release, independent of branch.
+# release-tag-pinned repository URL
+# `git+https://github.com/Ogekuri/{PROGRAM_NAME}@<tag_name>` resolved from the
+# GitHub releases API so `--upgrade --develop`/`--dev` always installs the
+# most recently tagged release, independent of branch.
 # @satisfies CTN-015
 # @satisfies REQ-189
 _GITHUB_UPGRADE_BASE_COMMAND: list[str] = [
@@ -154,12 +166,15 @@ _GITHUB_UPGRADE_BASE_COMMAND: list[str] = [
     "--force",
 ]
 # @brief GitHub repository URL used by the `--upgrade --develop` lifecycle.
-# @details Installed with an `@<tag_name>` suffix pinning the latest GitHub
-# release tag (raw `tag_name`, leading `v` preserved) resolved via
-# `_fetch_github_latest_release` (REQ-189).
+# @details Composed from the single program-name constant `PROGRAM_NAME`
+# (REQ-191) as `git+https://github.com/Ogekuri/{PROGRAM_NAME}`; installed with
+# an `@<tag_name>` suffix pinning the latest GitHub release tag (raw
+# `tag_name`, leading `v` preserved) resolved via `_fetch_github_latest_release`
+# (REQ-189), independent of the branch carrying the tag.
 # @satisfies CTN-015
 # @satisfies REQ-189
-_GITHUB_UPGRADE_REPO_URL = "git+https://github.com/Ogekuri/AIBar"
+# @satisfies REQ-191
+_GITHUB_UPGRADE_REPO_URL = f"git+https://github.com/Ogekuri/{PROGRAM_NAME}"
 _LOG_FAILURE_CATEGORY_OAUTH = "oauth"
 _LOG_FAILURE_CATEGORY_RATE_LIMIT = "rate_limit"
 
@@ -514,7 +529,7 @@ def _fetch_github_latest_release() -> StartupReleaseCheckResponse:
     """
     @brief Fetch latest GitHub release metadata for version reporting.
     @details Executes one HTTP request to the GitHub releases API endpoint
-    `https://api.github.com/repos/Ogekuri/AIBar/releases/latest` with the
+    `https://api.github.com/repos/Ogekuri/{PROGRAM_NAME}/releases/latest` (program-name composed, REQ-191) with the
     hardcoded startup timeout. Success returns the normalized latest release
     tag parsed from the `tag_name` field plus the unmodified `tag_name` in
     `raw_tag` so `--upgrade --develop` can pin the uv install ref (REQ-189).
@@ -747,9 +762,10 @@ def _resolve_github_upgrade_lifecycle_command() -> list[str] | None:
     """
     @brief Build the GitHub upgrade argv pinned to the latest GitHub release tag.
     @details Fetches the latest GitHub release metadata from
-    `https://api.github.com/repos/Ogekuri/AIBar/releases/latest`, reads the
-    raw `tag_name`, and returns the base `uv tool install --force` argv
-    completed with `git+https://github.com/Ogekuri/AIBar@<tag_name>` so
+    `https://api.github.com/repos/Ogekuri/{PROGRAM_NAME}/releases/latest`
+    (program-name composed, REQ-191), reads the raw `tag_name`, and returns
+    the base `uv tool install --force` argv completed with
+    `git+https://github.com/Ogekuri/{PROGRAM_NAME}@<tag_name>` so
     `--upgrade --develop`/`--dev` always installs the most recently tagged
     release regardless of the branch carrying the tag (REQ-189). When
     `tag_name` is unavailable or unparsable, emits one bright-red diagnostic
