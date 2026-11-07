@@ -48,7 +48,7 @@ AIBar brings every supported AI provider quota and cost into one place, on the t
 - Text output and machine output (`show --json`) with stable top-level sections (`payload`, `status`, `idle_time`, `freshness`, `extension`, `enabled_providers`).
 - Per-run refresh override with `show --force` (bypasses idle-time gating for that execution).
 - Interactive `setup` for provider enable/disable state, runtime throttling, Copilot overage pricing, provider currency symbols, GeminiAI OAuth/project settings, and logging flags.
-- Built-in lifecycle and observability flags: `--version|--ver`, `--upgrade`, `--upgrade --github`, `--uninstall`, `--enable-log`, `--disable-log`, `--enable-debug`, `--disable-debug`.
+- Built-in lifecycle and observability flags: `--version|--ver`, `--upgrade`, `--upgrade --develop|--dev`, `--uninstall`, `--enable-log`, `--disable-log`, `--enable-debug`, `--disable-debug`.
 - Startup release preflight that can emit update notices or fetch diagnostics before normal command output.
 - GNOME Shell extension support via `gnome-install` / `gnome-uninstall`, popup `Refresh Now`, and JSON-driven refresh/window metadata.
 
@@ -145,8 +145,10 @@ uv tool install --force git+https://github.com/Ogekuri/AIBar
 Upgrade an existing installation to the latest GitHub release:
 
 ```bash
-aibar --upgrade --github
+aibar --upgrade --develop
 ```
+
+`aibar --upgrade --develop` and `aibar --upgrade --dev` are equivalent.
 
 `aibar --version` reports the installed version plus the latest release
 available on both PyPI and GitHub.
@@ -274,7 +276,8 @@ aibar --version
 
 # Package lifecycle helpers (Linux: executed directly; non-Linux: prints manual command)
 aibar --upgrade
-aibar --upgrade --github
+# aibar --upgrade --develop and aibar --upgrade --dev are equivalent
+aibar --upgrade --develop
 aibar --uninstall
 
 # Runtime logging flags
@@ -287,7 +290,7 @@ aibar --disable-debug
 
 - Startup behavior: every CLI invocation runs a latest-release preflight (PyPI) before command parsing. Notices and fetch diagnostics are idle-cached for about `300` seconds; `aibar --version` and `aibar --ver` still force one online check.
 - `--version`/`--ver` print the installed version and the latest releases available on PyPI and GitHub.
-- `--upgrade` upgrades from PyPI; `--upgrade --github` upgrades from the latest GitHub release instead. Both execute only on Linux; on non-Linux platforms, AIBar prints the equivalent manual `uv` command.
+- `--upgrade` upgrades from PyPI; `--upgrade --develop` (or `--dev`) upgrades from the latest GitHub release instead. Both execute only on Linux; on non-Linux platforms, AIBar prints the equivalent manual `uv` command.
 - `--uninstall` executes only on Linux. On non-Linux platforms, AIBar prints the equivalent manual `uv` command.
 - Debug rows are emitted only when execution logging is enabled. For verbose API diagnostics, enable both `--enable-log` and `--enable-debug`.
 

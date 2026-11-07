@@ -702,15 +702,18 @@ def _github_upgrade_requested_from_args(args: Sequence[str] | None) -> bool:
     """
     @brief Detect whether `--upgrade` must use the GitHub package source.
     @details Returns true when invocation arguments contain the literal token
-    `--github`, independent of ordering relative to the eager `--upgrade`
-    callback execution. Complexity O(A) over argv tokens A; space O(A).
+    `--develop` or its equivalent alias `--dev`, independent of ordering
+    relative to the eager `--upgrade` callback execution. Complexity O(A) over
+    argv tokens A; space O(A).
     @param args {Sequence[str] | None} CLI argv sequence; `None` uses `sys.argv[1:]`.
     @return {bool} True when the GitHub package source is requested.
     @satisfies REQ-176
     """
     argument_tokens = list(args) if args is not None else list(sys.argv[1:])
     return any(
-        token == "--github" for token in argument_tokens if isinstance(token, str)
+        token in {"--develop", "--dev"}
+        for token in argument_tokens
+        if isinstance(token, str)
     )
 
 
@@ -718,8 +721,9 @@ def _resolve_upgrade_lifecycle_command() -> list[str]:
     """
     @brief Resolve the `--upgrade` lifecycle command source from argv.
     @details Returns a copy of the GitHub-hosted uv install command when argv
-    contains `--github`; otherwise returns a copy of the default PyPI install
-    command. Complexity O(A) over argv tokens A; space O(1) beyond constants.
+    contains `--develop` or `--dev`; otherwise returns a copy of the default
+    PyPI install command. Complexity O(A) over argv tokens A; space O(1)
+    beyond constants.
     @return {list[str]} Lifecycle command argv for `--upgrade`.
     @satisfies CTN-015
     @satisfies REQ-076
@@ -800,9 +804,10 @@ def _handle_upgrade_option(
     """
     @brief Handle eager `--upgrade` lifecycle option callback.
     @details Resolves the upgrade command source (PyPI by default; GitHub when
-    argv contains `--github`), executes the lifecycle subprocess on Linux, and
-    exits with propagated subprocess code; on non-Linux emits manual command
-    guidance for the resolved command and exits without subprocess execution.
+    argv contains `--develop`/`--dev`), executes the lifecycle subprocess on
+    Linux, and exits with propagated subprocess code; on non-Linux emits manual
+    command guidance for the resolved command and exits without subprocess
+    execution.
     @param ctx {click.Context} Active Click context.
     @param param {click.Parameter} Option metadata (unused).
     @param value {bool} Parsed `--upgrade` flag value.
@@ -2618,7 +2623,7 @@ def _build_cached_dual_window_results(
         "  aibar gnome-uninstall        Remove GNOME extension\n"
         "  aibar --version              Show installed version\n"
         "  aibar --upgrade              Upgrade from PyPI via uv\n"
-        "  aibar --upgrade --github     Upgrade from GitHub via uv\n"
+        "  aibar --upgrade --develop    Upgrade from GitHub via uv\n"
         "  aibar --uninstall            Uninstall via uv\n"
         "  aibar --enable-log           Enable runtime execution log\n"
         "  aibar --disable-log          Disable runtime execution log\n"
@@ -2645,7 +2650,8 @@ def _build_cached_dual_window_results(
     help="Upgrade aibar from PyPI using uv and exit.",
 )
 @click.option(
-    "--github",
+    "--develop",
+    "--dev",
     is_flag=True,
     expose_value=False,
     help="With --upgrade: install the GitHub package instead of PyPI.",
