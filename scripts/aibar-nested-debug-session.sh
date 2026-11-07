@@ -11,7 +11,12 @@
 # invoking terminal instead of a residual intermediate shell. The debug shell runs
 # in background with job control disabled (`+m`) so it stays in the wrapper's
 # foreground process group and keyboard interrupts reach the wrapper for
-# whole-session termination. No screenshots are captured.
+# whole-session termination. Because bash assigns /dev/null as stdin to
+# background commands when job control is off, the wrapper duplicates its own
+# stdin onto file descriptor 3 and launches the debug shell with an explicit
+# `<&3` redirection so terminal input reaches the interactive debug shell
+# (fixes the instant-session-exit regression introduced by 260b3f0). No
+# screenshots are captured.
 # Time O(1) orchestration; space O(1); mutates child processes only.
 # @param[in] ... GNOME Shell command with arguments to launch as the nested shell.
 # @env AIBAR_NESTED_SETTLE_SECONDS Delay before the debug shell starts (default: 3).
@@ -60,12 +65,14 @@ echo "  aibar show --json --force"
 echo "  aibar doctor"
 echo "[INFO] Type 'exit' or press Ctrl+D or Ctrl+C to stop the nested debug session."
 
-bash --noprofile --norc -i +m &
+exec 3<&0
+bash --noprofile --norc -i +m <&3 &
 debug_pid=$!
 wait "$debug_pid"
 debug_status=$?
 debug_pid=""
 
+exec 3<&-
 cleanup
 trap - INT TERM EXIT
 exit "$debug_status"

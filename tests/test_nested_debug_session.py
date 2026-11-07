@@ -5,8 +5,9 @@
 `scripts/aibar-nested-debug-session.sh`: argv-based background nested shell
 launch, SIGINT/SIGTERM whole-session termination without a residual interactive
 shell, interactive debug shell sharing the nested session bus after the settle
-delay, extension inspection guidance, nested-shell termination on debug-shell
-exit with status propagation, and absence of screenshot capture logic.
+delay with inherited wrapper stdin, extension inspection guidance, nested-shell
+termination on debug-shell exit with status propagation, and absence of
+screenshot capture logic.
 @satisfies TST-074, REQ-178, REQ-179, REQ-180, REQ-181, REQ-182
 """
 
@@ -178,6 +179,10 @@ def debug_session_env(tmp_path: Path) -> tuple[dict[str, str], Path, Path]:
         fake_bash,
         'printf "debug-start\\n" >> "$EVENTS"\n'
         'if [ -n "${DEBUG_EXIT_STATUS:-}" ]; then exit "$DEBUG_EXIT_STATUS"; fi\n'
+        'if [ "${DEBUG_READ_STDIN:-}" = "1" ]; then\n'
+        "    read -r debug_line || true\n"
+        '    printf "debug-input:%s\\n" "$debug_line" >> "$EVENTS"\n'
+        "fi\n"
         "sleep 30\n"
         'printf "debug-end\\n" >> "$EVENTS"\n',
     )
@@ -192,20 +197,22 @@ def debug_session_env(tmp_path: Path) -> tuple[dict[str, str], Path, Path]:
 
 
 def _start_wrapper(
-    env: dict[str, str], nested: Path, settle: int
+    env: dict[str, str], nested: Path, settle: int,
+    stdin: int = subprocess.DEVNULL,
 ) -> subprocess.Popen:
     """
     @brief Start the debug wrapper with substituted dependencies.
-    @details O(1) process spawn; stdin detached; combined output captured.
+    @details O(1) process spawn; combined output captured; stdin selectable.
     @param env {dict[str, str]} Substitution environment.
     @param nested {Path} Nested-command executable path.
     @param settle {int} AIBAR_NESTED_SETTLE_SECONDS override.
+    @param stdin {int} Stdin fileno for the wrapper (DEVNULL or PIPE).
     @return {subprocess.Popen} Wrapper process handle.
     """
     return subprocess.Popen(
         ["/bin/bash", str(DEBUG_WRAPPER_PATH), str(nested)],
         env={**env, "AIBAR_NESTED_SETTLE_SECONDS": str(settle)},
-        stdin=subprocess.DEVNULL,
+        stdin=stdin,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )
@@ -218,6 +225,8 @@ def _stop_wrapper(proc: subprocess.Popen) -> None:
     @param proc {subprocess.Popen} Wrapper process handle.
     @return {None} Process reaped.
     """
+    if proc.stdin is not None:
+        proc.stdin.close()
     if proc.poll() is None:
         proc.kill()
     proc.wait(timeout=EVENT_TIMEOUT_SECONDS)
@@ -306,3 +315,46 @@ def test_debug_shell_exit_status_propagates_and_nested_shell_stops(
     observed = events.read_text(encoding="utf-8").splitlines()
     assert returncode == 7
     assert observed == ["nested-start", "debug-start"]
+
+
+def test_debug_shell_receives_wrapper_stdin(
+    debug_session_env: tuple[dict[str, str], Path, Path],
+) -> None:
+    """
+    @brief Verify the debug shell reads the wrapper's standard input.
+    @details Reproducer for the 260b3f0 regression: without job control bash
+    assigns /dev/null as stdin to background commands, so the backgrounded
+    interactive debug shell saw immediate EOF and the whole nested debug
+    session terminated as soon as it started. The wrapper must duplicate its
+    own stdin onto descriptor 3 and launch the debug shell with an explicit
+    `<&3` redirection so terminal input reaches the interactive debug shell.
+    Level 1 subprocess boundaries with a PATH-substituted debug shell that
+    records one read line; bounded polling; no GNOME session or network.
+    expected_output: piped input line recorded as debug-input event, then
+    SIGINT terminates the session with exit 130 and no end markers.
+    @param debug_session_env {tuple} Substitution environment, event log, path.
+    @return {None} Assertions complete.
+    @satisfies REQ-180, TST-074
+    """
+    env, events, nested = debug_session_env
+    proc = _start_wrapper(
+        {**env, "DEBUG_READ_STDIN": "1"}, nested, settle=1,
+        stdin=subprocess.PIPE,
+    )
+    try:
+        _wait_for_event(events, "debug-start")
+        assert proc.stdin is not None
+        proc.stdin.write(b"hello-debug\n")
+        proc.stdin.flush()
+        _wait_for_event(events, "debug-input:hello-debug")
+        proc.send_signal(signal.SIGINT)
+        returncode = proc.wait(timeout=EVENT_TIMEOUT_SECONDS)
+    finally:
+        _stop_wrapper(proc)
+    observed = events.read_text(encoding="utf-8").splitlines()
+    assert returncode == 130
+    assert observed == [
+        "nested-start",
+        "debug-start",
+        "debug-input:hello-debug",
+    ]

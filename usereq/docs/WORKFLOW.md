@@ -74,7 +74,7 @@
   - `gnome-shell --help-all`: capability probe; unsupported windowed backends exit non-zero.
   - `/usr/libexec/mutter-devkit`: Ubuntu 26.04 executable supplied by `mutter-dev-bin`; missing executable exits before installation.
   - `dbus-run-session -- scripts/aibar-nested-debug-session.sh gnome-shell --devkit --wayland`: private session bus shared by Shell and interactive debug shell.
-  - `scripts/aibar-nested-debug-session.sh`: background Shell launch, settle delay, inspection guidance, background interactive debug shell with job control disabled (`+m`), nested-shell cleanup on debug-shell exit with status propagation, and whole-session termination (SIGKILL of all background jobs with immediate wrapper exit 130/143) on SIGINT/SIGTERM.
+  - `scripts/aibar-nested-debug-session.sh`: background Shell launch, settle delay, inspection guidance, background interactive debug shell with job control disabled (`+m`) reading the wrapper stdin through duplicated descriptor 3 (`<&3`) because bash otherwise assigns /dev/null to background-command stdin, nested-shell cleanup on debug-shell exit with status propagation, and whole-session termination (SIGKILL of all background jobs with immediate wrapper exit 130/143) on SIGINT/SIGTERM.
 
 ### PROC:main
 - `Entrypoints`
