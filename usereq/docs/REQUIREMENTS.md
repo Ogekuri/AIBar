@@ -104,6 +104,8 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **PRJ-023**: `scripts/pre-release-check.sh` MUST execute the unit-test suite via `uv run pytest` and MUST fail with non-zero exit status when any test fails.
 - **PRJ-024**: `scripts/pre-release-check.sh` MUST remove stale `dist/` content, build sdist and wheel into `dist/`, and MUST fail when no sdist or no wheel artifact exists after the build.
 - **PRJ-025**: `scripts/pre-release-check.sh` MUST remove the `dist/` directory, the `.pytest_cache/` directory, and `__pycache__` trees under `src/` and `tests/` on pipeline exit, regardless of pipeline outcome.
+- **PRJ-026**: `.github/workflows/release-pypi.yml` MUST run a dedicated `unit-tests` job executing `uv sync --locked` and `uv run pytest tests/` for every release tag push.
+- **PRJ-027**: `.github/workflows/release-pypi.yml` MUST gate the `build-release` job on the `unit-tests` job so no release artifacts are created when the pytest suite fails.
 
 ### 2.2 Project Constraints
 - **CTN-001**: MUST resolve provider credentials with precedence: environment variable, then `~/.config/aibar/env`, then provider-specific local credential stores.
@@ -413,6 +415,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-083**: MUST verify the `--version` GitHub report performs one fresh releases/latest fetch per invocation and its reported version equals the tag pinned by the `--develop` upgrade argv.
 - **TST-084**: MUST verify `scripts/pre-release-check.sh` exists, is executable, gates on a dirty git tree with `--allow-dirty` opt-out, runs `uv sync --locked` and `uv run pytest`, builds sdist+wheel into `dist/`, and verifies both artifacts.
 - **TST-085**: MUST verify `scripts/pre-release-check.sh` registers an EXIT trap removing `dist/`, `.pytest_cache/`, and `__pycache__` trees under `src/` and `tests/`, independent of pipeline outcome.
+- **TST-086**: MUST verify `.github/workflows/release-pypi.yml` declares a `unit-tests` job running `uv sync --locked` and `uv run pytest tests/`, and gates `build-release` on `unit-tests`.
 
 ## 5. Evidence
 
@@ -639,3 +642,6 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | TST-084 | `tests/test_pre_release_check_script.py` + source-level assertions for executable bit, dirty-tree gate with `--allow-dirty`, stage commands (`uv sync --locked`, `uv run pytest`, build), `dist/` artifact checks, and stage ordering. |
 | PRJ-025 | `scripts/pre-release-check.sh` + `cleanup_pipeline_artifacts` EXIT trap + `rm -rf -- dist .pytest_cache` and `find src tests` removal of `__pycache__` trees. |
 | TST-085 | `tests/test_pre_release_check_script.py` + `test_script_cleans_pipeline_artifacts_on_exit` + EXIT trap registration and cleanup command assertions. |
+| PRJ-026 | `.github/workflows/release-pypi.yml` + `unit-tests` job + `uv sync --locked` step and `uv run pytest tests/` step with Python 3.12/uv setup pins. |
+| PRJ-027 | `.github/workflows/release-pypi.yml` + `build-release` job + `needs: [check-branch, unit-tests]` gating so artifact creation and transitive `publish-pypi` never run on test failure. |
+| TST-086 | `tests/test_release_workflow_test_gate.py` + source-level assertions for the `unit-tests` job steps and the `build-release` needs gate. |

@@ -35,8 +35,8 @@
 - `id: PROC:release-pypi`
   - `type: Process`
   - `parent_process: null`
-  - `role: GitHub Actions release pipeline for PyPI publication, Python package, and GNOME extension assets`
-  - `entrypoint_symbols: workflow trigger (push tag), check-branch job, build-release job, publish-pypi job`
+  - `role: GitHub Actions release pipeline for unit-test gating, PyPI publication, Python package, and GNOME extension assets`
+  - `entrypoint_symbols: workflow trigger (push tag), check-branch job, unit-tests job, build-release job, publish-pypi job`
   - `defining_files: .github/workflows/release-pypi.yml`
   - `thread_model: no explicit threads detected`
 
@@ -387,11 +387,12 @@
   - workflow trigger: push tags matching `v[0-9]+.[0-9]+.[0-9]+` [`.github/workflows/release-pypi.yml`]
 - `Lifecycle/Trigger`
   - Starts when a matching release tag is pushed.
-  - Runs `check-branch` gate job resolving whether the tag SHA is on `master` or `develop`; runs `build-release` packaging job for version tags on either branch; runs `publish-pypi` Trusted Publishing job only for `master` tags.
+  - Runs `check-branch` gate job resolving whether the tag SHA is on `master` or `develop`; runs `unit-tests` job executing the locked pytest suite; runs `build-release` packaging job only when both `check-branch` and `unit-tests` succeed, so release artifacts are never created for versions whose tests fail; runs `publish-pypi` Trusted Publishing job only for `master` tags, transitively gated by the test suite through its `build-release` dependency.
 - `Internal Call-Trace Tree`
   - workflow trigger dispatch [`.github/workflows/release-pypi.yml`]
     - `check-branch` job: checkout + `git branch -r --contains ${GITHUB_SHA}` gate resolving `is_master` and `is_release_branch` outputs from `origin/master`/`origin/develop` tag containment [`.github/workflows/release-pypi.yml`]
-    - `build-release` job (gated on `check-branch` output `is_release_branch == 'true'`, re-exporting `is_master` for the publish gate): checkout + python/uv setup [`.github/workflows/release-pypi.yml`]
+    - `unit-tests` job: checkout + python/uv setup + dependency synchronization locked to `uv.lock` + full pytest suite execution; failing tests block the `build-release` job [`.github/workflows/release-pypi.yml`]
+    - `build-release` job (gated on `check-branch` output `is_release_branch == 'true'` and on `unit-tests` success via `needs: [check-branch, unit-tests]`, re-exporting `is_master` for the publish gate): checkout + python/uv setup [`.github/workflows/release-pypi.yml`]
       - build step: `uv run --with build --with setuptools --with wheel python -m build` [`.github/workflows/release-pypi.yml`]
       - extension asset step: zip `src/aibar/aibar/gnome-extension/aibar@aibar.panel` into release artifact [`.github/workflows/release-pypi.yml`]
       - release publication steps: attest provenance and publish GitHub release assets [`.github/workflows/release-pypi.yml`]
