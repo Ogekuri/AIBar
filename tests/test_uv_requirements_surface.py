@@ -47,6 +47,6 @@ def test_readme_includes_uv_requirement_and_optional_requirements_export() -> No
     @satisfies TST-040
     """
     source = README_PATH.read_text(encoding="utf-8")
-    assert "## Requirements (uv)" in source
+    assert "## Requirements\n" in source
     assert "Astral uv" in source
     assert "uv export --format requirements-txt > requirements.txt" in source

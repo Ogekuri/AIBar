@@ -83,7 +83,7 @@ To place usage in the GNOME top panel, run `aibar gnome-install` and enable the
 credentials details, throttling, currencies, logging, JSON contract) is covered
 in the [User's Guide](#users-guide).
 
-## Requirements (uv)
+## Requirements
 
 - Python >= 3.12; the repository pins the interpreter via `.python-version` and `uv run` resolves a Python 3.12+ interpreter automatically.
 - [Astral uv](https://docs.astral.sh/uv/): `uv` for installation/removal and `uvx` for live execution; no external virtualenv bootstrap is required.
