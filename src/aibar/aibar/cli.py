@@ -175,6 +175,16 @@ _GITHUB_UPGRADE_BASE_COMMAND: list[str] = [
 # @satisfies REQ-189
 # @satisfies REQ-191
 _GITHUB_UPGRADE_REPO_URL = f"git+https://github.com/Ogekuri/{PROGRAM_NAME}"
+# @brief Fixed prefix of the `--version` GitHub latest-release failure line.
+# @details When the GitHub releases/latest check fails (any HTTP error,
+# including 404), `_emit_version_option_release_report` renders the failure
+# line `<prefix> (<reason>)` with this prefix, so the displayed message
+# reports `GitHub latest: unknown (<reason>)` where `<reason>` is the
+# normalized fetch failure message from `_fetch_github_latest_release`
+# (REQ-194); the success line keeps the `Latest GitHub release: <version>`
+# label.
+# @satisfies REQ-195
+_GITHUB_REPORT_UNKNOWN_PREFIX = "GitHub latest: unknown"
 _LOG_FAILURE_CATEGORY_OAUTH = "oauth"
 _LOG_FAILURE_CATEGORY_RATE_LIMIT = "rate_limit"
 
@@ -956,24 +966,35 @@ def _handle_uninstall_option(
     ctx.exit(exit_code)
 
 
-def _format_release_report_value(response: StartupReleaseCheckResponse) -> str:
+def _format_release_report_value(
+    response: StartupReleaseCheckResponse,
+    failure_prefix: str = "unavailable",
+) -> str:
     """
     @brief Render one release-check response as version-report value text.
     @details Returns the normalized latest version on success; returns
-    `unavailable (<reason>)` text when the check failed or metadata was absent.
-    For GitHub responses the returned value equals the raw tag minus its
-    leading `v` prefix (`_normalize_github_release_tag`), so the reported
-    version is exactly the release pinned by `--upgrade --develop`/`--dev`
-    (REQ-193). Complexity O(1); space O(1).
+    `<failure_prefix> (<reason>)` text when the check failed or metadata was
+    absent, where `<reason>` is the fetch error message or the
+    `release metadata unavailable` fallback. The default prefix preserves the
+    PyPI report wording; the GitHub call site passes the
+    `_GITHUB_REPORT_UNKNOWN_PREFIX` prefix so a failed releases/latest check
+    (any HTTP error, including 404) renders the mandated
+    `GitHub latest: unknown (<reason>)` failure line (REQ-195). For GitHub
+    responses the success value equals the raw tag minus its leading `v`
+    prefix (`_normalize_github_release_tag`), so the reported version is
+    exactly the release pinned by `--upgrade --develop`/`--dev` (REQ-193).
+    Complexity O(1); space O(1).
     @param response {StartupReleaseCheckResponse} Release-check result to render.
+    @param failure_prefix {str} Text prepended to the parenthesized failure reason.
     @return {str} Human-readable version-report value.
     @satisfies REQ-078
     @satisfies REQ-193
+    @satisfies REQ-195
     """
     if response.latest_version is not None:
         return response.latest_version
     reason = response.error_message or "release metadata unavailable"
-    return f"unavailable ({reason})"
+    return f"{failure_prefix} ({reason})"
 
 
 def _emit_version_option_release_report() -> None:
@@ -985,7 +1006,11 @@ def _emit_version_option_release_report() -> None:
     idle-gated, REQ-192) against the program-name releases/latest endpoint,
     and prints one labeled line per repository to stderr so stdout remains
     the parseable installed version. The GitHub line reports the same
-    release that `--upgrade --develop`/`--dev` installs (REQ-193).
+    release that `--upgrade --develop`/`--dev` installs (REQ-193). A failed
+    GitHub releases/latest check (any HTTP error, including 404, normalized
+    by `_fetch_github_latest_release` per REQ-194) renders the failure line
+    `GitHub latest: unknown (<reason>)` (REQ-195) instead of the success
+    label, where `<reason>` is the fetch failure message.
     Complexity O(1) beyond one HTTP request per repository.
     @return {None} Function return value.
     @satisfies CTN-011
@@ -993,6 +1018,7 @@ def _emit_version_option_release_report() -> None:
     @satisfies REQ-078
     @satisfies REQ-192
     @satisfies REQ-193
+    @satisfies REQ-195
     """
     pypi_response = _LAST_PYPI_RELEASE_CHECK or _fetch_startup_latest_release()
     github_response = _fetch_github_latest_release()
@@ -1000,10 +1026,19 @@ def _emit_version_option_release_report() -> None:
         f"Latest PyPI release: {_format_release_report_value(pypi_response)}",
         err=True,
     )
-    click.echo(
-        f"Latest GitHub release: {_format_release_report_value(github_response)}",
-        err=True,
-    )
+    if github_response.latest_version is not None:
+        click.echo(
+            f"Latest GitHub release: {github_response.latest_version}",
+            err=True,
+        )
+    else:
+        click.echo(
+            _format_release_report_value(
+                github_response,
+                failure_prefix=_GITHUB_REPORT_UNKNOWN_PREFIX,
+            ),
+            err=True,
+        )
 
 
 def _handle_version_option(
