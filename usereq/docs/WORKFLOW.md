@@ -43,7 +43,7 @@
 - `id: PROC:pre-release-check`
   - `type: Process`
   - `parent_process: null`
-  - `role: Local pre-release verification pipeline process (tree gate, locked dependency sync, pytest, sdist/wheel build, artifact checks)`
+  - `role: Local pre-release verification pipeline process (tree gate, locked dependency sync, pytest, sdist/wheel build, artifact checks, exit cleanup)`
   - `entrypoint_symbols: main script body`
   - `defining_files: scripts/pre-release-check.sh`
   - `thread_model: no explicit threads detected`
@@ -409,11 +409,13 @@
   - Starts when a maintainer invokes `scripts/pre-release-check.sh` before tagging an official release.
   - Accepts the optional `--allow-dirty` flag; `-h`/`--help` prints usage and exits; unknown arguments exit with code 2.
   - Executes five labeled stages in order and aborts at the first failing stage with a non-zero exit status: (1) clean git working-tree gate (skipped only with `--allow-dirty`), (2) dependency sync locked to `uv.lock`, (3) full pytest unit-test suite, (4) sdist and wheel build into `dist/`, (5) built-artifact verification.
+  - On exit (success, failure, help, unknown arguments, dirty-tree abort), an unconditional EXIT trap removes the pipeline artifacts: `dist/`, `.pytest_cache/`, and `__pycache__` trees under `src/` and `tests/`, leaving the repository clean.
 - `Internal Call-Trace Tree`
   - No internal functions defined under `src/`; orchestration occurs at external process boundaries.
     - `check_clean_working_tree(...)`: clean-tree gate stage implementation with `--allow-dirty` opt-out, `git status --porcelain` inspection, and explicit non-zero abort on dirty tree [`scripts/pre-release-check.sh`]
     - `build_distribution(...)`: build stage implementation removing stale `dist/` and mirroring the release workflow build command [`scripts/pre-release-check.sh`]
     - `require_dist_artifacts(...)`: artifact verification stage implementation scanning `dist/*.tar.gz` and `dist/*.whl` with explicit error on missing artifacts [`scripts/pre-release-check.sh`]
+    - `cleanup_pipeline_artifacts(...)`: EXIT-trap cleanup removing `dist/`, `.pytest_cache/`, and `__pycache__` trees under `src/`/`tests/` without altering the pipeline exit status [`scripts/pre-release-check.sh`]
     - `run_stage(...)`: labeled `[<executed>/<total>]` stage wrapper providing progress headers and first-failure abort via `set -euo pipefail` [`scripts/pre-release-check.sh`]
 - `External Boundaries`
   - Declaration: `scripts/pre-release-check.sh`.
@@ -421,6 +423,7 @@
   - `uv sync --locked`: dependency synchronization validated against the tracked `uv.lock` (CTN-018, REQ-087).
   - `uv run pytest tests/`: pytest suite execution resolving the project environment.
   - `uv run --with build --with setuptools --with wheel python -m build`: sdist+wheel build identical to the `build-release` job of `PROC:release-pypi`, writing `dist/aibar-<version>.tar.gz` and `dist/aibar-<version>-py3-none-any.whl`.
+  - Exit cleanup removals: `rm -rf -- dist .pytest_cache` and `find src tests -type d -name __pycache__ -prune -exec rm -rf -- '{}' +` executed by the EXIT trap on every script termination path.
 
 ## Communication Edges
 

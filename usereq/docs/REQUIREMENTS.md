@@ -103,6 +103,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **PRJ-022**: `scripts/pre-release-check.sh` MUST execute each pipeline stage with a labeled progress header and MUST abort at the first failing stage with a non-zero exit status.
 - **PRJ-023**: `scripts/pre-release-check.sh` MUST execute the unit-test suite via `uv run pytest` and MUST fail with non-zero exit status when any test fails.
 - **PRJ-024**: `scripts/pre-release-check.sh` MUST remove stale `dist/` content, build sdist and wheel into `dist/`, and MUST fail when no sdist or no wheel artifact exists after the build.
+- **PRJ-025**: `scripts/pre-release-check.sh` MUST remove the `dist/` directory, the `.pytest_cache/` directory, and `__pycache__` trees under `src/` and `tests/` on pipeline exit, regardless of pipeline outcome.
 
 ### 2.2 Project Constraints
 - **CTN-001**: MUST resolve provider credentials with precedence: environment variable, then `~/.config/aibar/env`, then provider-specific local credential stores.
@@ -411,6 +412,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-082**: MUST verify GitHub release and upgrade URLs compose from the program-name constant and the `--develop` upgrade argv pins the fetched `tag_name`.
 - **TST-083**: MUST verify the `--version` GitHub report performs one fresh releases/latest fetch per invocation and its reported version equals the tag pinned by the `--develop` upgrade argv.
 - **TST-084**: MUST verify `scripts/pre-release-check.sh` exists, is executable, gates on a dirty git tree with `--allow-dirty` opt-out, runs `uv sync --locked` and `uv run pytest`, builds sdist+wheel into `dist/`, and verifies both artifacts.
+- **TST-085**: MUST verify `scripts/pre-release-check.sh` registers an EXIT trap removing `dist/`, `.pytest_cache/`, and `__pycache__` trees under `src/` and `tests/`, independent of pipeline outcome.
 
 ## 5. Evidence
 
@@ -635,3 +637,5 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | PRJ-023 | `scripts/pre-release-check.sh` + tests stage + `uv run pytest tests/` execution with exit-code propagation. |
 | PRJ-024 | `scripts/pre-release-check.sh` + build stage + `rm -rf dist` before `uv run --with build --with setuptools --with wheel python -m build`, then non-empty `dist/*.tar.gz` and `dist/*.whl` checks. |
 | TST-084 | `tests/test_pre_release_check_script.py` + source-level assertions for executable bit, dirty-tree gate with `--allow-dirty`, stage commands (`uv sync --locked`, `uv run pytest`, build), `dist/` artifact checks, and stage ordering. |
+| PRJ-025 | `scripts/pre-release-check.sh` + `cleanup_pipeline_artifacts` EXIT trap + `rm -rf -- dist .pytest_cache` and `find src tests` removal of `__pycache__` trees. |
+| TST-085 | `tests/test_pre_release_check_script.py` + `test_script_cleans_pipeline_artifacts_on_exit` + EXIT trap registration and cleanup command assertions. |

@@ -87,6 +87,22 @@ def test_script_builds_sdist_and_wheel_into_dist() -> None:
     assert "python -m build" in source
 
 
+def test_script_cleans_pipeline_artifacts_on_exit() -> None:
+    """
+    @brief Verify the EXIT trap removes pipeline artifacts after execution.
+    @details The script must register `cleanup_pipeline_artifacts` as an
+    EXIT trap so `dist/`, `.pytest_cache/`, and `__pycache__` trees under
+    `src/` and `tests/` are removed whether the pipeline succeeds or fails.
+    @return {None} Function return value.
+    @satisfies PRJ-025
+    @satisfies TST-085
+    """
+    source = _script_source()
+    assert "trap cleanup_pipeline_artifacts EXIT" in source
+    assert "rm -rf -- dist .pytest_cache" in source
+    assert "-name __pycache__" in source
+
+
 def test_script_verifies_dist_artifacts_and_labeled_stages() -> None:
     """
     @brief Verify artifact checks, labeled stage headers, and stage ordering.

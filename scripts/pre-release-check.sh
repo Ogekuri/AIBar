@@ -8,7 +8,10 @@
 # (2) locked dependency synchronization via `uv sync --locked`,
 # (3) full pytest suite via `uv run pytest`, (4) sdist+wheel build into
 # `dist/` mirroring `.github/workflows/release-pypi.yml`, and (5) built
-# artifact verification. Every stage prints one labeled progress header
+# artifact verification. An unconditional EXIT trap removes the pipeline
+# artifacts (`dist/`, `.pytest_cache/`, `__pycache__` trees under `src/`
+# and `tests/`) so the repository is left clean whether the pipeline
+# succeeds or fails. Every stage prints one labeled progress header
 # and the pipeline aborts at the first failing stage with a non-zero
 # exit status.
 # @satisfies PRJ-020
@@ -16,6 +19,7 @@
 # @satisfies PRJ-022
 # @satisfies PRJ-023
 # @satisfies PRJ-024
+# @satisfies PRJ-025
 
 set -euo pipefail
 
@@ -128,6 +132,26 @@ run_stage() {
   printf '\n==> [%d/%d] %s\n' "$STAGE_INDEX" "$STAGE_TOTAL" "$stage_label"
   "$@"
 }
+
+## @fn cleanup_pipeline_artifacts
+# @brief Remove build and test artifacts created by the pipeline on exit.
+# @details Registered as an EXIT trap so cleanup runs when the script
+# exits, whether the pipeline succeeded, failed, or exited early (help,
+# unknown arguments, dirty-tree gate). Removes `dist/`, `.pytest_cache/`,
+# and every `__pycache__` tree under `src/` and `tests/`. Failures inside
+# the cleanup never alter the pipeline exit status. Time complexity O(T)
+# over removed trees T.
+# @return {void} No return value.
+# @satisfies PRJ-025
+cleanup_pipeline_artifacts() {
+  set +e
+  rm -rf -- dist .pytest_cache
+  find src tests -type d -name __pycache__ -prune -exec rm -rf -- '{}' + 2>/dev/null
+  printf '  removed pipeline artifacts (dist/, .pytest_cache/, __pycache__ trees)\n'
+  set -e
+}
+
+trap cleanup_pipeline_artifacts EXIT
 
 # Argument parsing: only the documented flags are accepted.
 for arg in "$@"; do
