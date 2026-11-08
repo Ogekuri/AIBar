@@ -1,5 +1,61 @@
 # Changelog
 
+## [0.59.0](https://github.com/Ogekuri/AIBar/compare/v0.58.0..v0.59.0) - 2026-11-08
+### ⛰️  Features
+- add pre-release verification pipeline script [useReq] *(pre-release-check)*
+  - Add scripts/pre-release-check.sh running the checks required before an
+  - official release, plus requirements and tests.
+  - PRJ-020..PRJ-024 (new): five labeled stages - clean-tree gate with
+  - --allow-dirty opt-out, uv sync --locked, full pytest suite, sdist+wheel
+  - build into dist/ (mirrors release-pypi.yml build step), and built
+  - artifact verification; aborts at first failing stage, non-zero exit
+  - TST-084 (new): tests/test_pre_release_check_script.py source-level
+  - regression coverage (executable bit, gate, stage commands, ordering)
+  - WORKFLOW.md: new PROC:pre-release-check execution unit
+  - Verified live: dirty-tree abort exit 1; full pipeline 5/5 stages OK
+  - (exit 0) producing dist/aibar-0.58.0.tar.gz and .whl; suite 254 passed
+
+### 🐛  Bug Fixes
+- restore dedicated Requirements (uv) section heading [useReq] *(readme)*
+  - Rename the README '# Requirements' heading to '## Requirements (uv)' so the
+  - dedicated uv-based requirements section matches the documented README contract
+  - again (PRJ-007, REQ-087, TST-040).
+  - Restores test_uv_requirements_surface.py::test_readme_includes_uv_requirement_and_optional_requirements_export
+  - Full suite green: 249 passed, 1 skipped (pre-existing skip)
+  - Requirements, workflow docs, and source code unchanged
+
+### 🚜  Changes
+- gate release build on unit-test job [useReq] *(release-pypi)*
+  - Prevent release artifacts and PyPI publication for versions whose tests fail.
+  - PRJ-026 (new): .github/workflows/release-pypi.yml adds a unit-tests
+  - job running uv sync --locked + uv run pytest tests/ on every tag push
+  - PRJ-027 (new): build-release now needs [check-branch, unit-tests], so
+  - no dist/ artifacts, GitHub Release, or transitive publish-pypi run
+  - when the pytest suite fails
+  - TST-086 (new): tests/test_release_workflow_test_gate.py source-level
+  - coverage of the job steps and the needs gate
+  - WORKFLOW.md: PROC:release-pypi unit-tests job documented
+  - Verified: YAML parses with jobs order check-branch -> unit-tests ->
+  - build-release -> publish-pypi; suite 258 passed, 1 skipped
+- remove build/test artifacts on exit [useReq] *(pre-release-check)*
+  - Leave the repository clean after scripts/pre-release-check.sh runs.
+  - PRJ-025 (new): unconditional EXIT trap removes dist/, .pytest_cache/,
+  - and __pycache__ trees under src/ and tests/ whether the pipeline
+  - succeeds, fails, or exits early; cleanup never alters the exit status
+  - TST-085 (new): source-level test asserting EXIT trap registration
+  - and cleanup removal commands
+  - WORKFLOW.md: PROC:pre-release-check exit-cleanup behavior documented
+  - Verified live: dirty-gate abort cleans pre-seeded dist/; full pipeline
+  - 5/5 stages OK (exit 0) with zero residue after execution
+- rename uv requirements section to Requirements [useReq] *(readme)*
+  - Rename the README section '## Requirements (uv)' to '## Requirements' and
+  - align requirements, evidence, and tests with the new section name.
+  - REQUIREMENTS.md: PRJ-007 and TST-040 now encode the exact '## Requirements'
+  - README section name; PRJ-007 evidence row updated accordingly
+  - tests/test_uv_requirements_surface.py: heading assertion realigned to
+  - the exact '## Requirements' heading line (TST-040)
+  - Full suite green: 249 passed, 1 skipped (pre-existing skip)
+
 ## [0.58.0](https://github.com/Ogekuri/AIBar/compare/v0.57.0..v0.58.0) - 2026-11-07
 ### 🐛  Bug Fixes
 - pin setup-uv to resolvable v10.3.3 tag [useReq] *(release-pypi)*
@@ -1661,6 +1717,7 @@
 - \[0.56.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.56.0
 - \[0.57.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.57.0
 - \[0.58.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.58.0
+- \[0.59.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.59.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1720,3 +1777,4 @@
 [0.56.0]: https://github.com/Ogekuri/AIBar/compare/v0.55.0..v0.56.0
 [0.57.0]: https://github.com/Ogekuri/AIBar/compare/v0.56.0..v0.57.0
 [0.58.0]: https://github.com/Ogekuri/AIBar/compare/v0.57.0..v0.58.0
+[0.59.0]: https://github.com/Ogekuri/AIBar/compare/v0.58.0..v0.59.0
