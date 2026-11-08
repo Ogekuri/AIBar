@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.59.1](https://github.com/Ogekuri/AIBar/compare/v0.59.0..v0.59.1) - 2026-11-08
+### 🚜  Changes
+- report GitHub version failures as unknown with reason [useReq] *(cli)*
+  - REQ-194: GitHub releases/latest HTTP failures (incl. 404) normalize into
+  - failure responses carrying status code and reason text
+  - REQ-195: --version renders failed GitHub checks as
+  - 'GitHub latest: unknown (<reason>)' reflecting the actual error
+  - Success line 'Latest GitHub release: <version>' and PyPI wording unchanged
+  - _format_release_report_value gains failure_prefix parameter;
+  - _GITHUB_REPORT_UNKNOWN_PREFIX constant added
+  - WORKFLOW.md call-trace and REFERENCES.md regenerated; evidence rows added
+
 ## [0.59.0](https://github.com/Ogekuri/AIBar/compare/v0.58.0..v0.59.0) - 2026-11-08
 ### ⛰️  Features
 - add pre-release verification pipeline script [useReq] *(pre-release-check)*
@@ -1718,6 +1730,7 @@
 - \[0.57.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.57.0
 - \[0.58.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.58.0
 - \[0.59.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.59.0
+- \[0.59.1\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.59.1
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1778,3 +1791,4 @@
 [0.57.0]: https://github.com/Ogekuri/AIBar/compare/v0.56.0..v0.57.0
 [0.58.0]: https://github.com/Ogekuri/AIBar/compare/v0.57.0..v0.58.0
 [0.59.0]: https://github.com/Ogekuri/AIBar/compare/v0.58.0..v0.59.0
+[0.59.1]: https://github.com/Ogekuri/AIBar/compare/v0.59.0..v0.59.1
