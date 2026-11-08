@@ -98,6 +98,11 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **PRJ-017**: MUST document `pip install aibar` and `uv`/`uvx` installations in `README.md` as alternative methods after the primary pipx flow.
 - **PRJ-018**: MUST document in `README.md` a dedicated non-primary GitHub section covering GitHub package installation, `--upgrade --develop`, and dual-repository `--version` reporting.
 - **PRJ-019**: MUST skip PyPI publication when a version tag is on `develop` and not on `master`, while the release workflow still builds artifacts and publishes the GitHub Release.
+- **PRJ-020**: MUST provide `scripts/pre-release-check.sh` that executes the pre-release verification pipeline: locked dependency synchronization, full pytest suite execution, sdist and wheel build, and built-artifact verification.
+- **PRJ-021**: `scripts/pre-release-check.sh` MUST abort with non-zero exit status before any pipeline stage when the git working tree contains uncommitted changes, unless the `--allow-dirty` flag is passed.
+- **PRJ-022**: `scripts/pre-release-check.sh` MUST execute each pipeline stage with a labeled progress header and MUST abort at the first failing stage with a non-zero exit status.
+- **PRJ-023**: `scripts/pre-release-check.sh` MUST execute the unit-test suite via `uv run pytest` and MUST fail with non-zero exit status when any test fails.
+- **PRJ-024**: `scripts/pre-release-check.sh` MUST remove stale `dist/` content, build sdist and wheel into `dist/`, and MUST fail when no sdist or no wheel artifact exists after the build.
 
 ### 2.2 Project Constraints
 - **CTN-001**: MUST resolve provider credentials with precedence: environment variable, then `~/.config/aibar/env`, then provider-specific local credential stores.
@@ -405,6 +410,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-081**: MUST verify `.github/workflows/release-pypi.yml` contains no transitional Node20 opt-out variables `ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION` and `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24`.
 - **TST-082**: MUST verify GitHub release and upgrade URLs compose from the program-name constant and the `--develop` upgrade argv pins the fetched `tag_name`.
 - **TST-083**: MUST verify the `--version` GitHub report performs one fresh releases/latest fetch per invocation and its reported version equals the tag pinned by the `--develop` upgrade argv.
+- **TST-084**: MUST verify `scripts/pre-release-check.sh` exists, is executable, gates on a dirty git tree with `--allow-dirty` opt-out, runs `uv sync --locked` and `uv run pytest`, builds sdist+wheel into `dist/`, and verifies both artifacts.
 
 ## 5. Evidence
 
@@ -623,3 +629,9 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | CTN-021 | `.github/workflows/release-pypi.yml` + `actions/checkout@v7`, `actions/setup-python@v7`, `astral-sh/setup-uv@v10`, `actions/attest-build-provenance@v4`, `softprops/action-gh-release@v3`, `actions/upload-artifact@v7`, `actions/download-artifact@v8` (upstream `runs.using: node24` verified); `mikepenz/release-changelog-builder-action@v6` resolves to node24-native `v6.5`; `pypa/gh-action-pypi-publish@release/v1` is Docker-based and Node-independent. |
 | TST-080 | `tests/test_workflow_node24_actions.py` + `TestNode24ActionPins` + Node24-major pin assertions over every workflow `uses:` reference. |
 | TST-081 | `tests/test_workflow_node24_actions.py` + `TestNode24ActionPins` + absence assertions for `ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION` and `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24`. |
+| PRJ-020 | `scripts/pre-release-check.sh` + main script body + ordered stages: `uv sync --locked`, `uv run pytest`, `python -m build`, and `dist/` artifact checks. |
+| PRJ-021 | `scripts/pre-release-check.sh` + `check_clean_working_tree` + `git status --porcelain` gate with `--allow-dirty` opt-out and non-zero abort. |
+| PRJ-022 | `scripts/pre-release-check.sh` + `run_stage` + labeled `[<index>/<total>]` stage headers with `set -euo pipefail` first-failure abort. |
+| PRJ-023 | `scripts/pre-release-check.sh` + tests stage + `uv run pytest tests/` execution with exit-code propagation. |
+| PRJ-024 | `scripts/pre-release-check.sh` + build stage + `rm -rf dist` before `uv run --with build --with setuptools --with wheel python -m build`, then non-empty `dist/*.tar.gz` and `dist/*.whl` checks. |
+| TST-084 | `tests/test_pre_release_check_script.py` + source-level assertions for executable bit, dirty-tree gate with `--allow-dirty`, stage commands (`uv sync --locked`, `uv run pytest`, build), `dist/` artifact checks, and stage ordering. |

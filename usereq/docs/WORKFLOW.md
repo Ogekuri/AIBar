@@ -40,6 +40,14 @@
   - `defining_files: .github/workflows/release-pypi.yml`
   - `thread_model: no explicit threads detected`
 
+- `id: PROC:pre-release-check`
+  - `type: Process`
+  - `parent_process: null`
+  - `role: Local pre-release verification pipeline process (tree gate, locked dependency sync, pytest, sdist/wheel build, artifact checks)`
+  - `entrypoint_symbols: main script body`
+  - `defining_files: scripts/pre-release-check.sh`
+  - `thread_model: no explicit threads detected`
+
 ## Execution Units
 
 ### PROC:aibar-launcher
@@ -393,6 +401,26 @@
   - GitHub Actions runtime and hosted runners.
   - `uv`, `python`, `git`, `zip`, and GitHub release APIs/actions.
   - PyPI Trusted Publishing (OIDC) endpoint authenticated via workflow-level `id-token: write` permission; Trusted Publisher registered for project `aibar`, repository `Ogekuri/AiBar`, workflow `release-pypi.yml`; the project is published at `https://pypi.org/project/aibar/`.
+
+### PROC:pre-release-check
+- `Entrypoints`
+  - External entrypoint: script body [`scripts/pre-release-check.sh`].
+- `Lifecycle/Trigger`
+  - Starts when a maintainer invokes `scripts/pre-release-check.sh` before tagging an official release.
+  - Accepts the optional `--allow-dirty` flag; `-h`/`--help` prints usage and exits; unknown arguments exit with code 2.
+  - Executes five labeled stages in order and aborts at the first failing stage with a non-zero exit status: (1) clean git working-tree gate (skipped only with `--allow-dirty`), (2) dependency sync locked to `uv.lock`, (3) full pytest unit-test suite, (4) sdist and wheel build into `dist/`, (5) built-artifact verification.
+- `Internal Call-Trace Tree`
+  - No internal functions defined under `src/`; orchestration occurs at external process boundaries.
+    - `check_clean_working_tree(...)`: clean-tree gate stage implementation with `--allow-dirty` opt-out, `git status --porcelain` inspection, and explicit non-zero abort on dirty tree [`scripts/pre-release-check.sh`]
+    - `build_distribution(...)`: build stage implementation removing stale `dist/` and mirroring the release workflow build command [`scripts/pre-release-check.sh`]
+    - `require_dist_artifacts(...)`: artifact verification stage implementation scanning `dist/*.tar.gz` and `dist/*.whl` with explicit error on missing artifacts [`scripts/pre-release-check.sh`]
+    - `run_stage(...)`: labeled `[<executed>/<total>]` stage wrapper providing progress headers and first-failure abort via `set -euo pipefail` [`scripts/pre-release-check.sh`]
+- `External Boundaries`
+  - Declaration: `scripts/pre-release-check.sh`.
+  - `git status --porcelain`: working-tree cleanliness gate.
+  - `uv sync --locked`: dependency synchronization validated against the tracked `uv.lock` (CTN-018, REQ-087).
+  - `uv run pytest tests/`: pytest suite execution resolving the project environment.
+  - `uv run --with build --with setuptools --with wheel python -m build`: sdist+wheel build identical to the `build-release` job of `PROC:release-pypi`, writing `dist/aibar-<version>.tar.gz` and `dist/aibar-<version>-py3-none-any.whl`.
 
 ## Communication Edges
 
