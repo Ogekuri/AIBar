@@ -139,6 +139,18 @@ _UPGRADE_LIFECYCLE_COMMAND: list[str] = [
     "--force",
 ]
 _UNINSTALL_LIFECYCLE_COMMAND: list[str] = ["uv", "tool", "uninstall", "aibar"]
+# @brief Forcing options inserted into upgrade lifecycle argv on `--force`.
+# @details Inserted by `_insert_upgrade_force_options` immediately after the
+# `--force` token of the resolved upgrade command so `--upgrade --force`
+# (optionally combined with `--develop`/`--dev`) forces the full package
+# download and reinstallation via
+# `uv tool install ... --force --reinstall --refresh` (REQ-197, REQ-198);
+# standard-process invocations keep the exact CTN-015 command strings without
+# these options.
+# @satisfies REQ-196
+# @satisfies REQ-197
+# @satisfies REQ-198
+_UPGRADE_FORCE_OPTIONS: list[str] = ["--reinstall", "--refresh"]
 # @brief GitHub releases API endpoint used by release reporting and upgrades.
 # @details Composed from the single program-name constant `PROGRAM_NAME`
 # (current program name, REQ-191) as
@@ -769,6 +781,49 @@ def _github_upgrade_requested_from_args(args: Sequence[str] | None) -> bool:
     )
 
 
+def _upgrade_force_requested_from_args(args: Sequence[str] | None) -> bool:
+    """
+    @brief Detect whether `--upgrade` must force full download and reinstallation.
+    @details Returns true when invocation arguments contain the literal token
+    `--force`, independent of ordering relative to the eager `--upgrade`
+    callback execution. Consumed only by `_resolve_upgrade_lifecycle_command`
+    during `--upgrade` handling, so the token has no effect on invocations
+    without `--upgrade` (REQ-196). Complexity O(A) over argv tokens A; space
+    O(A).
+    @param args {Sequence[str] | None} CLI argv sequence; `None` uses `sys.argv[1:]`.
+    @return {bool} True when the forced upgrade mode is requested.
+    @satisfies REQ-196
+    """
+    argument_tokens = list(args) if args is not None else list(sys.argv[1:])
+    return any(
+        token == "--force" for token in argument_tokens if isinstance(token, str)
+    )
+
+
+def _insert_upgrade_force_options(command: list[str]) -> list[str]:
+    """
+    @brief Insert forcing options into one upgrade lifecycle argv.
+    @details Locates the uv `--force` token and inserts `_UPGRADE_FORCE_OPTIONS`
+    (`--reinstall`, `--refresh`) immediately after it, yielding
+    `uv tool install aibar --force --reinstall --refresh` for the PyPI source
+    (REQ-197) and
+    `uv tool install --force --reinstall --refresh git+<repo>@<tag_name>` for
+    the GitHub source (REQ-198). Returns a new list; commands without a
+    `--force` token are copied unchanged. Complexity O(C) over argv tokens C;
+    space O(C).
+    @param command {list[str]} Resolved upgrade lifecycle argv.
+    @return {list[str]} Forced upgrade argv when the `--force` token exists;
+    otherwise an unchanged copy.
+    @satisfies REQ-196
+    @satisfies REQ-197
+    @satisfies REQ-198
+    """
+    if "--force" not in command:
+        return list(command)
+    anchor = command.index("--force") + 1
+    return command[:anchor] + list(_UPGRADE_FORCE_OPTIONS) + command[anchor:]
+
+
 def _resolve_github_upgrade_lifecycle_command() -> list[str] | None:
     """
     @brief Build the GitHub upgrade argv pinned to the latest GitHub release tag.
@@ -812,9 +867,14 @@ def _resolve_upgrade_lifecycle_command() -> list[str] | None:
     @brief Resolve the `--upgrade` lifecycle command source from argv.
     @details Returns a copy of the tag-pinned GitHub uv install command when
     argv contains `--develop` or `--dev`; otherwise returns a copy of the
-    default PyPI install command. Returns None when the GitHub source is
-    requested but the latest GitHub release tag cannot be resolved (REQ-190).
-    Complexity O(A) over argv tokens A; space O(1) beyond constants.
+    default PyPI install command. When argv contains `--force`, inserts the
+    `_UPGRADE_FORCE_OPTIONS` forcing options (`--reinstall`, `--refresh`)
+    after the command's `--force` token so the upgrade forces the full
+    package download and reinstallation (REQ-196, REQ-197, REQ-198);
+    standard-process invocations keep the exact CTN-015 command strings.
+    Returns None when the GitHub source is requested but the latest GitHub
+    release tag cannot be resolved (REQ-190). Complexity O(A) over argv
+    tokens A; space O(1) beyond constants.
     @return {list[str] | None} Lifecycle command argv for `--upgrade`, or None
     when the GitHub release tag is unresolved.
     @satisfies CTN-015
@@ -823,10 +883,19 @@ def _resolve_upgrade_lifecycle_command() -> list[str] | None:
     @satisfies REQ-177
     @satisfies REQ-189
     @satisfies REQ-190
+    @satisfies REQ-196
+    @satisfies REQ-197
+    @satisfies REQ-198
     """
     if _github_upgrade_requested_from_args(None):
-        return _resolve_github_upgrade_lifecycle_command()
-    return list(_UPGRADE_LIFECYCLE_COMMAND)
+        upgrade_command = _resolve_github_upgrade_lifecycle_command()
+    else:
+        upgrade_command = list(_UPGRADE_LIFECYCLE_COMMAND)
+    if upgrade_command is None:
+        return None
+    if _upgrade_force_requested_from_args(None):
+        upgrade_command = _insert_upgrade_force_options(upgrade_command)
+    return upgrade_command
 
 
 def _execute_lifecycle_subprocess(command: list[str]) -> int:
@@ -898,7 +967,9 @@ def _handle_upgrade_option(
     """
     @brief Handle eager `--upgrade` lifecycle option callback.
     @details Resolves the upgrade command source (PyPI by default; tag-pinned
-    GitHub when argv contains `--develop`/`--dev`), executes the lifecycle
+    GitHub when argv contains `--develop`/`--dev`; the resolved argv carries
+    the `--reinstall --refresh` forcing options when argv also contains
+    `--force`, REQ-197/REQ-198), executes the lifecycle
     subprocess on Linux, and exits with propagated subprocess code; on
     non-Linux emits manual command guidance for the resolved command and
     exits without subprocess execution. When the latest GitHub release tag
@@ -2758,6 +2829,8 @@ def _build_cached_dual_window_results(
         "  aibar --version              Show installed version\n"
         "  aibar --upgrade              Upgrade from PyPI via uv\n"
         "  aibar --upgrade --develop    Upgrade from GitHub via uv\n"
+        "  aibar --upgrade --force            Upgrade from PyPI forcing full re-install\n"
+        "  aibar --upgrade --develop --force  Upgrade from GitHub forcing full re-install\n"
         "  aibar --uninstall            Uninstall via uv\n"
         "  aibar --enable-log           Enable runtime execution log\n"
         "  aibar --disable-log          Disable runtime execution log\n"
@@ -2789,6 +2862,12 @@ def _build_cached_dual_window_results(
     is_flag=True,
     expose_value=False,
     help="With --upgrade: install the GitHub package instead of PyPI.",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    expose_value=False,
+    help="With --upgrade: force full package download and reinstallation.",
 )
 @click.option(
     "--uninstall",

@@ -122,7 +122,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **CTN-012**: MUST use hardcoded startup update-check constants `idle_delay_seconds=300` and `http_timeout_seconds=2`.
 - **CTN-013**: MUST persist startup update-check idle state in `~/.cache/aibar/check_version_idle-time.json` JSON with epoch and human-readable `last_success_at` and `idle_until`.
 - **CTN-014**: MUST perform at most one startup update HTTP check per 300 seconds unless `~/.cache/aibar/check_version_idle-time.json` is missing or expired.
-- **CTN-015**: MUST use lifecycle command strings exactly as `uv tool install aibar --force` (PyPI), `uv tool install --force git+https://github.com/Ogekuri/<program-name>@<tag_name>` (GitHub), and `uv tool uninstall aibar`.
+- **CTN-015**: MUST use standard-process lifecycle command strings exactly as `uv tool install aibar --force` (PyPI), `uv tool install --force git+https://github.com/Ogekuri/<program-name>@<tag_name>` (GitHub), and `uv tool uninstall aibar`.
 - **CTN-017**: MUST persist `enabled_providers` in `~/.config/aibar/config.json` as provider-keyed booleans for `agy`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, and `zai`; missing keys MUST default to `true`.
 - **CTN-018**: MUST declare `requires-python >= 3.12` in `pyproject.toml` and pin `.python-version` to a Python 3.12+ interpreter so `uv run` never resolves Python 3.11.
 - **CTN-019**: MUST declare `pytest` under `[dependency-groups]` `dev` in `pyproject.toml`, outside runtime `[project]` `dependencies`.
@@ -155,6 +155,9 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-175**: `aibar login` without `--provider` MUST exit with non-zero status when at least one executed login flow fails.
 - **REQ-176**: MUST expose global flag `--develop` with equivalent alias `--dev` that selects the GitHub package source only for `--upgrade` and has no effect on other invocations.
 - **REQ-177**: MUST execute `uv tool install --force git+https://github.com/Ogekuri/<program-name>@<tag_name>` on Linux when `--upgrade` is provided with `--develop` or `--dev`, propagating subprocess exit status.
+- **REQ-196**: MUST expose global flag `--force` that selects forced download and full reinstallation mode only for `--upgrade` invocations and has no effect on other invocations.
+- **REQ-197**: MUST execute `uv tool install aibar --force --reinstall --refresh` (PyPI index) on Linux when `--upgrade` is provided with `--force` without `--develop`/`--dev`, propagating subprocess exit status.
+- **REQ-198**: MUST execute `uv tool install --force --reinstall --refresh git+https://github.com/Ogekuri/<program-name>@<tag_name>` (GitHub) on Linux when `--upgrade` with `--develop`/`--dev` is provided with `--force`, propagating subprocess exit status.
 - **REQ-189**: MUST resolve the `--develop`/`--dev` upgrade source tag by fetching `tag_name` from `https://api.github.com/repos/Ogekuri/<program-name>/releases/latest`, independent of the branch carrying the tag, before executing the GitHub lifecycle install.
 - **REQ-190**: MUST exit `--upgrade` with `--develop`/`--dev` using non-zero status and a bright-red diagnostic, without executing `uv tool install`, when the latest GitHub release tag cannot be resolved.
 - **REQ-191**: MUST define the GitHub program name once as the current program name `aibar` and compose all GitHub release and upgrade URLs from it without duplicated repository literals.
@@ -257,7 +260,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-129**: CLI `show` text mode MUST render Copilot `Cost: <currency_symbol><value>` after one blank line following `Remaining credits` and MUST NOT render `Window <window>` heading text.
 - **REQ-117**: GNOME Copilot card MUST render `Cost: <currency_symbol><value>` from `metrics.cost` (fallback `premium_requests_extra_cost`), including `0`, preserving existing Copilot typography and spacing.
 - **REQ-118**: GNOME panel status bar MUST place Copilot `<currency_symbol><cost>` immediately after Copilot percentages and before Codex status labels when Copilot cost is available.
-- **REQ-068**: Bare `aibar` and `aibar --help` MUST print human-readable usage text listing all commands and global or command-specific options, including `show --force`, `show --json`, `gnome-install`, `gnome-uninstall`, `--version`, `--upgrade`, `--uninstall`, `--enable-log`/`--disable-log`, and `--enable-debug`/`--disable-debug` examples, without Doxygen tags.
+- **REQ-068**: Bare `aibar` and `aibar --help` MUST print human-readable usage text listing all commands and global or command-specific options, including `show --force`, `show --json`, `gnome-install`, `gnome-uninstall`, `--version`, `--upgrade` optionally combined with `--develop`/`--dev` and auxiliary `--force`, `--uninstall`, `--enable-log`/`--disable-log`, and `--enable-debug`/`--disable-debug` examples, without Doxygen tags.
 - **REQ-069**: GNOME panel icon MUST be bright white when all percentages are <= 25, bright yellow when any percentage > 25, bright orange when any percentage > 50, bright red when any percentage > 75, and blinking bright-red/dim-red when any percentage > 90.
 - **REQ-070**: MUST execute startup update-check preflight before CLI argument validation and command dispatch.
 - **REQ-071**: MUST skip startup update HTTP calls while current epoch is lower than persisted `idle_until` in `~/.cache/aibar/check_version_idle-time.json`, except when invocation includes `--version`.
@@ -418,6 +421,8 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-084**: MUST verify `scripts/pre-release-check.sh` exists, is executable, gates on a dirty git tree with `--allow-dirty` opt-out, runs `uv sync --locked` and `uv run pytest`, builds sdist+wheel into `dist/`, and verifies both artifacts.
 - **TST-085**: MUST verify `scripts/pre-release-check.sh` registers an EXIT trap removing `dist/`, `.pytest_cache/`, and `__pycache__` trees under `src/` and `tests/`, independent of pipeline outcome.
 - **TST-086**: MUST verify `.github/workflows/release-pypi.yml` declares a `unit-tests` job running `uv sync --locked` and `uv run pytest tests/`, and gates `build-release` on `unit-tests`.
+- **TST-087**: MUST verify Linux `--upgrade --force` executes the PyPI forced lifecycle argv `uv tool install aibar --force --reinstall --refresh` with exit-code propagation and non-Linux `--upgrade --force` prints manual guidance containing the forced command without subprocess execution.
+- **TST-088**: MUST verify Linux `--upgrade` with `--develop`/`--dev` and `--force` executes the tag-pinned GitHub forced lifecycle argv `uv tool install --force --reinstall --refresh git+https://github.com/Ogekuri/<program-name>@<tag_name>` with exit-code propagation.
 
 ## 5. Evidence
 
@@ -649,3 +654,8 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | PRJ-026 | `.github/workflows/release-pypi.yml` + `unit-tests` job + `uv sync --locked` step and `uv run pytest tests/` step with Python 3.12/uv setup pins. |
 | PRJ-027 | `.github/workflows/release-pypi.yml` + `build-release` job + `needs: [check-branch, unit-tests]` gating so artifact creation and transitive `publish-pypi` never run on test failure. |
 | TST-086 | `tests/test_release_workflow_test_gate.py` + source-level assertions for the `unit-tests` job steps and the `build-release` needs gate. |
+| REQ-196 | `src/aibar/aibar/cli.py` + `--force` group option declaration and `_upgrade_force_requested_from_args` argv-token detection consumed only by `_resolve_upgrade_lifecycle_command` for `--upgrade`. |
+| REQ-197 | `src/aibar/aibar/cli.py` + `_UPGRADE_FORCE_OPTIONS`/`_insert_upgrade_force_options`/`_resolve_upgrade_lifecycle_command` produce argv `uv tool install aibar --force --reinstall --refresh` when `--upgrade` is combined with `--force`. |
+| REQ-198 | `src/aibar/aibar/cli.py` + `_resolve_upgrade_lifecycle_command` inserts `_UPGRADE_FORCE_OPTIONS` after the `--force` token of the tag-pinned GitHub argv, yielding `uv tool install --force --reinstall --refresh git+https://github.com/Ogekuri/<program-name>@<tag_name>`. |
+| TST-087 | `tests/test_cli_startup_update_preflight.py` + forced-lifecycle parametrized tests asserting the PyPI forced argv with exit-code propagation and non-Linux manual guidance carrying the forced command without subprocess execution. |
+| TST-088 | `tests/test_github_upgrade_program_name.py` + forced resolver assertions pinning the fetched `tag_name` into the forced GitHub argv and unresolved-tag abort preserved under `--force`. |

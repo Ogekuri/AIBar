@@ -10,13 +10,17 @@ substitutes; assertions are behavior-focused per HDT principles.
 @satisfies TST-078
 @satisfies TST-079
 @satisfies TST-082
+@satisfies TST-088
 @satisfies CTN-020
 @satisfies REQ-177
 @satisfies REQ-189
 @satisfies REQ-190
 @satisfies REQ-191
+@satisfies REQ-196
+@satisfies REQ-198
 """
 
+import sys
 from unittest.mock import patch
 
 from aibar import PROGRAM_NAME
@@ -104,6 +108,42 @@ class TestGithubUpgradeProgramName:
             cli, "_fetch_github_latest_release", return_value=arrange_response
         ):
             assert cli._resolve_github_upgrade_lifecycle_command() == expected_output
+
+    def test_develop_force_upgrade_pins_fetched_tag_name(self) -> None:
+        """
+        @brief Verify the --develop --force resolver pins the forced GitHub argv.
+        @details Arranges `sys.argv` carrying `--upgrade --develop --force` and
+        a successful release-check substitute with `raw_tag`, invokes
+        `_resolve_upgrade_lifecycle_command`, and asserts the argv equals
+        `uv tool install --force --reinstall --refresh
+        git+https://github.com/Ogekuri/aibar@<tag>` with the raw tag preserved
+        (leading `v` intact, no branch filtering).
+        @return {None} Function return value.
+        @satisfies TST-088
+        @satisfies REQ-196
+        @satisfies REQ-198
+        """
+        arrange_response = cli.StartupReleaseCheckResponse(
+            latest_version="9.9.9",
+            status_code=200,
+            error_message=None,
+            retry_after_seconds=0,
+            raw_tag="v9.9.9",
+        )
+        arrange_argv: list[str] = ["aibar", "--upgrade", "--develop", "--force"]
+        expected_output: list[str] = [
+            "uv",
+            "tool",
+            "install",
+            "--force",
+            "--reinstall",
+            "--refresh",
+            f"git+https://github.com/Ogekuri/{PROGRAM_NAME}@v9.9.9",
+        ]
+        with patch.object(sys, "argv", arrange_argv), patch.object(
+            cli, "_fetch_github_latest_release", return_value=arrange_response
+        ):
+            assert cli._resolve_upgrade_lifecycle_command() == expected_output
 
     def test_unresolved_tag_returns_none_without_argv(self) -> None:
         """

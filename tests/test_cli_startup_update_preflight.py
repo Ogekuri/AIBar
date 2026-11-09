@@ -12,6 +12,11 @@ option behavior for `--version`.
 @satisfies TST-041
 @satisfies TST-036
 @satisfies TST-070
+@satisfies TST-087
+@satisfies TST-088
+@satisfies REQ-196
+@satisfies REQ-197
+@satisfies REQ-198
 """
 
 import json
@@ -355,6 +360,246 @@ def test_lifecycle_flags_on_non_linux_emit_manual_guidance_without_subprocess(
     assert f"Run manually: {' '.join(expected_command)}" in result.output
     assert startup_state_path.exists()
     assert startup_cache_sentinel_path.exists()
+
+
+def test_upgrade_force_flag_executes_forced_pypi_command_and_propagates_exit_code(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """
+    @brief Verify `--upgrade --force` executes the forced PyPI lifecycle argv.
+    @details Mocks subprocess execution and the startup release fetch, invokes
+    the CLI with `--upgrade --force`, and asserts the exact forced argv
+    `uv tool install aibar --force --reinstall --refresh` plus propagated
+    subprocess exit code. `sys.argv` is synchronized with the invoked tokens
+    because the resolver performs argv-token detection.
+    @param monkeypatch {pytest.MonkeyPatch} Pytest monkeypatch fixture.
+    @param tmp_path {Path} Temporary filesystem root for HOME isolation.
+    @return {None} Function return value.
+    @satisfies TST-087
+    @satisfies REQ-197
+    """
+    observed_commands: list[list[str]] = []
+
+    def _fake_run(command: list[str], check: bool) -> subprocess.CompletedProcess[str]:
+        """
+        @brief Capture lifecycle subprocess command invocation.
+        @param command {list[str]} Subprocess argv.
+        @param check {bool} Subprocess check argument.
+        @return {subprocess.CompletedProcess[str]} Completed process stub.
+        """
+        assert check is False
+        observed_commands.append(command)
+        return subprocess.CompletedProcess(command, returncode=7)
+
+    def _fake_fetch() -> cli_module.StartupReleaseCheckResponse:
+        """
+        @brief Return deterministic startup release-check substitute.
+        @return {StartupReleaseCheckResponse} Successful response without update notice.
+        """
+        return cli_module.StartupReleaseCheckResponse(
+            latest_version=None,
+            status_code=200,
+            error_message=None,
+            retry_after_seconds=0,
+            raw_tag=None,
+        )
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr("sys.argv", ["aibar", "--upgrade", "--force"])
+    monkeypatch.setattr(cli_module.subprocess, "run", _fake_run)
+    monkeypatch.setattr(cli_module, "_fetch_startup_latest_release", _fake_fetch)
+    monkeypatch.setattr(cli_module, "_is_linux_runtime", lambda: True)
+    runner = CliRunner()
+    result = runner.invoke(main, ["--upgrade", "--force"])
+
+    expected_command: list[str] = [
+        "uv",
+        "tool",
+        "install",
+        "aibar",
+        "--force",
+        "--reinstall",
+        "--refresh",
+    ]
+    assert result.exit_code == 7
+    assert observed_commands == [expected_command]
+
+
+def test_upgrade_develop_force_executes_forced_github_command_and_propagates_exit_code(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """
+    @brief Verify `--upgrade --develop --force` executes the forced GitHub argv.
+    @details Mocks subprocess execution and the GitHub release fetch, invokes
+    the CLI with `--upgrade --develop --force`, and asserts the exact forced
+    argv `uv tool install --force --reinstall --refresh
+    git+https://github.com/Ogekuri/aibar@<tag_name>` plus propagated exit code.
+    `sys.argv` is synchronized with the invoked tokens because the resolver
+    performs argv-token detection.
+    @param monkeypatch {pytest.MonkeyPatch} Pytest monkeypatch fixture.
+    @param tmp_path {Path} Temporary filesystem root for HOME isolation.
+    @return {None} Function return value.
+    @satisfies TST-088
+    @satisfies REQ-198
+    """
+    observed_commands: list[list[str]] = []
+
+    def _fake_run(command: list[str], check: bool) -> subprocess.CompletedProcess[str]:
+        """
+        @brief Capture lifecycle subprocess command invocation.
+        @param command {list[str]} Subprocess argv.
+        @param check {bool} Subprocess check argument.
+        @return {subprocess.CompletedProcess[str]} Completed process stub.
+        """
+        assert check is False
+        observed_commands.append(command)
+        return subprocess.CompletedProcess(command, returncode=5)
+
+    def _fake_github_fetch() -> cli_module.StartupReleaseCheckResponse:
+        """
+        @brief Return deterministic GitHub release-check substitute.
+        @return {StartupReleaseCheckResponse} Response pinning raw tag `v1.2.3`.
+        """
+        return cli_module.StartupReleaseCheckResponse(
+            latest_version="1.2.3",
+            status_code=200,
+            error_message=None,
+            retry_after_seconds=0,
+            raw_tag="v1.2.3",
+        )
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr("sys.argv", ["aibar", "--upgrade", "--develop", "--force"])
+    monkeypatch.setattr(cli_module.subprocess, "run", _fake_run)
+    monkeypatch.setattr(cli_module, "_fetch_startup_latest_release", _fake_github_fetch)
+    monkeypatch.setattr(cli_module, "_fetch_github_latest_release", _fake_github_fetch)
+    monkeypatch.setattr(cli_module, "_is_linux_runtime", lambda: True)
+    runner = CliRunner()
+    result = runner.invoke(main, ["--upgrade", "--develop", "--force"])
+
+    expected_command: list[str] = [
+        "uv",
+        "tool",
+        "install",
+        "--force",
+        "--reinstall",
+        "--refresh",
+        "git+https://github.com/Ogekuri/aibar@v1.2.3",
+    ]
+    assert result.exit_code == 5
+    assert observed_commands == [expected_command]
+
+
+def test_upgrade_force_flag_on_non_linux_emits_forced_manual_guidance(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """
+    @brief Verify non-Linux `--upgrade --force` prints forced manual guidance.
+    @details Forces the non-Linux runtime branch, asserts no subprocess is
+    executed, and validates the guidance carries the forced command
+    `uv tool install aibar --force --reinstall --refresh`. `sys.argv` is
+    synchronized with the invoked tokens because the resolver performs
+    argv-token detection.
+    @param monkeypatch {pytest.MonkeyPatch} Pytest monkeypatch fixture.
+    @param tmp_path {Path} Temporary filesystem root for HOME isolation.
+    @return {None} Function return value.
+    @satisfies TST-087
+    @satisfies REQ-196
+    @satisfies REQ-089
+    """
+    observed_commands: list[list[str]] = []
+
+    def _fake_run(command: list[str], check: bool) -> subprocess.CompletedProcess[str]:
+        """
+        @brief Capture unexpected subprocess invocation in non-Linux branch.
+        @param command {list[str]} Subprocess argv.
+        @param check {bool} Subprocess check argument.
+        @return {subprocess.CompletedProcess[str]} Completed process stub.
+        """
+        observed_commands.append(command)
+        return subprocess.CompletedProcess(command, returncode=0)
+
+    def _fake_fetch() -> cli_module.StartupReleaseCheckResponse:
+        """
+        @brief Return deterministic startup release-check substitute.
+        @return {StartupReleaseCheckResponse} Successful response without update notice.
+        """
+        return cli_module.StartupReleaseCheckResponse(
+            latest_version=None,
+            status_code=200,
+            error_message=None,
+            retry_after_seconds=0,
+            raw_tag=None,
+        )
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr("sys.argv", ["aibar", "--upgrade", "--force"])
+    monkeypatch.setattr(cli_module.subprocess, "run", _fake_run)
+    monkeypatch.setattr(cli_module, "_fetch_startup_latest_release", _fake_fetch)
+    monkeypatch.setattr(cli_module, "_is_linux_runtime", lambda: False)
+    monkeypatch.setattr(cli_module.platform, "system", lambda: "Darwin")
+    runner = CliRunner()
+    result = runner.invoke(main, ["--upgrade", "--force"])
+
+    assert result.exit_code == 1
+    assert observed_commands == []
+    assert "--upgrade is supported only on Linux." in result.output
+    assert (
+        "Run manually: uv tool install aibar --force --reinstall --refresh"
+        in result.output
+    )
+
+
+def test_force_flag_without_upgrade_does_not_execute_lifecycle(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """
+    @brief Verify `--force` without `--upgrade` executes no lifecycle command.
+    @details Mocks subprocess execution and the startup release fetch, invokes
+    the bare CLI with `--force`, and asserts no lifecycle subprocess runs and
+    the invocation exits successfully (usage output only).
+    @param monkeypatch {pytest.MonkeyPatch} Pytest monkeypatch fixture.
+    @param tmp_path {Path} Temporary filesystem root for HOME isolation.
+    @return {None} Function return value.
+    @satisfies REQ-196
+    """
+    observed_commands: list[list[str]] = []
+
+    def _fake_run(command: list[str], check: bool) -> subprocess.CompletedProcess[str]:
+        """
+        @brief Capture unexpected lifecycle subprocess invocation.
+        @param command {list[str]} Subprocess argv.
+        @param check {bool} Subprocess check argument.
+        @return {subprocess.CompletedProcess[str]} Completed process stub.
+        """
+        observed_commands.append(command)
+        return subprocess.CompletedProcess(command, returncode=0)
+
+    def _fake_fetch() -> cli_module.StartupReleaseCheckResponse:
+        """
+        @brief Return deterministic startup release-check substitute.
+        @return {StartupReleaseCheckResponse} Successful response without update notice.
+        """
+        return cli_module.StartupReleaseCheckResponse(
+            latest_version=None,
+            status_code=200,
+            error_message=None,
+            retry_after_seconds=0,
+            raw_tag=None,
+        )
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(cli_module.subprocess, "run", _fake_run)
+    monkeypatch.setattr(cli_module, "_fetch_startup_latest_release", _fake_fetch)
+    runner = CliRunner()
+    result = runner.invoke(main, ["--force"])
+
+    assert result.exit_code == 0
+    assert observed_commands == []
 
 
 def test_version_prints_installed_version_without_dispatch(
