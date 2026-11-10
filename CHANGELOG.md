@@ -1,7 +1,15 @@
 # Changelog
 
-## [0.59.2](https://github.com/Ogekuri/AIBar/compare/v0.59.0..v0.59.2) - 2026-11-09
+## [0.59.3](https://github.com/Ogekuri/AIBar/compare/v0.59.0..v0.59.3) - 2026-11-10
 ### 🚜  Changes
+- align --version report into three labeled lines [useReq] *(cli)*
+--version/--ver now prints exactly three stdout lines with
+left-justified labels padded to one shared 18-character field so all
+colons align: Current Installed, Latest @ PyPI, Latest @ GitHub
+(REQ-199, TST-089 added). GitHub fetch failures render the aligned
+failure value unknown (<reason>) instead of the former standalone
+line (REQ-195 updated); bare stdout version line removed.
+Version-report tests realigned; WORKFLOW/REFERENCES regenerated.
 - add --force flag forcing full upgrade re-install [useReq] *(cli)*
 REQUIREMENTS: add REQ-196/197/198 (global --force for --upgrade;
 forced uv lifecycle argv with --reinstall --refresh) and TST-087/088;
@@ -1469,7 +1477,7 @@ rebuild Execution Units Index for usage_tui and GNOME extension; add internal ca
 - \[0.57.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.57.0
 - \[0.58.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.58.0
 - \[0.59.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.59.0
-- \[0.59.2\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.59.2
+- \[0.59.3\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.59.3
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1530,4 +1538,4 @@ rebuild Execution Units Index for usage_tui and GNOME extension; add internal ca
 [0.57.0]: https://github.com/Ogekuri/AIBar/compare/v0.56.0..v0.57.0
 [0.58.0]: https://github.com/Ogekuri/AIBar/compare/v0.57.0..v0.58.0
 [0.59.0]: https://github.com/Ogekuri/AIBar/compare/v0.58.0..v0.59.0
-[0.59.2]: https://github.com/Ogekuri/AIBar/compare/v0.59.0..v0.59.2
+[0.59.3]: https://github.com/Ogekuri/AIBar/compare/v0.59.0..v0.59.3
