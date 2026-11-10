@@ -187,16 +187,30 @@ _GITHUB_UPGRADE_BASE_COMMAND: list[str] = [
 # @satisfies REQ-189
 # @satisfies REQ-191
 _GITHUB_UPGRADE_REPO_URL = f"git+https://github.com/Ogekuri/{PROGRAM_NAME}"
-# @brief Fixed prefix of the `--version` GitHub latest-release failure line.
+# @brief Fixed prefix of the `--version` GitHub latest-release failure value.
 # @details When the GitHub releases/latest check fails (any HTTP error,
-# including 404), `_emit_version_option_release_report` renders the failure
-# line `<prefix> (<reason>)` with this prefix, so the displayed message
-# reports `GitHub latest: unknown (<reason>)` where `<reason>` is the
+# including 404), `_emit_version_option_release_report` renders the aligned
+# `Latest @ GitHub` report line with the failure value `<prefix> (<reason>)`
+# using this prefix, so the displayed message reports
+# `Latest @ GitHub   : unknown (<reason>)` where `<reason>` is the
 # normalized fetch failure message from `_fetch_github_latest_release`
-# (REQ-194); the success line keeps the `Latest GitHub release: <version>`
-# label.
+# (REQ-194).
 # @satisfies REQ-195
-_GITHUB_REPORT_UNKNOWN_PREFIX = "GitHub latest: unknown"
+_GITHUB_REPORT_UNKNOWN_PREFIX = "unknown"
+# @brief Shared label-field width of the aligned `--version`/`--ver` report.
+# @details Every report label is left-justified inside this field width so the
+# `: <version-value>` separator column aligns vertically across the three
+# report lines (`Current Installed`, `Latest @ PyPI`, `Latest @ GitHub`).
+# @satisfies REQ-199
+_VERSION_REPORT_LABEL_WIDTH = 18
+# @brief Left-justified labels of the three `--version`/`--ver` report lines.
+# @details Rendered in declaration order (installed version, latest PyPI
+# release, latest GitHub release); each label is padded to
+# `_VERSION_REPORT_LABEL_WIDTH` and followed by `: <version-value>`.
+# @satisfies REQ-199
+_VERSION_REPORT_INSTALLED_LABEL = "Current Installed"
+_VERSION_REPORT_PYPI_LABEL = "Latest @ PyPI"
+_VERSION_REPORT_GITHUB_LABEL = "Latest @ GitHub"
 _LOG_FAILURE_CATEGORY_OAUTH = "oauth"
 _LOG_FAILURE_CATEGORY_RATE_LIMIT = "rate_limit"
 
@@ -1049,8 +1063,9 @@ def _format_release_report_value(
     `release metadata unavailable` fallback. The default prefix preserves the
     PyPI report wording; the GitHub call site passes the
     `_GITHUB_REPORT_UNKNOWN_PREFIX` prefix so a failed releases/latest check
-    (any HTTP error, including 404) renders the mandated
-    `GitHub latest: unknown (<reason>)` failure line (REQ-195). For GitHub
+    (any HTTP error, including 404) renders the failure value
+    `unknown (<reason>)` inside the aligned `Latest @ GitHub` report line
+    (REQ-195). For GitHub
     responses the success value equals the raw tag minus its leading `v`
     prefix (`_normalize_github_release_tag`), so the reported version is
     exactly the release pinned by `--upgrade --develop`/`--dev` (REQ-193).
@@ -1068,20 +1083,40 @@ def _format_release_report_value(
     return f"{failure_prefix} ({reason})"
 
 
+def _format_version_report_line(label: str, value: str) -> str:
+    """
+    @brief Render one aligned label line of the `--version`/`--ver` report.
+    @details Left-justifies the label inside the shared
+    `_VERSION_REPORT_LABEL_WIDTH` field and appends `: <value>` so the three
+    report lines (`Current Installed`, `Latest @ PyPI`, `Latest @ GitHub`)
+    align their colon separator vertically. Complexity O(W) over rendered
+    width W; space O(W).
+    @param label {str} Report label text (`Current Installed`, `Latest @ PyPI`, or `Latest @ GitHub`).
+    @param value {str} Version value rendered after the aligned colon separator.
+    @return {str} One aligned report line `<label padded to 18> : <value>`.
+    @satisfies REQ-199
+    """
+    return f"{label:<{_VERSION_REPORT_LABEL_WIDTH}}: {value}"
+
+
 def _emit_version_option_release_report() -> None:
     """
-    @brief Emit labeled latest-release availability lines for `--version`.
+    @brief Emit the aligned three-line `--version`/`--ver` release report.
     @details Reuses the cached startup PyPI release-check response when the
     forced preflight already fetched it (falling back to one direct fetch),
     executes exactly one fresh GitHub release fetch per invocation (never
     idle-gated, REQ-192) against the program-name releases/latest endpoint,
-    and prints one labeled line per repository to stderr so stdout remains
-    the parseable installed version. The GitHub line reports the same
-    release that `--upgrade --develop`/`--dev` installs (REQ-193). A failed
-    GitHub releases/latest check (any HTTP error, including 404, normalized
-    by `_fetch_github_latest_release` per REQ-194) renders the failure line
-    `GitHub latest: unknown (<reason>)` (REQ-195) instead of the success
-    label, where `<reason>` is the fetch failure message.
+    and prints exactly three stdout lines with left-justified labels
+    `Current Installed`, `Latest @ PyPI`, and `Latest @ GitHub` padded to one
+    shared field width so all colons align (REQ-199): the installed package
+    version, the latest PyPI release value, and the latest GitHub release
+    value. The GitHub line reports the same release that
+    `--upgrade --develop`/`--dev` installs (REQ-193). A failed GitHub
+    releases/latest check (any HTTP error, including 404, normalized by
+    `_fetch_github_latest_release` per REQ-194) renders the GitHub line with
+    failure value `unknown (<reason>)` (REQ-195), where `<reason>` is the
+    fetch failure message; the PyPI line renders failure value
+    `unavailable (<reason>)`.
     Complexity O(1) beyond one HTTP request per repository.
     @return {None} Function return value.
     @satisfies CTN-011
@@ -1090,26 +1125,27 @@ def _emit_version_option_release_report() -> None:
     @satisfies REQ-192
     @satisfies REQ-193
     @satisfies REQ-195
+    @satisfies REQ-199
     """
     pypi_response = _LAST_PYPI_RELEASE_CHECK or _fetch_startup_latest_release()
     github_response = _fetch_github_latest_release()
     click.echo(
-        f"Latest PyPI release: {_format_release_report_value(pypi_response)}",
-        err=True,
+        _format_version_report_line(_VERSION_REPORT_INSTALLED_LABEL, __version__)
     )
-    if github_response.latest_version is not None:
-        click.echo(
-            f"Latest GitHub release: {github_response.latest_version}",
-            err=True,
+    click.echo(
+        _format_version_report_line(
+            _VERSION_REPORT_PYPI_LABEL,
+            _format_release_report_value(pypi_response),
         )
-    else:
-        click.echo(
+    )
+    click.echo(
+        _format_version_report_line(
+            _VERSION_REPORT_GITHUB_LABEL,
             _format_release_report_value(
-                github_response,
-                failure_prefix=_GITHUB_REPORT_UNKNOWN_PREFIX,
+                github_response, failure_prefix=_GITHUB_REPORT_UNKNOWN_PREFIX
             ),
-            err=True,
         )
+    )
 
 
 def _handle_version_option(
@@ -1117,9 +1153,9 @@ def _handle_version_option(
 ) -> None:
     """
     @brief Handle eager `--version` and `--ver` option callback.
-    @details Prints installed package version to stdout, emits the PyPI and
-    GitHub latest-release report to stderr, and exits before command dispatch
-    when either version flag is present.
+    @details Prints the aligned three-line release report (installed version,
+    latest PyPI release, latest GitHub release) to stdout and exits before
+    command dispatch when either version flag is present.
     @param ctx {click.Context} Active Click context.
     @param param {click.Parameter} Option metadata (unused).
     @param value {bool} Parsed version-option flag value.
@@ -1130,7 +1166,6 @@ def _handle_version_option(
     del param
     if not value or ctx.resilient_parsing:
         return
-    click.echo(__version__)
     _emit_version_option_release_report()
     ctx.exit(0)
 

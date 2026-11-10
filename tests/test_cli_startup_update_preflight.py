@@ -17,6 +17,7 @@ option behavior for `--version`.
 @satisfies REQ-196
 @satisfies REQ-197
 @satisfies REQ-198
+@satisfies REQ-199
 """
 
 import json
@@ -606,17 +607,19 @@ def test_version_prints_installed_version_without_dispatch(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """
-    @brief Verify `--version` prints installed version, release report, and exits.
+    @brief Verify `--version` prints the aligned three-line report and exits.
     @details Replaces both release fetch boundaries with deterministic responses,
     invokes `--version` standalone and before a subcommand, and asserts the first
-    output line equals the installed version, labeled PyPI/GitHub release lines
-    follow, exit status is zero, and subcommand dispatch is bypassed.
-    expected_output: `<version>\nLatest PyPI release: 9.9.9\nLatest GitHub
-    release: 9.9.9` with exit status 0 for both invocations.
+    output line is the aligned `Current Installed` line carrying the installed
+    version, the aligned `Latest @ PyPI`/`Latest @ GitHub` lines follow, exit
+    status is zero, and subcommand dispatch is bypassed.
+    expected_output: `Current Installed : <version>\nLatest @ PyPI     : 9.9.9\nLatest @ GitHub   : 9.9.9`
+    with exit status 0 for both invocations.
     @param monkeypatch {pytest.MonkeyPatch} Pytest monkeypatch fixture.
     @return {None} Function return value.
     @satisfies TST-036
     @satisfies REQ-078
+    @satisfies REQ-199
     """
     def _fake_fetch() -> cli_module.StartupReleaseCheckResponse:
         """
@@ -640,9 +643,9 @@ def test_version_prints_installed_version_without_dispatch(
 
     for result in (version_result, bypass_result):
         assert result.exit_code == 0
-        assert result.output.splitlines()[0] == __version__
-        assert "Latest PyPI release: 9.9.9" in result.output
-        assert "Latest GitHub release: 9.9.9" in result.output
+        assert result.output.splitlines()[0] == f"Current Installed : {__version__}"
+        assert "Latest @ PyPI     : 9.9.9" in result.output
+        assert "Latest @ GitHub   : 9.9.9" in result.output
 
 
 def test_ver_alias_prints_installed_version_without_dispatch(
@@ -652,14 +655,16 @@ def test_ver_alias_prints_installed_version_without_dispatch(
     @brief Verify `--ver` behaves as an exact alias of `--version`.
     @details Replaces both release fetch boundaries with deterministic responses,
     invokes `--ver` standalone and before a subcommand, and asserts output and
-    exit status equal the `--version` invocation: installed version first,
-    labeled PyPI/GitHub release lines, zero exit, and dispatch bypass.
+    exit status equal the `--version` invocation: aligned `Current Installed`
+    line first, aligned `Latest @ PyPI`/`Latest @ GitHub` lines, zero exit, and
+    dispatch bypass.
     expected_output: `--ver` output identical to `--version` output for both
     standalone and pre-subcommand invocations.
     @param monkeypatch {pytest.MonkeyPatch} Pytest monkeypatch fixture.
     @return {None} Function return value.
     @satisfies TST-077
     @satisfies REQ-188
+    @satisfies REQ-199
     """
     def _fake_fetch() -> cli_module.StartupReleaseCheckResponse:
         """
@@ -685,9 +690,9 @@ def test_ver_alias_prints_installed_version_without_dispatch(
     assert ver_result.exit_code == 0
     assert ver_bypass_result.exit_code == 0
     assert ver_result.output == version_result.output
-    assert ver_bypass_result.output.splitlines()[0] == __version__
-    assert "Latest PyPI release: 9.9.9" in ver_bypass_result.output
-    assert "Latest GitHub release: 9.9.9" in ver_bypass_result.output
+    assert ver_bypass_result.output.splitlines()[0] == f"Current Installed : {__version__}"
+    assert "Latest @ PyPI     : 9.9.9" in ver_bypass_result.output
+    assert "Latest @ GitHub   : 9.9.9" in ver_bypass_result.output
 
 
 def test_version_flags_force_startup_online_check_bypassing_idle_gate(
