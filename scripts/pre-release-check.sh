@@ -19,8 +19,8 @@
 # space O(1) beyond tool output.
 # @pre Invoked from any directory inside a git checkout of this repository.
 # @pre `uv`, `git`, `bash`, `find`, and `zip` are available in `PATH`.
-# @post `dist/`, `build/`, `.pytest_cache/`, `__pycache__` trees, and a
-# script-created `.venv` are removed.
+# @post `build/`, `.pytest_cache/`, `__pycache__` trees, and a
+# script-created `.venv` are removed; versioned `dist/` artifacts are retained.
 # @return Exit status of the pre-release pipeline.
 # @retval 0 Every mandatory check passed and the repository is unchanged.
 # @retval 1 A mandatory check, the cleanup, or the integrity check failed.
@@ -119,7 +119,7 @@ handle_interrupt() {
 ## @fn cleanup_pipeline_artifacts
 # @brief Remove pipeline artifacts and verify repository integrity on exit.
 # @details Registered as the EXIT trap so it runs on success, failure, help,
-# argument errors, and signal termination. Removes `dist/`, `.pytest_cache/`,
+# argument errors, and signal termination. Removes `.pytest_cache/`,
 # `__pycache__` trees under `src/` and `tests/`, plus `build/` and `.venv` when
 # this run created them. After removal, when the pipeline reached its first
 # stage, `verify_repository_integrity` compares the repository against the
@@ -137,8 +137,8 @@ cleanup_pipeline_artifacts() {
   trap - ERR EXIT INT TERM
   set +e
   printf '\n==> [cleanup] removing pipeline artifacts\n'
-  if ! rm -rf -- dist .pytest_cache; then
-    printf 'ERROR: failed to remove dist/ or .pytest_cache/.\n' >&2
+  if ! rm -rf -- .pytest_cache; then
+    printf 'ERROR: failed to remove .pytest_cache/.\n' >&2
     cleanup_status=1
   fi
   if ! find src tests -type d -name __pycache__ -prune -exec rm -rf -- '{}' +; then
@@ -158,7 +158,7 @@ cleanup_pipeline_artifacts() {
     fi
   fi
   if [ "$cleanup_status" -eq 0 ]; then
-    printf '  removed pipeline artifacts (dist/, build/, .pytest_cache/, __pycache__ trees, script-created .venv)\n'
+    printf '  removed pipeline artifacts (build/, .pytest_cache/, __pycache__ trees, script-created .venv)\n'
   fi
   if [ "$PIPELINE_ACTIVE" = "true" ]; then
     printf '\n==> [integrity] verifying repository state\n'
@@ -421,20 +421,6 @@ validate_type_checking() {
   report_check "type checking: OK"
 }
 
-## @fn assert_path_ignored
-# @brief Abort when git does not ignore one generated path.
-# @details Evaluates the effective `.gitignore` rules with
-# `git check-ignore --no-index`; the path need not exist on disk.
-# @param target_path {string} Repository-relative path that must be ignored.
-# @return {void} Returns when the path is ignored.
-# @satisfies PRJ-038
-assert_path_ignored() {
-  local target_path="$1"
-  if ! git check-ignore --no-index --quiet -- "$target_path"; then
-    fail "generated path is not ignored by .gitignore: $target_path"
-  fi
-}
-
 ## @fn assert_path_visible_to_git
 # @brief Abort when git unexpectedly ignores one intentionally tracked path.
 # @param target_path {string} Repository-relative path that must stay visible.
@@ -449,14 +435,15 @@ assert_path_visible_to_git() {
 
 ## @fn validate_gitignore_rules
 # @brief Validate the `.gitignore` artifact and source-exclusion contract.
-# @details Confirms generated release artifacts are ignored while the release
-# scripts, package sources, documentation, and lockfile stay visible to git.
+# @details Confirms generated release artifacts, the release scripts, package
+# sources, documentation, and lockfile stay visible to git for versioning.
 # @return {void} Returns when the contract holds.
 # @satisfies PRJ-038
+# @satisfies PRJ-041
 validate_gitignore_rules() {
-  assert_path_ignored "dist/${PROJECT_NAME}-${PROJECT_VERSION}.tar.gz"
-  assert_path_ignored "dist/${PROJECT_NAME}-${PROJECT_VERSION}-py3-none-any.whl"
-  assert_path_ignored "dist/${EXTENSION_ZIP_NAME}"
+  assert_path_visible_to_git "dist/${PROJECT_NAME}-${PROJECT_VERSION}.tar.gz"
+  assert_path_visible_to_git "dist/${PROJECT_NAME}-${PROJECT_VERSION}-py3-none-any.whl"
+  assert_path_visible_to_git "dist/${EXTENSION_ZIP_NAME}"
   assert_path_visible_to_git "src/aibar/aibar/cli.py"
   assert_path_visible_to_git "scripts/build.sh"
   assert_path_visible_to_git "scripts/pre-release-check.sh"
@@ -467,22 +454,15 @@ validate_gitignore_rules() {
 
 ## @fn assert_dist_safe_to_clean
 # @brief Abort when `dist/` holds content this pipeline must not delete.
-# @details Refuses to proceed when `dist/` contains tracked files or untracked
-# entries outside the generated artifact patterns, so user and versioned
-# content is never destroyed by the cleanup stage.
+# @details Refuses to proceed when `dist/` contains entries outside the
+# generated artifact patterns, so non-generated content is never destroyed.
+# Tracked generated artifacts are permitted because the build replaces them.
 # @return {void} Returns when `dist/` is absent or only generated artifacts.
 # @satisfies PRJ-036
 assert_dist_safe_to_clean() {
   if [ ! -d "$DIST_DIR" ]; then
     report_check "dist/ safety: absent"
     return 0
-  fi
-  local tracked_entries
-  tracked_entries="$(git ls-files -- dist)"
-  if [ -n "$tracked_entries" ]; then
-    printf 'ERROR: dist/ contains tracked files; refusing to remove them.\n' >&2
-    printf '%s\n' "$tracked_entries" >&2
-    exit 1
   fi
   local entry
   local entry_name
@@ -529,7 +509,7 @@ check_clean_working_tree() {
   else
     report_check "working tree gate: clean"
   fi
-  BASELINE_STATUS="$status_output"
+  BASELINE_STATUS="$(git status --porcelain -- . ':(exclude)dist')"
   PIPELINE_ACTIVE=true
   capture_preexisting_paths
   validate_project_structure
@@ -544,16 +524,16 @@ check_clean_working_tree() {
 
 ## @fn build_distribution
 # @brief Generate release artifacts through the canonical build script.
-# @details Re-checks the `dist/` cleanup safety, removes stale `dist/`
-# content, and delegates artifact generation to `scripts/build.sh` so the build
-# logic has a single implementation.
+# @details Re-checks the `dist/` cleanup safety and delegates artifact
+# generation, including removal of stale generated artifacts, to
+# `scripts/build.sh` so the build logic has a single implementation. Versioned
+# `dist/` content outside the generated patterns is never removed here.
 # @return {void} Returns when `scripts/build.sh` succeeded.
 # @satisfies PRJ-024
 # @satisfies PRJ-036
+# @satisfies PRJ-041
 build_distribution() {
   assert_dist_safe_to_clean
-  report_check "removing stale dist/ content"
-  rm -rf dist
   report_check "delegating artifact generation to scripts/build.sh ($BUILD_COMMAND_DISPLAY)"
   if ! "$REPO_ROOT/scripts/build.sh"; then
     fail "scripts/build.sh failed; release artifact generation aborted."
@@ -561,11 +541,11 @@ build_distribution() {
 }
 
 ## @fn require_dist_artifacts
-# @brief Verify the generated release artifacts and their git exclusion.
+# @brief Verify the generated release artifacts and their git visibility.
 # @details Requires exactly one sdist, one wheel, and the GNOME extension zip,
 # validates archive integrity and required members through the project
-# interpreter, and confirms every produced artifact stays ignored by git.
-# @return {void} Returns when every artifact is valid and ignored.
+# interpreter, and confirms every produced artifact stays visible to git.
+# @return {void} Returns when every artifact is valid and git-visible.
 # @satisfies PRJ-024
 # @satisfies PRJ-033
 require_dist_artifacts() {
@@ -695,15 +675,15 @@ sys.exit(1 if failures else 0)
 PY
   for artifact in dist/*; do
     if [ -f "$artifact" ]; then
-      assert_path_ignored "$artifact"
+      assert_path_visible_to_git "$artifact"
     fi
   done
-  report_check "artifact git exclusion: OK"
+  report_check "artifact git visibility: OK"
 }
 
 ## @fn verify_repository_integrity
 # @brief Compare the post-run repository state with the pre-run baseline.
-# @details Fails when tracked files changed, when the `git status --porcelain`
+# @details Fails when tracked files outside `dist/` changed, when the `git status --porcelain` (excluding `dist/`)
 # output differs from the baseline, when any pipeline artifact survived
 # cleanup, or when a script-created environment directory remains. Ignored
 # build output is inspected explicitly because `git status` alone cannot
@@ -713,7 +693,7 @@ PY
 verify_repository_integrity() {
   local failures=0
   local current_status=""
-  if ! current_status="$(git status --porcelain)"; then
+  if ! current_status="$(git status --porcelain -- . ':(exclude)dist')"; then
     printf 'ERROR: unable to read git status during integrity verification.\n' >&2
     return 1
   fi
@@ -725,13 +705,13 @@ verify_repository_integrity() {
   else
     printf '  working tree matches the pre-run baseline\n'
   fi
-  if [ "$ALLOW_DIRTY" = "false" ] && ! git diff --quiet HEAD --; then
+  if [ "$ALLOW_DIRTY" = "false" ] && ! git diff --quiet HEAD -- . ':(exclude)dist'; then
     printf 'ERROR: tracked files differ from HEAD after the pipeline.\n' >&2
-    git diff --stat HEAD -- >&2
+    git diff --stat HEAD -- . ':(exclude)dist' >&2
     failures=1
   fi
   local generated_path
-  for generated_path in dist .pytest_cache; do
+  for generated_path in .pytest_cache; do
     if [ -e "$generated_path" ]; then
       printf 'ERROR: %s remains after cleanup.\n' "$generated_path" >&2
       failures=1

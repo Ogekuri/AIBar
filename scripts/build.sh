@@ -9,7 +9,7 @@
 # `.github/workflows/release-pypi.yml`, creates the GNOME Shell extension
 # zip, validates every produced artifact (non-empty size, archive integrity,
 # required member entries), and retains all artifacts in `dist/` while
-# printing a summary. Non-generated and tracked content inside `dist/` is
+# printing a summary. Non-generated content inside `dist/` is
 # never deleted; a failed build never reports success.
 # Time complexity O(A) over produced artifacts A; space O(1) beyond artifact bytes.
 # @pre `uv`, `zip`, and `find` are available in `PATH`.
@@ -26,6 +26,7 @@
 # @satisfies PRJ-034
 # @satisfies PRJ-039
 # @satisfies PRJ-040
+# @satisfies PRJ-041
 
 set -Eeuo pipefail
 
@@ -188,21 +189,14 @@ is_generated_dist_entry() {
 
 ## @fn assert_dist_safe_to_clean
 # @brief Abort when `dist/` holds content this script must not delete.
-# @details Refuses to proceed when `dist/` contains tracked files or untracked
-# entries outside the generated artifact patterns, so user and versioned
-# content is never destroyed.
+# @details Refuses to proceed when `dist/` contains entries outside the
+# generated artifact patterns, so non-generated content is never destroyed.
+# Tracked generated artifacts are permitted because the build replaces them.
 # @return {void} Returns when `dist/` is absent or contains only generated artifacts.
 # @satisfies PRJ-032
 assert_dist_safe_to_clean() {
   if [ ! -d "$DIST_DIR" ]; then
     return 0
-  fi
-  local tracked_entries
-  tracked_entries="$(git -C "$REPO_ROOT" ls-files -- dist)"
-  if [ -n "$tracked_entries" ]; then
-    printf 'ERROR: dist/ contains tracked files; refusing to delete them.\n' >&2
-    printf '%s\n' "$tracked_entries" >&2
-    exit 1
   fi
   local entry
   while IFS= read -r entry; do

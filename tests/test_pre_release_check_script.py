@@ -75,15 +75,18 @@ def test_script_runs_locked_dependency_sync_and_pytest() -> None:
 
 def test_script_builds_sdist_and_wheel_into_dist() -> None:
     """
-    @brief Verify the build stage removes stale dist and builds both artifacts.
-    @details The build stage must clear `dist/` before building and mirror
-    the release workflow build command ending in `python -m build`.
+    @brief Verify the build stage delegates artifact generation to build.sh.
+    @details The build stage must delegate to `scripts/build.sh`, which removes
+    only stale generated artifacts, and must not remove the versioned `dist/`
+    directory itself. The delegated build still runs `python -m build`.
     @return {None} Function return value.
     @satisfies PRJ-024
+    @satisfies PRJ-041
     @satisfies TST-084
     """
     source = _script_source()
-    assert "rm -rf dist" in source
+    assert "scripts/build.sh" in source
+    assert "rm -rf dist" not in source
     assert "python -m build" in source
 
 
@@ -91,15 +94,17 @@ def test_script_cleans_pipeline_artifacts_on_exit() -> None:
     """
     @brief Verify the EXIT trap removes pipeline artifacts after execution.
     @details The script must register `cleanup_pipeline_artifacts` as an
-    EXIT trap so `dist/`, `.pytest_cache/`, and `__pycache__` trees under
-    `src/` and `tests/` are removed whether the pipeline succeeds or fails.
+    EXIT trap so `.pytest_cache/` and `__pycache__` trees under `src/` and
+    `tests/` are removed whether the pipeline succeeds or fails. The versioned
+    `dist/` directory must not be removed by the trap.
     @return {None} Function return value.
     @satisfies PRJ-025
     @satisfies TST-085
     """
     source = _script_source()
     assert "trap cleanup_pipeline_artifacts EXIT" in source
-    assert "rm -rf -- dist .pytest_cache" in source
+    assert "rm -rf -- .pytest_cache" in source
+    assert "rm -rf -- dist" not in source
     assert "-name __pycache__" in source
 
 

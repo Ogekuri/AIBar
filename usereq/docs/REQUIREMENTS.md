@@ -105,22 +105,23 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **PRJ-022**: `scripts/pre-release-check.sh` MUST execute each pipeline stage with a labeled progress header and MUST abort at the first failing stage with a non-zero exit status.
 - **PRJ-023**: `scripts/pre-release-check.sh` MUST execute the unit-test suite via `uv run pytest` and MUST fail with non-zero exit status when any test fails.
 - **PRJ-024**: `scripts/pre-release-check.sh` MUST generate release artifacts by invoking `scripts/build.sh` and MUST fail when the sdist, wheel, or GNOME extension zip is missing from `dist/` after the build.
-- **PRJ-025**: `scripts/pre-release-check.sh` MUST remove the `dist/`, `build/`, and `.pytest_cache/` directories, `__pycache__` trees under `src/` and `tests/`, and script-created `.venv` on pipeline exit, regardless of pipeline outcome.
+- **PRJ-025**: `scripts/pre-release-check.sh` MUST remove the `build/` and `.pytest_cache/` directories, `__pycache__` trees under `src/` and `tests/`, and script-created `.venv` on pipeline exit, regardless of pipeline outcome, and MUST leave versioned `dist/` artifacts untouched.
 - **PRJ-026**: `.github/workflows/release-pypi.yml` MUST run a dedicated `unit-tests` job executing `uv sync --locked` and `uv run pytest tests/` for every release tag push.
 - **PRJ-027**: `.github/workflows/release-pypi.yml` MUST gate the `build-release` job on the `unit-tests` job so no release artifacts are created when the pytest suite fails.
 - **PRJ-028**: MUST validate repository structure, required executables (`uv`, `git`, `zip`, `find`, `bash`), and the syntax of every `scripts/*.sh` file before generating artifacts.
 - **PRJ-029**: MUST validate Python syntax under `src/` and MUST execute `uv run --locked --with pyright pyright --project pyrightconfig.json`, failing when type checking exits non-zero.
 - **PRJ-030**: MUST provide executable `scripts/build.sh` that resolves the repository root from its own path and generates the sdist, wheel, and GNOME extension zip inside `dist/`.
 - **PRJ-031**: `scripts/build.sh` MUST remove only previously generated `dist/` artifacts matching the project sdist, wheel, or extension zip patterns before building.
-- **PRJ-032**: `scripts/build.sh` MUST preserve tracked files and non-generated files inside `dist/` and MUST NOT delete them.
+- **PRJ-032**: `scripts/build.sh` MUST preserve every non-generated file inside `dist/` and MUST NOT delete it.
 - **PRJ-033**: `scripts/build.sh` MUST verify that `dist/` contains a non-empty sdist, wheel, and GNOME extension zip and MUST exit non-zero otherwise.
 - **PRJ-034**: `scripts/build.sh` MUST leave the generated release artifacts in `dist/` and MUST print a summary listing every produced artifact path.
 - **PRJ-035**: `scripts/pre-release-check.sh` MUST register `trap` handlers for EXIT, SIGINT, and SIGTERM that run cleanup, preserve the original exit status, and fail the run when cleanup fails.
-- **PRJ-036**: `scripts/pre-release-check.sh` MUST abort before removing anything when `dist/` contains tracked files or untracked files not matching generated artifact patterns.
-- **PRJ-037**: `scripts/pre-release-check.sh` MUST verify after cleanup that tracked files are unchanged, no pipeline artifacts remain, and the repository matches its pre-run git status.
-- **PRJ-038**: `.gitignore` MUST keep exclude-all-then-reinclude semantics, MUST re-include `dist/` for traversal, and MUST ignore generated `dist/` archives through specific patterns.
+- **PRJ-036**: `scripts/pre-release-check.sh` MUST abort before any artifact mutation when `dist/` contains entries not matching generated artifact patterns.
+- **PRJ-037**: `scripts/pre-release-check.sh` MUST verify after cleanup that tracked files outside `dist/` are unchanged, no pipeline artifacts remain outside `dist/`, and git status outside `dist/` matches the pre-run status.
+- **PRJ-038**: `.gitignore` MUST keep exclude-all-then-reinclude semantics and MUST re-include `dist/` and `dist/**/*` in the "Include specific files and directories" section so release artifacts are versioned.
 - **PRJ-039**: `scripts/build.sh` and `scripts/pre-release-check.sh` MUST locate the repository root from their own paths and MUST work from any invocation directory, including paths with spaces.
 - **PRJ-040**: `scripts/build.sh` MUST validate that `uv`, `zip`, and `find` are available and MUST exit non-zero when a required tool is missing.
+- **PRJ-041**: MUST version the release artifacts in `dist/` (sdist, wheel, GNOME extension zip) as tracked files of the git repository.
 
 ### 2.2 Project Constraints
 - **CTN-001**: MUST resolve provider credentials with precedence: environment variable, then `~/.config/aibar/env`, then provider-specific local credential stores.
@@ -476,7 +477,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-082**: MUST verify GitHub release and upgrade URLs compose from the program-name constant and the `--develop` upgrade argv pins the fetched `tag_name`.
 - **TST-083**: MUST verify the `--version` GitHub report performs one fresh releases/latest fetch per invocation and its reported version equals the tag pinned by the `--develop` upgrade argv.
 - **TST-084**: MUST verify `scripts/pre-release-check.sh` exists, is executable, gates on a dirty git tree with `--allow-dirty` opt-out, runs `uv sync --locked` and `uv run pytest`, delegates building to `scripts/build.sh`, and verifies the sdist and wheel artifacts.
-- **TST-085**: MUST verify `scripts/pre-release-check.sh` registers an EXIT trap removing `dist/`, `.pytest_cache/`, and `__pycache__` trees under `src/` and `tests/`, independent of pipeline outcome.
+- **TST-085**: MUST verify `scripts/pre-release-check.sh` registers an EXIT trap removing `build/`, `.pytest_cache/`, and `__pycache__` trees under `src/` and `tests/`, independent of pipeline outcome, and leaves `dist/` untouched.
 - **TST-086**: MUST verify `.github/workflows/release-pypi.yml` declares a `unit-tests` job running `uv sync --locked` and `uv run pytest tests/`, and gates `build-release` on `unit-tests`.
 - **TST-087**: MUST verify Linux `--upgrade --force` executes the PyPI forced lifecycle argv `uv tool install aibar --force --reinstall --refresh` with exit-code propagation and non-Linux `--upgrade --force` prints manual guidance containing the forced command without subprocess execution.
 - **TST-088**: MUST verify Linux `--upgrade` with `--develop`/`--dev` and `--force` executes the tag-pinned GitHub forced lifecycle argv `uv tool install --force --reinstall --refresh git+https://github.com/Ogekuri/<program-name>@<tag_name>` with exit-code propagation.
@@ -488,6 +489,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-094**: MUST verify atomic write failure preserves the previous `config.json` bytes and leaves no temporary file in the configuration directory.
 - **TST-095**: MUST verify bootstrap writes `RuntimeConfig` defaults when `config.json` is missing and preserves an existing valid file untouched.
 - **TST-096**: MUST verify every command example published by `--info` uses a complete canonical path, is shell-parsable, and succeeds when executed against a temporary configuration file.
+- **TST-097**: MUST verify `.gitignore` contains `!dist/` and `!dist/**/*` inside the "Include specific files and directories" section and that `git check-ignore --no-index` reports `dist/` release artifacts as not ignored.
 
 ## 5. Evidence
 
@@ -713,9 +715,9 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | PRJ-021 | `scripts/pre-release-check.sh` + `check_clean_working_tree` + `git status --porcelain` gate with `--allow-dirty` opt-out and non-zero abort. |
 | PRJ-022 | `scripts/pre-release-check.sh` + `run_stage` + labeled `[<index>/<total>]` stage headers with `set -euo pipefail` first-failure abort. |
 | PRJ-023 | `scripts/pre-release-check.sh` + tests stage + `uv run pytest tests/` execution with exit-code propagation. |
-| PRJ-024 | `scripts/pre-release-check.sh` + `build_distribution` + `rm -rf dist` then `scripts/build.sh` delegation; `require_dist_artifacts` validates non-empty `dist/*.tar.gz`, `dist/*.whl`, and the GNOME extension zip. |
+| PRJ-024 | `scripts/pre-release-check.sh` + `build_distribution` + `scripts/build.sh` delegation (stale generated-artifact removal occurs inside build.sh); `require_dist_artifacts` validates non-empty `dist/*.tar.gz`, `dist/*.whl`, and the GNOME extension zip. |
 | TST-084 | `tests/test_pre_release_check_script.py` + source-level assertions for executable bit, dirty-tree gate with `--allow-dirty`, stage commands (`uv sync --locked`, `uv run pytest`, delegated build), `dist/` artifact checks, and stage ordering. |
-| PRJ-025 | `scripts/pre-release-check.sh` + `cleanup_pipeline_artifacts` trap + `rm -rf -- dist .pytest_cache`, `find src tests` removal of `__pycache__` trees, and removal of script-created `build/` and `.venv`. |
+| PRJ-025 | `scripts/pre-release-check.sh` + `cleanup_pipeline_artifacts` trap + `rm -rf -- .pytest_cache`, `find src tests` removal of `__pycache__` trees, and removal of script-created `build/` and `.venv`. |
 | TST-085 | `tests/test_pre_release_check_script.py` + `test_script_cleans_pipeline_artifacts_on_exit` + EXIT trap registration and cleanup command assertions. |
 | PRJ-026 | `.github/workflows/release-pypi.yml` + `unit-tests` job + `uv sync --locked` step and `uv run pytest tests/` step with Python 3.12/uv setup pins. |
 | PRJ-027 | `.github/workflows/release-pypi.yml` + `build-release` job + `needs: [check-branch, unit-tests]` gating so artifact creation and transitive `publish-pypi` never run on test failure. |
@@ -724,15 +726,16 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | PRJ-029 | `scripts/pre-release-check.sh` + `validate_python_syntax`/`validate_type_checking` + `uv run --locked python -m compileall -q src` and `uv run --locked --with pyright pyright --project pyrightconfig.json`. |
 | PRJ-030 | `scripts/build.sh` + script body + `readlink -f` repository-root resolution, `uv run ... python -m build`, and the GNOME extension `zip` written into `dist/`. |
 | PRJ-031 | `scripts/build.sh` + `remove_stale_generated_artifacts` + `find` removal limited to `${PROJECT_NAME}-*.tar.gz`, `${PROJECT_NAME}-*.whl`, and the extension zip pattern. |
-| PRJ-032 | `scripts/build.sh` + `assert_dist_has_no_untracked_foreign_files` + abort when `dist/` contains tracked files or files outside generated patterns, so non-generated content is never deleted. |
+| PRJ-032 | `scripts/build.sh` + `assert_dist_has_no_untracked_foreign_files` + abort when `dist/` contains files outside generated patterns, so non-generated content is never deleted. |
 | PRJ-033 | `scripts/build.sh` + `verify_artifacts` + non-empty sdist, wheel, and extension zip checks with archive-integrity validation through `zipfile` and `tarfile`. |
 | PRJ-034 | `scripts/build.sh` + `print_artifact_summary` + artifact path and byte-size listing emitted after successful verification, artifacts retained in `dist/`. |
 | PRJ-035 | `scripts/pre-release-check.sh` + `on_exit`/`on_signal` traps + EXIT, INT, and TERM handlers that run cleanup, preserve the captured status, and escalate cleanup failure to exit 1. |
-| PRJ-036 | `scripts/pre-release-check.sh` + `assert_dist_safe_to_clean` + abort when `dist/` holds tracked entries or untracked entries outside generated artifact patterns. |
-| PRJ-037 | `scripts/pre-release-check.sh` + `verify_repository_integrity` + pre-run `git status --porcelain` baseline comparison, artifact-absence checks, and script-created-environment checks after cleanup. |
-| PRJ-038 | `.gitignore` + `!dist/` and `!dist/**` reintroduction lines plus `/dist/*.tar.gz`, `/dist/*.whl`, and `/dist/*.zip` generated-artifact exclusions placed after the re-include block. |
+| PRJ-036 | `scripts/pre-release-check.sh` + `assert_dist_safe_to_clean` + abort when `dist/` holds entries outside generated artifact patterns. |
+| PRJ-037 | `scripts/pre-release-check.sh` + `verify_repository_integrity` + pre-run `git status --porcelain` baseline comparison (pathspec excludes `dist/`), artifact-absence checks, and script-created-environment checks after cleanup. |
+| PRJ-038 | `.gitignore` + `!dist/` and `!dist/**/*` re-include lines in the "Include specific files and directories" section; no dist-scoped exclusion rules. |
 | PRJ-039 | `scripts/build.sh` and `scripts/pre-release-check.sh` + `readlink -f "${BASH_SOURCE[0]}"` root resolution with double-quoted path handling throughout. |
 | PRJ-040 | `scripts/build.sh` + `require_tool` + `command -v` validation of `uv`, `zip`, and `find` before any build step, exiting non-zero on a missing tool. |
+| PRJ-041 | `.gitignore` + `!dist/` and `!dist/**/*` include rules keep `dist/` release artifacts git-visible for versioning. |
 | REQ-196 | `src/aibar/aibar/cli.py` + `--force` group option declaration and `_upgrade_force_requested_from_args` argv-token detection consumed only by `_resolve_upgrade_lifecycle_command` for `--upgrade`. |
 | REQ-197 | `src/aibar/aibar/cli.py` + `_UPGRADE_FORCE_OPTIONS`/`_insert_upgrade_force_options`/`_resolve_upgrade_lifecycle_command` produce argv `uv tool install aibar --force --reinstall --refresh` when `--upgrade` is combined with `--force`. |
 | REQ-198 | `src/aibar/aibar/cli.py` + `_resolve_upgrade_lifecycle_command` inserts `_UPGRADE_FORCE_OPTIONS` after the `--force` token of the tag-pinned GitHub argv, yielding `uv tool install --force --reinstall --refresh git+https://github.com/Ogekuri/<program-name>@<tag_name>`. |
@@ -785,3 +788,4 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | TST-094 | `tests/test_config_cli_operations.py` + atomic-failure assertions on unchanged bytes and absent temporary files. |
 | TST-095 | `tests/test_config_cli_operations.py` + bootstrap and existing-file preservation assertions. |
 | TST-096 | `tests/test_config_cli_operations.py` + published-example execution assertions via `shlex.split`. |
+| TST-097 | `tests/test_dist_versioned_artifacts.py` + `.gitignore` include-section assertions and `git check-ignore --no-index` visibility assertions for `dist/` artifacts. |
