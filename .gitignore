@@ -47,6 +47,10 @@
 !usereq/
 !usereq/docs/
 !usereq/docs/**/*.md
+# Release artifact directory: re-included so git can traverse it and version
+# intentional files; the generated archives are re-excluded below.
+!dist/
+!dist/**
 
 ##########################################
 # Exlucde specific files and directories #
@@ -69,7 +73,6 @@ __pycache__/
 .Python
 build/
 develop-eggs/
-dist/
 downloads/
 eggs/
 .eggs/
@@ -267,3 +270,14 @@ __marimo__/
 
 # Temp dir for tests
 temp/
+
+##########################################
+# Generated release artifacts            #
+##########################################
+# Outputs written by scripts/build.sh. These specific patterns are declared
+# after the re-include block so the reverse-exclusion strategy keeps dist/
+# traversable while every generated archive stays ignored.
+/dist/*.tar.gz
+/dist/*.whl
+/dist/*.zip
+/dist/*.egg-info/
