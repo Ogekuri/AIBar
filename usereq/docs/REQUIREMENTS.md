@@ -1,8 +1,8 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.3.42"
-date: "2026-11-07"
+version: "0.3.43"
+date: "2026-11-11"
 author: "req-new"
 scope:
   paths:
@@ -336,6 +336,47 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-187**: MUST use GNOME 50-supported widget orientation and child-attachment APIs throughout extension UI construction.
 - **REQ-188**: MUST accept global flag `--ver` as an exact alias of `--version`, producing identical version output, release report, pre-dispatch exit, and startup idle-gate bypass.
 
+### 3.6 Configuration CLI
+- **REQ-200**: MUST expose global group options `--print [Path]`, `--info [Path]`, `--print-raw`, `--get Path`, `--set Path Value`, and `--unset Path` on the `aibar` command.
+- **REQ-201**: MUST resolve configuration paths case-sensitively as colon-separated tokens whose first token is a `RuntimeConfig` field name and whose optional second token addresses a map key.
+- **REQ-202**: MUST reject unknown field tokens, surplus tokens, empty tokens, and absent map keys with exit status 1 and one stderr diagnostic naming the rejected path.
+- **REQ-203**: MUST treat `Application_Configuration` as a virtual display root that MUST NOT be accepted as a CLI path token.
+- **REQ-204**: MUST reject the reserved tokens `append`, `+`, and `insert` in every configuration path because the `aibar` schema defines no array parameter.
+- **REQ-205**: MUST NOT implement a project-local configuration layer because the application defines only the global `~/.config/aibar/config.json` file.
+- **REQ-206**: MUST initialize `~/.config/aibar/config.json` from `RuntimeConfig` schema defaults when the file is missing and MUST NOT overwrite an existing file.
+- **REQ-207**: MUST reject an unparsable JSON configuration file with exit status 1 and MUST NOT rewrite that file during configuration CLI execution.
+- **REQ-208**: MUST validate the complete candidate configuration document before every write and MUST reject documents containing keys absent from `RuntimeConfig`.
+- **REQ-209**: MUST accept configuration documents that omit schema fields and MUST resolve omitted fields from `RuntimeConfig` defaults.
+- **REQ-210**: MUST parse `--set` input as JSON when the input is valid JSON and MUST type-check the parsed value against the schema before mutation.
+- **REQ-211**: MUST treat non-JSON `--set` input as a literal string value only when the target schema type is `String` or `Optional[String]`.
+- **REQ-212**: MUST persist `--set` and `--unset` results through a same-directory temporary file, file flush, file fsync, atomic replace, and directory fsync.
+- **REQ-213**: MUST preserve the mode of an existing `~/.config/aibar/config.json` and MUST create a new configuration file with mode `0o600`.
+- **REQ-214**: MUST keep the previous `~/.config/aibar/config.json` byte-identical and MUST remove temporary files when a write attempt fails.
+- **REQ-215**: MUST emit `--get` success output as one JSON value plus one newline on stdout without labels, tree decoration, or confirmation text.
+- **REQ-216**: MUST emit `--print-raw` output as the unmodified on-disk `config.json` bytes on stdout without validation, reformatting, headings, or appended text.
+- **REQ-217**: MUST route `--print`, `--info`, `--get`, and `--print-raw` success output to stdout and every diagnostic to stderr with exit status 0 on success and 1 on failure.
+- **REQ-218**: MUST emit no stdout text for successful `--set` and `--unset` execution.
+- **REQ-219**: MUST restore a schema default by removing the addressed field on `--unset <Field>` and MUST delete exactly the addressed map key on `--unset <Field>:<Key>`.
+- **REQ-220**: MUST reject `--unset <Field>:<Key>` with exit status 1 when the addressed map key is absent from the stored map.
+- **REQ-221**: MUST replace the whole map on `--set <Field> <JsonObject>` only after validating every map key and value against the schema.
+- **REQ-222**: MUST render `--print` and `--info` output through one shared recursive tree renderer driven by one shared schema node model.
+- **REQ-223**: MUST render the whole configuration tree when no path is given and only the requested parameter or subtree when a path is given.
+- **REQ-224**: MUST render every real non-root node with exactly one `├── ` or `└── ` marker preceded by one four-character ancestor segment per ancestor that has a later sibling.
+- **REQ-225**: MUST prefix every attached detail line with the ancestor segments of its owning node plus `│   ` when that node has a later sibling and four spaces otherwise.
+- **REQ-226**: MUST render a requested path root without a tree marker and MUST indent its attached details by exactly four spaces.
+- **REQ-227**: MUST attach metadata, notes, and table rows only as detail lines and MUST NOT render them as configuration tree child nodes.
+- **REQ-228**: MUST render `--print` parameter lines as `Token = <value>` with JSON-encoded values and a `(default)` or `(custom | default: <json>)` status suffix.
+- **REQ-229**: MUST render `--print` map parameters as `(<N> entries | key target: <FullPath>:<Key>)` followed by an attached two-column `Key | Value` table.
+- **REQ-230**: MUST render an empty `--print` map as `(empty map | set key: --set <FullPath>:<ExampleKey> <valid example>)` and MUST NOT render an empty table.
+- **REQ-231**: MUST render `--info` parameter headings as `Token - [Type: constraints] <description>` followed by `Default`, `Set cmd`, `Reset cmd`, and map action detail lines with complete canonical paths.
+- **REQ-232**: MUST render the `currency_symbols` value domain as an attached `Allowed Values` table covering `$`, `£`, and `€` with `Value`, `Default`, and `Meaning` columns.
+- **REQ-233**: MUST build every attached table from measured display widths so all border and separator characters align on one column boundary set.
+- **REQ-234**: MUST measure table cells by Unicode terminal display width after escaping control characters and newlines.
+- **REQ-235**: MUST derive every published example value, constraint label, default, and allowed value from the shared configuration schema.
+- **REQ-236**: MUST abort at import time when the shared configuration schema field set diverges from `RuntimeConfig` model fields.
+- **REQ-237**: MUST list `--print`, `--info`, `--print-raw`, `--get`, `--set`, and `--unset` in `aibar --help` with complete canonical path examples.
+- **REQ-238**: MUST emit every configuration CLI identifier, description, help text, diagnostic, and rendered value in English.
+
 ## 4. Test Requirements
 
 Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HDT principles: deterministic, isolated, and behavior-focused.
@@ -425,6 +466,13 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-087**: MUST verify Linux `--upgrade --force` executes the PyPI forced lifecycle argv `uv tool install aibar --force --reinstall --refresh` with exit-code propagation and non-Linux `--upgrade --force` prints manual guidance containing the forced command without subprocess execution.
 - **TST-088**: MUST verify Linux `--upgrade` with `--develop`/`--dev` and `--force` executes the tag-pinned GitHub forced lifecycle argv `uv tool install --force --reinstall --refresh git+https://github.com/Ogekuri/<program-name>@<tag_name>` with exit-code propagation.
 - **TST-089**: MUST verify `--version` output is exactly the three aligned stdout lines with equal label field width, aligned colons, package `__version__` installed value, and GitHub failure value `unknown (<reason>)` on fetch failure.
+- **TST-090**: MUST verify exact shared-renderer output strings for one root child, two root siblings, nested first/middle/last siblings, non-last and last parameter details, and a branch with details plus real children.
+- **TST-091**: MUST verify generated `--print` and `--info` trees satisfy marker uniqueness, sibling-order `└──` termination, detail-prefix parity, and absence of tree markers inside detail lines.
+- **TST-092**: MUST verify every generated table has a constant border width, aligned separator columns, and the exact owner detail prefix on every physical line.
+- **TST-093**: MUST verify `--get`, `--set`, `--unset`, `--print`, `--info`, and `--print-raw` success and failure behavior including exit codes, stream routing, JSON typing, defaults, map operations, and path rejection.
+- **TST-094**: MUST verify atomic write failure preserves the previous `config.json` bytes and leaves no temporary file in the configuration directory.
+- **TST-095**: MUST verify bootstrap writes `RuntimeConfig` defaults when `config.json` is missing and preserves an existing valid file untouched.
+- **TST-096**: MUST verify every command example published by `--info` uses a complete canonical path, is shell-parsable, and succeeds when executed against a temporary configuration file.
 
 ## 5. Evidence
 
@@ -663,3 +711,49 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | TST-087 | `tests/test_cli_startup_update_preflight.py` + forced-lifecycle parametrized tests asserting the PyPI forced argv with exit-code propagation and non-Linux manual guidance carrying the forced command without subprocess execution. |
 | TST-088 | `tests/test_github_upgrade_program_name.py` + forced resolver assertions pinning the fetched `tag_name` into the forced GitHub argv and unresolved-tag abort preserved under `--force`. |
 | TST-089 | `tests/test_version_github_report_parity.py` + `test_version_report_lines_align_labels_and_colons`/`test_version_report_github_failure_renders_unknown_value` + exact three-line stdout assertions, aligned-colon index assertions, and GitHub `unknown (<reason>)` failure-value assertion. |
+| REQ-200 | `src/aibar/aibar/cli.py` + `_handle_config_print_option`/`_handle_config_info_option`/`_handle_config_print_raw_option`/`_handle_config_get_option`/`_handle_config_set_option`/`_handle_config_unset_option` + group option declarations for the six configuration flags. |
+| REQ-201 | `src/aibar/aibar/config_cli.py` + `resolve_config_path(...)` + colon-token resolution against `CONFIG_PARAM_SPECS` with optional map-key token. |
+| REQ-202 | `src/aibar/aibar/config_cli.py` + `resolve_config_path(...)`/`get_config_value(...)` + `ConfigCliError` diagnostics for unknown, surplus, empty, and absent map-key tokens. |
+| REQ-203 | `src/aibar/aibar/config_cli.py` + `VIRTUAL_ROOT_LABEL`/`resolve_config_path(...)` + virtual root excluded from path token space. |
+| REQ-204 | `src/aibar/aibar/config_cli.py` + `RESERVED_ARRAY_OPERATION_TOKENS`/`resolve_config_path(...)` + rejection of `append`, `+`, and `insert`. |
+| REQ-205 | `src/aibar/aibar/config_cli.py` + `configuration_file_path(...)` + single global configuration file path with no project-local layer. |
+| REQ-206 | `src/aibar/aibar/config_cli.py` + `load_config_document(...)` + bootstrap write of `RuntimeConfig` defaults only when the file is absent. |
+| REQ-207 | `src/aibar/aibar/config_cli.py` + `load_config_document(...)` + unparsable-JSON rejection before any write. |
+| REQ-208 | `src/aibar/aibar/config_cli.py` + `validate_config_document(...)` + unknown-key rejection plus `RuntimeConfig.model_validate` confirmation. |
+| REQ-209 | `src/aibar/aibar/config_cli.py` + `field_default(...)`/`get_config_value(...)` + schema-default fallback for omitted fields. |
+| REQ-210 | `src/aibar/aibar/config_cli.py` + `parse_cli_value(...)` + JSON-first typed parsing. |
+| REQ-211 | `src/aibar/aibar/config_cli.py` + `parse_cli_value(...)` + literal-text acceptance limited to string schema types. |
+| REQ-212 | `src/aibar/aibar/config.py` + `write_json_document_atomic(...)` + temporary-file, flush, fsync, `os.replace`, and directory-fsync sequence. |
+| REQ-213 | `src/aibar/aibar/config.py` + `write_json_document_atomic(...)` + existing-mode preservation and `0o600` default mode. |
+| REQ-214 | `src/aibar/aibar/config.py` + `write_json_document_atomic(...)` + temporary-file cleanup on failure before target replacement. |
+| REQ-215 | `src/aibar/aibar/config_cli.py` + `run_config_get(...)` + single JSON value plus newline on stdout. |
+| REQ-216 | `src/aibar/aibar/config_cli.py` + `run_config_print_raw(...)` + unmodified on-disk byte emission. |
+| REQ-217 | `src/aibar/aibar/config_cli.py` + `run_config_*` handlers + stdout success and stderr diagnostic routing with 0/1 exit codes. |
+| REQ-218 | `src/aibar/aibar/config_cli.py` + `run_config_set(...)`/`run_config_unset(...)` + silent success path. |
+| REQ-219 | `src/aibar/aibar/config_cli.py` + `unset_config_value(...)` + field removal and exact map-key deletion. |
+| REQ-220 | `src/aibar/aibar/config_cli.py` + `unset_config_value(...)` + absent-map-key rejection. |
+| REQ-221 | `src/aibar/aibar/config_cli.py` + `set_config_value(...)`/`validate_schema_value(...)` + whole-map replacement validation. |
+| REQ-222 | `src/aibar/aibar/config_cli.py` + `render_config_tree(...)`/`build_print_tree(...)`/`build_info_tree(...)` + single shared renderer. |
+| REQ-223 | `src/aibar/aibar/config_cli.py` + `build_print_tree(...)`/`build_info_tree(...)` + whole-tree and requested-path projections. |
+| REQ-224 | `src/aibar/aibar/config_cli.py` + `render_config_tree(...)` + `_emit_config_node(...)` marker/prefix algorithm. |
+| REQ-225 | `src/aibar/aibar/config_cli.py` + `_emit_config_node(...)` + detail-prefix derivation from sibling position. |
+| REQ-226 | `src/aibar/aibar/config_cli.py` + `render_config_tree(...)` + marker-free root heading with four-space detail indent. |
+| REQ-227 | `src/aibar/aibar/config_cli.py` + `ConfigTreeNode` + details-only metadata and table lines. |
+| REQ-228 | `src/aibar/aibar/config_cli.py` + `format_print_parameter(...)` + JSON-encoded value and default/custom status suffix. |
+| REQ-229 | `src/aibar/aibar/config_cli.py` + `format_print_parameter(...)`/`format_config_table(...)` + map summary and `Key | Value` table. |
+| REQ-230 | `src/aibar/aibar/config_cli.py` + `format_print_parameter(...)` + empty-map hint without table. |
+| REQ-231 | `src/aibar/aibar/config_cli.py` + `build_info_parameter(...)` + type/description heading and `Default`/`Set cmd`/`Reset cmd`/map action details. |
+| REQ-232 | `src/aibar/aibar/config_cli.py` + `build_info_parameter(...)` + `Allowed Values` table for the `currency_symbols` domain. |
+| REQ-233 | `src/aibar/aibar/config_cli.py` + `format_config_table(...)` + measured column widths and shared border template. |
+| REQ-234 | `src/aibar/aibar/config_cli.py` + `display_width(...)`/`format_config_table(...)` + display-width measurement over escaped cells. |
+| REQ-235 | `src/aibar/aibar/config_cli.py` + `CONFIG_PARAM_SPECS` + schema-driven examples, constraints, defaults, and allowed values. |
+| REQ-236 | `src/aibar/aibar/config_cli.py` + `_verify_schema_alignment(...)` + import-time field-set divergence abort. |
+| REQ-237 | `src/aibar/aibar/cli.py` + group option help text and epilog examples listing all six configuration options with canonical paths. |
+| REQ-238 | `src/aibar/aibar/config_cli.py` + all rendered strings and diagnostics + English-only wording. |
+| TST-090 | `tests/test_config_cli_renderer.py` + exact whole-output golden assertions for root children, nested siblings, and detail layouts. |
+| TST-091 | `tests/test_config_cli_structure.py` + `_validate_tree_structure(...)` over real `--print`/`--info` output. |
+| TST-092 | `tests/test_config_cli_structure.py` + `_validate_tables(...)` + border-width, separator-column, and owner-prefix assertions. |
+| TST-093 | `tests/test_config_cli_operations.py` + `--get`/`--set`/`--unset`/`--print`/`--info`/`--print-raw` behavior assertions. |
+| TST-094 | `tests/test_config_cli_operations.py` + atomic-failure assertions on unchanged bytes and absent temporary files. |
+| TST-095 | `tests/test_config_cli_operations.py` + bootstrap and existing-file preservation assertions. |
+| TST-096 | `tests/test_config_cli_operations.py` + published-example execution assertions via `shlex.split`. |

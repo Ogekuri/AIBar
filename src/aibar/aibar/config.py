@@ -6,6 +6,7 @@
 
 import os
 import json
+import tempfile
 import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -343,20 +344,90 @@ def load_runtime_config() -> RuntimeConfig:
     return RuntimeConfig()
 
 
+def _fsync_directory(directory: Path) -> None:
+    """
+    @brief Flush directory metadata entries to persistent storage.
+    @details Opens the directory read-only (adding `O_DIRECTORY` when the
+    platform exposes it) and calls `os.fsync` so a preceding `os.replace`
+    survives a crash. Platforms rejecting directory fsync are tolerated because
+    the file-level flush already completed.
+    @param directory {Path} Directory whose entries must be durable.
+    @return {None} Function return value.
+    @satisfies REQ-212
+    """
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+    try:
+        directory_descriptor = os.open(directory, flags)
+    except OSError:
+        return
+    try:
+        os.fsync(directory_descriptor)
+    except OSError:
+        pass
+    finally:
+        os.close(directory_descriptor)
+
+
+def write_json_document_atomic(target_path: Path, document: dict[str, Any]) -> None:
+    """
+    @brief Persist a JSON document atomically with durability safeguards.
+    @details Serializes `document` as pretty-printed UTF-8 JSON into a temporary
+    file created in the target directory, flushes and fsyncs it, copies the mode
+    of an existing target (or applies `0o600` for a new file), atomically
+    replaces the target, and fsyncs the directory. A failure removes the
+    temporary file so the previous target content survives unchanged.
+    @param target_path {Path} JSON document destination path.
+    @param document {dict[str, Any]} JSON-serializable mapping to persist.
+    @return {None} Function return value.
+    @throws {OSError} Propagates filesystem failures after cleanup.
+    @satisfies REQ-212
+    @satisfies REQ-213
+    @satisfies REQ-214
+    """
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    serialized = json.dumps(document, indent=2, ensure_ascii=False) + "\n"
+    descriptor, temporary_name = tempfile.mkstemp(
+        dir=target_path.parent,
+        prefix=f".{target_path.name}.",
+        suffix=".tmp",
+    )
+    temporary_path = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(serialized)
+            handle.flush()
+            os.fsync(handle.fileno())
+        target_mode = 0o600
+        try:
+            target_mode = target_path.stat().st_mode & 0o777
+        except OSError:
+            target_mode = 0o600
+        os.chmod(temporary_path, target_mode)
+        os.replace(temporary_path, target_path)
+        _fsync_directory(target_path.parent)
+    except BaseException:
+        try:
+            temporary_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise
+
+
 def save_runtime_config(runtime_config: RuntimeConfig) -> None:
     """
     @brief Persist runtime refresh configuration to disk.
-    @details Serializes `RuntimeConfig` to `~/.config/aibar/config.json` using
-    stable pretty-printed JSON (`indent=2`) for deterministic readability.
+    @details Serializes `RuntimeConfig` to `~/.config/aibar/config.json` as
+    stable pretty-printed JSON (`indent=2`) through the shared atomic JSON
+    writer so partial writes can never corrupt the persisted configuration.
     @param runtime_config {RuntimeConfig} Validated runtime configuration model.
     @return {None} Function return value.
     @satisfies CTN-008
     @satisfies CTN-017
+    @satisfies REQ-212
     """
     _ensure_app_config_dir()
-    RUNTIME_CONFIG_PATH.write_text(
-        runtime_config.model_dump_json(indent=2),
-        encoding="utf-8",
+    write_json_document_atomic(
+        RUNTIME_CONFIG_PATH, runtime_config.model_dump(mode="json")
     )
 
 

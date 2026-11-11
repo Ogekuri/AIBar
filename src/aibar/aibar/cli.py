@@ -45,6 +45,14 @@ from aibar.config import (
     save_idle_time,
     save_runtime_config,
 )
+from aibar.config_cli import (
+    run_config_get,
+    run_config_info,
+    run_config_print,
+    run_config_print_raw,
+    run_config_set,
+    run_config_unset,
+)
 from aibar.providers import (
     AntigravityProvider,
     OpenAIUsageProvider,
@@ -1285,6 +1293,127 @@ def _handle_disable_debug_option(
         return
     _update_runtime_logging_flags(debug_enabled=False)
     ctx.exit(0)
+
+
+def _handle_configuration_print_option(
+    ctx: click.Context, param: click.Parameter, value: str | None
+) -> None:
+    """
+    @brief Render the configuration tree through `--print` and exit.
+    @details Delegates to the shared configuration CLI subsystem for the whole
+    tree when no path follows the option, or for one canonical path subtree.
+    @param ctx {click.Context} Active Click context.
+    @param param {click.Parameter} Option metadata (unused).
+    @param value {str | None} Optional canonical path selector.
+    @return {None} Function return value.
+    @satisfies REQ-200
+    @satisfies REQ-217
+    @satisfies REQ-223
+    """
+    del param
+    if ctx.resilient_parsing or value is None:
+        return
+    ctx.exit(run_config_print(value or None))
+
+
+def _handle_configuration_info_option(
+    ctx: click.Context, param: click.Parameter, value: str | None
+) -> None:
+    """
+    @brief Render configuration schema documentation through `--info` and exit.
+    @details Uses the same renderer as `--print` with the documentation detail
+    formatter, for the whole schema or one canonical path.
+    @param ctx {click.Context} Active Click context.
+    @param param {click.Parameter} Option metadata (unused).
+    @param value {str | None} Optional canonical path selector.
+    @return {None} Function return value.
+    @satisfies REQ-200
+    @satisfies REQ-222
+    @satisfies REQ-223
+    """
+    del param
+    if ctx.resilient_parsing or value is None:
+        return
+    ctx.exit(run_config_info(value or None))
+
+
+def _handle_configuration_print_raw_option(
+    ctx: click.Context, param: click.Parameter, value: bool
+) -> None:
+    """
+    @brief Emit the raw configuration file bytes through `--print-raw` and exit.
+    @param ctx {click.Context} Active Click context.
+    @param param {click.Parameter} Option metadata (unused).
+    @param value {bool} Parsed `--print-raw` flag value.
+    @return {None} Function return value.
+    @satisfies REQ-200
+    @satisfies REQ-216
+    """
+    del param
+    if not value or ctx.resilient_parsing:
+        return
+    ctx.exit(
+        run_config_print_raw(binary_stdout=click.get_binary_stream("stdout"))
+    )
+
+
+def _handle_configuration_get_option(
+    ctx: click.Context, param: click.Parameter, value: str | None
+) -> None:
+    """
+    @brief Emit one configuration value as JSON through `--get` and exit.
+    @param ctx {click.Context} Active Click context.
+    @param param {click.Parameter} Option metadata (unused).
+    @param value {str | None} Canonical path text.
+    @return {None} Function return value.
+    @satisfies REQ-200
+    @satisfies REQ-215
+    """
+    del param
+    if ctx.resilient_parsing or value is None:
+        return
+    ctx.exit(run_config_get(value))
+
+
+def _handle_configuration_set_option(
+    ctx: click.Context,
+    param: click.Parameter,
+    value: tuple[str, str] | None,
+) -> None:
+    """
+    @brief Apply one configuration mutation through `--set` and exit.
+    @param ctx {click.Context} Active Click context.
+    @param param {click.Parameter} Option metadata (unused).
+    @param value {tuple[str, str] | None} Canonical path and raw value pair.
+    @return {None} Function return value.
+    @satisfies REQ-200
+    @satisfies REQ-218
+    @satisfies REQ-221
+    """
+    del param
+    if ctx.resilient_parsing or value is None:
+        return
+    path_text, raw_value = value
+    ctx.exit(run_config_set(path_text, raw_value))
+
+
+def _handle_configuration_unset_option(
+    ctx: click.Context, param: click.Parameter, value: str | None
+) -> None:
+    """
+    @brief Reset one configuration target through `--unset` and exit.
+    @param ctx {click.Context} Active Click context.
+    @param param {click.Parameter} Option metadata (unused).
+    @param value {str | None} Canonical path text.
+    @return {None} Function return value.
+    @satisfies REQ-200
+    @satisfies REQ-219
+    @satisfies REQ-220
+    """
+    del param
+    if ctx.resilient_parsing or value is None:
+        return
+    ctx.exit(run_config_unset(value))
 
 
 class StartupPreflightGroup(click.Group):
@@ -2859,6 +2988,14 @@ def _build_cached_dual_window_results(
         "  aibar show --json            Machine-readable output\n"
         "  aibar show --force           Bypass idle-time gating\n"
         "  aibar setup                  Interactive configuration\n"
+        "  aibar --print                Print current configuration tree\n"
+        "  aibar --print enabled_providers        Print one configuration subtree\n"
+        "  aibar --info                 Print configuration schema documentation\n"
+        "  aibar --info currency_symbols          Print one schema subtree\n"
+        "  aibar --print-raw            Print raw ~/.config/aibar/config.json\n"
+        "  aibar --get idle_delay_seconds         Print one value as JSON\n"
+        "  aibar --set idle_delay_seconds 600     Set one value\n"
+        "  aibar --unset idle_delay_seconds       Reset one value\n"
         "  aibar gnome-install          Install GNOME extension\n"
         "  aibar gnome-uninstall        Remove GNOME extension\n"
         "  aibar --version              Show installed version\n"
@@ -2872,6 +3009,64 @@ def _build_cached_dual_window_results(
         "  aibar --enable-debug         Enable runtime API debug log\n"
         "  aibar --disable-debug        Disable runtime API debug log"
     ),
+)
+@click.option(
+    "--print",
+    "print_path",
+    is_flag=False,
+    flag_value="",
+    metavar="[PATH]",
+    is_eager=True,
+    expose_value=False,
+    callback=_handle_configuration_print_option,
+    help="Print current configuration as a tree and exit.",
+)
+@click.option(
+    "--info",
+    "info_path",
+    is_flag=False,
+    flag_value="",
+    metavar="[PATH]",
+    is_eager=True,
+    expose_value=False,
+    callback=_handle_configuration_info_option,
+    help="Print configuration schema documentation and exit.",
+)
+@click.option(
+    "--print-raw",
+    is_flag=True,
+    is_eager=True,
+    expose_value=False,
+    callback=_handle_configuration_print_raw_option,
+    help="Write the raw config.json bytes to stdout and exit.",
+)
+@click.option(
+    "--get",
+    "get_path",
+    metavar="PATH",
+    is_eager=True,
+    expose_value=False,
+    callback=_handle_configuration_get_option,
+    help="Print one configuration value as JSON and exit.",
+)
+@click.option(
+    "--set",
+    "set_path_value",
+    nargs=2,
+    metavar="PATH VALUE",
+    is_eager=True,
+    expose_value=False,
+    callback=_handle_configuration_set_option,
+    help="Set one configuration value and exit.",
+)
+@click.option(
+    "--unset",
+    "unset_path",
+    metavar="PATH",
+    is_eager=True,
+    expose_value=False,
+    callback=_handle_configuration_unset_option,
+    help="Reset one configuration field or delete one map key and exit.",
 )
 @click.option(
     "--version",
