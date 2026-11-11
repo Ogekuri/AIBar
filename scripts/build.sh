@@ -374,15 +374,17 @@ PY
 }
 
 ## @fn print_artifact_summary
-# @brief Print the produced artifact inventory retained in `dist/`.
-# @details Emits one deterministic line per artifact with its byte size so the
+# @brief Print the absolute path and byte size of every artifact retained in `dist/`.
+# @details Emits one deterministic line per artifact in sorted order. Each line
+# carries the full artifact path (`DIST_DIR` joined with the file name; absolute
+# because `DIST_DIR` derives from `readlink -f`) followed by its byte size, so the
 # operator can verify the release payload without listing the directory.
 # @return {void} No return value.
 # @satisfies PRJ-034
 print_artifact_summary() {
   printf '\n==> build succeeded: %s %s\n' "$PROJECT_NAME" "$PROJECT_VERSION"
   printf 'artifacts retained in %s:\n' "$DIST_DIR"
-  find "$DIST_DIR" -mindepth 1 -maxdepth 1 -type f -printf '  %f (%s bytes)\n' | sort
+  find "$DIST_DIR" -mindepth 1 -maxdepth 1 -type f -printf '  %p (%s bytes)\n' | sort
 }
 
 # Argument parsing: this script accepts only the help flags.
