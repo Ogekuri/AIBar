@@ -44,17 +44,14 @@ aibar = "aibar.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/aibar/aibar"]
-include = [
-    "scripts/**",
-]
 
 [tool.hatch.build.targets.sdist]
 include = [
     "src/aibar/aibar/**",
-    "scripts/**",
     "pyproject.toml",
     "README.md",
     "LICENSE",
+    "LICENSE_GnomeCodexBar",
 ]
 
 [tool.pytest.ini_options]

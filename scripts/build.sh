@@ -308,8 +308,8 @@ else:
         required = (
             f"{project_name}-{project_version}/pyproject.toml",
             f"{project_name}-{project_version}/src/aibar/aibar/cli.py",
-            f"{project_name}-{project_version}/scripts/build.sh",
-            f"{project_name}-{project_version}/scripts/pre-release-check.sh",
+            f"{project_name}-{project_version}/src/aibar/aibar/gnome-extension/aibar@aibar.panel/metadata.json",
+            f"{project_name}-{project_version}/LICENSE_GnomeCodexBar",
         )
         missing = [name for name in required if name not in names]
         if missing:

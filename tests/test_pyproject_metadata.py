@@ -142,7 +142,7 @@ class TestBuildArtifacts:
         """
         @brief Verify wheel packages setting includes aibar package with gnome-extension subtree.
         @details Asserts hatch wheel packages list contains the aibar package directory
-        which auto-includes gnome-extension/ subtree, and include list contains scripts glob.
+        which auto-includes gnome-extension/ subtree, and no wheel include override is declared.
         @param pyproject_data {dict} Parsed pyproject.toml.
         @return {None} Function return value.
         @satisfies TST-037
@@ -156,14 +156,13 @@ class TestBuildArtifacts:
         )
         packages = wheel.get("packages", [])
         assert "src/aibar/aibar" in packages
-        include = wheel.get("include", [])
-        assert "scripts/**" in include
+        assert "include" not in wheel
 
     def test_sdist_includes_runtime_assets(self, pyproject_data: dict) -> None:
         """
         @brief Verify sdist include settings list runtime assets.
         @details Asserts hatch sdist include list contains aibar package (with gnome-extension
-        subtree) and scripts globs required by release artifact builds.
+        subtree) and LICENSE_GnomeCodexBar, and excludes development scripts.
         @param pyproject_data {dict} Parsed pyproject.toml.
         @return {None} Function return value.
         @satisfies TST-037
@@ -177,7 +176,8 @@ class TestBuildArtifacts:
         )
         include = sdist.get("include", [])
         assert "src/aibar/aibar/**" in include
-        assert "scripts/**" in include
+        assert "LICENSE_GnomeCodexBar" in include
+        assert "scripts/**" not in include
 
 
 class TestPyPIProjectMetadata:
