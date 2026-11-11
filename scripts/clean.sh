@@ -116,13 +116,15 @@ validate_toolchain() {
 
 ## @fn load_project_metadata
 # @brief Resolve the distribution name from `pyproject.toml`.
-# @details Reads the PEP 621 project name through the project environment so
-# no duplicated name literal exists outside `pyproject.toml`; the resolved
-# name scopes the generated sdist and wheel deletion patterns.
+# @details Reads the PEP 621 project name through an ephemeral interpreter
+# (`uv run --no-project`) so no duplicated name literal exists outside
+# `pyproject.toml`; the resolved name scopes the generated sdist and wheel
+# deletion patterns. `--no-project` skips project discovery, so no `.venv`
+# or other file is created in the repository.
 # @return {void} Returns after populating `PROJECT_NAME`.
 # @satisfies PRJ-044
 load_project_metadata() {
-  PROJECT_NAME="$(uv run --locked --project "$REPO_ROOT" python -c '
+  PROJECT_NAME="$(uv run --no-project python -c '
 import pathlib
 import sys
 import tomllib

@@ -45,9 +45,12 @@ aibar = "aibar.cli:main"
 [tool.hatch.build.targets.wheel]
 packages = ["src/aibar/aibar"]
 
+[tool.hatch.build.hooks.custom]
+
 [tool.hatch.build.targets.sdist]
 include = [
     "src/aibar/aibar/**",
+    "hatch_build.py",
     "pyproject.toml",
     "README.md",
     "LICENSE",

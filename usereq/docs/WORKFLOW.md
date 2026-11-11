@@ -550,6 +550,7 @@
 - `External Boundaries`
   - Declaration: `scripts/build.sh`.
   - `uv run --locked --with build --with setuptools --with wheel python -m build`: sdist+wheel build identical to the `build-release` job of `PROC:release-pypi`, writing `dist/aibar-<version>.tar.gz` and `dist/aibar-<version>-py3-none-any.whl`.
+  - `hatch_build.py` (`CustomBuildHook`, `[tool.hatch.build.hooks.custom]`): hatchling build hook invoked for the sdist target that removes the force-included `.gitignore` from the sdist.
   - `zip -r`: GNOME extension archive `dist/aibar@aibar.panel.shell-extension.zip`.
   - `uv run --locked --project <root> python -` archive validation through `tarfile`/`zipfile`.
 
@@ -565,7 +566,7 @@
   - No internal functions defined under `src/`; orchestration occurs at external process boundaries.
     - `validate_toolchain(...)`: `uv` and `find` availability validation [`scripts/clean.sh`]
       - `require_tool(...)`: `command -v` executable validation with explicit non-zero abort [`scripts/clean.sh`]
-    - `load_project_metadata(...)`: resolve the distribution name from `pyproject.toml` through the project interpreter [`scripts/clean.sh`]
+    - `load_project_metadata(...)`: resolve the distribution name from `pyproject.toml` through an ephemeral interpreter (`uv run --no-project`) that creates no project environment [`scripts/clean.sh`]
     - `remove_generated_dist_artifacts(...)`: delete only `dist/` entries accepted by `is_generated_dist_entry(...)`, recording each removed path [`scripts/clean.sh`]
       - `is_generated_dist_entry(...)`: match project sdist, wheel, or extension zip patterns; every other entry is preserved [`scripts/clean.sh`]
     - `remove_build_dir(...)`: remove the `build/` Python distribution byproduct tree when present [`scripts/clean.sh`]
@@ -574,7 +575,7 @@
     - `on_error(...)`: ERR-trap diagnostic naming the active phase and failing command [`scripts/clean.sh`]
 - `External Boundaries`
   - Declaration: `scripts/clean.sh`.
-  - `uv run --locked --project <root> python -c ... tomllib`: project-name resolution from `pyproject.toml`, identical to the metadata resolution of `PROC:build`.
+  - `uv run --no-project python -c ... tomllib`: project-name resolution from `pyproject.toml` without creating a project environment or any repository file.
   - `find`, `rm -f`, `rm -rf`, and `rmdir`: filesystem mutation primitives restricted to generated artifact patterns, the `build/` tree, and an emptied `dist/` directory.
 
 ## Communication Edges
