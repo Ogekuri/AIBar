@@ -42,8 +42,9 @@ jobs:
             echo "is_release_branch=false" >> "$GITHUB_OUTPUT"
           fi
 
-  # 2. Publish the release artifacts already committed under dist/ by the local build pipeline.
-  # No build runs here: the tagged commit is the single source of every artifact.
+  # 2. Publish the release artifacts: reuse the sdist, wheel, and GNOME extension zip committed
+  # under dist/ when all three exist in the tagged commit, otherwise generate them with
+  # scripts/build.sh. Commit-tracked artifacts are optional; their absence never blocks a release.
   release-assets:
     needs: check-branch
     # Runs for version tags on either the master or the develop branch
@@ -58,18 +59,44 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Verify pre-built dist artifacts
+      - name: Resolve release artifacts
+        id: artifacts
+        run: |
+          set -euo pipefail
+          present=true
+          for pattern in 'dist/*.tar.gz' 'dist/*.whl' 'dist/aibar@aibar.panel.shell-extension.zip'; do
+            if ! compgen -G "$pattern" > /dev/null; then
+              echo "release artifact absent from the tagged commit: $pattern" >&2
+              present=false
+            fi
+          done
+          echo "present=$present" >> "$GITHUB_OUTPUT"
+
+      - name: Install uv toolchain
+        if: steps.artifacts.outputs.present != 'true'
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: false
+
+      - name: Generate release artifacts
+        if: steps.artifacts.outputs.present != 'true'
+        run: |
+          set -euo pipefail
+          bash scripts/build.sh
+          ls -l dist
+
+      - name: Verify resolved release artifacts
         run: |
           set -euo pipefail
           missing=0
           for pattern in 'dist/*.tar.gz' 'dist/*.whl' 'dist/aibar@aibar.panel.shell-extension.zip'; do
             if ! compgen -G "$pattern" > /dev/null; then
-              echo "ERROR: missing pre-built release artifact in the tagged commit: $pattern" >&2
+              echo "ERROR: missing release artifact after artifact resolution: $pattern" >&2
               missing=1
             fi
           done
           if [ "$missing" -ne 0 ]; then
-            echo "ERROR: the tagged commit must contain the sdist, wheel, and GNOME extension zip in dist/." >&2
+            echo "ERROR: the release requires the sdist, wheel, and GNOME extension zip in dist/." >&2
             exit 1
           fi
           ls -l dist

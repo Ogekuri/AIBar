@@ -29,6 +29,7 @@ NODE24_ACTION_MAJORS: dict[str, str] = {
         "mikepenz/release-changelog-builder-action@v6"
     ),
     "softprops/action-gh-release": "softprops/action-gh-release@v3",
+    "astral-sh/setup-uv": "astral-sh/setup-uv@v7",
     "actions/upload-artifact": "actions/upload-artifact@v7",
     "actions/download-artifact": "actions/download-artifact@v8",
 }

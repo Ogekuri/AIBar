@@ -4,7 +4,8 @@
 @details Verifies the release workflow `.github/workflows/release-pypi.yml`
 preserves the canonical tag-triggered release pipeline, declares PyPI Trusted
 Publishing via `pypa/gh-action-pypi-publish` under `id-token: write`, publishes
-the tagged-commit `dist/` artifacts, and that `README.md` documents PyPI
+the resolved `dist/` release artifacts (reused when committed, generated
+otherwise), and that `README.md` documents PyPI
 installation commands. All assertions are static file-content checks:
 deterministic, isolated, and free of network/filesystem side effects beyond
 repository reads.
@@ -145,7 +146,7 @@ class TestPythonVersionPins:
     @brief Validates the repository Python 3.12 interpreter pin.
     @details Ensures the repository `.python-version` tracks 3.12 so local uv
     execution resolves the documented interpreter floor. The release workflow
-    installs no Python toolchain because it publishes pre-built artifacts.
+    installs the uv toolchain only when the tagged commit lacks the artifacts.
     """
 
     def test_python_version_file_tracks_312(self) -> None:

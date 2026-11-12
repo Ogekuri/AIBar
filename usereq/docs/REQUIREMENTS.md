@@ -92,23 +92,24 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **PRJ-009**: MUST execute startup update checks and lifecycle flags `--upgrade`, `--uninstall`, `--version`, `--enable-log`, `--disable-log`, `--enable-debug`, and `--disable-debug` for program `aibar`.
 - **PRJ-010**: MUST package all runtime files required by `aibar` so local execution and `uv tool install` execution remain behaviorally equivalent.
 - **PRJ-011**: MUST keep GNOME extension contract documentation in `pi-usereq/docs/REQUIREMENTS.md`, `pi-usereq/docs/WORKFLOW.md`, and `pi-usereq/docs/REFERENCES.md`; repository source tree MUST NOT contain `src/aibar/plans/Gnome.plan.md`.
-- **PRJ-012**: MUST maintain release automation in `.github/workflows/release-pypi.yml` publishing the tagged-commit `dist/` artifacts as GitHub Release assets with changelog for version tags on `master` or `develop`.
-- **PRJ-013**: MUST publish the tagged-commit `dist/` sdist and wheel to PyPI project `aibar` via GitHub Actions Trusted Publishing with OIDC `id-token: write` only for tagged `master` releases.
+- **PRJ-012**: MUST maintain release automation in `.github/workflows/release-pypi.yml` publishing the sdist, wheel, and GNOME extension zip as GitHub Release assets with changelog for version tags on `master` or `develop`.
+- **PRJ-013**: MUST publish the sdist and wheel to PyPI project `aibar` via GitHub Actions Trusted Publishing with OIDC `id-token: write` only for tagged `master` releases.
 - **PRJ-014**: MUST declare `[project.urls]` and trove `classifiers` in `pyproject.toml` to complete PyPI project metadata.
 - **PRJ-015**: MUST document PyPI installation (`uv tool install aibar`, `uvx aibar`) in `README.md` beside existing git-based instructions.
 - **PRJ-016**: MUST document `sudo apt install pipx`, `pipx ensurepath`, and `pipx install aibar` as the primary installation method in `README.md`.
 - **PRJ-017**: MUST document `pip install aibar` and `uv`/`uvx` installations in `README.md` as alternative methods after the primary pipx flow.
 - **PRJ-018**: MUST document in `README.md` a dedicated non-primary GitHub section covering GitHub package installation, `--upgrade --develop`, and dual-repository `--version` reporting.
-- **PRJ-019**: MUST skip PyPI publication when a version tag is on `develop` and not on `master`, while the release workflow still publishes the pre-built GitHub Release assets.
+- **PRJ-019**: MUST skip PyPI publication when a version tag is on `develop` and not on `master`, while the release workflow still publishes the GitHub Release assets.
 - **PRJ-020**: MUST provide executable `scripts/pre-release-check.sh` that runs the authoritative pre-release pipeline and MUST exit `0` only when every mandatory check and the final cleanup succeed.
 - **PRJ-021**: `scripts/pre-release-check.sh` MUST abort with non-zero exit status before any pipeline stage when the git working tree contains uncommitted changes, unless the `--allow-dirty` flag is passed.
 - **PRJ-022**: `scripts/pre-release-check.sh` MUST execute each pipeline stage with a labeled progress header and MUST abort at the first failing stage with a non-zero exit status.
 - **PRJ-023**: `scripts/pre-release-check.sh` MUST execute the unit-test suite via `uv run pytest` and MUST fail with non-zero exit status when any test fails.
 - **PRJ-024**: `scripts/pre-release-check.sh` MUST generate release artifacts by invoking `scripts/build.sh` and MUST fail when the sdist, wheel, or GNOME extension zip is missing from `dist/` after the build.
 - **PRJ-025**: `scripts/pre-release-check.sh` MUST remove the `build/` and `.pytest_cache/` directories, `__pycache__` trees under `src/` and `tests/`, and script-created `.venv` on pipeline exit, regardless of pipeline outcome, and MUST leave versioned `dist/` artifacts untouched.
-- **PRJ-050**: `.github/workflows/release-pypi.yml` MUST obtain the sdist, wheel, and GNOME extension zip exclusively from the `dist/` directory of the tagged release commit.
-- **PRJ-051**: `.github/workflows/release-pypi.yml` MUST fail with non-zero status when the tagged commit does not provide the sdist, wheel, or GNOME extension zip in `dist/`.
-- **PRJ-052**: `.github/workflows/release-pypi.yml` MUST run every release job with pre-installed runner shell utilities and GitHub Actions only, requiring no Python, `uv`, pytest, or build command execution.
+- **PRJ-050**: `.github/workflows/release-pypi.yml` MUST reuse the sdist, wheel, and GNOME extension zip from `dist/` when all three exist in the tagged commit, and MUST generate them with `scripts/build.sh` otherwise.
+- **PRJ-051**: `.github/workflows/release-pypi.yml` MUST fail with non-zero status when the sdist, wheel, or GNOME extension zip is missing from `dist/` after artifact resolution.
+- **PRJ-052**: `.github/workflows/release-pypi.yml` MUST execute no pytest suite and no `scripts/pre-release-check.sh`, and MUST generate release artifacts at most once per run through `scripts/build.sh`.
+- **PRJ-053**: A release MUST NOT require the sdist, wheel, or GNOME extension zip to be tracked in `dist/` by the tagged commit.
 - **PRJ-028**: MUST validate repository structure, required executables (`uv`, `git`, `zip`, `find`, `bash`), and the syntax of every `scripts/*.sh` file before generating artifacts.
 - **PRJ-029**: MUST validate Python syntax under `src/` and MUST execute `uv run --locked --with pyright pyright --project pyrightconfig.json`, failing when type checking exits non-zero.
 - **PRJ-030**: MUST provide executable `scripts/build.sh` that resolves the repository root from its own path and generates the sdist, wheel, and GNOME extension zip inside `dist/`.
@@ -119,10 +120,10 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **PRJ-035**: `scripts/pre-release-check.sh` MUST register `trap` handlers for EXIT, SIGINT, and SIGTERM that run cleanup, preserve the original exit status, and fail the run when cleanup fails.
 - **PRJ-036**: `scripts/pre-release-check.sh` MUST abort before any artifact mutation when `dist/` contains entries not matching generated artifact patterns.
 - **PRJ-037**: `scripts/pre-release-check.sh` MUST verify after cleanup that tracked files outside `dist/` are unchanged, no pipeline artifacts remain outside `dist/`, and git status outside `dist/` matches the pre-run status.
-- **PRJ-038**: `.gitignore` MUST keep exclude-all-then-reinclude semantics and MUST re-include `dist/` and `dist/**/*` in the "Include specific files and directories" section so release artifacts are versioned.
+- **PRJ-038**: `.gitignore` MUST keep exclude-all-then-reinclude semantics and MUST re-include `dist/` and `dist/**/*` in the "Include specific files and directories" section so optionally committed release artifacts stay git-visible.
 - **PRJ-039**: `scripts/build.sh` and `scripts/pre-release-check.sh` MUST locate the repository root from their own paths and MUST work from any invocation directory, including paths with spaces.
 - **PRJ-040**: `scripts/build.sh` MUST validate that `uv`, `zip`, and `find` are available and MUST exit non-zero when a required tool is missing.
-- **PRJ-041**: MUST version the release artifacts in `dist/` (sdist, wheel, GNOME extension zip) as tracked files of the git repository.
+- **PRJ-041**: Release artifacts in `dist/` (sdist, wheel, GNOME extension zip) MAY be tracked as files of the git repository.
 - **PRJ-047**: `scripts/build.sh` MUST remove the `build/`, `.pytest_cache/`, `*.egg-info`, and `__pycache__` intermediate artifacts after every build while retaining every versioned `dist/` artifact.
 - **PRJ-048**: `scripts/build.sh` MUST execute the intermediate-artifact cleanup through EXIT, SIGINT, and SIGTERM handlers that preserve the original process exit status.
 - **PRJ-049**: `scripts/build.sh` MUST verify after cleanup that no `build/`, `.pytest_cache/`, `*.egg-info`, or `__pycache__` artifact remains outside `dist/` and MUST exit non-zero otherwise.
@@ -482,10 +483,10 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-083**: MUST verify the `--version` GitHub report performs one fresh releases/latest fetch per invocation and its reported version equals the tag pinned by the `--develop` upgrade argv.
 - **TST-084**: MUST verify `scripts/pre-release-check.sh` exists, is executable, gates on a dirty git tree with `--allow-dirty` opt-out, runs `uv sync --locked` and `uv run pytest`, delegates building to `scripts/build.sh`, and verifies the sdist and wheel artifacts.
 - **TST-085**: MUST verify `scripts/pre-release-check.sh` registers an EXIT trap removing `build/`, `.pytest_cache/`, and `__pycache__` trees under `src/` and `tests/`, independent of pipeline outcome, and leaves `dist/` untouched.
-- **TST-103**: MUST verify `.github/workflows/release-pypi.yml` resolves the sdist, wheel, and GNOME extension zip from the tagged-commit `dist/` directory and uploads them as GitHub Release assets.
-- **TST-104**: MUST verify `.github/workflows/release-pypi.yml` fails when any required `dist/` artifact is missing from the tagged commit.
-- **TST-105**: MUST verify `.github/workflows/release-pypi.yml` contains no `scripts/build.sh`, `scripts/pre-release-check.sh`, `python -m build`, `uv sync`, `uv run pytest`, or extension `zip` packaging step.
-- **TST-106**: MUST verify `.github/workflows/release-pypi.yml` declares no `actions/setup-python` or `astral-sh/setup-uv` step and keeps no `unit-tests` job.
+- **TST-103**: MUST verify `.github/workflows/release-pypi.yml` reuses `dist/` artifacts when present, generates them with `scripts/build.sh` otherwise, and uploads them as GitHub Release assets.
+- **TST-104**: MUST verify `.github/workflows/release-pypi.yml` fails with non-zero status when a required `dist/` artifact is missing after artifact resolution.
+- **TST-105**: MUST verify `.github/workflows/release-pypi.yml` contains no `scripts/pre-release-check.sh`, no `python -m build`, no `uv sync`, and no `uv run pytest` step.
+- **TST-106**: MUST verify `.github/workflows/release-pypi.yml` declares a conditional `astral-sh/setup-uv` toolchain step and keeps no `unit-tests` job.
 - **TST-087**: MUST verify Linux `--upgrade --force` executes the PyPI forced lifecycle argv `uv tool install aibar --force --reinstall --refresh` with exit-code propagation and non-Linux `--upgrade --force` prints manual guidance containing the forced command without subprocess execution.
 - **TST-088**: MUST verify Linux `--upgrade` with `--develop`/`--dev` and `--force` executes the tag-pinned GitHub forced lifecycle argv `uv tool install --force --reinstall --refresh git+https://github.com/Ogekuri/<program-name>@<tag_name>` with exit-code propagation.
 - **TST-089**: MUST verify `--version` output is exactly the three aligned stdout lines with equal label field width, aligned colons, package `__version__` installed value, and GitHub failure value `unknown (<reason>)` on fetch failure.
@@ -678,21 +679,22 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | CTN-018 | `pyproject.toml` + `requires-python = ">= 3.12"`; `.python-version` + `3.12` interpreter pin; `uv.lock` + `requires-python = ">=3.12"`. |
 | CTN-019 | `pyproject.toml` + `[dependency-groups] dev = ["pytest"]` with runtime `[project] dependencies` excluding test-only packages; `uv.lock` regenerated for the dependency-group split. |
 | TST-065 | `.python-version` + content `3.12`; verified by `tests/test_release_pypi_workflow.py`. |
-| PRJ-050 | `.github/workflows/release-pypi.yml` + `release-assets` job + checkout of the tagged release commit with no build step, so every published artifact is read from the committed `dist/` directory. |
-| PRJ-051 | `.github/workflows/release-pypi.yml` + `Verify pre-built dist artifacts` step + shell `compgen -G` presence probe over `dist/*.tar.gz`, `dist/*.whl`, and the GNOME extension zip, exiting non-zero on any missing artifact. |
-| PRJ-052 | `.github/workflows/release-pypi.yml` + release jobs declare only `actions/checkout`, `actions/attest-build-provenance`, changelog, release, and artifact upload/download actions, with no Python, `uv`, pytest, or build command step. |
-| TST-103 | `tests/test_release_workflow_prebuilt_artifacts.py` + assertions that the release job sources `dist/` from the tagged commit and uploads `dist/**/*` as GitHub Release assets. |
-| TST-104 | `tests/test_release_workflow_prebuilt_artifacts.py` + assertions for the required-artifact presence gate and its non-zero failure path. |
-| TST-105 | `tests/test_release_workflow_prebuilt_artifacts.py` + absence assertions for `scripts/build.sh`, `scripts/pre-release-check.sh`, `python -m build`, `uv sync`, `uv run pytest`, and extension `zip` packaging. |
-| TST-106 | `tests/test_release_workflow_prebuilt_artifacts.py` + absence assertions for `actions/setup-python`, `astral-sh/setup-uv`, and the `unit-tests` job. |
+| PRJ-050 | `.github/workflows/release-pypi.yml` + `release-assets` job + `Resolve release artifacts` step writing the `present` output from `compgen -G` probes, so committed `dist/` artifacts are reused when complete and generated with `scripts/build.sh` otherwise. |
+| PRJ-051 | `.github/workflows/release-pypi.yml` + `Verify resolved release artifacts` step + shell `compgen -G` presence probe over `dist/*.tar.gz`, `dist/*.whl`, and the GNOME extension zip, exiting non-zero when a resolved artifact is missing. |
+| PRJ-052 | `.github/workflows/release-pypi.yml` + `release-assets` job declares no pytest suite and no `scripts/pre-release-check.sh` step, and runs the single conditional `Generate release artifacts` step invoking `bash scripts/build.sh` only when `dist/` artifacts are incomplete. |
+| PRJ-053 | `.github/workflows/release-pypi.yml` + `Resolve release artifacts` step tolerates an empty `dist/` in the tagged commit, so commit-tracked release artifacts are never a release precondition; `tests/test_release_workflow_release_artifacts.py` asserts the fallback build path. |
+| TST-103 | `tests/test_release_workflow_release_artifacts.py` + assertions that the release job probes `dist/` artifacts, falls back to `scripts/build.sh`, and uploads `dist/**/*` as GitHub Release assets. |
+| TST-104 | `tests/test_release_workflow_release_artifacts.py` + assertions for the post-resolution artifact presence gate and its non-zero failure path. |
+| TST-105 | `tests/test_release_workflow_release_artifacts.py` + absence assertions for `scripts/pre-release-check.sh`, `python -m build`, `uv sync`, `uv run pytest`, and extension `zip` packaging. |
+| TST-106 | `tests/test_release_workflow_release_artifacts.py` + assertions for the conditional `astral-sh/setup-uv` toolchain step and the absent `unit-tests` job. |
 | REQ-172 | `src/aibar/aibar/cli.py` + `login`/`_login_error_state_providers`/`_select_login_error_providers` + bare-login branch selects login-capable providers with cached `result=FAIL` status via locked `load_cli_cache` read. |
 | REQ-173 | `src/aibar/aibar/cli.py` + `_select_login_error_providers` + provider selection requires at least one cached window status entry with `result=FAIL`. |
 | REQ-174 | `src/aibar/aibar/cli.py` + `_login_error_state_providers` + empty-selection branch prints informational message and returns with exit status 0. |
 | REQ-175 | `src/aibar/aibar/cli.py` + `_login_error_state_providers` + per-flow `SystemExit`/exception capture records failed flows and exits non-zero when any flow fails. |
 | TST-066 | `tests/test_login_error_state.py` + bare-login targeting assertions for cached `FAIL`-only execution and `OK`/absent/non-login-capable skip. |
 | TST-067 | `tests/test_login_error_state.py` + zero-exit informational message and non-zero flow-failure exit assertions. |
-| PRJ-012 | `.github/workflows/release-pypi.yml` + `release-assets` job (checkout of the tagged commit, pre-built `dist/` artifact verification, provenance attestation, changelog, GitHub Release asset publication from `dist/**/*`) for version tags on `master` or `develop` via `check-branch` outputs `is_master`/`is_release_branch`. |
-| PRJ-013 | `.github/workflows/release-pypi.yml` + `publish-pypi` job gated by `if: needs.release-assets.outputs.is_master == 'true'` uploading the tagged-commit `dist/*.tar.gz`/`dist/*.whl` via `pypa/gh-action-pypi-publish@release/v1` Trusted Publishing under top-level `id-token: write` permission. |
+| PRJ-012 | `.github/workflows/release-pypi.yml` + `release-assets` job (checkout of the tagged commit, artifact resolution reusing committed `dist/` artifacts or generating them, provenance attestation, changelog, GitHub Release asset publication from `dist/**/*`) for version tags on `master` or `develop` via `check-branch` outputs `is_master`/`is_release_branch`. |
+| PRJ-013 | `.github/workflows/release-pypi.yml` + `publish-pypi` job gated by `if: needs.release-assets.outputs.is_master == 'true'` uploading the resolved `dist/*.tar.gz`/`dist/*.whl` via `pypa/gh-action-pypi-publish@release/v1` Trusted Publishing under top-level `id-token: write` permission. |
 | PRJ-014 | `pyproject.toml` + `[project.urls]` (Homepage/Repository/Issues/Changelog) and `classifiers` declaring console, Linux, Python 3.12/3.13, and monitoring categories. |
 | PRJ-015 | `README.md` + Installation section documenting `uv tool install aibar` and `uvx aibar` from PyPI beside git-based commands. |
 | PRJ-016 | `README.md` + Installation section documenting the pipx primary flow `sudo apt install pipx`, `pipx ensurepath`, `pipx install aibar`. |
@@ -726,8 +728,8 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-195 | `src/aibar/aibar/cli.py` + `_emit_version_option_release_report` + `_GITHUB_REPORT_UNKNOWN_PREFIX="unknown"` failure value rendered inside the aligned `Latest @ GitHub   : unknown (<reason>)` line via `_format_release_report_value(..., failure_prefix=_GITHUB_REPORT_UNKNOWN_PREFIX)` and `_format_version_report_line`. |
 | REQ-199 | `src/aibar/aibar/cli.py` + `_format_version_report_line`/`_VERSION_REPORT_LABEL_WIDTH`/`_VERSION_REPORT_INSTALLED_LABEL`/`_VERSION_REPORT_PYPI_LABEL`/`_VERSION_REPORT_GITHUB_LABEL` + `_emit_version_option_release_report` emitting exactly three stdout lines with 18-character left-justified labels and aligned colons. |
 | TST-083 | `tests/test_version_github_report_parity.py` + `TestVersionGithubReportParity` + one-fetch-per-invocation assertion and report-value/tag-parity assertions under deterministic fetch substitutes. |
-| CTN-021 | `.github/workflows/release-pypi.yml` + `actions/checkout@v7`, `actions/attest-build-provenance@v4`, `softprops/action-gh-release@v3`, `actions/upload-artifact@v7`, `actions/download-artifact@v8` (upstream `runs.using: node24` verified); `mikepenz/release-changelog-builder-action@v6` resolves to node24-native `v6.5`; `pypa/gh-action-pypi-publish@release/v1` is Docker-based and Node-independent. |
-| TST-080 | `tests/test_workflow_node24_actions.py` + `TestNode24ActionPins` + Node24-major pin assertions over the workflow `uses:` references retained by the pre-built artifact release pipeline. |
+| CTN-021 | `.github/workflows/release-pypi.yml` + `actions/checkout@v7`, `actions/attest-build-provenance@v4`, `softprops/action-gh-release@v3`, `actions/upload-artifact@v7`, `actions/download-artifact@v8`, `astral-sh/setup-uv@v7` (upstream `runs.using: node24` verified; `setup-uv@v3` Node20-era pin retired); `mikepenz/release-changelog-builder-action@v6` resolves to node24-native `v6.5`; `pypa/gh-action-pypi-publish@release/v1` is Docker-based and Node-independent. |
+| TST-080 | `tests/test_workflow_node24_actions.py` + `TestNode24ActionPins` + Node24-major pin assertions over the workflow `uses:` references retained by the conditional artifact-resolution release pipeline. |
 | TST-081 | `tests/test_workflow_node24_actions.py` + `TestNode24ActionPins` + absence assertions for `ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION` and `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24`. |
 | PRJ-020 | `scripts/pre-release-check.sh` + main pipeline + ordered preflight, locked sync, pytest, delegated build, and artifact-verification stages, with success gated on cleanup and post-run repository integrity. |
 | PRJ-021 | `scripts/pre-release-check.sh` + `check_clean_working_tree` + `git status --porcelain` gate with `--allow-dirty` opt-out and non-zero abort. |
@@ -750,7 +752,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | PRJ-038 | `.gitignore` + `!dist/` and `!dist/**/*` re-include lines in the "Include specific files and directories" section; no dist-scoped exclusion rules. |
 | PRJ-039 | `scripts/build.sh` and `scripts/pre-release-check.sh` + `readlink -f "${BASH_SOURCE[0]}"` root resolution with double-quoted path handling throughout. |
 | PRJ-040 | `scripts/build.sh` + `require_tool` + `command -v` validation of `uv`, `zip`, and `find` before any build step, exiting non-zero on a missing tool. |
-| PRJ-041 | `.gitignore` + `!dist/` and `!dist/**/*` include rules keep `dist/` release artifacts git-visible for versioning. |
+| PRJ-041 | `.gitignore` + `!dist/` and `!dist/**/*` include rules keep committed `dist/` release artifacts git-visible; `tests/test_dist_versioned_artifacts.py` asserts the include rules without requiring tracked artifacts. |
 | REQ-196 | `src/aibar/aibar/cli.py` + `--force` group option declaration and `_upgrade_force_requested_from_args` argv-token detection consumed only by `_resolve_upgrade_lifecycle_command` for `--upgrade`. |
 | REQ-197 | `src/aibar/aibar/cli.py` + `_UPGRADE_FORCE_OPTIONS`/`_insert_upgrade_force_options`/`_resolve_upgrade_lifecycle_command` produce argv `uv tool install aibar --force --reinstall --refresh` when `--upgrade` is combined with `--force`. |
 | REQ-198 | `src/aibar/aibar/cli.py` + `_resolve_upgrade_lifecycle_command` inserts `_UPGRADE_FORCE_OPTIONS` after the `--force` token of the tag-pinned GitHub argv, yielding `uv tool install --force --reinstall --refresh git+https://github.com/Ogekuri/<program-name>@<tag_name>`. |

@@ -35,7 +35,7 @@
 - `id: PROC:release-pypi`
   - `type: Process`
   - `parent_process: null`
-  - `role: GitHub Actions release pipeline publishing the tagged-commit dist/ artifacts as GitHub Release assets and PyPI distributions without executing any build`
+  - `role: GitHub Actions release pipeline publishing the release artifacts (reusing committed dist/ artifacts when all three are present, otherwise generating them with scripts/build.sh) as GitHub Release assets and PyPI distributions`
   - `entrypoint_symbols: workflow trigger (push tag), check-branch job, release-assets job, publish-pypi job`
   - `defining_files: .github/workflows/release-pypi.yml`
   - `thread_model: no explicit threads detected`
@@ -461,15 +461,18 @@
 - `Lifecycle/Trigger`
   - Starts when a matching release tag is pushed.
   - Runs the `check-branch` gate job resolving whether the tag SHA is on `master` or `develop`.
-  - Runs the `release-assets` job for tags on either branch: checks out the tagged commit, verifies the pre-built `dist/` sdist, wheel, and GNOME extension zip, attests provenance, builds the changelog, publishes the GitHub Release with `dist/**/*` assets, and uploads the distributions as a workflow artifact; any missing artifact aborts the job with a non-zero exit.
+  - Runs the `release-assets` job for tags on either branch: checks out the tagged commit, resolves whether all three `dist/` artifacts exist, generates them with `scripts/build.sh` through a conditional `uv` toolchain when any artifact is absent, verifies the resolved artifacts, attests provenance, builds the changelog, publishes the GitHub Release with `dist/**/*` assets, and uploads the distributions as a workflow artifact; a required artifact still missing after resolution aborts the job with a non-zero exit.
   - Runs the `publish-pypi` Trusted Publishing job only for `master` tags, downloading the uploaded distributions and publishing them unchanged.
-  - Executes no build command, no Python or `uv` toolchain setup, no pytest suite, and no local release script, so the tagged commit is the single artifact source.
+  - Executes no pytest suite, no `scripts/pre-release-check.sh`, and no `python -m build`; artifact generation runs at most once per run through `scripts/build.sh`, and commit-tracked `dist/` artifacts are never a release precondition.
 - `Internal Call-Trace Tree`
   - workflow trigger dispatch [`.github/workflows/release-pypi.yml`]
     - `check-branch` job: checkout + `git branch -r --contains ${GITHUB_SHA}` gate resolving `is_master` and `is_release_branch` outputs from `origin/master`/`origin/develop` tag containment [`.github/workflows/release-pypi.yml`]
-    - `release-assets` job (gated on `check-branch` output `is_release_branch == 'true'`, re-exporting `is_master` for the publish gate): checkout of the tagged release commit + pre-built `dist/` artifact handling [`.github/workflows/release-pypi.yml`]
-      - artifact verification step: shell `compgen -G` presence probe over `dist/*.tar.gz`, `dist/*.whl`, and `dist/aibar@aibar.panel.shell-extension.zip`, reporting each missing artifact on stderr and exiting non-zero
-      - provenance attestation step: attest every `dist/` artifact as subject
+    - `release-assets` job (gated on `check-branch` output `is_release_branch == 'true'`, re-exporting `is_master` for the publish gate): checkout of the tagged release commit + optional committed `dist/` artifact handling [`.github/workflows/release-pypi.yml`]
+      - artifact resolution step (`id: artifacts`): shell `compgen -G` probe over `dist/*.tar.gz`, `dist/*.whl`, and `dist/aibar@aibar.panel.shell-extension.zip` reporting each absent artifact on stderr and publishing the `present` output instead of failing
+      - conditional toolchain step (`astral-sh/setup-uv@v7`): installs `uv` only when `steps.artifacts.outputs.present != 'true'`
+      - conditional generation step: executes `bash scripts/build.sh` only when `steps.artifacts.outputs.present != 'true'`, so committed artifacts are reused and their absence never blocks a release
+      - artifact verification step: shell `compgen -G` presence probe over the same three patterns after resolution, reporting each still-missing artifact on stderr and exiting non-zero
+      - provenance attestation step: attest every resolved `dist/` artifact as subject
       - changelog step: categorized changelog derived from commit history
       - release publication step: publish `dist/**/*` as GitHub Release assets with `fail_on_unmatched_files`
       - distribution artifact upload step: upload the tagged-commit `dist/*.tar.gz` and `dist/*.whl` as workflow artifact
@@ -477,6 +480,8 @@
 - `External Boundaries`
   - GitHub Actions runtime and hosted runners.
   - `git` and GitHub release APIs/actions.
+  - `astral-sh/setup-uv@v7`: conditional `uv` toolchain provisioning consumed by the artifact-generation step.
+  - `scripts/build.sh`: single artifact-generation subprocess invoked only when the tagged commit lacks the complete `dist/` artifact set.
   - PyPI Trusted Publishing (OIDC) endpoint authenticated via workflow-level `id-token: write` permission; Trusted Publisher registered for project `aibar`, repository `Ogekuri/AiBar`, workflow `release-pypi.yml`; the project is published at `https://pypi.org/project/aibar/`.
 
 ### PROC:pre-release-check
