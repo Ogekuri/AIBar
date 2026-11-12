@@ -4,9 +4,8 @@
 @details Verifies the executable surface and cleanup contract of the merged
 clean-build pipeline: repository-root self-resolution, `uv`/`zip`/`find`
 toolchain validation, removal of every previously generated `dist/` artifact
-for every version number, foreign-entry preservation, post-removal verification
-of the pre-existing release artifacts, intermediate-artifact removal,
-EXIT/SIGINT/SIGTERM cleanup handlers, residual-artifact verification,
+for every version number, foreign-entry preservation, intermediate-artifact
+removal, EXIT/SIGINT/SIGTERM cleanup handlers, residual-artifact verification,
 retention of versioned `dist/` artifacts, and the removal of the retired
 `scripts/clean.sh` entrypoint. Tests are source-level and deterministic; they
 never execute the build.
@@ -15,12 +14,10 @@ never execute the build.
 @satisfies PRJ-047
 @satisfies PRJ-048
 @satisfies PRJ-049
-@satisfies PRJ-056
 @satisfies TST-099
 @satisfies TST-100
 @satisfies TST-101
 @satisfies TST-102
-@satisfies TST-108
 """
 
 import stat
@@ -115,34 +112,6 @@ def test_script_removes_generated_artifacts_for_every_version() -> None:
     build_index = source.index('CURRENT_STAGE="python distribution build"')
     assert pre_build_index < build_index
     assert "remove_generated_dist_artifacts" in source[pre_build_index:build_index]
-
-
-def test_script_verifies_pre_build_artifact_removal() -> None:
-    """
-    @brief Verify the bootstrap removal is followed by a removal check.
-    @details Arrange: load the script source. Act: inspect
-    `verify_no_generated_dist_artifacts` and the pre-build stage block. Assert:
-    the check re-scans `dist/` through `is_generated_dist_entry`, reports every
-    surviving generated artifact on stderr, returns non-zero, and runs after
-    `remove_generated_dist_artifacts` and before the distribution build.
-    @return {None} Function return value.
-    @satisfies PRJ-056
-    @satisfies TST-108
-    """
-    source = _script_source()
-    verify_body = source.split("verify_no_generated_dist_artifacts() {", 1)[1]
-    verify_body = verify_body.split("\n}\n", 1)[0]
-    assert "is_generated_dist_entry \"$entry\"" in verify_body
-    assert "pre-existing release artifact survived removal" in verify_body
-    assert "residual_found=1" in verify_body
-    assert "return 1" in verify_body
-    pre_build_block = source.split('CURRENT_STAGE="pre-build cleanup"', 1)[1]
-    pre_build_block = pre_build_block.split(
-        'CURRENT_STAGE="python distribution build"', 1
-    )[0]
-    assert pre_build_block.index("remove_generated_dist_artifacts") < (
-        pre_build_block.index("verify_no_generated_dist_artifacts")
-    )
 
 
 def test_script_preserves_foreign_dist_entries() -> None:
