@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.59.4](https://github.com/Ogekuri/AIBar/compare/v0.59.0..v0.59.4) - 2026-11-12
+## [0.59.5](https://github.com/Ogekuri/AIBar/compare/v0.59.0..v0.59.5) - 2026-11-12
 ### ⛰️  Features
 - Update gitalias config.
 - add scripts/clean.sh removing build.sh artifacts [useReq] *(clean.sh)*
@@ -23,6 +23,16 @@
   clean.sh in the same copy exit 0; uv run pytest tests/ 333 passed, 1 skipped.
 
 ### 🚜  Changes
+- remove every generated dist entry type and verify pre-build cleanup [useReq] *(build-script)*
+  PRJ-031: pre-build cleanup removes every artifact-destination entry whose name
+  matches a generated artifact pattern regardless of entry type (regular files
+  via rm -f, matching directories and symbolic links via rm -rf).
+  PRJ-057 added: verify_generated_dist_artifacts_removed() aborts with non-zero
+  status when a generated artifact survives cleanup, before python -m build.
+  Requirements evidence, WORKFLOW.md PROC:build call trace, REFERENCES.md
+  regenerated; Parser-first Doxygen blocks updated for both script functions.
+  Verified: bash -n clean, isolated sandbox cleanup probe removes old-version
+  files/directories/symlinks, uv run pytest tests/ 347 passed 1 skipped.
 - build into temporary artifact directory [useReq] *(pre-release-check)*
   pre-release-check.sh builds verification artifacts in a mktemp -d directory
   through scripts/build.sh --dist-dir and removes that directory on exit
@@ -1553,7 +1563,7 @@
 - \[0.57.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.57.0
 - \[0.58.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.58.0
 - \[0.59.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.59.0
-- \[0.59.4\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.59.4
+- \[0.59.5\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.59.5
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1614,4 +1624,4 @@
 [0.57.0]: https://github.com/Ogekuri/AIBar/compare/v0.56.0..v0.57.0
 [0.58.0]: https://github.com/Ogekuri/AIBar/compare/v0.57.0..v0.58.0
 [0.59.0]: https://github.com/Ogekuri/AIBar/compare/v0.58.0..v0.59.0
-[0.59.4]: https://github.com/Ogekuri/AIBar/compare/v0.59.0..v0.59.4
+[0.59.5]: https://github.com/Ogekuri/AIBar/compare/v0.59.0..v0.59.5
