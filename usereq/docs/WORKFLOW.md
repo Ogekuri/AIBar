@@ -374,6 +374,8 @@
         - `GeminiAICredentialStore.authorize_interactively(...)`: browser authorization + token persistence using `GEMINIAI_OAUTH_SCOPES` (`bigquery.readonly`, `monitoring.read`, `cloud-platform`) [`src/aibar/aibar/providers/geminiai.py`]
     - `gnome_install(...)`: GNOME extension install/update route [`src/aibar/aibar/cli.py`]
       - `_resolve_extension_source_dir(...)`: package-relative source directory resolution [`src/aibar/aibar/cli.py`]
+      - `_validate_extension_metadata(...)`: GNOME Shell load-contract validation of the source `metadata.json` (JSON object root, non-empty `uuid` string, non-empty `shell-version` string array) executed before any target mutation so placeholder metadata aborts the command with non-zero status and cannot overwrite a valid installed extension [`src/aibar/aibar/cli.py`]
+      - `_resolve_extension_target_dir(...)`: target-directory resolution honoring the `AIBAR_EXT_TARGET_DIR` override root and falling back to `~/.local/share/gnome-shell/extensions/aibar@aibar.panel` read at call time [`src/aibar/aibar/cli.py`]
       - install/update branch resolution using target-directory presence:
         - install path: create target when missing -> copy files -> enable extension.
         - update path: disable extension -> copy files -> enable extension.
@@ -383,6 +385,7 @@
       - External boundary: `gnome-extensions disable` for update-path pre-copy deactivation.
       - External boundary: `gnome-extensions enable` for post-copy activation.
     - `gnome_uninstall(...)`: GNOME extension removal route [`src/aibar/aibar/cli.py`]
+      - `_resolve_extension_target_dir(...)`: target-directory resolution honoring the `AIBAR_EXT_TARGET_DIR` override root [`src/aibar/aibar/cli.py`]
       - ordered flow: disable extension first, then remove extension directory.
       - External boundary: `gnome-extensions disable` for extension deactivation.
       - External boundary: `shutil.rmtree` for extension directory removal.
@@ -398,7 +401,7 @@
   - Browser-based OAuth consent flow and loopback callback for GeminiAI Google credentials.
   - Google Cloud Monitoring API HTTPS endpoints.
   - Local filesystem reads/writes under user home for env, credentials, runtime config (including same-directory temporary-file atomic replacement and directory fsync), CLI cache, provider idle-time state, startup idle-state file (`~/.cache/aibar/check_version_idle-time.json`), and Linux uninstall cache-directory removal (`~/.cache/aibar/`).
-  - Local filesystem operations for GNOME extension install/uninstall (directory creation, file copy, directory removal) under `~/.local/share/gnome-shell/extensions/`.
+  - Local filesystem operations for GNOME extension install/uninstall (read-only `metadata.json` contract validation, directory creation, file copy, directory removal) under `~/.local/share/gnome-shell/extensions/` or under the `AIBAR_EXT_TARGET_DIR` override root when that environment variable is non-blank.
   - `gnome-extensions` CLI for extension enable/disable.
   - Process environment and terminal stdout/stderr streams.
 

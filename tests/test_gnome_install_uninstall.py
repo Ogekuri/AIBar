@@ -1,9 +1,11 @@
 """
 @file
 @brief Unit tests for `aibar gnome-install` and `aibar gnome-uninstall` CLI commands.
-@details Validates extension source resolution from package location, source directory
-validation, file copy to target, extension enable/disable via subprocess, and non-zero
-exit on missing source or missing target directory.
+@details Validates extension source resolution from package location, GNOME Shell
+metadata contract enforcement, source directory validation, file copy to target,
+extension enable/disable via subprocess, and non-zero exit on missing source or
+missing target directory. The conftest autouse fixture redirects the installation
+target so no test can mutate the developer's real GNOME extension installation.
 @satisfies TST-009, REQ-025, REQ-026, REQ-027, REQ-028, REQ-029, REQ-030, REQ-032, REQ-099, REQ-080, REQ-081, REQ-082
 """
 
@@ -18,6 +20,8 @@ from click.testing import CliRunner
 from aibar.cli import (
     _EXT_UUID,
     _resolve_extension_source_dir,
+    _resolve_extension_target_dir,
+    _validate_extension_metadata,
     main,
 )
 
@@ -125,7 +129,11 @@ class TestGnomeInstallAtomic:
 
     def test_exit_nonzero_empty_source_dir(self) -> None:
         """
-        @brief Verify gnome-install exits non-zero when source directory is empty.
+        @brief Verify gnome-install rejects placeholder metadata before any mutation.
+        @details A source directory holding only a `{}` metadata document MUST abort with
+        non-zero status and a `FAIL` diagnostic, and MUST NOT create or write the target
+        directory.
+        expected_output: non-zero exit code, `FAIL` marker, absent target directory.
         @satisfies REQ-027, REQ-030
         """
         runner = CliRunner()
@@ -133,24 +141,106 @@ class TestGnomeInstallAtomic:
             src_dir = Path(tmpdir) / "ext_src"
             src_dir.mkdir()
             (src_dir / "metadata.json").write_text("{}")
-            subdir = src_dir / "subdir"
-            subdir.mkdir()
-            with mock.patch(
-                "aibar.cli._resolve_extension_source_dir",
-                return_value=src_dir,
+            target_dir = Path(tmpdir) / "target"
+            with (
+                mock.patch(
+                    "aibar.cli._resolve_extension_source_dir",
+                    return_value=src_dir,
+                ),
+                mock.patch(
+                    "aibar.cli._resolve_extension_target_dir",
+                    return_value=target_dir,
+                ),
+                mock.patch("shutil.which", return_value=None),
             ):
                 result = runner.invoke(main, ["gnome-install"])
-        # metadata.json is a file, so source_files should contain it; this should pass
-        # But if we make a dir with ONLY a subdirectory and no files, then it would fail
-        # Actually metadata.json IS a file, so with metadata.json present, it's non-empty
-        # Let me adjust: empty = no files at all (not even metadata.json)
-        # The check is: no metadata.json -> fail, empty files -> fail
-        # We need to test the case with metadata.json as a dir...
-        # Actually the original script checked for empty source dir separately from metadata
-        # Our implementation checks: is_dir, metadata is_file, then files non-empty
-        # An empty dir with no files won't have metadata.json, so that test already passes
-        # Let me test the colored output instead
-        assert result.exit_code == 0 or "FAIL" in result.output
+            assert result.exit_code != 0
+            assert "FAIL" in result.output
+            assert not target_dir.exists()
+
+    def test_extension_target_dir_is_isolated_from_user_home(self) -> None:
+        """
+        @brief Verify the suite never targets the real user extension directory.
+        @details The autouse conftest fixture redirects the installation target, so no
+        `gnome-install`/`gnome-uninstall` execution performed by the suite can mutate
+        `~/.local/share/gnome-shell/extensions/aibar@aibar.panel`.
+        expected_output: resolved target path outside the user GNOME extensions root.
+        @satisfies TST-009
+        @satisfies REQ-026
+        @satisfies REQ-081
+        """
+        user_extensions_root = (
+            Path.home() / ".local" / "share" / "gnome-shell" / "extensions"
+        )
+        resolved_target = _resolve_extension_target_dir()
+        assert user_extensions_root not in resolved_target.parents
+
+
+class TestValidateExtensionMetadataAtomic:
+    """
+    @brief Level 0 atomic tests for _validate_extension_metadata.
+    @details Validates the GNOME Shell load contract enforced before any
+    target-directory mutation and confirms every rejection returns a diagnostic.
+    """
+
+    def test_accepts_valid_metadata(self, tmp_path: Path) -> None:
+        """
+        @brief Verify a metadata document with uuid and shell-version is accepted.
+        expected_output: None.
+        @satisfies REQ-027
+        """
+        metadata_path = tmp_path / "metadata.json"
+        metadata_path.write_text(
+            '{"uuid": "aibar@aibar.panel", "shell-version": ["50"]}'
+        )
+        assert _validate_extension_metadata(metadata_path) is None
+
+    def test_rejects_empty_json_object(self, tmp_path: Path) -> None:
+        """
+        @brief Verify the `{}` placeholder metadata document is rejected.
+        expected_output: diagnostic naming the missing uuid property.
+        @satisfies REQ-027
+        @satisfies REQ-030
+        """
+        metadata_path = tmp_path / "metadata.json"
+        metadata_path.write_text("{}")
+        diagnostic = _validate_extension_metadata(metadata_path)
+        assert diagnostic is not None
+        assert "uuid" in diagnostic
+
+    def test_rejects_missing_shell_version(self, tmp_path: Path) -> None:
+        """
+        @brief Verify metadata without shell-version is rejected.
+        expected_output: diagnostic naming the missing shell-version array.
+        @satisfies REQ-027
+        """
+        metadata_path = tmp_path / "metadata.json"
+        metadata_path.write_text('{"uuid": "aibar@aibar.panel"}')
+        diagnostic = _validate_extension_metadata(metadata_path)
+        assert diagnostic is not None
+        assert "shell-version" in diagnostic
+
+    def test_rejects_invalid_json(self, tmp_path: Path) -> None:
+        """
+        @brief Verify non-JSON metadata content is rejected.
+        expected_output: diagnostic reporting invalid JSON.
+        @satisfies REQ-027
+        """
+        metadata_path = tmp_path / "metadata.json"
+        metadata_path.write_text("not-json")
+        diagnostic = _validate_extension_metadata(metadata_path)
+        assert diagnostic is not None
+        assert "not valid JSON" in diagnostic
+
+    def test_rejects_missing_metadata_file(self, tmp_path: Path) -> None:
+        """
+        @brief Verify an absent metadata file is rejected with a diagnostic.
+        expected_output: diagnostic naming metadata.json.
+        @satisfies REQ-027
+        """
+        diagnostic = _validate_extension_metadata(tmp_path / "metadata.json")
+        assert diagnostic is not None
+        assert "metadata.json" in diagnostic
 
 
 class TestGnomeInstallComposed:
@@ -169,7 +259,7 @@ class TestGnomeInstallComposed:
         with tempfile.TemporaryDirectory() as tmpdir:
             src_dir = Path(tmpdir) / "ext_src"
             src_dir.mkdir()
-            (src_dir / "metadata.json").write_text('{"uuid": "test"}')
+            (src_dir / "metadata.json").write_text('{"uuid": "test", "shell-version": ["50"]}')
             (src_dir / "extension.js").write_text("// ext")
             (src_dir / "stylesheet.css").write_text("/* css */")
 
@@ -180,7 +270,7 @@ class TestGnomeInstallComposed:
                     "aibar.cli._resolve_extension_source_dir",
                     return_value=src_dir,
                 ),
-                mock.patch("aibar.cli._EXT_TARGET_DIR", target_dir),
+                mock.patch("aibar.cli._resolve_extension_target_dir", return_value=target_dir),
                 mock.patch("shutil.which", return_value=None),
             ):
                 result = runner.invoke(main, ["gnome-install"])
@@ -200,7 +290,7 @@ class TestGnomeInstallComposed:
         with tempfile.TemporaryDirectory() as tmpdir:
             src_dir = Path(tmpdir) / "ext_src"
             src_dir.mkdir()
-            (src_dir / "metadata.json").write_text('{"uuid": "new"}')
+            (src_dir / "metadata.json").write_text('{"uuid": "new", "shell-version": ["50"]}')
 
             target_dir = Path(tmpdir) / "target"
             target_dir.mkdir()
@@ -211,7 +301,7 @@ class TestGnomeInstallComposed:
                     "aibar.cli._resolve_extension_source_dir",
                     return_value=src_dir,
                 ),
-                mock.patch("aibar.cli._EXT_TARGET_DIR", target_dir),
+                mock.patch("aibar.cli._resolve_extension_target_dir", return_value=target_dir),
                 mock.patch("shutil.which", return_value=None),
             ):
                 result = runner.invoke(main, ["gnome-install"])
@@ -229,7 +319,7 @@ class TestGnomeInstallComposed:
         with tempfile.TemporaryDirectory() as tmpdir:
             src_dir = Path(tmpdir) / "ext_src"
             src_dir.mkdir()
-            (src_dir / "metadata.json").write_text('{"uuid": "test"}')
+            (src_dir / "metadata.json").write_text('{"uuid": "test", "shell-version": ["50"]}')
 
             target_dir = Path(tmpdir) / "target"
 
@@ -238,7 +328,7 @@ class TestGnomeInstallComposed:
                     "aibar.cli._resolve_extension_source_dir",
                     return_value=src_dir,
                 ),
-                mock.patch("aibar.cli._EXT_TARGET_DIR", target_dir),
+                mock.patch("aibar.cli._resolve_extension_target_dir", return_value=target_dir),
                 mock.patch("shutil.which", return_value="/usr/bin/gnome-extensions"),
                 mock.patch("subprocess.run") as mock_run,
             ):
@@ -272,7 +362,7 @@ class TestGnomeInstallComposed:
         with tempfile.TemporaryDirectory() as tmpdir:
             src_dir = Path(tmpdir) / "ext_src"
             src_dir.mkdir()
-            (src_dir / "metadata.json").write_text('{"uuid": "test"}')
+            (src_dir / "metadata.json").write_text('{"uuid": "test", "shell-version": ["50"]}')
             (src_dir / "extension.js").write_text("// ext")
 
             target_dir = Path(tmpdir) / "target"
@@ -284,7 +374,7 @@ class TestGnomeInstallComposed:
                     "aibar.cli._resolve_extension_source_dir",
                     return_value=src_dir,
                 ),
-                mock.patch("aibar.cli._EXT_TARGET_DIR", target_dir),
+                mock.patch("aibar.cli._resolve_extension_target_dir", return_value=target_dir),
                 mock.patch("shutil.which", return_value="/usr/bin/gnome-extensions"),
                 mock.patch("subprocess.run", side_effect=tracking_run),
                 mock.patch("shutil.copy2", side_effect=tracking_copy2),
@@ -308,7 +398,7 @@ class TestGnomeInstallComposed:
         with tempfile.TemporaryDirectory() as tmpdir:
             src_dir = Path(tmpdir) / "ext_src"
             src_dir.mkdir()
-            (src_dir / "metadata.json").write_text('{"uuid": "test"}')
+            (src_dir / "metadata.json").write_text('{"uuid": "test", "shell-version": ["50"]}')
 
             target_dir = Path(tmpdir) / "target"
             target_dir.mkdir()
@@ -321,7 +411,7 @@ class TestGnomeInstallComposed:
                     "aibar.cli._resolve_extension_source_dir",
                     return_value=src_dir,
                 ),
-                mock.patch("aibar.cli._EXT_TARGET_DIR", target_dir),
+                mock.patch("aibar.cli._resolve_extension_target_dir", return_value=target_dir),
                 mock.patch("shutil.which", return_value="/usr/bin/gnome-extensions"),
                 mock.patch("subprocess.run", side_effect=[disable_result, enable_result]) as mock_run,
             ):
@@ -343,7 +433,7 @@ class TestGnomeInstallComposed:
         with tempfile.TemporaryDirectory() as tmpdir:
             src_dir = Path(tmpdir) / "ext_src"
             src_dir.mkdir()
-            (src_dir / "metadata.json").write_text('{"uuid": "test"}')
+            (src_dir / "metadata.json").write_text('{"uuid": "test", "shell-version": ["50"]}')
 
             target_dir = Path(tmpdir) / "target"
 
@@ -352,7 +442,7 @@ class TestGnomeInstallComposed:
                     "aibar.cli._resolve_extension_source_dir",
                     return_value=src_dir,
                 ),
-                mock.patch("aibar.cli._EXT_TARGET_DIR", target_dir),
+                mock.patch("aibar.cli._resolve_extension_target_dir", return_value=target_dir),
                 mock.patch("shutil.which", return_value=None),
             ):
                 result = runner.invoke(main, ["gnome-install"])
@@ -360,6 +450,72 @@ class TestGnomeInstallComposed:
             assert result.exit_code == 0
             assert "OK" in result.output
             assert "Installation complete" in result.output
+
+    def test_invalid_metadata_preserves_existing_install(self) -> None:
+        """
+        @brief Verify invalid source metadata never overwrites a valid installation.
+        @details Reproducer for the production corruption defect: a source tree whose
+        `metadata.json` is the `{}` placeholder must abort before the update flow runs, so
+        the installed metadata document stays byte-identical and no
+        `gnome-extensions disable`/`enable` subprocess executes. The assertion proves the
+        defect cannot recur even when a caller omits target-directory isolation.
+        expected_output: non-zero exit, `FAIL` marker, unchanged target metadata, zero
+        subprocess executions.
+        @satisfies REQ-027
+        @satisfies REQ-029
+        @satisfies REQ-030
+        @satisfies TST-009
+        """
+        runner = CliRunner()
+        installed_metadata = '{"uuid": "aibar@aibar.panel", "shell-version": ["50"]}'
+        with tempfile.TemporaryDirectory() as tmpdir:
+            src_dir = Path(tmpdir) / "ext_src"
+            src_dir.mkdir()
+            (src_dir / "metadata.json").write_text("{}")
+            (src_dir / "extension.js").write_text("// placeholder")
+
+            target_dir = Path(tmpdir) / "target"
+            target_dir.mkdir()
+            (target_dir / "metadata.json").write_text(installed_metadata)
+
+            with (
+                mock.patch(
+                    "aibar.cli._resolve_extension_source_dir",
+                    return_value=src_dir,
+                ),
+                mock.patch(
+                    "aibar.cli._resolve_extension_target_dir",
+                    return_value=target_dir,
+                ),
+                mock.patch("shutil.which", return_value="/usr/bin/gnome-extensions"),
+                mock.patch("subprocess.run") as mock_run,
+            ):
+                result = runner.invoke(main, ["gnome-install"])
+
+            assert result.exit_code != 0
+            assert "FAIL" in result.output
+            assert (target_dir / "metadata.json").read_text() == installed_metadata
+            assert not (target_dir / "extension.js").exists()
+            mock_run.assert_not_called()
+
+    def test_default_target_isolation_confines_install_to_fixture_directory(self) -> None:
+        """
+        @brief Verify the autouse isolation fixture confines a real install to a temp path.
+        @details Invokes `gnome-install` with the real package extension source and without
+        any target-directory mock, so the resolved target comes exclusively from the
+        conftest isolation fixture. No user-home extension directory may be touched.
+        expected_output: exit 0 plus copied extension files inside the isolated target.
+        @satisfies TST-009
+        @satisfies REQ-026
+        @satisfies REQ-029
+        """
+        runner = CliRunner()
+        isolated_target = _resolve_extension_target_dir()
+        with mock.patch("shutil.which", return_value=None):
+            result = runner.invoke(main, ["gnome-install"])
+        assert result.exit_code == 0, f"Unexpected exit: {result.output}"
+        assert (isolated_target / "metadata.json").is_file()
+        assert (isolated_target / "extension.js").is_file()
 
 
 class TestGnomeUninstallAtomic:
@@ -384,8 +540,8 @@ class TestGnomeUninstallAtomic:
         """
         runner = CliRunner()
         with mock.patch(
-            "aibar.cli._EXT_TARGET_DIR",
-            Path("/tmp/nonexistent_aibar_ext_target"),
+            "aibar.cli._resolve_extension_target_dir",
+            return_value=Path("/tmp/nonexistent_aibar_ext_target"),
         ):
             result = runner.invoke(main, ["gnome-uninstall"])
         assert result.exit_code != 0
@@ -412,7 +568,7 @@ class TestGnomeUninstallComposed:
             (target_dir / "extension.js").write_text("// ext")
 
             with (
-                mock.patch("aibar.cli._EXT_TARGET_DIR", target_dir),
+                mock.patch("aibar.cli._resolve_extension_target_dir", return_value=target_dir),
                 mock.patch("shutil.which", return_value=None),
             ):
                 result = runner.invoke(main, ["gnome-uninstall"])
@@ -444,7 +600,7 @@ class TestGnomeUninstallComposed:
             (target_dir / "metadata.json").write_text('{"uuid": "test"}')
 
             with (
-                mock.patch("aibar.cli._EXT_TARGET_DIR", target_dir),
+                mock.patch("aibar.cli._resolve_extension_target_dir", return_value=target_dir),
                 mock.patch("shutil.which", return_value="/usr/bin/gnome-extensions"),
                 mock.patch("subprocess.run", side_effect=tracking_run),
                 mock.patch("shutil.rmtree", side_effect=tracking_rmtree),
@@ -468,7 +624,7 @@ class TestGnomeUninstallComposed:
             (target_dir / "metadata.json").write_text('{"uuid": "test"}')
 
             with (
-                mock.patch("aibar.cli._EXT_TARGET_DIR", target_dir),
+                mock.patch("aibar.cli._resolve_extension_target_dir", return_value=target_dir),
                 mock.patch("shutil.which", return_value=None),
             ):
                 result = runner.invoke(main, ["gnome-uninstall"])

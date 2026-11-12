@@ -139,6 +139,18 @@ _EXT_UUID = "aibar@aibar.panel"
 _EXT_TARGET_DIR = (
     Path.home() / ".local" / "share" / "gnome-shell" / "extensions" / _EXT_UUID
 )
+# @brief Environment variable overriding the GNOME extension installation root.
+# @details Consumed by `_resolve_extension_target_dir` so isolated executions
+# (unit-test suites, CI jobs, sandboxed shells) redirect every install/update/
+# remove operation away from the user's real GNOME Shell extension directory
+# (REQ-026, REQ-081). When unset or blank, the canonical
+# `~/.local/share/gnome-shell/extensions/aibar@aibar.panel` target is used.
+_EXT_TARGET_DIR_ENV_VAR = "AIBAR_EXT_TARGET_DIR"
+# @brief Metadata properties required to load a GNOME Shell extension.
+# @details GNOME Shell rejects an extension whose `metadata.json` lacks a
+# non-empty `uuid` string or a non-empty `shell-version` string array, so the
+# installer validates both before any target-directory mutation (REQ-027).
+_EXT_REQUIRED_METADATA_FIELDS = ("uuid", "shell-version")
 _UPGRADE_LIFECYCLE_COMMAND: list[str] = [
     "uv",
     "tool",
@@ -5110,6 +5122,69 @@ def _login_error_state_providers() -> None:
     click.secho("Login completed for all providers in error state.", fg="green")
 
 
+def _resolve_extension_target_dir() -> Path:
+    """
+    @brief Resolve the GNOME Shell extension installation target directory.
+    @details Returns `Path(AIBAR_EXT_TARGET_DIR)` when that environment override
+    is set to a non-blank value, otherwise returns the module-level canonical
+    target `~/.local/share/gnome-shell/extensions/aibar@aibar.panel` read at call
+    time so per-test monkeypatching of `_EXT_TARGET_DIR` stays effective. The
+    override lets isolated executions (unit-test suites, CI jobs) guarantee that
+    no install/update/remove operation can mutate the developer's real extension
+    directory (REQ-026, REQ-081).
+    @return {Path} Absolute extension target directory candidate.
+    @note Complexity O(1) time; O(1) space.
+    @satisfies REQ-026
+    @satisfies REQ-081
+    @see _validate_extension_metadata
+    """
+    override = os.environ.get(_EXT_TARGET_DIR_ENV_VAR, "").strip()
+    if override:
+        return Path(override).expanduser()
+    return _EXT_TARGET_DIR
+
+
+def _validate_extension_metadata(metadata_path: Path) -> str | None:
+    """
+    @brief Validate one GNOME Shell extension `metadata.json` document.
+    @details Decodes `metadata_path` as UTF-8 JSON and enforces the GNOME Shell
+    load contract: the root node MUST be a JSON object, `uuid` MUST be a
+    non-empty string, and `shell-version` MUST be a non-empty array of non-empty
+    strings. Every failure mode (missing file, unreadable file, invalid JSON,
+    contract violation) returns one deterministic diagnostic instead of raising,
+    so `gnome_install` can abort before `os.makedirs`, `shutil.copy2`,
+    `gnome-extensions disable`, or `gnome-extensions enable` execute. This
+    prevents a source tree with placeholder metadata (`{}`) from overwriting a
+    valid installed extension and making it unloadable (REQ-027, REQ-029).
+    @param metadata_path {Path} Candidate extension metadata file path.
+    @return {str | None} Failure diagnostic text; None when the document is
+    loadable by GNOME Shell.
+    @note Complexity O(B) time and O(B) space over document bytes B.
+    @satisfies REQ-027
+    @satisfies REQ-030
+    @see _resolve_extension_target_dir
+    """
+    if not metadata_path.is_file():
+        return f"metadata.json not found in: {metadata_path.parent}"
+    try:
+        document = json.loads(metadata_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError) as exc:
+        return f"metadata.json is not readable UTF-8 text: {exc}"
+    except json.JSONDecodeError as exc:
+        return f"metadata.json is not valid JSON: {exc}"
+    if not isinstance(document, dict):
+        return "metadata.json root element MUST be a JSON object"
+    uuid_value = document.get(_EXT_REQUIRED_METADATA_FIELDS[0])
+    if not isinstance(uuid_value, str) or not uuid_value.strip():
+        return 'metadata.json MUST declare a non-empty "uuid" property'
+    shell_versions = document.get(_EXT_REQUIRED_METADATA_FIELDS[1])
+    if not isinstance(shell_versions, list) or not shell_versions:
+        return 'metadata.json MUST declare a non-empty "shell-version" array'
+    if not all(isinstance(item, str) and item.strip() for item in shell_versions):
+        return 'metadata.json "shell-version" entries MUST be non-empty strings'
+    return None
+
+
 def _resolve_extension_source_dir() -> Path:
     """
     @brief Resolve GNOME extension source directory from within the `aibar` package.
@@ -5137,14 +5212,20 @@ def gnome_install() -> None:
     """
     @brief Install or update the AIBar GNOME Shell extension to the user's local extensions directory.
     @details Resolves extension source from the installed package path, validates source directory
-    contains `metadata.json` and is non-empty, then executes one of two flows:
+    contains `metadata.json` and is non-empty, validates the metadata document against the GNOME
+    Shell load contract (`uuid`, `shell-version`) before any target mutation, then executes one of
+    two flows:
     install flow (`target` absent) creates target and copies files before enabling extension;
     update flow (`target` present) disables extension, copies files, then enables extension.
+    The target directory resolves through `_resolve_extension_target_dir`, so an
+    `AIBAR_EXT_TARGET_DIR` override keeps isolated executions away from the real user extension
+    directory.
     Update flow masks non-zero disable outcomes caused by missing extension and continues.
     Produces colored Click-styled terminal output for all status messages.
     @return {None} Function return value.
     @throws {SystemExit} Exits with code 1 on prerequisite validation failure.
     @satisfies PRJ-008, REQ-025, REQ-026, REQ-027, REQ-028, REQ-029, REQ-030, REQ-032, REQ-099
+    @see _validate_extension_metadata
     """
     click.echo()
     click.echo(click.style("  AIBar GNOME Extension Installer", fg="blue", bold=True))
@@ -5165,6 +5246,10 @@ def gnome_install() -> None:
             + f"metadata.json not found in: {src_dir}"
         )
         sys.exit(1)
+    metadata_error = _validate_extension_metadata(metadata_path)
+    if metadata_error is not None:
+        click.echo(click.style("  [FAIL] ", fg="red") + metadata_error)
+        sys.exit(1)
     source_files = [f for f in src_dir.iterdir() if f.is_file()]
     if not source_files:
         click.echo(
@@ -5177,7 +5262,7 @@ def gnome_install() -> None:
     )
 
     click.echo(click.style("  [2/5] ", bold=True) + "Preparing target directory...")
-    target_dir = _EXT_TARGET_DIR
+    target_dir = _resolve_extension_target_dir()
     is_update_mode = target_dir.is_dir()
     if is_update_mode:
         click.echo(click.style("  [INFO] ", fg="cyan") + f"Update mode: {target_dir}")
@@ -5273,7 +5358,9 @@ def gnome_uninstall() -> None:
     """
     @brief Remove the AIBar GNOME Shell extension from the user's local extensions directory.
     @details Disables the extension via `gnome-extensions disable`, then removes the entire
-    extension directory at `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/`.
+    extension directory resolved by `_resolve_extension_target_dir` (canonical
+    `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/`, overridable through
+    `AIBAR_EXT_TARGET_DIR`).
     Exits with code 1 if the extension directory does not exist. Produces colored
     Click-styled terminal output for all status messages.
     @return {None} Function return value.
@@ -5284,7 +5371,7 @@ def gnome_uninstall() -> None:
     click.echo(click.style("  AIBar GNOME Extension Uninstaller", fg="blue", bold=True))
     click.echo()
 
-    target_dir = _EXT_TARGET_DIR
+    target_dir = _resolve_extension_target_dir()
 
     click.echo(
         click.style("  [1/3] ", bold=True) + "Checking extension installation..."
