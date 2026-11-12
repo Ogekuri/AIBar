@@ -1,268 +1,344 @@
 # Changelog
 
-## [0.59.3](https://github.com/Ogekuri/AIBar/compare/v0.59.0..v0.59.3) - 2026-11-10
+## [0.59.4](https://github.com/Ogekuri/AIBar/compare/v0.59.0..v0.59.4) - 2026-11-12
+### ⛰️  Features
+- Update gitalias config.
+- add scripts/clean.sh removing build.sh artifacts [useReq] *(clean.sh)*
+  Add executable scripts/clean.sh that deletes only the generated dist/
+  sdist, wheel, and GNOME extension zip, removes the build/ directory,
+  drops an emptied dist/, and prints a removal summary (PRJ-042..PRJ-046).
+  Add source-level regression tests tests/test_clean_script.py (TST-098)
+  and update REQUIREMENTS.md and WORKFLOW.md accordingly.
+
+### 🐛  Bug Fixes
+- isolate extension target and validate metadata before copy [useReq] *(gnome-install)*
+  add _resolve_extension_target_dir honoring AIBAR_EXT_TARGET_DIR so isolated executions never mutate the real user extension directory; add _validate_extension_metadata enforcing the GNOME Shell load contract (uuid, shell-version) before any target mutation, so placeholder metadata aborts instead of overwriting a valid installation; add autouse conftest isolation fixture redirecting the install target to a pytest temporary directory; repair the destructive gnome-install test and add reproducer, isolation, and metadata-contract unit tests; update WORKFLOW.md runtime model and regenerate REFERENCES.md
+- Remove dist/ artifacts.
+- track pre-built aibar 0.59.3 release artifacts [useReq] *(dist)*
+  Generate dist/ artifacts with scripts/build.sh (sdist, wheel, extension zip).; Track the three artifacts so PRJ-041 holds and the tagged-commit release gate passes.; Release workflow PRJ-050/PRJ-051 can now resolve and publish the artifacts.; No source, test, or requirements changes.
+- List absolute artifact paths in build summary [useReq] *(build)*
+  print_artifact_summary() emitted bare file names; PRJ-034 requires artifact paths.; Switch the find -printf directive from %f to %p, yielding the absolute dist path
+  (DIST_DIR derives from readlink -f) followed by the byte size; sort order unchanged.
+  Keep the directory header and success banner; update the Doxygen block.; No requirement changes (REQUIREMENTS.md untouched); no src/ or test changes.; Verified: bash -n OK; build.sh in /tmp copy exit 0 with absolute summary lines;
+  clean.sh in the same copy exit 0; uv run pytest tests/ 333 passed, 1 skipped.
+
 ### 🚜  Changes
+- build into temporary artifact directory [useReq] *(pre-release-check)*
+  pre-release-check.sh builds verification artifacts in a mktemp -d directory
+  through scripts/build.sh --dist-dir and removes that directory on exit
+  pre-release-check.sh no longer reads, cleans, or verifies the repository
+  dist/ directory and compares whole-tree git status against the baseline
+  build.sh accepts --dist-dir <Path> (default <repository-root>/dist) and
+  forwards it to python -m build through --outdir
+  requirements: PRJ-024/025/030-034/036/037 updated, PRJ-054/055/056 added,
+  TST-084/085/099 updated, TST-107 added; WORKFLOW.md and tests realigned
+- remove and verify pre-existing dist artifacts [useReq] *(build-scripts)*
+  pre-release-check removes versioned generated dist/ artifacts before build; pre-release-check verifies removal (PRJ-054, PRJ-055); build.sh verifies bootstrap removal (PRJ-056); requirements, workflow, and unit tests updated (TST-107, TST-108)
+- BREAKING CHANGE: make committed dist artifacts optional and track build output [useReq] *(release-artifacts)*
+  REQUIREMENTS: PRJ-041 downgraded to MAY, new PRJ-053 forbids requiring
+  tracked dist/ artifacts for a release, and PRJ-012/013/019/038/050/051/052
+  plus TST-103..106 realigned with artifact reuse-or-generate semantics.
+  release-pypi.yml: resolve dist/ artifacts, install astral-sh/setup-uv@v7 and
+  run scripts/build.sh only when an artifact is absent, then verify the
+  resolved set before attestation and publication.
+  tests: replace the pre-built artifact suite with the release-artifact
+  resolution suite and add setup-uv@v7 to the Node24 pin map.
+  dist/: commit the regenerated 0.59.3 sdist, wheel, and extension zip.
+- BREAKING CHANGE: publish pre-built dist artifacts without any build [useReq] *(release-workflow)*
+  Rewrite release-assets job to consume dist/ artifacts from the tagged commit.; Remove unit-tests job, Python/uv setup, sdist/wheel build, and extension zip steps.; Add shell presence gate failing when a required dist/ artifact is missing.; Publish pre-built assets to GitHub Release and PyPI via Trusted Publishing.; Update PRJ-012/013/019, add PRJ-050..052, replace TST-086 with TST-103..106.; Replace test-gate module with prebuilt-artifact workflow tests.
+- BREAKING CHANGE: merge dist and artifact cleanup into scripts/build.sh [useReq] *(build-scripts)*
+  Integrate pre-build dist/ cleanup into scripts/build.sh for every artifact version.; Remove intermediate artifacts (build/, .pytest_cache/, *.egg-info, __pycache__) after the build.; Add EXIT/SIGINT/SIGTERM cleanup handlers and residual-artifact verification.; Delete scripts/clean.sh and replace its test module with build-script coverage.; Update SRS requirements/workflow and regenerate references.
+- version dist/ release artifacts in git [useReq] *(build)*
+  REQ: PRJ-025, PRJ-032, PRJ-036, PRJ-037, PRJ-038 updated; PRJ-041 and TST-097 added; TST-085 updated; scripts/build.sh: remove tracked-file abort; keep non-generated dist/ guard; scripts/pre-release-check.sh: keep dist/ on cleanup; git visibility checks; exclude dist/ from integrity; .gitignore: re-include dist/ and dist/**/*; remove generated-archive exclusions; tests: update pre-release script assertions; add dist/ .gitignore contract tests
+- restrict sdist to runtime and packaging files [useReq] *(pyproject)*
+  Remove scripts/** from sdist include and ineffective wheel include in pyproject.toml; Keep LICENSE_GnomeCodexBar in sdist as third-party license attribution; Update TST-037 requirement text in REQUIREMENTS.md; REQ-079, CTN-007, PRJ-010 unchanged; Update sdist required-member checks in build.sh and pre-release-check.sh; Update TST-037 assertions in test_pyproject_metadata.py (wheel and sdist); hatchling force-includes .gitignore in sdist; not removable via pyproject config
+- add delegated build script and hardened pre-release pipeline [useReq] *(pre-release-check)*
+  Add scripts/build.sh: toolchain/layout validation, targeted dist/ cleanup,
+  uv-pinned python -m build, GNOME extension zip, artifact verification.
+  Rework scripts/pre-release-check.sh: structure, toolchain, shell/Python syntax,
+  pyright, .gitignore contract, dist/ safety, delegated build via build.sh,
+  artifact verification, EXIT/INT/TERM traps, repository integrity baseline.
+  .gitignore: re-include dist/ for traversal, exclude only generated archives.; Update REQUIREMENTS.md (PRJ-020..PRJ-040, TST-084) and WORKFLOW.md (PROC:build).
+- add schema-driven configuration CLI with deterministic tree rendering [useReq] *(config)*
+  add --print/--info/--print-raw/--get/--set/--unset group options; add shared RuntimeConfig schema table, canonical path resolver, typed validation; add one recursive tree renderer and measured Unicode-aware table formatter; persist --set/--unset atomically with fsync, replace, and mode preservation; update requirements, workflow runtime model, references, and tests
 - align --version report into three labeled lines [useReq] *(cli)*
---version/--ver now prints exactly three stdout lines with
-left-justified labels padded to one shared 18-character field so all
-colons align: Current Installed, Latest @ PyPI, Latest @ GitHub
-(REQ-199, TST-089 added). GitHub fetch failures render the aligned
-failure value unknown (<reason>) instead of the former standalone
-line (REQ-195 updated); bare stdout version line removed.
-Version-report tests realigned; WORKFLOW/REFERENCES regenerated.
+  --version/--ver now prints exactly three stdout lines with
+  left-justified labels padded to one shared 18-character field so all
+  colons align: Current Installed, Latest @ PyPI, Latest @ GitHub
+  (REQ-199, TST-089 added). GitHub fetch failures render the aligned
+  failure value unknown (<reason>) instead of the former standalone
+  line (REQ-195 updated); bare stdout version line removed.
+  Version-report tests realigned; WORKFLOW/REFERENCES regenerated.
 - add --force flag forcing full upgrade re-install [useReq] *(cli)*
-REQUIREMENTS: add REQ-196/197/198 (global --force for --upgrade;
-forced uv lifecycle argv with --reinstall --refresh) and TST-087/088;
-clarify CTN-015 standard-process strings and REQ-068 help contents.
-src/aibar/aibar/cli.py: add --force group option, argv detection, and
-forced-option insertion into PyPI/GitHub upgrade lifecycle commands;
-extend inline help epilog.
-tests: cover forced PyPI/GitHub argv, exit-code propagation, non-Linux
-manual guidance, and no-op --force without --upgrade.
-README.md: document forced upgrade variants.
+  REQUIREMENTS: add REQ-196/197/198 (global --force for --upgrade;
+  forced uv lifecycle argv with --reinstall --refresh) and TST-087/088;
+  clarify CTN-015 standard-process strings and REQ-068 help contents.
+  src/aibar/aibar/cli.py: add --force group option, argv detection, and
+  forced-option insertion into PyPI/GitHub upgrade lifecycle commands;
+  extend inline help epilog.
+  tests: cover forced PyPI/GitHub argv, exit-code propagation, non-Linux
+  manual guidance, and no-op --force without --upgrade.
+  README.md: document forced upgrade variants.
 - report GitHub version failures as unknown with reason [useReq] *(cli)*
-REQ-194: GitHub releases/latest HTTP failures (incl. 404) normalize into
-failure responses carrying status code and reason text
-REQ-195: --version renders failed GitHub checks as
-'GitHub latest: unknown (<reason>)' reflecting the actual error
-Success line 'Latest GitHub release: <version>' and PyPI wording unchanged; _format_release_report_value gains failure_prefix parameter;
-_GITHUB_REPORT_UNKNOWN_PREFIX constant added
-WORKFLOW.md call-trace and REFERENCES.md regenerated; evidence rows added
+  REQ-194: GitHub releases/latest HTTP failures (incl. 404) normalize into
+  failure responses carrying status code and reason text
+  REQ-195: --version renders failed GitHub checks as
+  'GitHub latest: unknown (<reason>)' reflecting the actual error
+  Success line 'Latest GitHub release: <version>' and PyPI wording unchanged; _format_release_report_value gains failure_prefix parameter;
+  _GITHUB_REPORT_UNKNOWN_PREFIX constant added
+  WORKFLOW.md call-trace and REFERENCES.md regenerated; evidence rows added
+
+### ✨  Refactor
+- make GNOME extension archive byte-reproducible [useReq] *(build-script)*
+  Stage the extension source files into build/extension-archive-staging, pin
+  their modification time and permission, and add them with zip -X in LC_ALL=C
+  sorted order under TZ=UTC0, so archive bytes no longer depend on filesystem
+  enumeration order, checkout mtimes, umask, or host timezone.
+  Keep the output path, zip toolchain, markdown exclusion, flat layout, required
+  members, artifact verification, and retained artifact summary unchanged; the
+  staging tree is removed by the existing intermediate-artifact cleanup.
+  Regenerate the tracked extension zip once so a rebuild leaves dist/ unmodified.
+  Refs: PRJ-030, PRJ-033, PRJ-041, PRJ-047, PRJ-049.
+- Exclude .gitignore from sdist; clean.sh avoids venv creation [useReq] *(packaging)*
+  Add hatch_build.py CustomBuildHook removing the force-included .gitignore from the sdist target.; Register [tool.hatch.build.hooks.custom]; add hatch_build.py to sdist include and .gitignore allowlist.; scripts/clean.sh load_project_metadata() uses uv run --no-project (no .venv or repository file side effect).; WORKFLOW.md: update PROC:build external boundaries and PROC:clean metadata resolution.; No requirement changes (REQUIREMENTS.md untouched); no src/ changes; no test changes.; Verification: uv run pytest tests/ 333 passed, 1 skipped; pyright 0 errors; build.sh exit 0.
+
+### ◀️  Revert
+- Roll back branch to f2cd0de8 (f2cd0de8da3a92f2cb407d0b01efdec7296aaee7).
 
 ## [0.59.0](https://github.com/Ogekuri/AIBar/compare/v0.58.0..v0.59.0) - 2026-11-08
 ### ⛰️  Features
 - add pre-release verification pipeline script [useReq] *(pre-release-check)*
-Add scripts/pre-release-check.sh running the checks required before an
-official release, plus requirements and tests.
-PRJ-020..PRJ-024 (new): five labeled stages - clean-tree gate with
---allow-dirty opt-out, uv sync --locked, full pytest suite, sdist+wheel
-build into dist/ (mirrors release-pypi.yml build step), and built
-artifact verification; aborts at first failing stage, non-zero exit
-TST-084 (new): tests/test_pre_release_check_script.py source-level
-regression coverage (executable bit, gate, stage commands, ordering)
-WORKFLOW.md: new PROC:pre-release-check execution unit; Verified live: dirty-tree abort exit 1; full pipeline 5/5 stages OK
-(exit 0) producing dist/aibar-0.58.0.tar.gz and .whl; suite 254 passed
+  Add scripts/pre-release-check.sh running the checks required before an
+  official release, plus requirements and tests.
+  PRJ-020..PRJ-024 (new): five labeled stages - clean-tree gate with
+  --allow-dirty opt-out, uv sync --locked, full pytest suite, sdist+wheel
+  build into dist/ (mirrors release-pypi.yml build step), and built
+  artifact verification; aborts at first failing stage, non-zero exit
+  TST-084 (new): tests/test_pre_release_check_script.py source-level
+  regression coverage (executable bit, gate, stage commands, ordering)
+  WORKFLOW.md: new PROC:pre-release-check execution unit; Verified live: dirty-tree abort exit 1; full pipeline 5/5 stages OK
+  (exit 0) producing dist/aibar-0.58.0.tar.gz and .whl; suite 254 passed
 
 ### 🐛  Bug Fixes
 - restore dedicated Requirements (uv) section heading [useReq] *(readme)*
-Rename the README '# Requirements' heading to '## Requirements (uv)' so the
-dedicated uv-based requirements section matches the documented README contract
-again (PRJ-007, REQ-087, TST-040).
-Restores test_uv_requirements_surface.py::test_readme_includes_uv_requirement_and_optional_requirements_export; Full suite green: 249 passed, 1 skipped (pre-existing skip); Requirements, workflow docs, and source code unchanged
+  Rename the README '# Requirements' heading to '## Requirements (uv)' so the
+  dedicated uv-based requirements section matches the documented README contract
+  again (PRJ-007, REQ-087, TST-040).
+  Restores test_uv_requirements_surface.py::test_readme_includes_uv_requirement_and_optional_requirements_export; Full suite green: 249 passed, 1 skipped (pre-existing skip); Requirements, workflow docs, and source code unchanged
 
 ### 🚜  Changes
 - gate release build on unit-test job [useReq] *(release-pypi)*
-Prevent release artifacts and PyPI publication for versions whose tests fail.
-PRJ-026 (new): .github/workflows/release-pypi.yml adds a unit-tests
-job running uv sync --locked + uv run pytest tests/ on every tag push
-PRJ-027 (new): build-release now needs [check-branch, unit-tests], so
-no dist/ artifacts, GitHub Release, or transitive publish-pypi run
-when the pytest suite fails
-TST-086 (new): tests/test_release_workflow_test_gate.py source-level
-coverage of the job steps and the needs gate
-WORKFLOW.md: PROC:release-pypi unit-tests job documented; Verified: YAML parses with jobs order check-branch -> unit-tests ->
-build-release -> publish-pypi; suite 258 passed, 1 skipped
+  Prevent release artifacts and PyPI publication for versions whose tests fail.
+  PRJ-026 (new): .github/workflows/release-pypi.yml adds a unit-tests
+  job running uv sync --locked + uv run pytest tests/ on every tag push
+  PRJ-027 (new): build-release now needs [check-branch, unit-tests], so
+  no dist/ artifacts, GitHub Release, or transitive publish-pypi run
+  when the pytest suite fails
+  TST-086 (new): tests/test_release_workflow_test_gate.py source-level
+  coverage of the job steps and the needs gate
+  WORKFLOW.md: PROC:release-pypi unit-tests job documented; Verified: YAML parses with jobs order check-branch -> unit-tests ->
+  build-release -> publish-pypi; suite 258 passed, 1 skipped
 - remove build/test artifacts on exit [useReq] *(pre-release-check)*
-Leave the repository clean after scripts/pre-release-check.sh runs.
-PRJ-025 (new): unconditional EXIT trap removes dist/, .pytest_cache/,
-and __pycache__ trees under src/ and tests/ whether the pipeline
-succeeds, fails, or exits early; cleanup never alters the exit status
-TST-085 (new): source-level test asserting EXIT trap registration
-and cleanup removal commands
-WORKFLOW.md: PROC:pre-release-check exit-cleanup behavior documented; Verified live: dirty-gate abort cleans pre-seeded dist/; full pipeline
-5/5 stages OK (exit 0) with zero residue after execution
+  Leave the repository clean after scripts/pre-release-check.sh runs.
+  PRJ-025 (new): unconditional EXIT trap removes dist/, .pytest_cache/,
+  and __pycache__ trees under src/ and tests/ whether the pipeline
+  succeeds, fails, or exits early; cleanup never alters the exit status
+  TST-085 (new): source-level test asserting EXIT trap registration
+  and cleanup removal commands
+  WORKFLOW.md: PROC:pre-release-check exit-cleanup behavior documented; Verified live: dirty-gate abort cleans pre-seeded dist/; full pipeline
+  5/5 stages OK (exit 0) with zero residue after execution
 - rename uv requirements section to Requirements [useReq] *(readme)*
-Rename the README section '## Requirements (uv)' to '## Requirements' and
-align requirements, evidence, and tests with the new section name.
-REQUIREMENTS.md: PRJ-007 and TST-040 now encode the exact '## Requirements'
-README section name; PRJ-007 evidence row updated accordingly
-tests/test_uv_requirements_surface.py: heading assertion realigned to
-the exact '## Requirements' heading line (TST-040)
-Full suite green: 249 passed, 1 skipped (pre-existing skip)
+  Rename the README section '## Requirements (uv)' to '## Requirements' and
+  align requirements, evidence, and tests with the new section name.
+  REQUIREMENTS.md: PRJ-007 and TST-040 now encode the exact '## Requirements'
+  README section name; PRJ-007 evidence row updated accordingly
+  tests/test_uv_requirements_surface.py: heading assertion realigned to
+  the exact '## Requirements' heading line (TST-040)
+  Full suite green: 249 passed, 1 skipped (pre-existing skip)
 
 ## [0.58.0](https://github.com/Ogekuri/AIBar/compare/v0.57.0..v0.58.0) - 2026-11-07
 ### 🐛  Bug Fixes
 - pin setup-uv to resolvable v10.3.3 tag [useReq] *(release-pypi)*
-astral-sh/setup-uv publishes no floating v10 major tag, so the workflow
-pin astral-sh/setup-uv@v10 failed runner action resolution (unable to
-find version v10). Pin the exact release tag v10.3.3, verified
-Node24-native upstream (runs.using: node24), preserving CTN-021.
-Add reproducer test asserting a resolvable full-version setup-uv pin
-and update the Node24 pin map accordingly (TST-080 scope).
+  astral-sh/setup-uv publishes no floating v10 major tag, so the workflow
+  pin astral-sh/setup-uv@v10 failed runner action resolution (unable to
+  find version v10). Pin the exact release tag v10.3.3, verified
+  Node24-native upstream (runs.using: node24), preserving CTN-021.
+  Add reproducer test asserting a resolvable full-version setup-uv pin
+  and update the Node24 pin map accordingly (TST-080 scope).
 
 ### 🚜  Changes
 - encode GitHub release parity with develop upgrade [useReq] *(version-report)*
-Verify --version GitHub reporting against the requested semantics: the
-report already performs one fresh, never idle-gated releases/latest
-fetch against the program-name endpoint (branch-independent) and its
-value is the raw tag minus the leading v of the same release that
---upgrade --develop pins.
-Encode the parity normatively with REQ-192 (endpoint + branch
-independence) and REQ-193 (identical release to the develop upgrade),
-add linkage tags in cli.py docstrings, and cover both with
-tests/test_version_github_report_parity.py (TST-083).
+  Verify --version GitHub reporting against the requested semantics: the
+  report already performs one fresh, never idle-gated releases/latest
+  fetch against the program-name endpoint (branch-independent) and its
+  value is the raw tag minus the leading v of the same release that
+  --upgrade --develop pins.
+  Encode the parity normatively with REQ-192 (endpoint + branch
+  independence) and REQ-193 (identical release to the develop upgrade),
+  add linkage tags in cli.py docstrings, and cover both with
+  tests/test_version_github_report_parity.py (TST-083).
 - resolve GitHub tag via program-name URLs [useReq] *(upgrade-develop)*
-Parameterize the --upgrade --develop|--dev GitHub source after the
-current program name: PROGRAM_NAME (aibar) is now the single source of
-truth composing both the releases/latest API endpoint and the
-git+https://github.com/Ogekuri/{PROGRAM_NAME} repository URL, removing
-duplicated Ogekuri/AIBar literals (new REQ-191; CTN-020/CTN-015/
-REQ-177/REQ-189 updated to <program-name> and explicit branch
-independence). Add tests/test_github_upgrade_program_name.py covering
-URL composition and tag-pinned argv resolution (TST-082; closes
-TST-078/TST-079 coverage).
+  Parameterize the --upgrade --develop|--dev GitHub source after the
+  current program name: PROGRAM_NAME (aibar) is now the single source of
+  truth composing both the releases/latest API endpoint and the
+  git+https://github.com/Ogekuri/{PROGRAM_NAME} repository URL, removing
+  duplicated Ogekuri/AIBar literals (new REQ-191; CTN-020/CTN-015/
+  REQ-177/REQ-189 updated to <program-name> and explicit branch
+  independence). Add tests/test_github_upgrade_program_name.py covering
+  URL composition and tag-pinned argv resolution (TST-082; closes
+  TST-078/TST-079 coverage).
 
 ## [0.57.0](https://github.com/Ogekuri/AIBar/compare/v0.56.0..v0.57.0) - 2026-11-07
 ### 🚜  Changes
 - migrate GitHub Actions to Node24-native versions [useReq] *(release-pypi)*
-Migrate all JavaScript-based release workflow actions to Node24-native
-majors (checkout v7, setup-python v7, setup-uv v10, attest v4, gh-release
-v3, upload-artifact v7, download-artifact v8) preserving step names,
-inputs, job gating, and Trusted Publishing behavior.
-Add CTN-021 mandating node24+ upstream runtimes, TST-080/TST-081 tests
-verifying pins and absence of transitional Node20 opt-out variables
-(ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION, FORCE_JAVASCRIPT_ACTIONS_TO_NODE24).
-Document primary pipx installation flow per PRJ-016/PRJ-017/TST-071.
+  Migrate all JavaScript-based release workflow actions to Node24-native
+  majors (checkout v7, setup-python v7, setup-uv v10, attest v4, gh-release
+  v3, upload-artifact v7, download-artifact v8) preserving step names,
+  inputs, job gating, and Trusted Publishing behavior.
+  Add CTN-021 mandating node24+ upstream runtimes, TST-080/TST-081 tests
+  verifying pins and absence of transitional Node20 opt-out variables
+  (ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION, FORCE_JAVASCRIPT_ACTIONS_TO_NODE24).
+  Document primary pipx installation flow per PRJ-016/PRJ-017/TST-071.
 - pin --upgrade --develop install to latest GitHub release tag [useReq] *(cli)*
-Resolve --develop/--dev upgrade source by fetching tag_name from the
-GitHub releases API and execute uv tool install --force
-git+https://github.com/Ogekuri/AIBar@<tag_name> (REQ-189, REQ-177).
-Exit non-zero with a bright-red diagnostic and without executing uv
-tool install when the latest release tag cannot be resolved (REQ-190).
-Update CTN-015 GitHub lifecycle command and TST-072; add TST-078 and
-TST-079 coverage requirements; sync WORKFLOW.md call-trace and
-regenerate REFERENCES.md.
+  Resolve --develop/--dev upgrade source by fetching tag_name from the
+  GitHub releases API and execute uv tool install --force
+  git+https://github.com/Ogekuri/AIBar@<tag_name> (REQ-189, REQ-177).
+  Exit non-zero with a bright-red diagnostic and without executing uv
+  tool install when the latest release tag cannot be resolved (REQ-190).
+  Update CTN-015 GitHub lifecycle command and TST-072; add TST-078 and
+  TST-079 coverage requirements; sync WORKFLOW.md call-trace and
+  regenerate REFERENCES.md.
 - BREAKING CHANGE: rename --github to --develop and add --dev equivalent alias [useReq] *(cli)*
-Rename the upgrade-source flag from --github to --develop and add --dev
-as an equivalent alias (REQ-176), both selecting the GitHub package
-source only for --upgrade (REQ-177, REQ-076, CTN-015 unchanged
-lifecycle command strings).
-Update the --help options list and examples epilog (REQ-068) and the
-README lifecycle flag list, GitHub upgrade section, and CLI reference
-(PRJ-018).
-Update REQUIREMENTS.md, WORKFLOW.md, and regenerate REFERENCES.md.
-Change-ID: useReq-change-20261107115749
+  Rename the upgrade-source flag from --github to --develop and add --dev
+  as an equivalent alias (REQ-176), both selecting the GitHub package
+  source only for --upgrade (REQ-177, REQ-076, CTN-015 unchanged
+  lifecycle command strings).
+  Update the --help options list and examples epilog (REQ-068) and the
+  README lifecycle flag list, GitHub upgrade section, and CLI reference
+  (PRJ-018).
+  Update REQUIREMENTS.md, WORKFLOW.md, and regenerate REFERENCES.md.
+  Change-ID: useReq-change-20261107115749
 
 ## [0.56.0](https://github.com/Ogekuri/AIBar/compare/v0.55.0..v0.56.0) - 2026-11-07
 ### ⛰️  Features
 - add --ver alias equivalent to --version [useReq] *(cli)*
-Change-ID: NEW-VER-ALIAS-20261107
-Add REQ-188/TST-077 declaring --ver as an exact alias of --version.
-Register --ver on the eager version option, include it in the startup
-idle-gate bypass argv scan, and document equivalence in README and the
-runtime model. Add a test asserting identical output, exit status, and
-dispatch bypass for both flags.
-Validation: full suite 233 passed with the 3 known pre-existing README
-doc failures; static-check clean.
+  Change-ID: NEW-VER-ALIAS-20261107
+  Add REQ-188/TST-077 declaring --ver as an exact alias of --version.
+  Register --ver on the eager version option, include it in the startup
+  idle-gate bypass argv scan, and document equivalence in README and the
+  runtime model. Add a test asserting identical output, exit status, and
+  dispatch bypass for both flags.
+  Validation: full suite 233 passed with the 3 known pre-existing README
+  doc failures; static-check clean.
 
 ### 🐛  Bug Fixes
 - end session when devkit window closes [useReq] *(aibar-nested-debug-session)*
-Change-ID: FIX-NESTED-CLOSE-20261107
-Closing the Devkit window terminated only the nested GNOME Shell while
-the wrapper waited solely on the debug shell, leaving a residual
-interactive bash-5.3$ prompt after the debug session ended.
-Reap the first terminated background job with wait -n, SIGKILL the
-surviving debug shell when the nested shell exits first, and exit with
-the nested-shell status; add a behavioral reproducer test and PTY
-evidence; update WORKFLOW.md. REQUIREMENTS.md unchanged.
-Validation: 10/10 nested-session tests pass; static-check clean; full
-suite 231 passed with the 4 known pre-existing failures.
+  Change-ID: FIX-NESTED-CLOSE-20261107
+  Closing the Devkit window terminated only the nested GNOME Shell while
+  the wrapper waited solely on the debug shell, leaving a residual
+  interactive bash-5.3$ prompt after the debug session ended.
+  Reap the first terminated background job with wait -n, SIGKILL the
+  surviving debug shell when the nested shell exits first, and exit with
+  the nested-shell status; add a behavioral reproducer test and PTY
+  evidence; update WORKFLOW.md. REQUIREMENTS.md unchanged.
+  Validation: 10/10 nested-session tests pass; static-check clean; full
+  suite 231 passed with the 4 known pre-existing failures.
 - restore debug shell stdin after backgrounding [useReq] *(aibar-nested-debug-session)*
-Change-ID: FIX-NESTED-STDIN-20261107
-Regression from 260b3f0: without job control bash assigns /dev/null as
-stdin to background commands, so the interactive debug shell hit EOF and
-the nested debug session terminated immediately after startup.
-Duplicate wrapper stdin onto descriptor 3 and launch the debug shell with
-<&3; add a stdin-inheritance reproducer test; update WORKFLOW.md.
-Validation: 9/9 nested-session tests pass; PTY run executes input and
-propagates exit 7; static-check clean; full suite 230 passed with the 4
-known pre-existing README/version-report failures.
+  Change-ID: FIX-NESTED-STDIN-20261107
+  Regression from 260b3f0: without job control bash assigns /dev/null as
+  stdin to background commands, so the interactive debug shell hit EOF and
+  the nested debug session terminated immediately after startup.
+  Duplicate wrapper stdin onto descriptor 3 and launch the debug shell with
+  <&3; add a stdin-inheritance reproducer test; update WORKFLOW.md.
+  Validation: 9/9 nested-session tests pass; PTY run executes input and
+  propagates exit 7; static-check clean; full suite 230 passed with the 4
+  known pre-existing README/version-report failures.
 - terminate whole debug session on interrupt [useReq] *(aibar-nested-debug-session)*
-Change-ID: FIX-NESTED-INT-20261107
-SIGINT/SIGTERM now SIGKILL the debug shell and nested shell and the wrapper
-exits 130/143 immediately, returning control to the invoking terminal instead
-of leaving a residual intermediate shell.
-Run the debug shell in background with job control disabled (+m).
-Add behavioral reproducer tests for both interrupt phases and exit-status path.
-Update WORKFLOW.md runtime model; REQUIREMENTS.md unchanged.
-Validation: 8/8 nested-session tests pass; static-check clean; full suite 229
-passed with 4 pre-existing unrelated README/version-report failures.
+  Change-ID: FIX-NESTED-INT-20261107
+  SIGINT/SIGTERM now SIGKILL the debug shell and nested shell and the wrapper
+  exits 130/143 immediately, returning control to the invoking terminal instead
+  of leaving a residual intermediate shell.
+  Run the debug shell in background with job control disabled (+m).
+  Add behavioral reproducer tests for both interrupt phases and exit-status path.
+  Update WORKFLOW.md runtime model; REQUIREMENTS.md unchanged.
+  Validation: 8/8 nested-session tests pass; static-check clean; full suite 229
+  passed with 4 pre-existing unrelated README/version-report failures.
 - prefer virtual-monitor in headless fallback [useReq] *(test-ext)*
-Bare gnome-shell --headless boots a display-less session, so the nested
-test session appeared not to start (no window; shell attached to the
-live session X display and GDM/logind session).
-Probe gnome-shell --help-all for --virtual-monitor and prefer
-gnome-shell --headless --virtual-monitor=1280x720, which provisions an
-explicit 1280x720 virtual monitor rendered in a window on builds with
-windowed virtual monitors; degrade to plain --headless with an
-informational notice when unsupported (REQ-031, PRJ-004).
-Extend reproducer test asserting the virtual-monitor probe/launch and
-the plain-headless degradation tier; update WORKFLOW.md PROC:test-ext
-call-trace with the three-tier launch branches.
+  Bare gnome-shell --headless boots a display-less session, so the nested
+  test session appeared not to start (no window; shell attached to the
+  live session X display and GDM/logind session).
+  Probe gnome-shell --help-all for --virtual-monitor and prefer
+  gnome-shell --headless --virtual-monitor=1280x720, which provisions an
+  explicit 1280x720 virtual monitor rendered in a window on builds with
+  windowed virtual monitors; degrade to plain --headless with an
+  informational notice when unsupported (REQ-031, PRJ-004).
+  Extend reproducer test asserting the virtual-monitor probe/launch and
+  the plain-headless degradation tier; update WORKFLOW.md PROC:test-ext
+  call-trace with the three-tier launch branches.
 - add headless fallback for nested shell launch [useReq] *(test-ext)*
-Probe gnome-shell --help-all for the legacy --nested option before
-launching the nested Wayland test session; retain --nested --wayland
-when advertised and fall back to gnome-shell --headless on newer GNOME
-Shell releases where the option was removed (REQ-031, PRJ-004).
-Fix inconsistent gnome-install step label [1/4] to [1/5] so all five
-installer steps share one step total (REQ-028).
-Add failing-first reproducer tests: launcher headless-fallback
-assertions (tests/test_extension_dev_script.py) and step-total
-consistency assertions (tests/test_gnome_install_step_labels.py).
-Update WORKFLOW.md PROC:test-ext call-trace with the capability probe
-and fallback branch; regenerate REFERENCES.md symbol inventory.
+  Probe gnome-shell --help-all for the legacy --nested option before
+  launching the nested Wayland test session; retain --nested --wayland
+  when advertised and fall back to gnome-shell --headless on newer GNOME
+  Shell releases where the option was removed (REQ-031, PRJ-004).
+  Fix inconsistent gnome-install step label [1/4] to [1/5] so all five
+  installer steps share one step total (REQ-028).
+  Add failing-first reproducer tests: launcher headless-fallback
+  assertions (tests/test_extension_dev_script.py) and step-total
+  consistency assertions (tests/test_gnome_install_step_labels.py).
+  Update WORKFLOW.md PROC:test-ext call-trace with the capability probe
+  and fallback branch; regenerate REFERENCES.md symbol inventory.
 
 ### 🚜  Changes
 - BREAKING CHANGE: remove legacy ver flag, CodexBar fallback, ResultCache, and legacy payload shapes [useReq] *(cli)*
-Change-ID: LEGACY-REMOVAL-20261107
-Drop the --ver alias; --version is the sole version flag and help/README
-no longer mention --ver. Remove the ~/.codexbar/config.json legacy token
-source from the Copilot credential store, delete the unused legacy
-ResultCache module src/aibar/aibar/cache.py, stop tolerating the legacy
-Z.ai key payload field in CLI/GNOME rendering, and stop reading the
-idle_time alias in the GNOME extension freshness parser.
-Update requirements, runtime model, references, and affected tests.
-Program behavior for current payloads and flags is unchanged.
-Validation: full suite 232 passed with 3 known pre-existing README doc
-failures; static-check clean.
+  Change-ID: LEGACY-REMOVAL-20261107
+  Drop the --ver alias; --version is the sole version flag and help/README
+  no longer mention --ver. Remove the ~/.codexbar/config.json legacy token
+  source from the Copilot credential store, delete the unused legacy
+  ResultCache module src/aibar/aibar/cache.py, stop tolerating the legacy
+  Z.ai key payload field in CLI/GNOME rendering, and stop reading the
+  idle_time alias in the GNOME extension freshness parser.
+  Update requirements, runtime model, references, and affected tests.
+  Program behavior for current payloads and flags is unchanged.
+  Validation: full suite 232 passed with 3 known pre-existing README doc
+  failures; static-check clean.
 - BREAKING CHANGE: target GNOME 50 and update windowed debug specs and tests [useReq] *(gnome-extension)*
-Change-ID: GNOME50-20261107-094842
-Declare GNOME 50 metadata and use supported widget APIs.
-Launch Ubuntu 26.04 debugging through Mutter Devkit with prerequisite checks.
-Update requirements, runtime documentation and isolated regression coverage.
-Validation: 99 tests pass; static-check reports no diagnostics.
-Live GUI validation is blocked by the missing mutter-dev-bin package.
+  Change-ID: GNOME50-20261107-094842
+  Declare GNOME 50 metadata and use supported widget APIs.
+  Launch Ubuntu 26.04 debugging through Mutter Devkit with prerequisite checks.
+  Update requirements, runtime documentation and isolated regression coverage.
+  Validation: 99 tests pass; static-check reports no diagnostics.
+  Live GUI validation is blocked by the missing mutter-dev-bin package.
 - replace snapshots with interactive debug session [useReq] *(test-ext)*
-Rewrite SRS section 3.5 into Nested Session Debug Environment (REQ-178..
-REQ-182) and rewrite TST-074; screenshot capture requirements removed.
-Remove scripts/aibar-observe-nested-session.sh and its test file; no
-Screenshot D-Bus capture remains in the debug launch surface.
-Add scripts/aibar-nested-debug-session.sh: launches the nested shell in
-background inside the dedicated D-Bus session, waits a 3s settle, prints
-extension inspection guidance (gnome-extensions info/list, aibar show
---json --force, aibar doctor), then starts an interactive bash debug
-shell sharing DBUS_SESSION_BUS_ADDRESS; nested shell terminates when the
-debug shell exits or SIGINT/SIGTERM arrives (REQ-178..REQ-182).
-scripts/test-gnome-extension.sh routes all three launch branches through
-the debug wrapper, preserving MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720.
-Replace tests/test_nested_session_observer.py with
-tests/test_nested_debug_session.py (TST-074) and update the
-launch-contract assertions in tests/test_extension_dev_script.py.
-Update WORKFLOW.md PROC:test-ext call-trace with the debug wrapper.
+  Rewrite SRS section 3.5 into Nested Session Debug Environment (REQ-178..
+  REQ-182) and rewrite TST-074; screenshot capture requirements removed.
+  Remove scripts/aibar-observe-nested-session.sh and its test file; no
+  Screenshot D-Bus capture remains in the debug launch surface.
+  Add scripts/aibar-nested-debug-session.sh: launches the nested shell in
+  background inside the dedicated D-Bus session, waits a 3s settle, prints
+  extension inspection guidance (gnome-extensions info/list, aibar show
+  --json --force, aibar doctor), then starts an interactive bash debug
+  shell sharing DBUS_SESSION_BUS_ADDRESS; nested shell terminates when the
+  debug shell exits or SIGINT/SIGTERM arrives (REQ-178..REQ-182).
+  scripts/test-gnome-extension.sh routes all three launch branches through
+  the debug wrapper, preserving MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720.
+  Replace tests/test_nested_session_observer.py with
+  tests/test_nested_debug_session.py (TST-074) and update the
+  launch-contract assertions in tests/test_extension_dev_script.py.
+  Update WORKFLOW.md PROC:test-ext call-trace with the debug wrapper.
 - add nested session snapshot observer [useReq] *(test-ext)*
-Add REQ-178..REQ-182 (new SRS section 3.5 Nested Session Observation) and
-TST-074.
-New scripts/aibar-observe-nested-session.sh launches the nested shell from
-argv inside the nested session bus, traps SIGINT/SIGTERM, and captures
-whole-screen PNG snapshots via org.gnome.Shell.Screenshot.Screenshot to
-~/.cache/aibar/nested-shell/nested-shell-snapshot.png (3s settle, 5s
-interval, env-overridable).
-scripts/test-gnome-extension.sh routes all three launch branches (legacy
---nested, --headless --virtual-monitor=1280x720, plain --headless) through
-the observer, preserving MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720.
-Add tests/test_nested_session_observer.py (TST-074) and update the
-launch-contract assertions in tests/test_extension_dev_script.py.
-Update WORKFLOW.md PROC:test-ext call-trace with the observation wrapper.
+  Add REQ-178..REQ-182 (new SRS section 3.5 Nested Session Observation) and
+  TST-074.
+  New scripts/aibar-observe-nested-session.sh launches the nested shell from
+  argv inside the nested session bus, traps SIGINT/SIGTERM, and captures
+  whole-screen PNG snapshots via org.gnome.Shell.Screenshot.Screenshot to
+  ~/.cache/aibar/nested-shell/nested-shell-snapshot.png (3s settle, 5s
+  interval, env-overridable).
+  scripts/test-gnome-extension.sh routes all three launch branches (legacy
+  --nested, --headless --virtual-monitor=1280x720, plain --headless) through
+  the observer, preserving MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720.
+  Add tests/test_nested_session_observer.py (TST-074) and update the
+  launch-contract assertions in tests/test_extension_dev_script.py.
+  Update WORKFLOW.md PROC:test-ext call-trace with the observation wrapper.
 
 ### 📚  Documentation
 - Update TODO.md file.
@@ -270,9 +346,9 @@ Update WORKFLOW.md PROC:test-ext call-trace with the observation wrapper.
 ## [0.55.0](https://github.com/Ogekuri/AIBar/compare/v0.54.0..v0.55.0) - 2026-11-05
 ### 🚜  Changes
 - gate PyPI publish on master and build releases for develop tags [useReq] *(release)*
-check-branch resolves is_master plus is_release_branch for master/develop tags; build-release and GitHub Release now run for tags on master or develop; publish-pypi gated on master only: develop tags skip PyPI publication; Requirements: PRJ-012/PRJ-013 updated, new PRJ-019 and TST-073
+  check-branch resolves is_master plus is_release_branch for master/develop tags; build-release and GitHub Release now run for tags on master or develop; publish-pypi gated on master only: develop tags skip PyPI publication; Requirements: PRJ-012/PRJ-013 updated, new PRJ-019 and TST-073
 - add --github upgrade source and dual-repo version report [useReq] *(cli)*
-Default --upgrade and startup checks keep PyPI as the only version source; New --github flag forces uv tool install --force git+https://github.com/Ogekuri/AIBar; --version/--ver print installed version plus latest PyPI and GitHub releases; README: PyPI-first uv/uvx docs kept, dedicated non-primary GitHub section; Requirements: REQ-076/078, CTN-015/020, new REQ-176/177, PRJ-018, TST-036/072
+  Default --upgrade and startup checks keep PyPI as the only version source; New --github flag forces uv tool install --force git+https://github.com/Ogekuri/AIBar; --version/--ver print installed version plus latest PyPI and GitHub releases; README: PyPI-first uv/uvx docs kept, dedicated non-primary GitHub section; Requirements: REQ-076/078, CTN-015/020, new REQ-176/177, PRJ-018, TST-036/072
 
 ### 📚  Documentation
 - Update README.md file.
@@ -280,57 +356,57 @@ Default --upgrade and startup checks keep PyPI as the only version source; New -
 ## [0.54.0](https://github.com/Ogekuri/AIBar/compare/v0.53.0..v0.54.0) - 2026-11-05
 ### 🚜  Changes
 - document pipx as primary install method [useReq] *(readme)*
-README Install section: pipx primary flow (sudo apt install pipx,
-pipx ensurepath, pipx install aibar) with pip and uv/uvx alternatives
-update requirements PRJ-016, add PRJ-017 and TST-071 with evidence rows; add README pipx assertions to tests/test_release_pypi_workflow.py
+  README Install section: pipx primary flow (sudo apt install pipx,
+  pipx ensurepath, pipx install aibar) with pip and uv/uvx alternatives
+  update requirements PRJ-016, add PRJ-017 and TST-071 with evidence rows; add README pipx assertions to tests/test_release_pypi_workflow.py
 - switch version check and self-upgrade to PyPI [useReq] *(update)*
-startup update check queries https://pypi.org/pypi/aibar/json and parses
-info.version instead of the GitHub releases/latest endpoint
---upgrade now runs uv tool install aibar --force from the PyPI index; README: pip install aibar as primary, uv/uvx kept as alternatives; update requirements CTN-011, CTN-015, REQ-073, REQ-076, TST-035; add
-PRJ-016 and TST-070 with evidence rows
-update lifecycle tests, add PyPI fetch regression test, regenerate docs
+  startup update check queries https://pypi.org/pypi/aibar/json and parses
+  info.version instead of the GitHub releases/latest endpoint
+  --upgrade now runs uv tool install aibar --force from the PyPI index; README: pip install aibar as primary, uv/uvx kept as alternatives; update requirements CTN-011, CTN-015, REQ-073, REQ-076, TST-035; add
+  PRJ-016 and TST-070 with evidence rows
+  update lifecycle tests, add PyPI fetch regression test, regenerate docs
 
 ## [0.53.0](https://github.com/Ogekuri/AIBar/compare/v0.52.0..v0.53.0) - 2026-11-05
 ### 🚜  Changes
 - rename workflow to release-pypi and add PyPI publishing [useReq] *(release)*
-rename release-uvx+extension.yml to release-pypi.yml preserving tag trigger,
-master-branch gate, build, extension zip, attestation, and GitHub Release
-add publish-pypi job uploading sdist+wheel to PyPI via Trusted Publishing
-(pypa/gh-action-pypi-publish, id-token: write, no environment per publisher)
-add [project.urls] and trove classifiers; move pytest to [dependency-groups]
-dev and regenerate uv.lock
-document PyPI install (uv tool install aibar, uvx aibar) in README; add requirements PRJ-012..PRJ-015, CTN-019, TST-068/TST-069 and update
-CTN-007, REQ-079, TST-008, TST-037, TST-065 with evidence rows
-update tests: pyproject metadata suite plus new release workflow suite
+  rename release-uvx+extension.yml to release-pypi.yml preserving tag trigger,
+  master-branch gate, build, extension zip, attestation, and GitHub Release
+  add publish-pypi job uploading sdist+wheel to PyPI via Trusted Publishing
+  (pypa/gh-action-pypi-publish, id-token: write, no environment per publisher)
+  add [project.urls] and trove classifiers; move pytest to [dependency-groups]
+  dev and regenerate uv.lock
+  document PyPI install (uv tool install aibar, uvx aibar) in README; add requirements PRJ-012..PRJ-015, CTN-019, TST-068/TST-069 and update
+  CTN-007, REQ-079, TST-008, TST-037, TST-065 with evidence rows
+  update tests: pyproject metadata suite plus new release workflow suite
 
 ## [0.52.0](https://github.com/Ogekuri/AIBar/compare/v0.51.0..v0.52.0) - 2026-11-04
 ### 🐛  Bug Fixes
 - include OpenRouter usage percent in panel icon threshold [useReq] *(gnome-extension)*
-getPanelUsageValues now resolves 'openrouter' from metrics.usage_percent with metrics.limit/metrics.remaining fallback, preserving over-credit values above 100 (REQ-149, REQ-150).; _updateUI panelValues gains openrouterMax and feeds panelPercents/_updateIconColor so the panel icon reacts to any rendered percentage (REQ-069).; Panel label order, styling, and AGY/Copilot/Codex/Z.ai icon inputs unchanged (REQ-021, REQ-022, REQ-118, REQ-133, REQ-143, REQ-170).; Add failing-then-passing reproducer test pinning the aggregated icon-threshold provider set (TST-007).; Update WORKFLOW.md _updateUI call-trace node and regenerate REFERENCES.md.
+  getPanelUsageValues now resolves 'openrouter' from metrics.usage_percent with metrics.limit/metrics.remaining fallback, preserving over-credit values above 100 (REQ-149, REQ-150).; _updateUI panelValues gains openrouterMax and feeds panelPercents/_updateIconColor so the panel icon reacts to any rendered percentage (REQ-069).; Panel label order, styling, and AGY/Copilot/Codex/Z.ai icon inputs unchanged (REQ-021, REQ-022, REQ-118, REQ-133, REQ-143, REQ-170).; Add failing-then-passing reproducer test pinning the aggregated icon-threshold provider set (TST-007).; Update WORKFLOW.md _updateUI call-trace node and regenerate REFERENCES.md.
 
 ## [0.51.0](https://github.com/Ogekuri/AIBar/compare/v0.50.0..v0.51.0) - 2026-11-04
 ### 🐛  Bug Fixes
 - bound in-process 429 retry sleeps to unblock show [useReq] *(claude_oauth)*
-Root cause: _request_usage slept max(retry-after, backoff) for each of 3 retries; Anthropic hourly-quota Retry-After ~3600s stalled each show run ~3h.; Add IN_PROCESS_RETRY_DELAY_CAP_SECONDS=10 cap; clamp per-attempt sleep and short-circuit retries when server Retry-After exceeds the cap so the REQ-041 idle-time policy defers the next attempt across runs (REQ-042 request minimization).; Add reproducer + regression tests TestClaudeRetryDelayBound; update WORKFLOW.md and regenerate REFERENCES.md.
+  Root cause: _request_usage slept max(retry-after, backoff) for each of 3 retries; Anthropic hourly-quota Retry-After ~3600s stalled each show run ~3h.; Add IN_PROCESS_RETRY_DELAY_CAP_SECONDS=10 cap; clamp per-attempt sleep and short-circuit retries when server Retry-After exceeds the cap so the REQ-041 idle-time policy defers the next attempt across runs (REQ-042 request minimization).; Add reproducer + regression tests TestClaudeRetryDelayBound; update WORKFLOW.md and regenerate REFERENCES.md.
 - Fix .gitignore file.
 
 ### 🚜  Changes
 - login without --provider targets cached error-state providers [useReq] *(cli)*
-REQ-172..REQ-175: bare aibar login now selects login-capable providers (copilot, geminiai) whose cached status section contains result=FAIL and executes their flows sequentially; the former implicit --provider copilot default is removed.
-Adds _LOGIN_FLOW_REGISTRY, _select_login_error_providers, and _login_error_state_providers to src/aibar/aibar/cli.py with per-flow failure capture, sequential continuation, and non-zero aggregate exit.
-Adds tests/test_login_error_state.py covering TST-066/TST-067; updates REQUIREMENTS.md (v0.3.35), WORKFLOW.md login call-trace, and regenerated REFERENCES.md.
-Verification: static-check clean; full pytest suite 202 passed, 1 skipped.
+  REQ-172..REQ-175: bare aibar login now selects login-capable providers (copilot, geminiai) whose cached status section contains result=FAIL and executes their flows sequentially; the former implicit --provider copilot default is removed.
+  Adds _LOGIN_FLOW_REGISTRY, _select_login_error_providers, and _login_error_state_providers to src/aibar/aibar/cli.py with per-flow failure capture, sequential continuation, and non-zero aggregate exit.
+  Adds tests/test_login_error_state.py covering TST-066/TST-067; updates REQUIREMENTS.md (v0.3.35), WORKFLOW.md login call-trace, and regenerated REFERENCES.md.
+  Verification: static-check clean; full pytest suite 202 passed, 1 skipped.
 - BREAKING CHANGE: raise Python floor to 3.12 and pin interpreter via .python-version [useReq] *(build)*
-Raise pyproject requires-python from >= 3.11 to >= 3.12 and regenerate uv.lock.; Add tracked .python-version (3.12) so uv run never resolves the managed 3.11.; Pin release workflow to python-version 3.12 and document the floor in README.; Eliminates the google-api-core 2.30.0 FutureWarning on Python 3.11 runs.; Add CTN-018/TST-065 constraints and update PRJ-007/CTN-007/REQ-086/REQ-087 evidence.
+  Raise pyproject requires-python from >= 3.11 to >= 3.12 and regenerate uv.lock.; Add tracked .python-version (3.12) so uv run never resolves the managed 3.11.; Pin release workflow to python-version 3.12 and document the floor in README.; Eliminates the google-api-core 2.30.0 FutureWarning on Python 3.11 runs.; Add CTN-018/TST-065 constraints and update PRJ-007/CTN-007/REQ-086/REQ-087 evidence.
 - BREAKING CHANGE: remove Claude support and add Antigravity (AGY) provider [useReq] *(providers)*
-Remove Claude OAuth provider, CLI login/renewal flows, refresh-block
-lifecycle, claude_cli_auth module, and claude_token_refresh.sh script.
-Add AntigravityProvider executing 'agy -p /usage', stripping ANSI
-escapes, and parsing TSV rows into five per-quota used percentages.
-AGY takes Claude's first position and red palette in CLI panels and the
-GNOME extension panel, tabs, cards, and stylesheet.
-Update requirements (REQ-158..171), workflow runtime model, references
-inventory, and affected test suites.
+  Remove Claude OAuth provider, CLI login/renewal flows, refresh-block
+  lifecycle, claude_cli_auth module, and claude_token_refresh.sh script.
+  Add AntigravityProvider executing 'agy -p /usage', stripping ANSI
+  escapes, and parsing TSV rows into five per-quota used percentages.
+  AGY takes Claude's first position and red palette in CLI panels and the
+  GNOME extension panel, tabs, cards, and stylesheet.
+  Update requirements (REQ-158..171), workflow runtime model, references
+  inventory, and affected test suites.
 
 ## [0.50.0](https://github.com/Ogekuri/AIBar/compare/v0.49.0..v0.50.0) - 2026-10-21
 ### 🐛  Bug Fixes
@@ -339,158 +415,158 @@ inventory, and affected test suites.
 ## [0.48.0](https://github.com/Ogekuri/AIBar/compare/v0.47.0..v0.48.0) - 2026-10-05
 ### 🐛  Bug Fixes
 - render Z.ai panel quotas from any payload shape [useReq] *(gnome-extension)*
-root cause (residual): the Z.ai panel matcher required quota_key, so
-payloads emitted by pre-9defd00 CLI builds or legacy/redacted cached
-entries left both Z.ai status-bar labels hidden while the card kept
-rendering from label fields and array order
-extension.js: panel extraction now accepts quota_key and legacy key
-identifiers and adds a positional fallback over the canonical quota
-order (5h, 1w) mirroring the index-based card bars; card label
-fallback tolerates the legacy field too
-cli.py: Z.ai CLI label fallback tolerates legacy key values while
-normalizing sanitizer-redacted placeholders to Quota
-tests: node-executed reproducer asserts the panel renders 5h/1w
-percentages for fresh, legacy, and redacted payload shapes
-docs: update WORKFLOW.md call-trace nodes; regenerate REFERENCES.md
+  root cause (residual): the Z.ai panel matcher required quota_key, so
+  payloads emitted by pre-9defd00 CLI builds or legacy/redacted cached
+  entries left both Z.ai status-bar labels hidden while the card kept
+  rendering from label fields and array order
+  extension.js: panel extraction now accepts quota_key and legacy key
+  identifiers and adds a positional fallback over the canonical quota
+  order (5h, 1w) mirroring the index-based card bars; card label
+  fallback tolerates the legacy field too
+  cli.py: Z.ai CLI label fallback tolerates legacy key values while
+  normalizing sanitizer-redacted placeholders to Quota
+  tests: node-executed reproducer asserts the panel renders 5h/1w
+  percentages for fresh, legacy, and redacted payload shapes
+  docs: update WORKFLOW.md call-trace nodes; regenerate REFERENCES.md
 
 ## [0.47.0](https://github.com/Ogekuri/AIBar/compare/v0.46.0..v0.47.0) - 2026-10-05
 ### 🐛  Bug Fixes
 - keep Z.ai panel status labels on cached payloads [useReq] *(gnome-extension)*
-root cause: cache sanitizer (DES-004) redacts dict fields named 'key',
-so Z.ai quota records lost their '5h'/'weekly' identifiers on every
-cache.json round-trip; the GNOME panel matcher required quota.key and
-hid both Z.ai status-bar labels on idle-gated (cached) startup payloads
-while cards kept rendering from label/array order
-zai.py: rename quota record field key -> quota_key (round-trip safe); cli.py/extension.js: consume quota_key in CLI label fallback, panel
-usage matcher, and card label fallback
-tests: add cache-roundtrip reproducer; align stale assertions with
-REQ-155 (OpenRouter no longer renders Requests/Tokens) and pyright
-docs: update WORKFLOW.md call-trace nodes and regenerate REFERENCES.md
+  root cause: cache sanitizer (DES-004) redacts dict fields named 'key',
+  so Z.ai quota records lost their '5h'/'weekly' identifiers on every
+  cache.json round-trip; the GNOME panel matcher required quota.key and
+  hid both Z.ai status-bar labels on idle-gated (cached) startup payloads
+  while cards kept rendering from label/array order
+  zai.py: rename quota record field key -> quota_key (round-trip safe); cli.py/extension.js: consume quota_key in CLI label fallback, panel
+  usage matcher, and card label fallback
+  tests: add cache-roundtrip reproducer; align stale assertions with
+  REQ-155 (OpenRouter no longer renders Requests/Tokens) and pyright
+  docs: update WORKFLOW.md call-trace nodes and regenerate REFERENCES.md
 
 ## [0.46.0](https://github.com/Ogekuri/AIBar/compare/v0.45.0..v0.46.0) - 2026-09-25
 ### 🚜  Changes
 - drop zero Requests/Tokens rows and show Total cost from API usage [useReq] *(openrouter)*
-requirements: bump docs version to 0.3.33; add REQ-155 (suppress
-OpenRouter Requests/Tokens rows), REQ-156 (normalize data.usage into
-UsageMetrics.total_cost), REQ-157 (render Total cost after Cost row);
-drop openrouter from REQ-036 null-to-zero API-counter normalization;
-extend CTN-002 monetary fields with total_cost; update evidence rows
-base.py: add UsageMetrics.total_cost optional float field; openrouter.py: _parse_response exposes total_cost from data.usage via
-new _to_optional_float helper (None when absent or non-finite)
-cli.py: remove openrouter from _API_COUNTER_PROVIDERS; _build_result_panel
-renders Total cost: <currency><value> after Cost and omits Requests/Tokens
-extension.js: drop openrouter from API_COUNTER_PROVIDERS;
-_populateProviderCard hides requests/tokens labels and renders the
-Total cost label from metrics.total_cost in the removed counters position
+  requirements: bump docs version to 0.3.33; add REQ-155 (suppress
+  OpenRouter Requests/Tokens rows), REQ-156 (normalize data.usage into
+  UsageMetrics.total_cost), REQ-157 (render Total cost after Cost row);
+  drop openrouter from REQ-036 null-to-zero API-counter normalization;
+  extend CTN-002 monetary fields with total_cost; update evidence rows
+  base.py: add UsageMetrics.total_cost optional float field; openrouter.py: _parse_response exposes total_cost from data.usage via
+  new _to_optional_float helper (None when absent or non-finite)
+  cli.py: remove openrouter from _API_COUNTER_PROVIDERS; _build_result_panel
+  renders Total cost: <currency><value> after Cost and omits Requests/Tokens
+  extension.js: drop openrouter from API_COUNTER_PROVIDERS;
+  _populateProviderCard hides requests/tokens labels and renders the
+  Total cost label from metrics.total_cost in the removed counters position
 - revert budget-total usage labels to 30d window label [useReq] *(openrouter)*
-requirements: drop REQ-151/152/153 (budget-total labels) and TST-064,
-restore REQ-132 <window> slot and TST-063 wording; add REQ-154 pinning
-OpenRouter usage labels to the effective-window label 30d because the key
-API exposes no explicit timeframe field (only usage_daily/usage_weekly/
-usage_monthly/all-time usage basis values) and the fixed DAY_30 window
-matches the usage_monthly credit basis; bump docs version to 0.3.32
-cli.py: remove _openrouter_budget_total and its _build_result_panel
-override so OpenRouter OK rows render Usage: 30d <progress_bar> <percent>%
-extension.js: remove _resolveOpenRouterBudgetLabel and its
-_populateProviderCard override so OpenRouter single-window 30d bars render
-the configured window label
-tests: show/openrouter usage-row and over-credit parity tests pass again
-(30d prefix, Copilot-row equality); full suite 223 passed, 1 skipped
+  requirements: drop REQ-151/152/153 (budget-total labels) and TST-064,
+  restore REQ-132 <window> slot and TST-063 wording; add REQ-154 pinning
+  OpenRouter usage labels to the effective-window label 30d because the key
+  API exposes no explicit timeframe field (only usage_daily/usage_weekly/
+  usage_monthly/all-time usage basis values) and the fixed DAY_30 window
+  matches the usage_monthly credit basis; bump docs version to 0.3.32
+  cli.py: remove _openrouter_budget_total and its _build_result_panel
+  override so OpenRouter OK rows render Usage: 30d <progress_bar> <percent>%
+  extension.js: remove _resolveOpenRouterBudgetLabel and its
+  _populateProviderCard override so OpenRouter single-window 30d bars render
+  the configured window label
+  tests: show/openrouter usage-row and over-credit parity tests pass again
+  (30d prefix, Copilot-row equality); full suite 223 passed, 1 skipped
 - render total budget in openrouter usage bar labels [useReq] *(openrouter)*
-requirements: add REQ-151/152/153 (OpenRouter usage labels show
-<currency><budget_total> = cost + remaining in CLI text and GNOME
-bars, window-label fallback when budget unavailable), reword REQ-132
-label slot and TST-063/064 semantics and evidence rows
-cli.py: add _openrouter_budget_total helper; OK OpenRouter usage rows
-render Usage: $<budget_total> <progress_bar> <percent>% instead of
-the 30d window label
-extension.js: add _resolveOpenRouterBudgetLabel helper; OpenRouter
-single-window 30d bar label renders <currency><budget_total> from
-cost + remaining with window-label fallback
+  requirements: add REQ-151/152/153 (OpenRouter usage labels show
+  <currency><budget_total> = cost + remaining in CLI text and GNOME
+  bars, window-label fallback when budget unavailable), reword REQ-132
+  label slot and TST-063/064 semantics and evidence rows
+  cli.py: add _openrouter_budget_total helper; OK OpenRouter usage rows
+  render Usage: $<budget_total> <progress_bar> <percent>% instead of
+  the 30d window label
+  extension.js: add _resolveOpenRouterBudgetLabel helper; OpenRouter
+  single-window 30d bar label renders <currency><budget_total> from
+  cost + remaining with window-label fallback
 
 ## [0.45.0](https://github.com/Ogekuri/AIBar/compare/v0.44.0..v0.45.0) - 2026-09-25
 ### 🚜  Changes
 - BREAKING CHANGE: base openrouter progress bar on API credit total [useReq] *(openrouter)*
-requirements: REQ-148/149/150 switch to credit total data.limit,
-remove REQ-151 budget prompt; update CTN-008 keys, TST-013 order,
-TST-063 semantics and evidence rows
-openrouter.py: metrics.limit/remaining derive from data.limit
-(None fallback when absent/zero), percentage cost/(cost+remaining)*100
-cli.py/config.py: drop openrouter_monthly_budget setup/config; tests: rename openrouter suite to credit usage, adapt setup tests; docs: regenerate references, update workflow model
+  requirements: REQ-148/149/150 switch to credit total data.limit,
+  remove REQ-151 budget prompt; update CTN-008 keys, TST-013 order,
+  TST-063 semantics and evidence rows
+  openrouter.py: metrics.limit/remaining derive from data.limit
+  (None fallback when absent/zero), percentage cost/(cost+remaining)*100
+  cli.py/config.py: drop openrouter_monthly_budget setup/config; tests: rename openrouter suite to credit usage, adapt setup tests; docs: regenerate references, update workflow model
 
 ## [0.44.0](https://github.com/Ogekuri/AIBar/compare/v0.43.0..v0.44.0) - 2026-07-15
 ### 🐛  Bug Fixes
 - align stale tests with requirements and add OpenRouter budget coverage [useReq] *(tests)*
-Refresh test_setup_runtime_config.py for REQ-151 budget prompt + persistence; Add tests/test_openrouter_monthly_budget.py for TST-063 (budget percent, over-budget Copilot parity); Fix test_cli_idle_force enabled_providers output-vs-cache comparison (REQ-126); Fix test_extension_dev_script and stale script comment to 1280x720 (PRJ-004); Fix test_gnome_plan_alignment and test_references_inventory paths to pi-usereq/docs/ (PRJ-011); Full suite: 223 passed, 0 failed (was 213 passed, 8 failed)
+  Refresh test_setup_runtime_config.py for REQ-151 budget prompt + persistence; Add tests/test_openrouter_monthly_budget.py for TST-063 (budget percent, over-budget Copilot parity); Fix test_cli_idle_force enabled_providers output-vs-cache comparison (REQ-126); Fix test_extension_dev_script and stale script comment to 1280x720 (PRJ-004); Fix test_gnome_plan_alignment and test_references_inventory paths to pi-usereq/docs/ (PRJ-011); Full suite: 223 passed, 0 failed (was 213 passed, 8 failed)
 
 ### 🚜  Changes
 - BREAKING CHANGE: compute usage bar against configurable monthly budget [useReq] *(openrouter)*
-Add openrouter_monthly_budget config (default $200) prompted in aibar setup; OpenRouter metrics.limit/remaining now derive from budget (spend/budget*100); Over-budget bars reuse the shared >100 over-limit segment (Copilot parity); CLI aibar show and GNOME openrouter tab render spend vs configured budget; Requirements: add REQ-148..151, TST-063; update REQ-011, CTN-008, TST-013
+  Add openrouter_monthly_budget config (default $200) prompted in aibar setup; OpenRouter metrics.limit/remaining now derive from budget (spend/budget*100); Over-budget bars reuse the shared >100 over-limit segment (Copilot parity); CLI aibar show and GNOME openrouter tab render spend vs configured budget; Requirements: add REQ-148..151, TST-063; update REQ-011, CTN-008, TST-013
 - derive 5h quota reset time so Resets in renders [useReq] *(zai)*
-The Z.ai monitor API omits nextResetTime for the 5 Hours quota, so
-reset_at_epoch_ms was None and the 'Resets in' row was suppressed for
-the 5h progress bar in both 'aibar show' CLI and the GNOME extension.
-Add ZaiProvider._derive_five_hour_reset_epoch_ms computing the next UTC
-5-hour boundary (00:00/05:00/10:00/15:00/20:00); _build_quota applies it
-when nextResetTime is absent for the 5h quota.
-CLI and GNOME already consume reset_at_epoch_ms, so both render the
-missing 'Resets in'/'Reset in' for 5h.
-Add REQ-147 and TST-062; update WORKFLOW.md and REFERENCES.md.
+  The Z.ai monitor API omits nextResetTime for the 5 Hours quota, so
+  reset_at_epoch_ms was None and the 'Resets in' row was suppressed for
+  the 5h progress bar in both 'aibar show' CLI and the GNOME extension.
+  Add ZaiProvider._derive_five_hour_reset_epoch_ms computing the next UTC
+  5-hour boundary (00:00/05:00/10:00/15:00/20:00); _build_quota applies it
+  when nextResetTime is absent for the 5h quota.
+  CLI and GNOME already consume reset_at_epoch_ms, so both render the
+  missing 'Resets in'/'Reset in' for 5h.
+  Add REQ-147 and TST-062; update WORKFLOW.md and REFERENCES.md.
 
 ## [0.43.0](https://github.com/Ogekuri/AIBar/compare/v0.42.0..v0.43.0) - 2026-07-14
 ### 🚜  Changes
 - add reset time indicator for Z.ai 5h quota progress bar [useReq] *(zai)*
-Add REQ-145 and REQ-146 clarifying Z.ai quota reset time format
-and float-to-int coercion requirement
-Fix _build_quota to coerce nextResetTime float to int for
-consistent reset_at_epoch_ms type through cache round-trip
-Fix _epoch_ms_to_datetime to accept both int and float values; Regenerate REFERENCES.md to reflect updated symbol documentation
-The fix ensures the 5h quota reset time renders correctly in both
-aibar show CLI output and the GNOME extension provider card.
+  Add REQ-145 and REQ-146 clarifying Z.ai quota reset time format
+  and float-to-int coercion requirement
+  Fix _build_quota to coerce nextResetTime float to int for
+  consistent reset_at_epoch_ms type through cache round-trip
+  Fix _epoch_ms_to_datetime to accept both int and float values; Regenerate REFERENCES.md to reflect updated symbol documentation
+  The fix ensures the 5h quota reset time renders correctly in both
+  aibar show CLI output and the GNOME extension provider card.
 
 ## [0.41.0](https://github.com/Ogekuri/AIBar/compare/v0.40.0..v0.41.0) - 2026-07-14
 ### 🚜  Changes
 - rename Z.ai quota labels to 5h/1w/1m and fix missing _panelOpenAICostLabel in _handleError [useReq] *(zai/gnome-extension)*
-Rename Z.ai GNOME tab progress-bar side labels from '5 Hours'/'Weekly'/'Monthly Web Search' to '5h'/'1w'/'1m' (REQ-137, REQ-140); Update ZaiProvider._extract_quotas label strings in zai.py; Fix GNOME extension _handleError missing _panelOpenAICostLabel reset/hide (REQ-144); Update REQUIREMENTS.md with REQ-144 and revised REQ-137/REQ-140/REQ-143/TST-060/TST-061; Update WORKFLOW.md and REFERENCES.md with label changes and _handleError fix
+  Rename Z.ai GNOME tab progress-bar side labels from '5 Hours'/'Weekly'/'Monthly Web Search' to '5h'/'1w'/'1m' (REQ-137, REQ-140); Update ZaiProvider._extract_quotas label strings in zai.py; Fix GNOME extension _handleError missing _panelOpenAICostLabel reset/hide (REQ-144); Update REQUIREMENTS.md with REQ-144 and revised REQ-137/REQ-140/REQ-143/TST-060/TST-061; Update WORKFLOW.md and REFERENCES.md with label changes and _handleError fix
 
 ## [0.40.0](https://github.com/Ogekuri/AIBar/compare/v0.39.0..v0.40.0) - 2026-07-14
 ### 🐛  Bug Fixes
 - restore CLI Resets-in rows after cache JSON round-trip [useReq] *(zai)*
-Z.ai Resets-in rows vanished from CLI show text because the shared cache
-pipeline serializes results via model_dump(mode=json), converting the
-untyped raw.zai_quotas reset_at datetime to an ISO string that the renderer
-skipped (it only handled datetime instances).
-Add _coerce_zai_quota_reset_at to resolve the reset datetime from the
-round-trip-safe reset_at_epoch_ms integer (same field the GNOME card uses)
-with datetime/ISO-string reset_at fallback, restoring REQ-137 rendering on
-both fresh-fetch and cached show paths.
-Add reproducer test covering the cache round-trip and in-memory paths.; Progress-bar and dual-status-bar Z.ai requests require /req-change
-(conflict with REQ-140 and REQ-139); not implemented in this defect fix.
+  Z.ai Resets-in rows vanished from CLI show text because the shared cache
+  pipeline serializes results via model_dump(mode=json), converting the
+  untyped raw.zai_quotas reset_at datetime to an ISO string that the renderer
+  skipped (it only handled datetime instances).
+  Add _coerce_zai_quota_reset_at to resolve the reset datetime from the
+  round-trip-safe reset_at_epoch_ms integer (same field the GNOME card uses)
+  with datetime/ISO-string reset_at fallback, restoring REQ-137 rendering on
+  both fresh-fetch and cached show paths.
+  Add reproducer test covering the cache round-trip and in-memory paths.; Progress-bar and dual-status-bar Z.ai requests require /req-change
+  (conflict with REQ-140 and REQ-139); not implemented in this defect fix.
 
 ### 🚜  Changes
 - render Z.ai progress bars and dual status-bar percentages [useReq] *(zai)*
-Update REQ-140/128/121/122 so Z.ai renders progress-bar usage rows in CLI
-and GNOME like claude/openrouter/copilot/codex; split REQ-139 (icon threshold
-from max) and add REQ-143 (status bar shows 5 Hours non-bold + Weekly bold).
-CLI: add ZAI to _should_render_cli_progress_bar; _build_zai_quota_lines now
-emits Usage: <label> <progress_bar> <percent>% plus Resets in per quota.
-GNOME: move zai into PROGRESS_BAR_PROVIDERS, render three per-quota window
-bars with Reset in labels in _populateProviderCard, add a Weekly (bold) panel
-label beside the 5 Hours (non-bold) label, drive icon color from max quota.
-Update TST-052/054/061 and extension tests for the new bar/dual-label surface.
+  Update REQ-140/128/121/122 so Z.ai renders progress-bar usage rows in CLI
+  and GNOME like claude/openrouter/copilot/codex; split REQ-139 (icon threshold
+  from max) and add REQ-143 (status bar shows 5 Hours non-bold + Weekly bold).
+  CLI: add ZAI to _should_render_cli_progress_bar; _build_zai_quota_lines now
+  emits Usage: <label> <progress_bar> <percent>% plus Resets in per quota.
+  GNOME: move zai into PROGRESS_BAR_PROVIDERS, render three per-quota window
+  bars with Reset in labels in _populateProviderCard, add a Weekly (bold) panel
+  label beside the 5 Hours (non-bold) label, drive icon color from max quota.
+  Update TST-052/054/061 and extension tests for the new bar/dual-label surface.
 
 ## [0.39.0](https://github.com/Ogekuri/AIBar/compare/v0.38.0..v0.39.0) - 2026-07-13
 ### ⛰️  Features
 - Add Z.ai quota unit-mapping regression tests [useReq] *(tests/zai)*
-Add tests/test_zai_quota_mapping.py covering ZaiProvider._extract_quotas unit->quota projection (3/6/5 -> 5h/weekly/monthly), percentage/reset_at normalization, malformed-entry skipping, and _max_percentage aggregation. Satisfies TST-060, REQ-136, REQ-137. Production code unchanged.
+  Add tests/test_zai_quota_mapping.py covering ZaiProvider._extract_quotas unit->quota projection (3/6/5 -> 5h/weekly/monthly), percentage/reset_at normalization, malformed-entry skipping, and _max_percentage aggregation. Satisfies TST-060, REQ-136, REQ-137. Production code unchanged.
 - add Z.ai quota provider to CLI and GNOME extension [useReq] *(provider)*
-Add ZAI provider fetching 5h/weekly/monthly web-search quotas from
-https://api.z.ai/api/monitor/usage/quota/limit via ZAI_API_KEY
-Register zai as last provider in CLI text, GNOME tabs/cards, and panel
-status bar with distinct bright-cyan color (#64D2FF / ANSI 96)
-Render per-quota percentages and reset times as text usage rows
-(no progress bars); status-bar/icon driven from max quota percentage
-Add ZAI_API_KEY setup prompt and zai activation/currency prompts; Reuse unmodified shared cache/idle-time pipeline (REQ-134..142); Update requirements/workflow/references and provider-inventory tests
+  Add ZAI provider fetching 5h/weekly/monthly web-search quotas from
+  https://api.z.ai/api/monitor/usage/quota/limit via ZAI_API_KEY
+  Register zai as last provider in CLI text, GNOME tabs/cards, and panel
+  status bar with distinct bright-cyan color (#64D2FF / ANSI 96)
+  Render per-quota percentages and reset times as text usage rows
+  (no progress bars); status-bar/icon driven from max quota percentage
+  Add ZAI_API_KEY setup prompt and zai activation/currency prompts; Reuse unmodified shared cache/idle-time pipeline (REQ-134..142); Update requirements/workflow/references and provider-inventory tests
 
 ## [0.38.0](https://github.com/Ogekuri/AIBar/compare/v0.37.0..v0.38.0) - 2026-07-08
 ### 🐛  Bug Fixes
@@ -506,52 +582,52 @@ Add ZAI_API_KEY setup prompt and zai activation/currency prompts; Reuse unmodifi
 
 ### 🚜  Changes
 - align SRS with current docs and GNOME test runtime [useReq] *(docs)*
-update requirement paths to the active pi-usereq/docs surface; align GNOME test-helper requirements with the install-and-launch 1280x720 flow; refresh WORKFLOW.md for PROC:test-ext and launcher edge
+  update requirement paths to the active pi-usereq/docs surface; align GNOME test-helper requirements with the install-and-launch 1280x720 flow; refresh WORKFLOW.md for PROC:test-ext and launcher edge
 
 ## [0.36.0](https://github.com/Ogekuri/AIBar/compare/v0.35.0..v0.36.0) - 2026-04-19
 ### ⛰️  Features
 - preserve canonical provider order across surfaces [useReq] *(cli)*
-add REQ-133 for stable provider ordering after disabled-provider filtering; keep CLI panels and GNOME tabs/status labels on the canonical provider sequence; refresh workflow and references traceability for the new ordering helpers
+  add REQ-133 for stable provider ordering after disabled-provider filtering; keep CLI panels and GNOME tabs/status labels on the canonical provider sequence; refresh workflow and references traceability for the new ordering helpers
 
 ## [0.35.0](https://github.com/Ogekuri/AIBar/compare/v0.34.0..v0.35.0) - 2026-04-19
 ### 🐛  Bug Fixes
 - restore openrouter reset spacing in show output [useReq] *(cli)*
-Ref: useReq-AIBar-work-20260419143702
-restore OpenRouter CLI reset countdown fallback; preserve blank separator before cost rows; add reproducer coverage for show panel rendering; update WORKFLOW.md and regenerate REFERENCES.md
+  Ref: useReq-AIBar-work-20260419143702
+  restore OpenRouter CLI reset countdown fallback; preserve blank separator before cost rows; add reproducer coverage for show panel rendering; update WORKFLOW.md and regenerate REFERENCES.md
 - render openrouter zero-usage bar in show [useReq] *(cli)*
-align CLI OpenRouter fallback with GNOME single-window bar behavior; add regression coverage for zero-percent OpenRouter usage rendering; update WORKFLOW.md and REFERENCES.md
+  align CLI OpenRouter fallback with GNOME single-window bar behavior; add regression coverage for zero-percent OpenRouter usage rendering; update WORKFLOW.md and REFERENCES.md
 - preserve dual-window sections in show output [useReq] *(cli)*
-retain 5h/7d labels in Claude/Codex panels; stop collapsing identical dual-window usage rows; add regression coverage for disabled-provider scenario
+  retain 5h/7d labels in Claude/Codex panels; stop collapsing identical dual-window usage rows; add regression coverage for disabled-provider scenario
 
 ### 🚜  Changes
 - keep OpenRouter progress bar in show [useReq] *(show)*
-split CLI usage requirements to make OpenRouter bar rendering explicit; route CLI usage-row policy through a dedicated OpenRouter-aware helper; add OpenRouter regression coverage and refresh workflow/reference docs
+  split CLI usage requirements to make OpenRouter bar rendering explicit; route CLI usage-row policy through a dedicated OpenRouter-aware helper; add OpenRouter regression coverage and refresh workflow/reference docs
 - remove OpenAI and GeminiAI progress bars [useReq] *(show)*
-update requirements, workflow, and references for text-only usage rows; remove OpenAI and GeminiAI progress bars from CLI and GNOME cards; extend regression tests for CLI and GNOME rendering
+  update requirements, workflow, and references for text-only usage rows; remove OpenAI and GeminiAI progress bars from CLI and GNOME cards; extend regression tests for CLI and GNOME rendering
 - align usage row window labels [useReq] *(cli)*
-Update REQ-067 with split CLI layout requirements.
-Implement Usage rows as window-left bar percent-right.
-Keep Copilot cost spacing and refresh references/workflow docs.
+  Update REQ-067 with split CLI layout requirements.
+  Implement Usage rows as window-left bar percent-right.
+  Keep Copilot cost spacing and refresh references/workflow docs.
 
 ## [0.34.0](https://github.com/Ogekuri/AIBar/compare/v0.33.0..v0.34.0) - 2026-04-18
 ### 🐛  Bug Fixes
 - restore Claude/Codex bar labels [useReq] *(gnome-extension)*
-WT: useReq-AIBar-work-20260418181825
-keep dual-window 5h/7d labels in GNOME cards; add regression test for label blanking; update workflow and references docs
+  WT: useReq-AIBar-work-20260418181825
+  keep dual-window 5h/7d labels in GNOME cards; add regression test for label blanking; update workflow and references docs
 
 ### 🚜  Changes
 - move provider activation to first setup section [useReq] *(setup)*
-update REQ-123, TST-013, and TST-055 for setup section order; reorder setup prompts so provider activation runs before runtime throttling; align setup tests, workflow, and references with the new requirement
+  update REQ-123, TST-013, and TST-055 for setup section order; reorder setup prompts so provider activation runs before runtime throttling; align setup tests, workflow, and references with the new requirement
 
 ## [0.33.0](https://github.com/Ogekuri/AIBar/compare/v0.32.0..v0.33.0) - 2026-04-18
 ### ⛰️  Features
 - add provider enable flags for show and GNOME [useReq] *(cli)*
-add enabled_providers requirements and runtime config; gate show refresh/json/text output by provider flags; hide disabled providers in GNOME extension; extend setup and targeted tests for provider toggles
+  add enabled_providers requirements and runtime config; gate show refresh/json/text output by provider flags; hide disabled providers in GNOME extension; extend setup and targeted tests for provider toggles
 
 ## [0.32.0](https://github.com/Ogekuri/AIBar/compare/v0.31.0..v0.32.0) - 2026-04-18
 ### 🐛  Bug Fixes
 - restore rounded >100 progress caps [useReq] *(gnome-extension)*
-add a reproducer for slight and large over-limit rounding; absorb too-thin overflow into the 100% marker for rounded caps; let neutral marker and overflow actors honor shape-class radii; refresh WORKFLOW.md and REFERENCES.md
+  add a reproducer for slight and large over-limit rounding; absorb too-thin overflow into the 100% marker for rounded caps; let neutral marker and overflow actors honor shape-class radii; refresh WORKFLOW.md and REFERENCES.md
 
 ## [0.31.0](https://github.com/Ogekuri/AIBar/compare/v0.30.0..v0.31.0) - 2026-04-18
 ### 🐛  Bug Fixes
@@ -560,81 +636,81 @@ add a reproducer for slight and large over-limit rounding; absorb too-thin overf
 ## [0.30.0](https://github.com/Ogekuri/AIBar/compare/v0.29.0..v0.30.0) - 2026-04-18
 ### 🐛  Bug Fixes
 - highlight >100 progress overflow [useReq] *(gnome-extension)*
-restore visible neutral overflow contrast in GNOME popup bars; add regression coverage for REQ-121 and TST-052; refresh WORKFLOW and REFERENCES metadata
+  restore visible neutral overflow contrast in GNOME popup bars; add regression coverage for REQ-121 and TST-052; refresh WORKFLOW and REFERENCES metadata
 
 ## [0.29.0](https://github.com/Ogekuri/AIBar/compare/v0.28.0..v0.29.0) - 2026-04-15
 ### 🚜  Changes
 - render over-limit segments in GNOME and CLI [useReq] *(progress-bar)*
-update REQUIREMENTS.md with REQ-121, REQ-122, TST-052, and TST-054; add GNOME over-limit marker plus neutral extra-quota segment rendering; add CLI fixed-width over-limit marker plus neutral extra-quota segment rendering; refresh WORKFLOW.md and REFERENCES.md for updated symbols and call traces
+  update REQUIREMENTS.md with REQ-121, REQ-122, TST-052, and TST-054; add GNOME over-limit marker plus neutral extra-quota segment rendering; add CLI fixed-width over-limit marker plus neutral extra-quota segment rendering; refresh WORKFLOW.md and REFERENCES.md for updated symbols and call traces
 
 ## [0.28.0](https://github.com/Ogekuri/AIBar/compare/v0.27.0..v0.28.0) - 2026-04-13
 ### 🚜  Changes
 - shrink popup viewport height for active card [useReq] *(gnome-extension)*
-Worktree: useReq-AIBar-work-20260413114433
-Requirements: add REQ-119 and REQ-120 for adaptive popup viewport sizing.
-Implementation: replace fixed 380px popup viewport with content-driven sizing capped at 260px.
-Docs: update WORKFLOW.md and regenerate REFERENCES.md.
+  Worktree: useReq-AIBar-work-20260413114433
+  Requirements: add REQ-119 and REQ-120 for adaptive popup viewport sizing.
+  Implementation: replace fixed 380px popup viewport with content-driven sizing capped at 260px.
+  Docs: update WORKFLOW.md and regenerate REFERENCES.md.
 
 ## [0.27.0](https://github.com/Ogekuri/AIBar/compare/v0.26.0..v0.27.0) - 2026-04-12
 ### 📚  Documentation
 - align usage docs with current CLI interfaces [useReq] *(readme)*
-document global lifecycle/logging flags and show --force behavior; add fixed-window notes for copilot/openrouter/openai/geminiai; add repository helper scripts and correct GeminiAI setup prerequisites
+  document global lifecycle/logging flags and show --force behavior; add fixed-window notes for copilot/openrouter/openai/geminiai; add repository helper scripts and correct GeminiAI setup prerequisites
 
 ## [0.26.0](https://github.com/Ogekuri/AIBar/compare/v0.25.0..v0.26.0) - 2026-04-12
 ### 🚜  Changes
 - enforce Copilot blank separator before cost [useReq] *(cli.show)*
-Update REQ-067 and TST-030 for Copilot spacing behavior.
-Insert one blank CLI row between Copilot Remaining credits and Cost.
-Extend panel-alignment test assertions for the new spacing contract.
-Refresh WORKFLOW.md and regenerate REFERENCES.md for traceability.
+  Update REQ-067 and TST-030 for Copilot spacing behavior.
+  Insert one blank CLI row between Copilot Remaining credits and Cost.
+  Extend panel-alignment test assertions for the new spacing contract.
+  Refresh WORKFLOW.md and regenerate REFERENCES.md for traceability.
 
 ## [0.25.0](https://github.com/Ogekuri/AIBar/compare/v0.24.0..v0.25.0) - 2026-04-12
 ### 🐛  Bug Fixes
 - Fix scripts/test-gnome-extension.sh script.
 - derive cost from remaining overage for show [useReq] *(copilot)*
-compute Copilot metrics.cost from remaining sign semantics; align CLI and GNOME fallback overage calculations; add regression tests for positive/negative remaining cases; refresh WORKFLOW and REFERENCES documentation
+  compute Copilot metrics.cost from remaining sign semantics; align CLI and GNOME fallback overage calculations; add regression tests for positive/negative remaining cases; refresh WORKFLOW and REFERENCES documentation
 - clamp over-100 progress bars [useReq] *(gnome-extension)*
-unify over-limit progress geometry for all provider bars; reserve window-label and percentage label slot widths; add regression assertions and refresh workflow/reference docs
+  unify over-limit progress geometry for all provider bars; reserve window-label and percentage label slot widths; add regression assertions and refresh workflow/reference docs
 - remove trailing braces causing shell parse error [useReq] *(gnome-extension)*
-Remove stray closing braces at extension.js EOF that caused GNOME Shell SyntaxError.
-Add regression test asserting extension.js terminates at AIBarExtension class closure.
-Regenerate docs/REFERENCES.md for updated extension source line map.
+  Remove stray closing braces at extension.js EOF that caused GNOME Shell SyntaxError.
+  Add regression test asserting extension.js terminates at AIBarExtension class closure.
+  Regenerate docs/REFERENCES.md for updated extension source line map.
 - Fix scripts/test-gnome-extension.sh script.
 - Fix scripts/test-gnome-extension.sh script.
 - clamp progress bar width and indicate overflow beyond 100% [useReq] *(gnome-extension)*
 - align stale assertions with current runtime behavior [useReq] *(tests)*
-update Claude dual-window 429 assertions to match live error passthrough; update GeminiAI extension provider-order expectation to include openai
+  update Claude dual-window 429 assertions to match live error passthrough; update GeminiAI extension provider-order expectation to include openai
 
 ### 🚜  Changes
 - align Copilot cost surfaces to Cost label [useReq] *(copilot-ui)*
-Update REQ-067/REQ-117/REQ-118 and related TST IDs for Cost label semantics.
-Set Copilot metrics.cost from premium request overage with 0.0 fallback in provider payload.
-Render Copilot CLI row as Cost and keep raw-overage fallback when metrics cost is missing.
-Render GNOME Copilot card and panel token as currency cost (no leading plus), using metrics.cost with overage fallback.
-Regenerate WORKFLOW and REFERENCES documentation to reflect updated runtime and symbols.
+  Update REQ-067/REQ-117/REQ-118 and related TST IDs for Cost label semantics.
+  Set Copilot metrics.cost from premium request overage with 0.0 fallback in provider payload.
+  Render Copilot CLI row as Cost and keep raw-overage fallback when metrics cost is missing.
+  Render GNOME Copilot card and panel token as currency cost (no leading plus), using metrics.cost with overage fallback.
+  Regenerate WORKFLOW and REFERENCES documentation to reflect updated runtime and symbols.
 - set default extra premium request cost to 0.04 [useReq] *(copilot-cost)*
-Update REQ-116 and TST-013 default unit cost from 0.004 to 0.04 USD/request.
-Set runtime and GNOME fallback constants to 0.04 for copilot extra premium request cost.
-Align setup runtime-config tests with the dedicated Copilot cost prompt and persisted value.
-Regenerate docs/REFERENCES.md to reflect symbol default updates.
+  Update REQ-116 and TST-013 default unit cost from 0.004 to 0.04 USD/request.
+  Set runtime and GNOME fallback constants to 0.04 for copilot extra premium request cost.
+  Align setup runtime-config tests with the dedicated Copilot cost prompt and persisted value.
+  Regenerate docs/REFERENCES.md to reflect symbol default updates.
 - add premium overage cost config and UI [useReq] *(copilot)*
-Update REQUIREMENTS for Copilot premium-request overage pricing behavior.
-Persist copilot_extra_premium_request_cost in RuntimeConfig and setup.
-Compute premium_requests_extra_cost in Copilot provider payload.
-Render Copilot extra premium cost in CLI show and GNOME card/panel.
-Expose copilot_extra_premium_request_cost via show --json extension section.
-Refresh WORKFLOW and REFERENCES documentation for updated runtime model.
+  Update REQUIREMENTS for Copilot premium-request overage pricing behavior.
+  Persist copilot_extra_premium_request_cost in RuntimeConfig and setup.
+  Compute premium_requests_extra_cost in Copilot provider payload.
+  Render Copilot extra premium cost in CLI show and GNOME card/panel.
+  Expose copilot_extra_premium_request_cost via show --json extension section.
+  Refresh WORKFLOW and REFERENCES documentation for updated runtime model.
 - enforce fixed popup dimensions and wrap error messages [useReq] *(gnome-extension)*
-This commit enforces a fixed standard width and height for the GNOME extension popup window, preventing UI expansion. It also adds word-wrapping to verbose error messages and constrains the maximum width of tab content and status bars, satisfying the new requirement REQ-102 and test TST-052.
+  This commit enforces a fixed standard width and height for the GNOME extension popup window, preventing UI expansion. It also adds word-wrapping to verbose error messages and constrains the maximum width of tab content and status bars, satisfying the new requirement REQ-102 and test TST-052.
 - relax satisfies audit gate [useReq] *(requirements)*
-Update REQ-020 and TST-006 to make @satisfies optional for audit pass/fail.
-Add regression in tests/test_references_inventory.py for requirements policy text.
+  Update REQ-020 and TST-006 to make @satisfies optional for audit pass/fail.
+  Add regression in tests/test_references_inventory.py for requirements policy text.
 - force online check on version flags [useReq] *(startup-preflight)*
-Update REQ-071/REQ-078 and TST-032/TST-036 for version-flag behavior.
-When invocation includes --version/--ver, startup preflight bypasses
-check_version_idle-time gating and performs one online release check.
-Keep existing idle gating unchanged for non-version invocations.
-Add targeted startup preflight regression test and refresh docs.
+  Update REQ-071/REQ-078 and TST-032/TST-036 for version-flag behavior.
+  When invocation includes --version/--ver, startup preflight bypasses
+  check_version_idle-time gating and performs one online release check.
+  Keep existing idle gating unchanged for non-version invocations.
+  Add targeted startup preflight regression test and refresh docs.
 
 ### 📚  Documentation
 - Update README.md file.
@@ -645,57 +721,57 @@ Add targeted startup preflight regression test and refresh docs.
 ## [0.24.0](https://github.com/Ogekuri/AIBar/compare/v0.23.0..v0.24.0) - 2026-03-27
 ### 🚜  Changes
 - log raw API error JSON in debug rows [useReq] *(cli-logging)*
-Update REQ-114/REQ-115 and TST-049 for debug raw error payload logging.
-Add CLI debug logging helper to emit provider.fetch.debug.error_json
-only for failed calls with JSON raw.body, preserving payload text unchanged.
-Add runtime logging regression test for debug-off/on gating and exact payload.
-Update WORKFLOW and regenerate REFERENCES for traceability.
+  Update REQ-114/REQ-115 and TST-049 for debug raw error payload logging.
+  Add CLI debug logging helper to emit provider.fetch.debug.error_json
+  only for failed calls with JSON raw.body, preserving payload text unchanged.
+  Add runtime logging regression test for debug-off/on gating and exact payload.
+  Update WORKFLOW and regenerate REFERENCES for traceability.
 
 ## [0.23.0](https://github.com/Ogekuri/AIBar/compare/v0.22.0..v0.23.0) - 2026-03-27
 ### 🐛  Bug Fixes
 - include refresh error reason [useReq] *(geminiai)*
-include Google refresh reason in GeminiAI auth error message\n- add reproducer for refresh error diagnostics\n- update workflow and regenerate references
+  include Google refresh reason in GeminiAI auth error message\n- add reproducer for refresh error diagnostics\n- update workflow and regenerate references
 
 ### 🚜  Changes
 - enforce lock acquisition timeout [useReq] *(config)*
-update REQ-066/REQ-112 and add TST-051 for lock timeout behavior\n- enforce 5s lock-file acquisition timeout with explicit error and runtime log row\n- propagate lock timeout to CLI show with non-zero exit\n- add lock-timeout regression tests and update workflow/references
+  update REQ-066/REQ-112 and add TST-051 for lock timeout behavior\n- enforce 5s lock-file acquisition timeout with explicit error and runtime log row\n- propagate lock timeout to CLI show with non-zero exit\n- add lock-timeout regression tests and update workflow/references
 
 ## [0.22.0](https://github.com/Ogekuri/AIBar/compare/v0.21.0..v0.22.0) - 2026-03-27
 ### 🐛  Bug Fixes
 - normalize Claude retry fallback [useReq] *(cli)*
-normalize Claude error results without parseable Retry-After\n- add OAuth scope-error reproducer for default fallback idle-time\n- update WORKFLOW and REFERENCES runtime docs
+  normalize Claude error results without parseable Retry-After\n- add OAuth scope-error reproducer for default fallback idle-time\n- update WORKFLOW and REFERENCES runtime docs
 - honor fallback retry-after for claude auth errors [useReq] *(cli)*
-Add fail-first reproducer for Claude OAuth error idle-time scheduling.
-Mark synthesized Claude dual-fetch error payloads with retry_after_unavailable=true.
-Preserve existing REQ-041 behavior by applying configured default_retry_after_seconds.
-Update WORKFLOW and regenerate REFERENCES for traceability.
+  Add fail-first reproducer for Claude OAuth error idle-time scheduling.
+  Mark synthesized Claude dual-fetch error payloads with retry_after_unavailable=true.
+  Preserve existing REQ-041 behavior by applying configured default_retry_after_seconds.
+  Update WORKFLOW and regenerate REFERENCES for traceability.
 
 ## [0.21.0](https://github.com/Ogekuri/AIBar/compare/v0.20.0..v0.21.0) - 2026-03-27
 ### 🐛  Bug Fixes
 - log claude dual-window retry-after evidence [useReq] *(cli)*
-Restore REQ-115 compliance for Claude fail paths in refresh pipeline.
-Append provider failure runtime logs for Claude 5h/7d dual-window results.
-Add failing reproducer then validate retry_after and unavailable evidence logging.
-Update workflow/references docs to reflect runtime call-trace behavior.
+  Restore REQ-115 compliance for Claude fail paths in refresh pipeline.
+  Append provider failure runtime logs for Claude 5h/7d dual-window results.
+  Add failing reproducer then validate retry_after and unavailable evidence logging.
+  Update workflow/references docs to reflect runtime call-trace behavior.
 
 ### 🚜  Changes
 - add default Retry-After fallback in setup [useReq] *(cli)*
-Update REQ-005 and REQ-041 for configurable fallback retry delay.
-Add RuntimeConfig.default_retry_after_seconds defaulting to 3600 seconds.
-Extend setup timing prompts/persistence with default-retry-after seconds.
-Mark provider 429 payloads with retry_after_unavailable when header is absent.
-Use configured fallback to compute provider idle_until on retry-after-unavailable.
-Update tests plus WORKFLOW/REFERENCES traceability for changed behavior.
+  Update REQ-005 and REQ-041 for configurable fallback retry delay.
+  Add RuntimeConfig.default_retry_after_seconds defaulting to 3600 seconds.
+  Extend setup timing prompts/persistence with default-retry-after seconds.
+  Mark provider 429 payloads with retry_after_unavailable when header is absent.
+  Use configured fallback to compute provider idle_until on retry-after-unavailable.
+  Update tests plus WORKFLOW/REFERENCES traceability for changed behavior.
 
 ## [0.20.0](https://github.com/Ogekuri/AIBar/compare/v0.19.0..v0.20.0) - 2026-03-27
 ### 🚜  Changes
 - refine provider-scoped Err and retry-after logging [useReq] *(core)*
-Update existing requirements REQ-021 and REQ-115.
-Apply provider-scoped GNOME panel Err rendering for oauth/rate-limit failures.
-Preserve normal panel percentage/cost labels for non-failing providers.
-Extend runtime failure logging with retry-after source/evidence fields.
-Log explicit retry_after_unavailable evidence when extraction is impossible.
-Add/adjust targeted regression tests and refresh docs workflow/references.
+  Update existing requirements REQ-021 and REQ-115.
+  Apply provider-scoped GNOME panel Err rendering for oauth/rate-limit failures.
+  Preserve normal panel percentage/cost labels for non-failing providers.
+  Extend runtime failure logging with retry-after source/evidence fields.
+  Log explicit retry_after_unavailable evidence when extraction is impossible.
+  Add/adjust targeted regression tests and refresh docs workflow/references.
 - log oauth and rate-limit failures with retry-after [useReq] *(cli)*
 
 ## [0.19.0](https://github.com/Ogekuri/AIBar/compare/v0.18.0..v0.19.0) - 2026-03-26
@@ -709,28 +785,28 @@ Add/adjust targeted regression tests and refresh docs workflow/references.
 ## [0.17.0](https://github.com/Ogekuri/AIBar/compare/v0.16.0..v0.17.0) - 2026-03-26
 ### 🐛  Bug Fixes
 - parse HTTP-date Retry-After for 429 [useReq] *(claude_oauth)*
-Normalize Claude Retry-After parsing for numeric and HTTP-date headers.
-Add a failing-then-passing reproducer for HTTP-date 429 handling.
-Preserve retry_after_seconds for idle-time expansion paths.
-Update workflow/runtime documentation and symbol references.
+  Normalize Claude Retry-After parsing for numeric and HTTP-date headers.
+  Add a failing-then-passing reproducer for HTTP-date 429 handling.
+  Preserve retry_after_seconds for idle-time expansion paths.
+  Update workflow/runtime documentation and symbol references.
 - prioritize auth-expired payload on HTTP 429 [useReq] *(claude-oauth)*
-Classify HTTP 429 Claude responses containing canonical token-expired text as AuthenticationError.
-Preserve standard 429 handling for non-auth payloads.
-Add reproducer test for 429 auth payload classification.
-Update WORKFLOW.md and regenerate REFERENCES.md.
+  Classify HTTP 429 Claude responses containing canonical token-expired text as AuthenticationError.
+  Preserve standard 429 handling for non-auth payloads.
+  Add reproducer test for 429 auth payload classification.
+  Update WORKFLOW.md and regenerate REFERENCES.md.
 
 ### 🚜  Changes
 - collapse oauth/rate-limit to single Err [useReq] *(gnome-panel)*
-Update REQ-021/TST-007 to require one provider-colored bold Err token.
-Implement panel failure-category collapse logic for OAuth and rate-limit states.
-Hide normal percentage/cost labels while single Err is active.
-Add bold err style class and refresh extension panel regression assertions.
-Update WORKFLOW model and regenerate REFERENCES.
+  Update REQ-021/TST-007 to require one provider-colored bold Err token.
+  Implement panel failure-category collapse logic for OAuth and rate-limit states.
+  Hide normal percentage/cost labels while single Err is active.
+  Add bold err style class and refresh extension panel regression assertions.
+  Update WORKFLOW model and regenerate REFERENCES.
 - restrict Err to usage percentages [useReq] *(gnome-panel)*
-Update REQ-021/TST-007 to map panel Err only to failed percentage labels.
-Fix extension panelStatusFailures so cost labels never render Err.
-Adjust GNOME extension quota-label regression test to enforce new behavior.
-Update WORKFLOW runtime model and regenerate REFERENCES index.
+  Update REQ-021/TST-007 to map panel Err only to failed percentage labels.
+  Fix extension panelStatusFailures so cost labels never render Err.
+  Adjust GNOME extension quota-label regression test to enforce new behavior.
+  Update WORKFLOW runtime model and regenerate REFERENCES index.
 
 ### ◀️  Revert
 - Roll back branch to b4a48147 (b4a48147008a22d49226a630f878fb3e16b1f459).
@@ -738,9 +814,9 @@ Update WORKFLOW runtime model and regenerate REFERENCES index.
 ## [0.16.0](https://github.com/Ogekuri/AIBar/compare/v0.15.0..v0.16.0) - 2026-03-24
 ### 🐛  Bug Fixes
 - reload Claude token before auth retry [useReq] *(cli)*
-add failing reproducer for stale token reuse in Python OAuth recovery; reload provider token from env/CLI source after renewal before retry; keep one-refresh one-retry and block-flag semantics unchanged; update workflow and references docs for retry-token reload flow
+  add failing reproducer for stale token reuse in Python OAuth recovery; reload provider token from env/CLI source after renewal before retry; keep one-refresh one-retry and block-flag semantics unchanged; update workflow and references docs for retry-token reload flow
 - recover once mode on expired oauth [useReq] *(claude-token-refresh)*
-detect canonical OAuth-expired usage failure in once mode; run claude setup-token once and retry claude /usage once; keep loop mode behavior unchanged; add deterministic regression test for once-mode recovery; update workflow and references docs for new call flow
+  detect canonical OAuth-expired usage failure in once mode; run claude setup-token once and retry claude /usage once; keep loop mode behavior unchanged; add deterministic regression test for once-mode recovery; update workflow and references docs for new call flow
 
 ### ◀️  Revert
 - Roll back branch to d50cfc8f (d50cfc8f41cb9e647c3af07aa9dc36a659792e45).
@@ -748,20 +824,20 @@ detect canonical OAuth-expired usage failure in once mode; run claude setup-toke
 ## [0.15.0](https://github.com/Ogekuri/AIBar/compare/v0.14.0..v0.15.0) - 2026-03-23
 ### 🚜  Changes
 - render Err for failed provider cost labels [useReq] *(gnome-extension)*
-Update REQ-021 to require Err rendering for failed provider cost labels and percentages.
-Extend extension panel status mapping to set Err on failed cost labels for claude, openrouter, codex, openai, and geminiai while preserving healthy providers.
-Adjust extension label regression test to cover percentage and cost Err mappings.
-Refresh WORKFLOW and REFERENCES runtime/symbol evidence.
+  Update REQ-021 to require Err rendering for failed provider cost labels and percentages.
+  Extend extension panel status mapping to set Err on failed cost labels for claude, openrouter, codex, openai, and geminiai while preserving healthy providers.
+  Adjust extension label regression test to cover percentage and cost Err mappings.
+  Refresh WORKFLOW and REFERENCES runtime/symbol evidence.
 - render provider fail labels as Err [useReq] *(gnome-extension)*
-Update REQ-021 for provider/window FAIL Err rendering on panel percentage labels.
-Implement status-driven Err mapping in extension _updateUI for percentage labels.
-Add regression test for provider/window fail Err logic.
-Refresh WORKFLOW and REFERENCES for updated runtime/symbol evidence.
+  Update REQ-021 for provider/window FAIL Err rendering on panel percentage labels.
+  Implement status-driven Err mapping in extension _updateUI for percentage labels.
+  Add regression test for provider/window fail Err logic.
+  Refresh WORKFLOW and REFERENCES for updated runtime/symbol evidence.
 
 ## [0.14.0](https://github.com/Ogekuri/AIBar/compare/v0.13.0..v0.14.0) - 2026-03-20
 ### 🚜  Changes
 - add persistent runtime log/debug flags [useReq] *(cli)*
-Update SRS with REQ-107..REQ-114 and TST-047..TST-049 for logging controls.; Add eager flags --enable-log/--disable-log/--enable-debug/--disable-debug with config persistence.; Extend setup with final logging section and persist log_enabled/debug_enabled.; Implement append runtime logging, idle/call/error/cache logging, and debug API result logging.; Refresh WORKFLOW/REFERENCES and add targeted regression tests for help/setup/log behavior.
+  Update SRS with REQ-107..REQ-114 and TST-047..TST-049 for logging controls.; Add eager flags --enable-log/--disable-log/--enable-debug/--disable-debug with config persistence.; Extend setup with final logging section and persist log_enabled/debug_enabled.; Implement append runtime logging, idle/call/error/cache logging, and debug API result logging.; Refresh WORKFLOW/REFERENCES and add targeted regression tests for help/setup/log behavior.
 
 ### 📚  Documentation
 - Update README.md document.
@@ -769,140 +845,140 @@ Update SRS with REQ-107..REQ-114 and TST-047..TST-049 for logging controls.; Add
 ## [0.13.0](https://github.com/Ogekuri/AIBar/compare/v0.12.0..v0.13.0) - 2026-03-19
 ### ⛰️  Features
 - add in-process token refresh recovery and retry block state [useReq] *(claude-oauth)*
-add requirements for Claude OAuth once-mode refresh parity, auth retry, and idle-time block flag lifecycle\n- port once-mode shell flow to Python routine with timeout/delay controls and log truncation\n- add Claude auth-expired recovery path with single renewal+retry and block-flag persistence\n- extend idle-time schema with oauth_refresh_blocked and force/TTL unblock behavior\n- add unit tests covering refresh routine, retry policy, and block flag lifecycle
+  add requirements for Claude OAuth once-mode refresh parity, auth retry, and idle-time block flag lifecycle\n- port once-mode shell flow to Python routine with timeout/delay controls and log truncation\n- add Claude auth-expired recovery path with single renewal+retry and block-flag persistence\n- extend idle-time schema with oauth_refresh_blocked and force/TTL unblock behavior\n- add unit tests covering refresh routine, retry policy, and block flag lifecycle
 
 ### 🐛  Bug Fixes
 - reset Refresh Now visual state on focus loss [useReq] *(gnome-extension)*
-REQ-EVIDENCE-ID: useReq-AIBar-work-20260319120024\n- add helper to clear Refresh Now focus/active pseudo classes\n- invoke cleanup on activation and key-focus-out events\n- update workflow and references docs for new internal helper\n- add focused regression test for Refresh Now focus-loss color reset
+  REQ-EVIDENCE-ID: useReq-AIBar-work-20260319120024\n- add helper to clear Refresh Now focus/active pseudo classes\n- invoke cleanup on activation and key-focus-out events\n- update workflow and references docs for new internal helper\n- add focused regression test for Refresh Now focus-loss color reset
 
 ### 🚜  Changes
 - set default API timeout to 5 seconds [useReq] *(config)*
-Update REQ-005, REQ-095, and TST-013 defaults from 3000ms to 5000ms in docs/REQUIREMENTS.md.; Set RuntimeConfig default timeout to 5000ms in src/aibar/aibar/config.py and align Doxygen details.; Update setup runtime-config tests to assert timeout prompt ordering and persisted timeout value.; Regenerate docs/REFERENCES.md and update docs/WORKFLOW.md runtime setup timeout description.
+  Update REQ-005, REQ-095, and TST-013 defaults from 3000ms to 5000ms in docs/REQUIREMENTS.md.; Set RuntimeConfig default timeout to 5000ms in src/aibar/aibar/config.py and align Doxygen details.; Update setup runtime-config tests to assert timeout prompt ordering and persisted timeout value.; Regenerate docs/REFERENCES.md and update docs/WORKFLOW.md runtime setup timeout description.
 - align FAIL block formatting across CLI and GNOME [useReq] *(show-output)*
-Update REQ-017/REQ-036/REQ-084 and related TST requirements for FAIL rendering format.
-Render CLI FAIL panels as Status/Reason/Updated-Next and remove window heading rows.
-Render GNOME FAIL cards as Status/Reason while preserving Updated/Next row visibility.
-Refresh workflow and references docs and update targeted tests for new output contract.
+  Update REQ-017/REQ-036/REQ-084 and related TST requirements for FAIL rendering format.
+  Render CLI FAIL panels as Status/Reason/Updated-Next and remove window heading rows.
+  Render GNOME FAIL cards as Status/Reason while preserving Updated/Next row visibility.
+  Refresh workflow and references docs and update targeted tests for new output contract.
 - render all GeminiAI billing services without truncation [useReq] *(cli)*
-Update REQ-106 and TST-046 to require full billing-service evidence output.
-Remove truncation logic from _format_billing_service_descriptions in CLI rendering.
-Adjust GeminiAI status-message test to assert all four service names are printed.
-Refresh WORKFLOW and REFERENCES documentation to match updated behavior and symbols.
+  Update REQ-106 and TST-046 to require full billing-service evidence output.
+  Remove truncation logic from _format_billing_service_descriptions in CLI rendering.
+  Adjust GeminiAI status-message test to assert all four service names are printed.
+  Refresh WORKFLOW and REFERENCES documentation to match updated behavior and symbols.
 - add human-readable GeminiAI billing services output [useReq] *(cli)*
-Update requirements with REQ-106 and TST-046 for GeminiAI billing services formatting.
-Implement CLI GeminiAI billing service summary with ordered names and truncation.
-Add unit tests for human-readable and truncated billing service list rendering.
-Regenerate REFERENCES and update WORKFLOW call-trace for new formatter helper.
+  Update requirements with REQ-106 and TST-046 for GeminiAI billing services formatting.
+  Implement CLI GeminiAI billing service summary with ordered names and truncation.
+  Add unit tests for human-readable and truncated billing service list rendering.
+  Regenerate REFERENCES and update WORKFLOW call-trace for new formatter helper.
 - remove FAIL/status window labels from CLI/GNOME [useReq] *(cli-show)*
-Update REQ-017/036/037/067/084 and related TST entries for FAIL rendering.
-Implement CLI FAIL output as error-only and remove all window heading labels.
-Implement GNOME card FAIL output as error-only and hide freshness/window rows.
-Regenerate WORKFLOW and REFERENCES to reflect updated runtime/symbol evidence.
+  Update REQ-017/036/037/067/084 and related TST entries for FAIL rendering.
+  Implement CLI FAIL output as error-only and remove all window heading labels.
+  Implement GNOME card FAIL output as error-only and hide freshness/window rows.
+  Regenerate WORKFLOW and REFERENCES to reflect updated runtime/symbol evidence.
 
 ## [0.12.0](https://github.com/Ogekuri/AIBar/compare/v0.11.0..v0.12.0) - 2026-03-18
 ### 🐛  Bug Fixes
 - restore Updated/Next with legacy CLI JSON [useReq] *(gnome-extension)*
-Add freshness fallback derived from status.updated_at when freshness/idle_time is absent.
-Preserve bottom-right Updated/Next card row using resolved provider freshness state.
-Add targeted failing reproducer and assertions for fallback freshness logic.
-Update WORKFLOW runtime trace and regenerate REFERENCES.
+  Add freshness fallback derived from status.updated_at when freshness/idle_time is absent.
+  Preserve bottom-right Updated/Next card row using resolved provider freshness state.
+  Add targeted failing reproducer and assertions for fallback freshness logic.
+  Update WORKFLOW runtime trace and regenerate REFERENCES.
 - guard ScrollView child API for GNOME runtime [useReq] *(gnome-extension)*
-Add a GNOME-compatible child attachment path in _buildPopupMenu.
-Prefer set_child and use add_actor only as guarded fallback.
-Add/adjust reproducer test for the TypeError regression.
-Update workflow narrative and regenerate references.
+  Add a GNOME-compatible child attachment path in _buildPopupMenu.
+  Prefer set_child and use add_actor only as guarded fallback.
+  Add/adjust reproducer test for the TypeError regression.
+  Update workflow narrative and regenerate references.
 - prevent freshness label clipping in popup cards [useReq] *(gnome-extension)*
-Reproduce missing Updated/Next row with a targeted failing test.
-Wrap provider card area in a vertical scroll view for overflowed cards.
-Add stylesheet max-height for provider scroll container.
-Update workflow and regenerate references for runtime/documentation parity.
+  Reproduce missing Updated/Next row with a targeted failing test.
+  Wrap provider card area in a vertical scroll view for overflowed cards.
+  Add stylesheet max-height for provider scroll container.
+  Update workflow and regenerate references for runtime/documentation parity.
 - align freshness footer bottom-left [useReq] *(gnome-extension)*
-enforce START alignment for Updated/Next footer row in provider cards; keep footer sourcing from freshness.last_success_timestamp and idle_until_timestamp; add regression assertion for explicit left alignment; refresh WORKFLOW/REFERENCES evidence
+  enforce START alignment for Updated/Next footer row in provider cards; keep footer sourcing from freshness.last_success_timestamp and idle_until_timestamp; add regression assertion for explicit left alignment; refresh WORKFLOW/REFERENCES evidence
 - align FAIL rendering for cached auth/429 states [useReq] *(cli-show)*
-Apply per-window cached FAIL overlays for Claude/Codex dual-window text panels.
-Render GNOME fail cards with CLI-equivalent Status/Window/Error plus HTTP retry lines.
-Add reproducer test for dual-window cached FAIL regression and update extension assertions.
-Regenerate docs/REFERENCES.md and update docs/WORKFLOW.md call-trace details.
+  Apply per-window cached FAIL overlays for Claude/Codex dual-window text panels.
+  Render GNOME fail cards with CLI-equivalent Status/Window/Error plus HTTP retry lines.
+  Add reproducer test for dual-window cached FAIL regression and update extension assertions.
+  Regenerate docs/REFERENCES.md and update docs/WORKFLOW.md call-trace details.
 
 ### 🚜  Changes
 - wire window labels and bold costs [useReq] *(gnome-extension)*
-Update REQ-003/REQ-017/TST-004 for GNOME visual fixes.
-show --json extension now exports provider window_labels.
-Extension parses window_labels and shows fixed-window labels on bar rows.
-Costs values now render bold bright white like CLI show values.
-Provider cards keep no-empty-row behavior after Costs for quota providers.
-Updated JSON/extension regression tests and regenerated workflow references.
+  Update REQ-003/REQ-017/TST-004 for GNOME visual fixes.
+  show --json extension now exports provider window_labels.
+  Extension parses window_labels and shows fixed-window labels on bar rows.
+  Costs values now render bold bright white like CLI show values.
+  Provider cards keep no-empty-row behavior after Costs for quota providers.
+  Updated JSON/extension regression tests and regenerated workflow references.
 - align window headings and GNOME costs UI [useReq] *(show)*
-Update REQ-017/067/084 and related test requirements for CLI+GNOME formatting.
-CLI show now renders Window <window>: headings and right-aligns Updated/Next rows.
-Grouped Claude/Codex panels now label sections as Window 5h:/Window 7d:.
-GNOME provider cards now render Costs: with non-bold values and hide empty BYOK spacer rows.
-Added/updated regression tests for headings, right alignment, and extension cost styling.
+  Update REQ-017/067/084 and related test requirements for CLI+GNOME formatting.
+  CLI show now renders Window <window>: headings and right-aligns Updated/Next rows.
+  Grouped Claude/Codex panels now label sections as Window 5h:/Window 7d:.
+  GNOME provider cards now render Costs: with non-bold values and hide empty BYOK spacer rows.
+  Added/updated regression tests for headings, right alignment, and extension cost styling.
 - enforce 30d windows and GNOME freshness source [useReq] *(cli)*
-Update REQ-003/010/011/017 and TST-004 requirement definitions.
-Force OpenAI/OpenRouter/Copilot/GeminiAI effective show window to 30d.
-Export extension.idle_delay_seconds in show --json for extension fallback.
-Use idle-delay-based Updated/Next fallback and 30d bars in GNOME cards.
-Remove Open AIBar Report popup action from GNOME extension UI.
-Update unit tests, WORKFLOW.md, and regenerate REFERENCES.md.
+  Update REQ-003/010/011/017 and TST-004 requirement definitions.
+  Force OpenAI/OpenRouter/Copilot/GeminiAI effective show window to 30d.
+  Export extension.idle_delay_seconds in show --json for extension fallback.
+  Use idle-delay-based Updated/Next fallback and 30d bars in GNOME cards.
+  Remove Open AIBar Report popup action from GNOME extension UI.
+  Update unit tests, WORKFLOW.md, and regenerate REFERENCES.md.
 - align show and GNOME metric rendering [useReq] *(cli)*
-Update REQUIREMENTS for shared remaining-credits layout and metric labels.
-Implement CLI formatting: bright/bold remaining and cost values, Copilot 30d canonical window, Gemini billing-table spacing.
-Implement GNOME card formatting: Cost prefix + bright/bold values, Codex remaining-credits row, Requests/Tokens label format alignment.
-Refresh WORKFLOW and REFERENCES for updated call-trace and symbol evidence.
+  Update REQUIREMENTS for shared remaining-credits layout and metric labels.
+  Implement CLI formatting: bright/bold remaining and cost values, Copilot 30d canonical window, Gemini billing-table spacing.
+  Implement GNOME card formatting: Cost prefix + bright/bold values, Codex remaining-credits row, Requests/Tokens label format alignment.
+  Refresh WORKFLOW and REFERENCES for updated call-trace and symbol evidence.
 - align CLI/GNOME panel layout and provider order [useReq] *(show)*
-Update requirements for CLI status/freshness row placement and provider order.
-Implement deterministic CLI panel ordering and grouped CODEX footer metrics.
-Move GNOME GeminiAI tab to last and enforce API counter tokens as total/in/out.
-Keep provider-card freshness label right-aligned bottom row in extension cards.
-Add/adjust regression tests for panel order, grouped layout, and GNOME token labels.
-Refresh WORKFLOW and regenerate REFERENCES for updated runtime/symbol traceability.
+  Update requirements for CLI status/freshness row placement and provider order.
+  Implement deterministic CLI panel ordering and grouped CODEX footer metrics.
+  Move GNOME GeminiAI tab to last and enforce API counter tokens as total/in/out.
+  Keep provider-card freshness label right-aligned bottom row in extension cards.
+  Add/adjust regression tests for panel order, grouped layout, and GNOME token labels.
+  Refresh WORKFLOW and regenerate REFERENCES for updated runtime/symbol traceability.
 - group Claude/Codex dual windows [useReq] *(cli-show)*
-Update REQ-002 and TST-030 to require grouped dual-window provider panels.
-Render default-window Claude and Codex output in one panel per provider.
-Deduplicate shared lines and keep 5h/7d sections separated by blank lines.
-Update CLI regression tests, workflow model, and regenerated references.
+  Update REQ-002 and TST-030 to require grouped dual-window provider panels.
+  Render default-window Claude and Codex output in one panel per provider.
+  Deduplicate shared lines and keep 5h/7d sections separated by blank lines.
+  Update CLI regression tests, workflow model, and regenerated references.
 - align freshness label bottom-right [useReq] *(gnome-extension)*
-Update REQ-017/TST-004 alignment semantics for provider-card freshness label.
-Place extension Updated/Next label at bottom-right in each provider card.
-Keep freshness label style parity with Reset in label class.
-Refresh workflow trace wording and extension quota-label test expectations.
+  Update REQ-017/TST-004 alignment semantics for provider-card freshness label.
+  Place extension Updated/Next label at bottom-right in each provider card.
+  Keep freshness label style parity with Reset in label class.
+  Refresh workflow trace wording and extension quota-label test expectations.
 - enforce update disable-copy-enable flow [useReq] *(gnome-install)*
-update PRJ-008/REQ-032/TST-009 and add REQ-099 for masked update disable failures; implement gnome-install install/update branching with update disable->copy->enable ordering; keep gnome-uninstall disable-before-remove semantics and refresh docs references; extend gnome install/uninstall tests for update ordering and masked-missing-extension behavior
+  update PRJ-008/REQ-032/TST-009 and add REQ-099 for masked update disable failures; implement gnome-install install/update branching with update disable->copy->enable ordering; keep gnome-uninstall disable-before-remove semantics and refresh docs references; extend gnome install/uninstall tests for update ordering and masked-missing-extension behavior
 - align freshness schema for GNOME [useReq] *(show-json)*
-update REQ-003/REQ-017/REQ-084 and TST-004/TST-038 mappings; export top-level freshness in show --json with local-time strings; parse/render Updated/Next from freshness in GNOME bottom-left row; update CLI and extension regression tests for schema/layout parity
+  update REQ-003/REQ-017/REQ-084 and TST-004/TST-038 mappings; export top-level freshness in show --json with local-time strings; parse/render Updated/Next from freshness in GNOME bottom-left row; update CLI and extension regression tests for schema/layout parity
 - remove gnome-install from nested GNOME launcher [useReq] *(test-ext)*
-Update REQ-031 to require UI-only nested shell execution in test-gnome-extension.sh.
-Align TST-004 and evidence mapping for no gnome-install invocation.
-Simplify script to launch nested GNOME Shell directly with fixed 1024x800 dummy mode.
-Adjust script regression tests and regenerate WORKFLOW/REFERENCES docs.
+  Update REQ-031 to require UI-only nested shell execution in test-gnome-extension.sh.
+  Align TST-004 and evidence mapping for no gnome-install invocation.
+  Simplify script to launch nested GNOME Shell directly with fixed 1024x800 dummy mode.
+  Adjust script regression tests and regenerate WORKFLOW/REFERENCES docs.
 - force 30d window and current-month monitoring [useReq] *(geminiai)*
-Update REQ-060 and add REQ-097/REQ-098 for GeminiAI 30d semantics.
-Force show --provider geminiai to effective window 30d even with explicit non-30d --window.
-Align GeminiAI monitoring interval to UTC month-start through now for current-month scope.
-Update CLI/provider and targeted GeminiAI regressions; refresh WORKFLOW and REFERENCES docs.
+  Update REQ-060 and add REQ-097/REQ-098 for GeminiAI 30d semantics.
+  Force show --provider geminiai to effective window 30d even with explicit non-30d --window.
+  Align GeminiAI monitoring interval to UTC month-start through now for current-month scope.
+  Update CLI/provider and targeted GeminiAI regressions; refresh WORKFLOW and REFERENCES docs.
 - normalize null API counters to zero [useReq] *(show)*
-Update REQ-017/REQ-036 and related TST requirements for API counters.
-Render Requests/Tokens for openai/openrouter/codex/geminiai on OK states.
-Normalize null requests/input_tokens/output_tokens to zero in CLI and GNOME.
-Add regression coverage in CLI and extension tests for null-to-zero rendering.
-Update WORKFLOW runtime model and regenerate REFERENCES index.
+  Update REQ-017/REQ-036 and related TST requirements for API counters.
+  Render Requests/Tokens for openai/openrouter/codex/geminiai on OK states.
+  Normalize null requests/input_tokens/output_tokens to zero in CLI and GNOME.
+  Add regression coverage in CLI and extension tests for null-to-zero rendering.
+  Update WORKFLOW runtime model and regenerate REFERENCES index.
 - align freshness with idle-time state [useReq] *(show)*
-Update requirements for idle_time freshness source and local-time human fields.
-Persist idle-time human timestamps in local timezone.
-Expose idle_time section in show --json and use it for CLI panel freshness.
-Read idle_time in GNOME extension and render Updated/Next from idle timestamps.
-Adjust regression tests for CLI/JSON/extension freshness behavior.
+  Update requirements for idle_time freshness source and local-time human fields.
+  Persist idle-time human timestamps in local timezone.
+  Expose idle_time section in show --json and use it for CLI panel freshness.
+  Read idle_time in GNOME extension and render Updated/Next from idle timestamps.
+  Adjust regression tests for CLI/JSON/extension freshness behavior.
 - refactor show pipeline, single cache write, configurable timeout [useReq] *(cli)*
-Refactor retrieve_results_via_cache_pipeline to sequential flow:
-idle-time check → modular API calls → memory persist → cache read → present
-Enforce single cache.json write point via _refresh_and_persist_cache_payload; Minimize cache reads to one load_cli_cache per execution path; Add api_call_timeout_milliseconds config (default 3000ms, REQ-095); Change api_call_delay default from 1000 to 100ms (REQ-096); All httpx-based providers use get_api_call_timeout_seconds() (CTN-003); Setup prompt order: idle_delay → api_call_delay → api_call_timeout → gnome_refresh; Update requirements REQ-091..REQ-096, CTN-003, CTN-008, REQ-005, REQ-040; Update WORKFLOW.md call-traces and REFERENCES.md symbol index
+  Refactor retrieve_results_via_cache_pipeline to sequential flow:
+  idle-time check → modular API calls → memory persist → cache read → present
+  Enforce single cache.json write point via _refresh_and_persist_cache_payload; Minimize cache reads to one load_cli_cache per execution path; Add api_call_timeout_milliseconds config (default 3000ms, REQ-095); Change api_call_delay default from 1000 to 100ms (REQ-096); All httpx-based providers use get_api_call_timeout_seconds() (CTN-003); Setup prompt order: idle_delay → api_call_delay → api_call_timeout → gnome_refresh; Update requirements REQ-091..REQ-096, CTN-003, CTN-008, REQ-005, REQ-040; Update WORKFLOW.md call-traces and REFERENCES.md symbol index
 - move startup idle file and uninstall cleanup [useReq] *(cli)*
-Update requirements for startup idle-state path to ~/.cache/aibar/check_version_idle-time.json.
-Implement CLI startup idle-state path migration in runtime code.
-Add Linux --uninstall cleanup of startup idle file and cache directory.
-Extend startup preflight tests for path creation and uninstall cleanup behavior.
-Refresh WORKFLOW and REFERENCES docs for updated call trace and symbols.
+  Update requirements for startup idle-state path to ~/.cache/aibar/check_version_idle-time.json.
+  Implement CLI startup idle-state path migration in runtime code.
+  Add Linux --uninstall cleanup of startup idle file and cache directory.
+  Extend startup preflight tests for path creation and uninstall cleanup behavior.
+  Refresh WORKFLOW and REFERENCES docs for updated call trace and symbols.
 
 ## [0.11.0](https://github.com/Ogekuri/AIBar/compare/v0.10.0..v0.11.0) - 2026-03-17
 ### ⛰️  Features
@@ -910,82 +986,82 @@ Refresh WORKFLOW and REFERENCES docs for updated call trace and symbols.
 
 ### 🐛  Bug Fixes
 - make req static-check pass [useReq] *(static-check)*
-Add tracked Pyright config with src/aibar include and extraPaths for first-party imports.
-Add targeted regression test for static-check configuration presence.
-Suppress known Click entrypoint call-issue at module __main__ call sites only.
-Unignore pyrightconfig.json in .gitignore for persistent repository behavior.
+  Add tracked Pyright config with src/aibar include and extraPaths for first-party imports.
+  Add targeted regression test for static-check configuration presence.
+  Suppress known Click entrypoint call-issue at module __main__ call sites only.
+  Unignore pyrightconfig.json in .gitignore for persistent repository behavior.
 - Fix .gitignore file.
 - Remove pyrightconfig.json.
 
 ### 🚜  Changes
 - unify fail-state error rendering [useReq] *(show)*
-Update requirements for error-only fail rendering in CLI and GNOME cards.
-Suppress statistics lines on FAIL and normalize status/retry output format.
-Persist retry_after_seconds in cache status and propagate to renderers.
-Remove Claude 429 partial metric fallback paths from active flow.
-Update regression tests for CLI/GNOME error parity and retry metadata.
-Refresh WORKFLOW and regenerate REFERENCES documentation.
+  Update requirements for error-only fail rendering in CLI and GNOME cards.
+  Suppress statistics lines on FAIL and normalize status/retry output format.
+  Persist retry_after_seconds in cache status and propagate to renderers.
+  Remove Claude 429 partial metric fallback paths from active flow.
+  Update regression tests for CLI/GNOME error parity and retry metadata.
+  Refresh WORKFLOW and regenerate REFERENCES documentation.
 - localize Updated/Next datetime output [useReq] *(core)*
-Update requirements for local-time freshness labels with YYYY-MM-DD HH:MM format.
-Switch CLI show freshness rendering to runtime local timezone format.
-Switch GNOME extension freshness formatter to local-time YYYY-MM-DD HH:MM.
-Adjust CLI/extension regression tests and refresh WORKFLOW/REFERENCES docs.
+  Update requirements for local-time freshness labels with YYYY-MM-DD HH:MM format.
+  Switch CLI show freshness rendering to runtime local timezone format.
+  Switch GNOME extension freshness formatter to local-time YYYY-MM-DD HH:MM.
+  Adjust CLI/extension regression tests and refresh WORKFLOW/REFERENCES docs.
 - gate lifecycle uv commands to Linux runtime [useReq] *(cli)*
-Update requirements for Linux-only --upgrade/--uninstall execution and non-Linux guidance.
-Implement OS-gated lifecycle handlers that skip subprocess execution off Linux.
-Add regression tests for Linux subprocess path and non-Linux manual guidance path.
-Refresh WORKFLOW and regenerate REFERENCES documentation.
+  Update requirements for Linux-only --upgrade/--uninstall execution and non-Linux guidance.
+  Implement OS-gated lifecycle handlers that skip subprocess execution off Linux.
+  Add regression tests for Linux subprocess path and non-Linux manual guidance path.
+  Refresh WORKFLOW and regenerate REFERENCES documentation.
 - include pytest in runtime dependencies [useReq] *(pyproject)*
-update CTN-007 and TST-008 in docs/REQUIREMENTS.md; add pytest to [project].dependencies in pyproject.toml; refresh uv.lock after dependency update; extend tests/test_pyproject_metadata.py to assert pytest presence
+  update CTN-007 and TST-008 in docs/REQUIREMENTS.md; add pytest to [project].dependencies in pyproject.toml; refresh uv.lock after dependency update; extend tests/test_pyproject_metadata.py to assert pytest presence
 - migrate runtime to uv-only workflow [useReq] *(launcher)*
-Update SRS for uv-only launcher/runtime and lockfile policy.
-Replace scripts/aibar.sh virtualenv bootstrap with uv-run delegation.
-Track uv.lock, remove requirements.txt from repo and allowlist rules.
-Update README requirements/install guidance and requirements export snippet.
-Adjust release workflow build step to uv-run build toolchain.
-Add regression tests for launcher, repository surfaces, and GeminiAI dependency manifest.
+  Update SRS for uv-only launcher/runtime and lockfile policy.
+  Replace scripts/aibar.sh virtualenv bootstrap with uv-run delegation.
+  Track uv.lock, remove requirements.txt from repo and allowlist rules.
+  Update README requirements/install guidance and requirements export snippet.
+  Adjust release workflow build step to uv-run build toolchain.
+  Add regression tests for launcher, repository surfaces, and GeminiAI dependency manifest.
 - resolve TST id collision [useReq] *(requirements)*
-Rename new show-status test requirement from TST-037 to TST-038.
-Update test docstring satisfies tags to keep ID traceability consistent.
+  Rename new show-status test requirement from TST-037 to TST-038.
+  Update test docstring satisfies tags to keep ID traceability consistent.
 - align datetime/status error rendering [useReq] *(show)*
-Update requirements for show/auth visibility and datetime formatting parity.
-Implement CLI Updated/Next datetime line and cached status-error surfacing.
-Apply idle-time failure scheduling with max(idle delay, retry-after).
-Update GNOME extension datetime formatter to UTC date+time labels.
-Add and adjust tests for auth failures, datetime output, and status rendering.
-Regenerate WORKFLOW and REFERENCES docs for traceability.
+  Update requirements for show/auth visibility and datetime formatting parity.
+  Implement CLI Updated/Next datetime line and cached status-error surfacing.
+  Apply idle-time failure scheduling with max(idle delay, retry-after).
+  Update GNOME extension datetime formatter to UTC date+time labels.
+  Add and adjust tests for auth failures, datetime output, and status rendering.
+  Regenerate WORKFLOW and REFERENCES docs for traceability.
 
 ## [0.10.0](https://github.com/Ogekuri/AIBar/compare/v0.9.0..v0.10.0) - 2026-03-16
 ### 🐛  Bug Fixes
 - add pyrightconfig.json and pytest pythonpath for src-based imports [useReq] *(config)*
-Add pyrightconfig.json with extraPaths=['src/aibar'] and venv config
-so Pylance static analysis resolves aibar.* and third-party imports.
-Add [tool.pytest.ini_options] pythonpath=['src/aibar'] to pyproject.toml
-ensuring tests always import from src/aibar/ rather than system packages.
-Unignore pyrightconfig.json in .gitignore for version control tracking.; Regenerate docs/REFERENCES.md.
+  Add pyrightconfig.json with extraPaths=['src/aibar'] and venv config
+  so Pylance static analysis resolves aibar.* and third-party imports.
+  Add [tool.pytest.ini_options] pythonpath=['src/aibar'] to pyproject.toml
+  ensuring tests always import from src/aibar/ rather than system packages.
+  Unignore pyrightconfig.json in .gitignore for version control tracking.; Regenerate docs/REFERENCES.md.
 - Remove .req dir.
 - resolve Ruff F401 unused imports and Pylance type errors [useReq] *(static-check)*
-Remove unused imports in 3 test files (MagicMock, patch, pytest, os,
-datetime, timezone, gnome_install, gnome_uninstall, _EXT_TARGET_DIR)
-Fix ProviderResult construction: remove is_error= kwarg (computed property); Fix UsageMetrics construction: remove usage_percent= kwarg (computed property); Add type-narrowing assertions before 'in' operator on Optional[str]; Fix resolve_currency_symbol signature: raw accepts dict | None; Cast InstalledAppFlow.run_local_server() to Credentials in geminiai.py; Make _FakeCredentialStore inherit GeminiAICredentialStore for type safety; Cast _FakeBigQueryClient to bigquery.Client for Pylance compatibility
+  Remove unused imports in 3 test files (MagicMock, patch, pytest, os,
+  datetime, timezone, gnome_install, gnome_uninstall, _EXT_TARGET_DIR)
+  Fix ProviderResult construction: remove is_error= kwarg (computed property); Fix UsageMetrics construction: remove usage_percent= kwarg (computed property); Add type-narrowing assertions before 'in' operator on Optional[str]; Fix resolve_currency_symbol signature: raw accepts dict | None; Cast InstalledAppFlow.run_local_server() to Credentials in geminiai.py; Make _FakeCredentialStore inherit GeminiAICredentialStore for type safety; Cast _FakeBigQueryClient to bigquery.Client for Pylance compatibility
 - align JS static-check test with check-js-syntax.sh config [useReq] *(test_req_static_check_config)*
-Update test assertion from noop cmd "true" to "scripts/check-js-syntax.sh"
-matching current .req/config.json JavaScript static-check configuration.
-Rename test function to test_javascript_static_check_uses_gjs_compatible_script.; Update Doxygen docstrings to reflect GJS preprocessor wrapper approach.; Regenerate docs/REFERENCES.md.
+  Update test assertion from noop cmd "true" to "scripts/check-js-syntax.sh"
+  matching current .req/config.json JavaScript static-check configuration.
+  Rename test function to test_javascript_static_check_uses_gjs_compatible_script.; Update Doxygen docstrings to reflect GJS preprocessor wrapper approach.; Regenerate docs/REFERENCES.md.
 
 ### 🚜  Changes
 - remove unused check-js-syntax.sh [useReq] *(scripts)*
 - BREAKING CHANGE: relocate GNOME extension into aibar package for correct wheel inclusion [useReq] *(gnome-install)*
-Move src/aibar/gnome-extension/ into src/aibar/aibar/gnome-extension/
-so extension files are included in wheel builds (fixes uv tool install).
-Update _resolve_extension_source_dir() to use Path(__file__).parent
-instead of parent.parent for module-relative resolution.
-Update pyproject.toml wheel/sdist include paths.; Update REQ-025: explicit module-relative resolution from aibar package.; Add REQ-083: extension source must reside inside aibar package subtree.; Update TST-037: verify wheel packages contain gnome-extension subtree.; Update all test and workflow file path references.; Update WORKFLOW.md and REFERENCES.md with new file locations.
+  Move src/aibar/gnome-extension/ into src/aibar/aibar/gnome-extension/
+  so extension files are included in wheel builds (fixes uv tool install).
+  Update _resolve_extension_source_dir() to use Path(__file__).parent
+  instead of parent.parent for module-relative resolution.
+  Update pyproject.toml wheel/sdist include paths.; Update REQ-025: explicit module-relative resolution from aibar package.; Add REQ-083: extension source must reside inside aibar package subtree.; Update TST-037: verify wheel packages contain gnome-extension subtree.; Update all test and workflow file path references.; Update WORKFLOW.md and REFERENCES.md with new file locations.
 
 ## [0.9.0](https://github.com/Ogekuri/AIBar/compare/v0.8.0..v0.9.0) - 2026-03-16
 ### 🚜  Changes
 - add lifecycle options to help epilog and update REQ-068 [useReq] *(cli)*
-Update REQ-068 to require --version/--ver, --upgrade, --uninstall in help examples; Add lifecycle option examples to CLI epilog (--version, --upgrade, --uninstall); Update test_cli_usage_help.py to verify lifecycle flags appear in help output; Regenerate docs/REFERENCES.md with updated symbol inventory
+  Update REQ-068 to require --version/--ver, --upgrade, --uninstall in help examples; Add lifecycle option examples to CLI epilog (--version, --upgrade, --uninstall); Update test_cli_usage_help.py to verify lifecycle flags appear in help output; Regenerate docs/REFERENCES.md with updated symbol inventory
 
 ## [0.8.0](https://github.com/Ogekuri/AIBar/compare/v0.7.0..v0.8.0) - 2026-03-16
 ### ⛰️  Features
@@ -994,38 +1070,38 @@ Update REQ-068 to require --version/--ver, --upgrade, --uninstall in help exampl
 
 ### 🐛  Bug Fixes
 - avoid false JS failures on GNOME imports [useReq] *(static-check)*
-Replace JavaScript static-check command with compatibility-safe no-op.
-Add regression test for .req/config.json JavaScript checker behavior.
-Keep runtime/source requirements unchanged.
-Validate with req --here --static-check and full pytest.
+  Replace JavaScript static-check command with compatibility-safe no-op.
+  Add regression test for .req/config.json JavaScript checker behavior.
+  Keep runtime/source requirements unchanged.
+  Validate with req --here --static-check and full pytest.
 - Update .gitignore file.
 - sync plan with current GNOME extension contract [useReq] *(gnome-plan)*
-Replace legacy build guide with implementation-aligned runtime plan.
-Add regression test for JSON envelope, branding, forced refresh, and GeminiAI ordering.
-Preserve requirements document unchanged while aligning plan semantics to current code.
+  Replace legacy build guide with implementation-aligned runtime plan.
+  Add regression test for JSON envelope, branding, forced refresh, and GeminiAI ordering.
+  Preserve requirements document unchanged while aligning plan semantics to current code.
 
 ### 🚜  Changes
 - complete help with gnome-install/gnome-uninstall examples and fix epilog formatting [useReq] *(cli)*
-Update REQ-068 to require gnome-install and gnome-uninstall in help examples; Add format_epilog override in StartupPreflightGroup to preserve multi-line epilog; Expand epilog with descriptive examples for all major commands; Add gnome-install/gnome-uninstall assertions in help tests; Update WORKFLOW.md with format_epilog call-trace entry; Regenerate REFERENCES.md
+  Update REQ-068 to require gnome-install and gnome-uninstall in help examples; Add format_epilog override in StartupPreflightGroup to preserve multi-line epilog; Expand epilog with descriptive examples for all major commands; Add gnome-install/gnome-uninstall assertions in help tests; Update WORKFLOW.md with format_epilog call-trace entry; Regenerate REFERENCES.md
 - BREAKING CHANGE: update provider card datetime label to show Updated and Next times [useReq] *(extension)*
-REQ-017: Changed label format from "Update at: <HH:MM>" to "Updated: <HH:MM>, Next: <HH:MM>"; Next time computed as updated_at + gnome_refresh_interval_seconds; TST-004: Updated test to verify "Updated:" and "Next:" presence plus _refreshIntervalSeconds usage; Updated WORKFLOW.md call-trace descriptions for _updateUI and _populateProviderCard; Regenerated REFERENCES.md
+  REQ-017: Changed label format from "Update at: <HH:MM>" to "Updated: <HH:MM>, Next: <HH:MM>"; Next time computed as updated_at + gnome_refresh_interval_seconds; TST-004: Updated test to verify "Updated:" and "Next:" presence plus _refreshIntervalSeconds usage; Updated WORKFLOW.md call-trace descriptions for _updateUI and _populateProviderCard; Regenerated REFERENCES.md
 - BREAKING CHANGE: replace install script with CLI gnome-install/gnome-uninstall commands [useReq] *(gnome-extension)*
-Add `aibar gnome-install` CLI command: resolves extension source from
-package path, validates metadata.json, copies files to target dir,
-enables extension via gnome-extensions enable.
-Add `aibar gnome-uninstall` CLI command: disables extension via
-gnome-extensions disable, removes extension directory.
-Remove scripts/install-gnome-extension.sh (replaced by CLI commands).; Update scripts/test-gnome-extension.sh to invoke aibar gnome-install.; Update requirements PRJ-001/PRJ-008/REQ-025..REQ-032, add REQ-080..082.; Replace tests/test_install_gnome_extension.py with test_gnome_install_uninstall.py.; Update WORKFLOW.md: remove PROC:install-ext, add gnome commands to PROC:main.
+  Add `aibar gnome-install` CLI command: resolves extension source from
+  package path, validates metadata.json, copies files to target dir,
+  enables extension via gnome-extensions enable.
+  Add `aibar gnome-uninstall` CLI command: disables extension via
+  gnome-extensions disable, removes extension directory.
+  Remove scripts/install-gnome-extension.sh (replaced by CLI commands).; Update scripts/test-gnome-extension.sh to invoke aibar gnome-install.; Update requirements PRJ-001/PRJ-008/REQ-025..REQ-032, add REQ-080..082.; Replace tests/test_install_gnome_extension.py with test_gnome_install_uninstall.py.; Update WORKFLOW.md: remove PROC:install-ext, add gnome commands to PROC:main.
 - remove warning glyph from show reset lines [useReq] *(cli)*
-Update REQ-067 and TST-030 for CLI reset-line glyph policy.
-Remove '⚠️ Limit reached!' suffix from CLI show reset output.
-Keep panel width/alignment behavior unchanged.
-Adjust CLI panel alignment test to assert glyph absence.
-Update WORKFLOW and regenerate REFERENCES for traceability.
+  Update REQ-067 and TST-030 for CLI reset-line glyph policy.
+  Remove '⚠️ Limit reached!' suffix from CLI show reset output.
+  Keep panel width/alignment behavior unchanged.
+  Adjust CLI panel alignment test to assert glyph absence.
+  Update WORKFLOW and regenerate REFERENCES for traceability.
 - remove deprecated GNOME plan artifact [useReq] *(gnome-plan)*
-Add PRJ-011 to REQUIREMENTS to define canonical GNOME contract documentation sources.
-Delete src/aibar/plans/Gnome.plan.md from source tree.
-Refactor GNOME plan regression test to enforce PRJ-011 semantics.
+  Add PRJ-011 to REQUIREMENTS to define canonical GNOME contract documentation sources.
+  Delete src/aibar/plans/Gnome.plan.md from source tree.
+  Refactor GNOME plan regression test to enforce PRJ-011 semantics.
 
 ### 📚  Documentation
 - Update README.md document.
@@ -1033,20 +1109,20 @@ Refactor GNOME plan regression test to enforce PRJ-011 semantics.
 ## [0.7.0](https://github.com/Ogekuri/AIBar/compare/v0.6.0..v0.7.0) - 2026-03-14
 ### 🚜  Changes
 - add startup release preflight and uv lifecycle flags [useReq] *(cli)*
-Update REQUIREMENTS with startup GitHub release-check, idle-time file, and lifecycle flag requirements.
-Implement startup preflight in cli.py with 300s idle gate, 2s timeout, 429 retry-after handling, and bright color diagnostics.
-Add --upgrade/--uninstall/--version/--ver handlers with exact uv subprocess commands and exit-code propagation.
-Add targeted startup-preflight and packaging tests plus deterministic test fixture.
-Update pyproject build includes, WORKFLOW runtime model, and regenerate REFERENCES.
+  Update REQUIREMENTS with startup GitHub release-check, idle-time file, and lifecycle flag requirements.
+  Implement startup preflight in cli.py with 300s idle gate, 2s timeout, 429 retry-after handling, and bright color diagnostics.
+  Add --upgrade/--uninstall/--version/--ver handlers with exact uv subprocess commands and exit-code propagation.
+  Add targeted startup-preflight and packaging tests plus deterministic test fixture.
+  Update pyproject build includes, WORKFLOW runtime model, and regenerate REFERENCES.
 
 ## [0.6.0](https://github.com/Ogekuri/AIBar/compare/v0.5.0..v0.6.0) - 2026-03-14
 ### 🚜  Changes
 - scope provider idle-time and isolate 429 backoff [useReq] *(idle-time)*
-REQ: CTN-009, REQ-009, REQ-038, REQ-041, TST-003, TST-011, TST-014, and TST-027 now require provider-scoped idle-time state.
-Code: config.py persists idle-time.json as provider-keyed entries; cli.py applies per-provider idle gating and refresh scope selection.
-Code: HTTP 429 backoff updates only the rate-limited provider entry; non-rate-limited providers keep idle_delay scheduling.
-Tests: updated idle/cache/lock suites and added GeminiAI 429 payload-retention and provider-scoped idle-time assertions.
-Docs: updated REQUIREMENTS.md and WORKFLOW.md, then regenerated REFERENCES.md.
+  REQ: CTN-009, REQ-009, REQ-038, REQ-041, TST-003, TST-011, TST-014, and TST-027 now require provider-scoped idle-time state.
+  Code: config.py persists idle-time.json as provider-keyed entries; cli.py applies per-provider idle gating and refresh scope selection.
+  Code: HTTP 429 backoff updates only the rate-limited provider entry; non-rate-limited providers keep idle_delay scheduling.
+  Tests: updated idle/cache/lock suites and added GeminiAI 429 payload-retention and provider-scoped idle-time assertions.
+  Docs: updated REQUIREMENTS.md and WORKFLOW.md, then regenerated REFERENCES.md.
 
 ### 📚  Documentation
 - Update README.md file.
@@ -1066,231 +1142,231 @@ Docs: updated REQUIREMENTS.md and WORKFLOW.md, then regenerated REFERENCES.md.
 ## [0.2.0](https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0) - 2026-03-08
 ### ⛰️  Features
 - add GeminiAI provider across all surfaces [useReq] *(geminiai)*
-Append REQ-054..REQ-063 and TST-024..TST-029 in REQUIREMENTS.md.
-Add OAuth setup/login + GeminiAI provider using Monitoring/Billing APIs.
-Integrate GeminiAI into CLI show/json, Text UI, and GNOME extension.
-Add bright-pink GNOME styles and GeminiAI display label mapping.
-Add provider/unit/integration tests and refresh WORKFLOW/REFERENCES docs.
+  Append REQ-054..REQ-063 and TST-024..TST-029 in REQUIREMENTS.md.
+  Add OAuth setup/login + GeminiAI provider using Monitoring/Billing APIs.
+  Integrate GeminiAI into CLI show/json, Text UI, and GNOME extension.
+  Add bright-pink GNOME styles and GeminiAI display label mapping.
+  Add provider/unit/integration tests and refresh WORKFLOW/REFERENCES docs.
 - add runtime debug command API [useReq] *(chrome-extension)*
-append debug API requirements and tests for command interface; implement debug.api.describe and debug.api.execute dispatcher; add http.get, parser.run, and standard runtime debug commands; enforce https host allowlist and bounded body preview output; regenerate workflow/references docs for updated runtime model
+  append debug API requirements and tests for command interface; implement debug.api.describe and debug.api.execute dispatcher; add http.get, parser.run, and standard runtime debug commands; enforce https host allowlist and bounded body preview output; regenerate workflow/references docs for updated runtime model
 - align module extensions to .js [useReq] *(chrome-extension)*
-rename chrome extension modules from .mjs to .js; update manifest/popup/import paths and parser test helpers; regenerate references and workflow docs for JS symbol indexing
+  rename chrome extension modules from .mjs to .js; update manifest/popup/import paths and parser test helpers; regenerate references and workflow docs for JS symbol indexing
 - add autonomous Chrome usage extension [useReq] *(chrome-extension)*
-append Chrome-extension requirements and test IDs; implement MV3 service worker scheduler with 180s default refresh; add localization-independent HTML parsers and Copilot merge logic; add popup UI with Claude/Copilot/Codex tabs and debug export tools; add fixture-driven parser tests and regenerate workflow/references docs
+  append Chrome-extension requirements and test IDs; implement MV3 service worker scheduler with 180s default refresh; add localization-independent HTML parsers and Copilot merge logic; add popup UI with Claude/Copilot/Codex tabs and debug export tools; add fixture-driven parser tests and regenerate workflow/references docs
 
 ### 🐛  Bug Fixes
 - align ANSI panel borders in show output [useReq] *(cli)*
-Fix ANSI width accounting in CLI panel rendering.
-Add focused regression test for colored progress-bar row alignment.
-Update WORKFLOW and regenerate REFERENCES for new helpers.
+  Fix ANSI width accounting in CLI panel rendering.
+  Add focused regression test for colored progress-bar row alignment.
+  Update WORKFLOW and regenerate REFERENCES for new helpers.
 - normalize BigQuery scope errors [useReq] *(geminiai)*
-map google.api_core insufficient-scope failures to AuthenticationError; add reproducer test and opt-in system-auth integration test; refresh WORKFLOW and REFERENCES for GeminiAI error path
+  map google.api_core insufficient-scope failures to AuthenticationError; add reproducer test and opt-in system-auth integration test; refresh WORKFLOW and REFERENCES for GeminiAI error path
 - replace globalThis.imports with GNOME Shell 45+ ES module imports [useReq] *(extension.js)*
-Replace globalThis.imports shim + const bindings (GNOME Shell ≤44 legacy API)
-with ES6 gi:// and resource:// import statements required by GNOME Shell 45+
-AIBarExtension now extends Extension from GNOME Shell extensions API
-(provides this.uuid, used as addToStatusArea key)
-Add scripts/check-js-syntax.sh: preprocesses gi:// and resource:// imports
-to const stubs before node --check to enable static analysis of GJS files
-Update .req/config.json JavaScript checker to use check-js-syntax.sh; Add tests/test_extension_esmodule_imports.py: 4 reproducer tests (all
-failed before fix, all pass after); satisfies PRJ-004
-Root cause: gi:// imports triggered legacy GNOME Shell module loader which
-loaded main.js as a script; main.js uses ES6 import at line 3 causing
-SyntaxError: import declarations may only appear at top level of a module
+  Replace globalThis.imports shim + const bindings (GNOME Shell ≤44 legacy API)
+  with ES6 gi:// and resource:// import statements required by GNOME Shell 45+
+  AIBarExtension now extends Extension from GNOME Shell extensions API
+  (provides this.uuid, used as addToStatusArea key)
+  Add scripts/check-js-syntax.sh: preprocesses gi:// and resource:// imports
+  to const stubs before node --check to enable static analysis of GJS files
+  Update .req/config.json JavaScript checker to use check-js-syntax.sh; Add tests/test_extension_esmodule_imports.py: 4 reproducer tests (all
+  failed before fix, all pass after); satisfies PRJ-004
+  Root cause: gi:// imports triggered legacy GNOME Shell module loader which
+  loaded main.js as a script; main.js uses ES6 import at line 3 causing
+  SyntaxError: import declarations may only appear at top level of a module
 - normalize console details sink payload [useReq] *(chrome-debug)*
-Fixes console 'unsupported object' warnings in _emitConsoleSafe by serializing details to text before sink invocation.
-Adds reproducer test for direct object-argument console emission.
-Updates runtime workflow trace and regenerated symbol references.
+  Fixes console 'unsupported object' warnings in _emitConsoleSafe by serializing details to text before sink invocation.
+  Adds reproducer test for direct object-argument console emission.
+  Updates runtime workflow trace and regenerated symbol references.
 - use tcpServer accept events for localhost API [useReq] *(background)*
-Replace unsupported tcpServer.accept polling with onAccept/onAcceptError event handling.
-Add a reproducer test that fails on direct tcpServer.accept usage.
-Update workflow/runtime references for localhost accept path behavior.
+  Replace unsupported tcpServer.accept polling with onAccept/onAcceptError event handling.
+  Add a reproducer test that fails on direct tcpServer.accept usage.
+  Update workflow/runtime references for localhost accept path behavior.
 - add curl and wget API examples [useReq] *(chrome-api-reference)*
-Add HTTP CLI examples section with curl and wget snippets; Cover provider page fetch and runtime-message bridge payload samples; Add regression test enforcing curl/wget examples presence
+  Add HTTP CLI examples section with curl and wget snippets; Cover provider page fetch and runtime-message bridge payload samples; Add regression test enforcing curl/wget examples presence
 - add runtime API call examples [useReq] *(chrome-api-reference)*
-Add simple sendMessage examples for snapshot, debug enable, describe, execute; Add regression test that enforces examples section presence; Keep requirements unchanged; align API reference with current routes
+  Add simple sendMessage examples for snapshot, debug enable, describe, execute; Add regression test that enforces examples section presence; Keep requirements unchanged; align API reference with current routes
 - Remove .place-holder files.
 
 ### 🚜  Changes
 - uppercase geminiai show title [useReq] *(cli)*
-Update REQ-062/TST-029 to require GEMINIAI CLI title casing.
-Change _provider_display_name mapping for geminiai to uppercase output.
-Add regression source assertion and refresh WORKFLOW/REFERENCES docs.
+  Update REQ-062/TST-029 to require GEMINIAI CLI title casing.
+  Change _provider_display_name mapping for geminiai to uppercase output.
+  Add regression source assertion and refresh WORKFLOW/REFERENCES docs.
 - unify show panel width and zero-cost labels [useReq] *(core)*
-Update REQ-021/REQ-022/REQ-067 and related test requirements.
-Render OpenAI cost label in GNOME panel order and keep zero-cost labels visible.
-Render CLI show panels with one shared width equal to widest panel content.
-Add regression coverage and refresh WORKFLOW/REFERENCES.
+  Update REQ-021/REQ-022/REQ-067 and related test requirements.
+  Render OpenAI cost label in GNOME panel order and keep zero-cost labels visible.
+  Render CLI show panels with one shared width equal to widest panel content.
+  Add regression coverage and refresh WORKFLOW/REFERENCES.
 - BREAKING CHANGE: switch delay to ms and redesign GNOME status [useReq] *(core)*
-Update requirements for milliseconds delay, billing_data setup dataset, GNOME costs/colors/icon behavior.
-Implementation updates: runtime config key rename, Gemini dataset resolution, CLI provider-colored panels/progress bars, GNOME per-provider status labels.
-Validation updates: tests, WORKFLOW, REFERENCES, and README Gemini prerequisites.
+  Update requirements for milliseconds delay, billing_data setup dataset, GNOME costs/colors/icon behavior.
+  Implementation updates: runtime config key rename, Gemini dataset resolution, CLI provider-colored panels/progress bars, GNOME per-provider status labels.
+  Validation updates: tests, WORKFLOW, REFERENCES, and README Gemini prerequisites.
 - BREAKING CHANGE: remove terminal ui [useReq] *(cli)*
 - add cloud-platform OAuth scope [useReq] *(geminiai)*
-update REQ-056 OAuth scope set for setup/login; extend GEMINIAI_OAUTH_SCOPES with cloud-platform and align order; update scope assertion test and stabilize runtime-currency test setup; refresh WORKFLOW and REFERENCES
+  update REQ-056 OAuth scope set for setup/login; extend GEMINIAI_OAUTH_SCOPES with cloud-platform and align order; update scope assertion test and stabilize runtime-currency test setup; refresh WORKFLOW and REFERENCES
 - align labels and setup login scopes [useReq] *(geminiai)*
-update REQ-055/056/062 for setup login source and GNOME uppercase label; add setup login source path that re-authorizes with GEMINIAI_OAUTH_SCOPES; render GNOME GeminiAI tab/card label as GEMINIAI; refresh affected tests, WORKFLOW, and REFERENCES
+  update REQ-055/056/062 for setup login source and GNOME uppercase label; add setup login source path that re-authorizes with GEMINIAI_OAUTH_SCOPES; render GNOME GeminiAI tab/card label as GEMINIAI; refresh affected tests, WORKFLOW, and REFERENCES
 - enforce cache locks and refresh show/help output [useReq] *(cli)*
-update REQUIREMENTS for lock-file synchronization and CLI output behavior; guard cache.json and idle-time.json reads/writes with blocking 250ms polling locks; include GeminiAI in setup currency defaults and runtime symbol resolution; redesign show text output with blue panels/progress bars and richer metrics; replace top-level usage/help text with human-readable command/option guidance; add regression tests plus static-check and full-suite verification
+  update REQUIREMENTS for lock-file synchronization and CLI output behavior; guard cache.json and idle-time.json reads/writes with blocking 250ms polling locks; include GeminiAI in setup currency defaults and runtime symbol resolution; redesign show text output with blue panels/progress bars and richer metrics; replace top-level usage/help text with human-readable command/option guidance; add regression tests plus static-check and full-suite verification
 - BREAKING CHANGE: add current-month BigQuery billing flow [useReq] *(geminiai)*
-Update REQ-056..REQ-065 for GeminiAI Monitoring+BigQuery behavior.
-Implement billing table discovery and current-month cost aggregation query.
-Propagate GeminiAI billing status/errors to cache, CLI, TUI, and GNOME surfaces.
-Add dependency and regression tests for new GeminiAI cost/error paths.
+  Update REQ-056..REQ-065 for GeminiAI Monitoring+BigQuery behavior.
+  Implement billing table discovery and current-month cost aggregation query.
+  Propagate GeminiAI billing status/errors to cache, CLI, TUI, and GNOME surfaces.
+  Add dependency and regression tests for new GeminiAI cost/error paths.
 - BREAKING CHANGE: remove billing API usage from provider [useReq] *(geminiai)*
-Update requirements, implementation, tests, workflow, and references for monitoring-only GeminiAI metrics.
+  Update requirements, implementation, tests, workflow, and references for monitoring-only GeminiAI metrics.
 - add per-provider currency symbol configuration and display [useReq] *(config)*
-REQ-049: aibar setup prompts per-provider currency symbol ($, £, €, default $) after timeout section; REQ-050: providers extract currency from API raw (ISO code or symbol), fall back to configured default then $; REQ-051: _print_result uses metrics.currency_symbol (not hardcoded $); REQ-052: TUI ProviderCard.watch_result uses metrics.currency_symbol; REQ-053: GNOME extension cost/byok labels and panel summary use metrics.currency_symbol; Updated CTN-002 (UsageMetrics.currency_symbol field), CTN-008 (RuntimeConfig.currency_symbols dict); Updated REQ-005 (setup timeout section scope), TST-013 (currency prompt assertions); Added resolve_currency_symbol() in config.py with ISO-code mapping and provider fallback; Added tests: test_currency_symbol_flow.py (TST-023) and updated test_setup_runtime_config.py
+  REQ-049: aibar setup prompts per-provider currency symbol ($, £, €, default $) after timeout section; REQ-050: providers extract currency from API raw (ISO code or symbol), fall back to configured default then $; REQ-051: _print_result uses metrics.currency_symbol (not hardcoded $); REQ-052: TUI ProviderCard.watch_result uses metrics.currency_symbol; REQ-053: GNOME extension cost/byok labels and panel summary use metrics.currency_symbol; Updated CTN-002 (UsageMetrics.currency_symbol field), CTN-008 (RuntimeConfig.currency_symbols dict); Updated REQ-005 (setup timeout section scope), TST-013 (currency prompt assertions); Added resolve_currency_symbol() in config.py with ISO-code mapping and provider fallback; Added tests: test_currency_symbol_flow.py (TST-023) and updated test_setup_runtime_config.py
 - configurable refresh interval via JSON extension section, remove Last updated UI, add per-tab Update at label [useReq] *(gnome-extension)*
-REQ-005/CTN-008: gnome_refresh_interval_seconds (default 60s) added to RuntimeConfig, prompted in setup(); REQ-003: show --json emits extension.gnome_refresh_interval_seconds (injected at emit time, not cached); DES-006/REQ-017: removed Last updated/Next update popup status line and separator; added per-card Update at: HH:MM label bottom-right (aibar-update-at-label CSS class, matching Reset in: style); extension.js: _refreshIntervalSeconds instance var replaces constant; _parseOutput reads extension section and reschedules timer on change; _formatStatusTime removed; Tests: updated test_setup_runtime_config, test_extension_quota_label, test_cli_idle_cache, test_cli_idle_force; added test_show_json_extension_section.py
+  REQ-005/CTN-008: gnome_refresh_interval_seconds (default 60s) added to RuntimeConfig, prompted in setup(); REQ-003: show --json emits extension.gnome_refresh_interval_seconds (injected at emit time, not cached); DES-006/REQ-017: removed Last updated/Next update popup status line and separator; added per-card Update at: HH:MM label bottom-right (aibar-update-at-label CSS class, matching Reset in: style); extension.js: _refreshIntervalSeconds instance var replaces constant; _parseOutput reads extension section and reschedules timer on change; _formatStatusTime removed; Tests: updated test_setup_runtime_config, test_extension_quota_label, test_cli_idle_cache, test_cli_idle_force; added test_show_json_extension_section.py
 - truncate log at start of each refresh cycle [useReq] *(claude_token_refresh.sh)*
-Added REQ-048: do_refresh() MUST truncate LOG_FILE before first log entry; Added TST-022: source-level test verifying truncation placement; Implemented: '> "$LOG_FILE"' as first statement in do_refresh(); Added 2 tests in tests/test_claude_token_refresh_script.py; Updated WORKFLOW.md: added PROC:claude-token-refresh execution unit; Updated REFERENCES.md: regenerated
+  Added REQ-048: do_refresh() MUST truncate LOG_FILE before first log entry; Added TST-022: source-level test verifying truncation placement; Implemented: '> "$LOG_FILE"' as first statement in do_refresh(); Added 2 tests in tests/test_claude_token_refresh_script.py; Updated WORKFLOW.md: added PROC:claude-token-refresh execution unit; Updated REFERENCES.md: regenerated
 - remove static metric assertions from HTTP-pipeline tests [useReq] *(tests)*
-Add TST-021: provider-HTTP-pipeline tests MUST NOT assert numeric metric values
-(usage_percent, remaining, cost) from parsed HTTP responses; restrict to
-success/error state, window key presence, and HTTP call count.
-Remove assert result.metrics.remaining == 70.0 from test_retries_on_429_then_succeeds.; Remove remaining == 80.0 and remaining == 70.0 assertions from
-test_single_call_returns_both_windows.
-Update Section 4 intro to reflect active test coverage and HDT compliance.; All 75 tests pass.
+  Add TST-021: provider-HTTP-pipeline tests MUST NOT assert numeric metric values
+  (usage_percent, remaining, cost) from parsed HTTP responses; restrict to
+  success/error state, window key presence, and HTTP call count.
+  Remove assert result.metrics.remaining == 70.0 from test_retries_on_429_then_succeeds.; Remove remaining == 80.0 and remaining == 70.0 assertions from
+  test_single_call_returns_both_windows.
+  Update Section 4 intro to reflect active test coverage and HDT compliance.; All 75 tests pass.
 - BREAKING CHANGE: section cache payload/status and remove Claude snapshot [useReq] *(cache)*
-Update REQUIREMENTS with CTN-010, REQ-044..REQ-047, TST-018..TST-020.
-Refactor CLI cache pipeline to persist payload/status sections in cache.json.
-Store per-provider/window OK/FAIL attempt metadata and preserve payload on failures.
-Remove runtime dependency on claude_dual_last_success.json and use cache.json fallback.
-Adjust GNOME extension JSON parsing for sectioned schema.
-Refactor and add tests for status retention, partial-window failures, and legacy file removal.
+  Update REQUIREMENTS with CTN-010, REQ-044..REQ-047, TST-018..TST-020.
+  Refactor CLI cache pipeline to persist payload/status sections in cache.json.
+  Store per-provider/window OK/FAIL attempt metadata and preserve payload on failures.
+  Remove runtime dependency on claude_dual_last_success.json and use cache.json fallback.
+  Adjust GNOME extension JSON parsing for sectioned schema.
+  Refactor and add tests for status retention, partial-window failures, and legacy file removal.
 - unify show/ui cache retrieval pipeline [useReq] *(cli)*
-Update SRS requirements for shared cache.json retrieval flow (REQ-009/039/042/043).
-Refactor CLI and Text UI to reuse one force->idle->refresh->cache-load pipeline.
-Centralize refresh/write/readback logic and keep idle-time/429 handling in shared path.
-Remove active ResultCache usage from runtime retrieval and align tests with new behavior.
-Regenerate WORKFLOW/REFERENCES and validate with req static-check plus full pytest suite.
+  Update SRS requirements for shared cache.json retrieval flow (REQ-009/039/042/043).
+  Refactor CLI and Text UI to reuse one force->idle->refresh->cache-load pipeline.
+  Centralize refresh/write/readback logic and keep idle-time/429 handling in shared path.
+  Remove active ResultCache usage from runtime retrieval and align tests with new behavior.
+  Regenerate WORKFLOW/REFERENCES and validate with req static-check plus full pytest suite.
 - replace IABar typo with AIBar [useReq] *(gnome-extension)*
-Update PRJ-004 requirement text and evidence mapping to AIBar Monitor.; Replace extension runtime and metadata label strings from IABar to AIBar.; Add regression tests for panel and metadata monitor name assertions.; Update WORKFLOW call-trace wording for the AIBar Monitor title.; Align changelog entries with corrected AIBar naming.
+  Update PRJ-004 requirement text and evidence mapping to AIBar Monitor.; Replace extension runtime and metadata label strings from IABar to AIBar.; Add regression tests for panel and metadata monitor name assertions.; Update WORKFLOW call-trace wording for the AIBar Monitor title.; Align changelog entries with corrected AIBar naming.
 - force Refresh Now CLI execution [useReq] *(gnome-extension)*
-Update DES-006, REQ-016, and TST-004 in docs/REQUIREMENTS.md.; Wire popup Refresh Now to _refreshData(true) and append --force to CLI argv.; Add regression assertion for Refresh Now forced refresh in tests/test_extension_quota_label.py.; Update docs/WORKFLOW.md and regenerate docs/REFERENCES.md.
+  Update DES-006, REQ-016, and TST-004 in docs/REQUIREMENTS.md.; Wire popup Refresh Now to _refreshData(true) and append --force to CLI argv.; Add regression assertion for Refresh Now forced refresh in tests/test_extension_quota_label.py.; Update docs/WORKFLOW.md and regenerate docs/REFERENCES.md.
 - relocate cache files and add GNOME next-update [useReq] *(config)*
-Update requirements for ~/.cache/aibar cache and idle-time paths.
-Implement APP_CACHE_DIR-backed cache/idle persistence in config helpers.
-Render GNOME popup status as 'Last updated: <time>, next update: <time>'.
-Refresh tests plus WORKFLOW/REFERENCES for traceable compliance.
+  Update requirements for ~/.cache/aibar cache and idle-time paths.
+  Implement APP_CACHE_DIR-backed cache/idle persistence in config helpers.
+  Render GNOME popup status as 'Last updated: <time>, next update: <time>'.
+  Refresh tests plus WORKFLOW/REFERENCES for traceable compliance.
 - implement idle-time cache and 429 backoff control [useReq] *(cli)*
-Update SRS for idle-delay, idle-time state, force refresh, and API throttling.
-Persist canonical show JSON payload to ~/.config/aibar/cache.json.
-Add runtime config persistence in ~/.config/aibar/config.json.
-Persist idle-time epoch/ISO metadata in ~/.config/aibar/idle-time.json.
-Propagate retry-after metadata and enforce max(idle-delay,retry-after).
-Add regression tests for setup prompts, idle gating, force mode, 429 policy, and throttling.
+  Update SRS for idle-delay, idle-time state, force refresh, and API throttling.
+  Persist canonical show JSON payload to ~/.config/aibar/cache.json.
+  Add runtime config persistence in ~/.config/aibar/config.json.
+  Persist idle-time epoch/ISO metadata in ~/.config/aibar/idle-time.json.
+  Propagate retry-after metadata and enforce max(idle-delay,retry-after).
+  Add regression tests for setup prompts, idle gating, force mode, 429 policy, and throttling.
 - remove Chrome extension scope [useReq] *(core)*
-Update docs/REQUIREMENTS.md by removing Chrome-extension requirement IDs and evidence rows.
-Delete src/aibar/chrome-extension implementation and associated guideline document.
-Remove Chrome-extension fixtures/helpers/tests and update workflow/reference docs.
+  Update docs/REQUIREMENTS.md by removing Chrome-extension requirement IDs and evidence rows.
+  Delete src/aibar/chrome-extension implementation and associated guideline document.
+  Remove Chrome-extension fixtures/helpers/tests and update workflow/reference docs.
 - add localhost external API bridge [useReq] *(chrome-extension)*
-Update requirements with REQ-060/REQ-061 and TST-032/TST-033.
-Implement localhost listener on 127.0.0.1 default port 32767 with descending fallback.
-Expose external routes for api.main.snapshot and debug API endpoints.
-Preserve debug gate semantics and structured debug command logging.
-Add runtime guards for node static-check compatibility in background/popup.
-Refresh workflow and references documentation to reflect runtime changes.
+  Update requirements with REQ-060/REQ-061 and TST-032/TST-033.
+  Implement localhost listener on 127.0.0.1 default port 32767 with descending fallback.
+  Expose external routes for api.main.snapshot and debug API endpoints.
+  Preserve debug gate semantics and structured debug command logging.
+  Add runtime guards for node static-check compatibility in background/popup.
+  Refresh workflow and references documentation to reflect runtime changes.
 - persist debug session state and popup preload [useReq] *(chrome-extension)*
-update REQUIREMENTS for session-persisted debug enablement and popup layout order; implement background debug flag persistence via chrome.storage.session; execute startup refresh before alarm scheduling and keep primary snapshot always available; reorder popup HTML to tabs/cards first and controls at bottom; extend chrome extension tests for startup flow, debug persistence, snapshot availability, and layout order; sync WORKFLOW, REFERENCES, and Google_Extension_API_Reference docs
+  update REQUIREMENTS for session-persisted debug enablement and popup layout order; implement background debug flag persistence via chrome.storage.session; execute startup refresh before alarm scheduling and keep primary snapshot always available; reorder popup HTML to tabs/cards first and controls at bottom; extend chrome extension tests for startup flow, debug persistence, snapshot availability, and layout order; sync WORKFLOW, REFERENCES, and Google_Extension_API_Reference docs
 - update Copilot fixture data to 24.4% / 321 of 1500 [useReq] *(tests)*
 - decouple interval config from debug gate, add code_review window, fix parser datetime fallback [useReq] *(chrome-extension)*
-Un-gate interval input/button from debug mode; add config.refresh_interval.set
-handler before debug guard in background.js (CTN-016, REQ-057)
-Remove Export debug, Clear logs, Fetch pages buttons from popup HTML/JS;
-features remain accessible only through debug API commands (DES-012)
-Add code_review window to codex provider: parsers.js WINDOW_HINT_REGEX,
-_extractWindowHint, parseCodexUsageHtml; background.js and popup.js
-PROVIDER_WINDOWS updated (REQ-041)
-Fix _buildWindows datetime fallback: only pick unrelated datetime candidates
-when no JSON candidate matched for the window
-Bump PARSER_VERSION to 2026.03.07.1; Update test fixtures for current values (Claude 0%/11%, Codex 0%/32%/0%,
-Copilot 20.4% 272/1500); update test assertions and add TST-028/TST-029
-Update REQUIREMENTS.md v0.3.13, WORKFLOW.md, REFERENCES.md, API guideline
+  Un-gate interval input/button from debug mode; add config.refresh_interval.set
+  handler before debug guard in background.js (CTN-016, REQ-057)
+  Remove Export debug, Clear logs, Fetch pages buttons from popup HTML/JS;
+  features remain accessible only through debug API commands (DES-012)
+  Add code_review window to codex provider: parsers.js WINDOW_HINT_REGEX,
+  _extractWindowHint, parseCodexUsageHtml; background.js and popup.js
+  PROVIDER_WINDOWS updated (REQ-041)
+  Fix _buildWindows datetime fallback: only pick unrelated datetime candidates
+  when no JSON candidate matched for the window
+  Bump PARSER_VERSION to 2026.03.07.1; Update test fixtures for current values (Claude 0%/11%, Codex 0%/32%/0%,
+  Copilot 20.4% 272/1500); update test assertions and add TST-028/TST-029
+  Update REQUIREMENTS.md v0.3.13, WORKFLOW.md, REFERENCES.md, API guideline
 - hide unpopulated window bars on provider error and codify host_permissions auth [useReq] *(chrome-extension)*
-Add _hasPopulatedWindows helper to popup.js for window-data presence detection; Gate window progress bar rendering in _renderProviderCard on populated data; Show error-only card when provider fails with no prior window data (REQ-055); Preserve windows alongside error when prior data exists (REQ-056); Add CTN-015 requirement for manifest host_permissions enabling authenticated fetch; Add REQ-055/REQ-056 requirements for error-gated popup rendering; Add TST-026/TST-027 test requirements for manifest auth and popup error behavior; Update manifest test with credentials-include and host_permissions auth assertions; Create test_chrome_extension_popup.py for error rendering contract assertions; Update WORKFLOW.md call trace with _hasPopulatedWindows in popup render path; Update REFERENCES.md with new symbol, line ranges, and satisfies tags
+  Add _hasPopulatedWindows helper to popup.js for window-data presence detection; Gate window progress bar rendering in _renderProviderCard on populated data; Show error-only card when provider fails with no prior window data (REQ-055); Preserve windows alongside error when prior data exists (REQ-056); Add CTN-015 requirement for manifest host_permissions enabling authenticated fetch; Add REQ-055/REQ-056 requirements for error-gated popup rendering; Add TST-026/TST-027 test requirements for manifest auth and popup error behavior; Update manifest test with credentials-include and host_permissions auth assertions; Create test_chrome_extension_popup.py for error rendering contract assertions; Update WORKFLOW.md call trace with _hasPopulatedWindows in popup render path; Update REFERENCES.md with new symbol, line ranges, and satisfies tags
 - refactor debug API and parser diagnostics [useReq] *(chrome-extension)*
-Update REQ-040..REQ-053 and TST-020..TST-025 for current debug/API behavior.
-Add debug command providers.pages.get with fixed provider URL set and related-resource downloads.
-Expose provider-page diagnostics action in popup and keep debug controls session-gated.
-Harden debug logger and metric normalization to keep sink/empty-value paths non-throwing.
-Improve parser extraction for current Claude/Copilot/Codex structures and reject noise artifacts.
-Refresh API reference, workflow model, references index, fixtures, and tests.
+  Update REQ-040..REQ-053 and TST-020..TST-025 for current debug/API behavior.
+  Add debug command providers.pages.get with fixed provider URL set and related-resource downloads.
+  Expose provider-page diagnostics action in popup and keep debug controls session-gated.
+  Harden debug logger and metric normalization to keep sink/empty-value paths non-throwing.
+  Improve parser extraction for current Claude/Copilot/Codex structures and reject noise artifacts.
+  Refresh API reference, workflow model, references index, fixtures, and tests.
 - BREAKING CHANGE: add primary snapshot API and runtime debug gate [useReq] *(chrome-extension-debug-api)*
-Update REQUIREMENTS.md for primary/debug API split and non-persistent debug flag.
-Implement api.main.snapshot plus config.debug_api.get/set runtime controls.
-Gate all debug.* routes with deterministic DEBUG_API_DISABLED responses by default.
-Update popup configuration UI with session-only debug toggle and disabled debug actions.
-Add/adjust Chrome extension debug tests and API-reference documentation assertions.
-Create guidelines/Google_Extension_API_Reference.md and regenerate WORKFLOW/REFERENCES docs.
+  Update REQUIREMENTS.md for primary/debug API split and non-persistent debug flag.
+  Implement api.main.snapshot plus config.debug_api.get/set runtime controls.
+  Gate all debug.* routes with deterministic DEBUG_API_DISABLED responses by default.
+  Update popup configuration UI with session-only debug toggle and disabled debug actions.
+  Add/adjust Chrome extension debug tests and API-reference documentation assertions.
+  Create guidelines/Google_Extension_API_Reference.md and regenerate WORKFLOW/REFERENCES docs.
 - extend diagnostics and logger safety [useReq] *(chrome-debug-api)*
-Update requirements for enhanced debug diagnostics and safe console logging.
-Add parser window-assignment trace extraction for provider debug flows.
-Add providers.diagnose aggregate API command for multi-provider analysis.
-Include payload assertion metadata in parser and diagnose responses.
-Fix console method invocation by binding logger methods to console context.
-Expand Chrome debug/parser tests and regenerate WORKFLOW/REFERENCES docs.
+  Update requirements for enhanced debug diagnostics and safe console logging.
+  Add parser window-assignment trace extraction for provider debug flows.
+  Add providers.diagnose aggregate API command for multi-provider analysis.
+  Include payload assertion metadata in parser and diagnose responses.
+  Fix console method invocation by binding logger methods to console context.
+  Expand Chrome debug/parser tests and regenerate WORKFLOW/REFERENCES docs.
 - recover codex metrics from escaped scripts [useReq] *(chrome-parser)*
-Update existing SRS IDs for escaped Codex script extraction and key-evidence diagnostics.
-Extend parser signals with escaped script key/value candidates and metric-key samples.
-Add Codex escaped-script fixture and regression assertions for parser + diagnostics.
-Refresh WORKFLOW and regenerate REFERENCES for updated parser symbol graph.
+  Update existing SRS IDs for escaped Codex script extraction and key-evidence diagnostics.
+  Extend parser signals with escaped script key/value candidates and metric-key samples.
+  Add Codex escaped-script fixture and regression assertions for parser + diagnostics.
+  Refresh WORKFLOW and regenerate REFERENCES for updated parser symbol graph.
 - harden parser + debug diagnostics [useReq] *(chrome-extension)*
-Update existing SRS IDs for bootstrap-script extraction and parser-empty failure handling.
-Add provider.diagnose debug command, payload quality summary, and HTTP hash/head-tail probes.
-Harden Claude/Codex parser selection to avoid reset-only false positives and support script payloads.
-Add parser/debug regression fixtures and tests; regenerate WORKFLOW/REFERENCES.
+  Update existing SRS IDs for bootstrap-script extraction and parser-empty failure handling.
+  Add provider.diagnose debug command, payload quality summary, and HTTP hash/head-tail probes.
+  Harden Claude/Codex parser selection to avoid reset-only false positives and support script payloads.
+  Add parser/debug regression fixtures and tests; regenerate WORKFLOW/REFERENCES.
 - rename extension source directory path [useReq] *(gnome-extension)*
-update requirement paths for GNOME extension source location; rename src/aibar/extension/ to src/aibar/gnome-extension/; update installer script, release workflow, and affected tests; refresh docs/WORKFLOW.md and regenerate docs/REFERENCES.md
+  update requirement paths for GNOME extension source location; rename src/aibar/extension/ to src/aibar/gnome-extension/; update installer script, release workflow, and affected tests; refresh docs/WORKFLOW.md and regenerate docs/REFERENCES.md
 - suppress rate-limit banners and flag full-quota resets [useReq] *(ui)*
-Update REQ-008/REQ-017 and TST requirements for rate-limit rendering behavior.
-Textual UI now suppresses 'Error: Rate limited. Try again later.' on quota payloads.
-Textual reset rows append '⚠️ Limit reached!' at displayed 100.0% for Claude/Codex/Copilot windows.
-GNOME extension now treats rate-limit quota payloads as metric cards, not error cards.
-GNOME reset labels append '⚠️ Limit reached!' for displayed full usage.
-Add and update regression tests for extension and Textual card helper logic.
-Regenerate REFERENCES and update WORKFLOW call-trace notes.
+  Update REQ-008/REQ-017 and TST requirements for rate-limit rendering behavior.
+  Textual UI now suppresses 'Error: Rate limited. Try again later.' on quota payloads.
+  Textual reset rows append '⚠️ Limit reached!' at displayed 100.0% for Claude/Codex/Copilot windows.
+  GNOME extension now treats rate-limit quota payloads as metric cards, not error cards.
+  GNOME reset labels append '⚠️ Limit reached!' for displayed full usage.
+  Add and update regression tests for extension and Textual card helper logic.
+  Regenerate REFERENCES and update WORKFLOW call-trace notes.
 - restore Claude 429 metrics from snapshot [useReq] *(cli)*
-Update REQ-036 and related constraints/tests for Claude 429 rendering semantics.
-Persist latest successful Claude dual-window payload for rate-limit fallback.
-Keep 5h at 100% with error line, restore 7d usage/reset from persisted payload.
-Add legacy snapshot compatibility for existing claude_5h/claude_7d cache files.
-Refresh workflow and references documentation to match new runtime helpers.
+  Update REQ-036 and related constraints/tests for Claude 429 rendering semantics.
+  Persist latest successful Claude dual-window payload for rate-limit fallback.
+  Keep 5h at 100% with error line, restore 7d usage/reset from persisted payload.
+  Add legacy snapshot compatibility for existing claude_5h/claude_7d cache files.
+  Refresh workflow and references documentation to match new runtime helpers.
 - normalize Claude 429 dual-window output [useReq] *(cli)*
-Update REQUIREMENTS with REQ-034/REQ-035/REQ-036 and TST-010/TST-011.
-Normalize Claude dual-window 429 handling in _fetch_claude_dual.
-Keep rate-limit error visible only in 5h while preserving 100% usage/reset output for 5h and 7d.
-Allow _print_result to continue metrics rendering for Claude 429 partial-window path.
-Add regression test test_claude_rate_limit_partial_window and update Claude dual cooldown symmetry test.
-Update WORKFLOW runtime model and regenerate REFERENCES index.
+  Update REQUIREMENTS with REQ-034/REQ-035/REQ-036 and TST-010/TST-011.
+  Normalize Claude dual-window 429 handling in _fetch_claude_dual.
+  Keep rate-limit error visible only in 5h while preserving 100% usage/reset output for 5h and 7d.
+  Allow _print_result to continue metrics rendering for Claude 429 partial-window path.
+  Add regression test test_claude_rate_limit_partial_window and update Claude dual cooldown symmetry test.
+  Update WORKFLOW runtime model and regenerate REFERENCES index.
 - disable Claude API cache reuse in CLI/UI [useReq] *(claude-cache)*
-Update CTN-004, REQ-009, and TST-003 in docs/REQUIREMENTS.md.
-Disable Claude caching/cooldown in ResultCache via provider policy gate.
-Bypass Claude cache in CLI _fetch_result and _fetch_claude_dual paths.
-Restrict Textual UI action_refresh cache get/set to non-Claude providers.
-Replace obsolete Claude cache-fallback tests with cache-bypass assertions.
-Add non-Claude cache persistence and raw-key redaction tests.
-Regenerate WORKFLOW and REFERENCES documentation.
+  Update CTN-004, REQ-009, and TST-003 in docs/REQUIREMENTS.md.
+  Disable Claude caching/cooldown in ResultCache via provider policy gate.
+  Bypass Claude cache in CLI _fetch_result and _fetch_claude_dual paths.
+  Restrict Textual UI action_refresh cache get/set to non-Claude providers.
+  Replace obsolete Claude cache-fallback tests with cache-bypass assertions.
+  Add non-Claude cache persistence and raw-key redaction tests.
+  Regenerate WORKFLOW and REFERENCES documentation.
 
 ### 📚  Documentation
 - align provider and login examples [useReq] *(readme)*
-Add geminiai to show provider list in Feature Highlights.
-Add geminiai login helper command in Usage section.
+  Add geminiai to show provider list in Feature Highlights.
+  Add geminiai login helper command in Usage section.
 
 ## [0.1.0](https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0) - 2026-03-05
 ### ⛰️  Features
 - Add extension build.
 - add GNOME extension installer script with colored output [useReq] *(install-gnome-extension)*
-Add scripts/install-gnome-extension.sh: resolves git project root, validates
-prerequisites (git, source dir, metadata.json), creates target directory
-~/.local/share/gnome-shell/extensions/aibar@aibar.panel/, copies all extension
-files preserving attributes via cp -a, produces ANSI-colored terminal output.
-Add requirements PRJ-008, REQ-025..REQ-030, TST-009.; Add tests/test_install_gnome_extension.py with atomic and composed test levels.; Update docs/WORKFLOW.md with PROC:install-ext execution unit.; Regenerate docs/REFERENCES.md.
+  Add scripts/install-gnome-extension.sh: resolves git project root, validates
+  prerequisites (git, source dir, metadata.json), creates target directory
+  ~/.local/share/gnome-shell/extensions/aibar@aibar.panel/, copies all extension
+  files preserving attributes via cp -a, produces ANSI-colored terminal output.
+  Add requirements PRJ-008, REQ-025..REQ-030, TST-009.; Add tests/test_install_gnome_extension.py with atomic and composed test levels.; Update docs/WORKFLOW.md with PROC:install-ext execution unit.; Regenerate docs/REFERENCES.md.
 - Update models.json file.
 - Add LICENSE_GnomeCodexBar file.
 - add colored panel usage percentages [useReq] *(gnome-extension)*
-append REQ-021/REQ-022 and TST-007 in docs/REQUIREMENTS.md; render ordered Claude/Copilot/Codex percentages in panel status area; apply provider tab color classes to panel percentages; hide percentage labels when metrics are unavailable; add extension regression tests and refresh WORKFLOW/REFERENCES docs
+  append REQ-021/REQ-022 and TST-007 in docs/REQUIREMENTS.md; render ordered Claude/Copilot/Codex percentages in panel status area; apply provider tab color classes to panel percentages; hide percentage labels when metrics are unavailable; add extension regression tests and refresh WORKFLOW/REFERENCES docs
 - Update .req/models.json file.
 - Add requirements.txt file.
 - Add dummy docs/REFERENCES.md.
@@ -1298,47 +1374,47 @@ append REQ-021/REQ-022 and TST-007 in docs/REQUIREMENTS.md; render ordered Claud
 
 ### 🐛  Bug Fixes
 - reapply progress bar fill widths on popup open [useReq] *(extension-popup)*
-Root cause: GLib.idle_add callback in _populateProviderCard reads
-barBg.get_width() which returns 0 when popup is closed. Data arriving
-while popup is closed results in zero-width fill bars.
-Fix: connect menu open-state-changed signal to new _applyBarWidths()
-method that re-applies cached _barData fill widths via GLib.idle_add
-when popup opens, ensuring bars render correctly on first open.
-Adds test_popup_open_triggers_bar_width_reapply regression test.
+  Root cause: GLib.idle_add callback in _populateProviderCard reads
+  barBg.get_width() which returns 0 when popup is closed. Data arriving
+  while popup is closed results in zero-width fill bars.
+  Fix: connect menu open-state-changed signal to new _applyBarWidths()
+  method that re-applies cached _barData fill widths via GLib.idle_add
+  when popup opens, ensuring bars render correctly on first open.
+  Adds test_popup_open_triggers_bar_width_reapply regression test.
 - Add new install scripts.
 - handle displayed-zero fallback for pending reset text [useReq] *(extension-reset)*
-treat near-zero percentages that render as 0.0% as zero for reset-pending fallback; apply same displayed-zero semantics in CLI and GNOME extension; extend regression tests and refresh WORKFLOW/REFERENCES
+  treat near-zero percentages that render as 0.0% as zero for reset-pending fallback; apply same displayed-zero semantics in CLI and GNOME extension; extend regression tests and refresh WORKFLOW/REFERENCES
 - show pending reset hint at 0% usage [useReq] *(claude-reset)*
-print fallback 'Resets in' text in CLI for Claude when usage is 0 and reset_at is unavailable; render GNOME window-bar fallback reset text when usage is 0 and reset timestamp is unavailable; add reproducer tests for CLI and extension; update WORKFLOW and regenerate REFERENCES
+  print fallback 'Resets in' text in CLI for Claude when usage is 0 and reset_at is unavailable; render GNOME window-bar fallback reset text when usage is 0 and reset timestamp is unavailable; add reproducer tests for CLI and extension; update WORKFLOW and regenerate REFERENCES
 - project next reset boundary from stale cache resets_at to restore 'Resets in:' display [useReq] *(cli)*
-Root cause: _parse_response correctly sets reset_at=None for past resets_at timestamps;
-_fetch_claude_dual did not project forward, so 'Resets in:' was silently suppressed
-for stale cached results on both the cooldown pre-check and post-fetch 429 paths.
-Add _WINDOW_PERIOD_TIMEDELTA mapping, _project_next_reset (math.ceil multi-cycle
-advance), and _apply_reset_projection (model_copy with projected reset_at).
-Apply _apply_reset_projection to every last-good and cross-window re-parse result
-in _fetch_claude_dual on all affected code paths.
-Add 3 guideline-compliant reproducer tests in test_claude_dual_stale_reset_projection.py.; Update docs/WORKFLOW.md and docs/REFERENCES.md.
+  Root cause: _parse_response correctly sets reset_at=None for past resets_at timestamps;
+  _fetch_claude_dual did not project forward, so 'Resets in:' was silently suppressed
+  for stale cached results on both the cooldown pre-check and post-fetch 429 paths.
+  Add _WINDOW_PERIOD_TIMEDELTA mapping, _project_next_reset (math.ceil multi-cycle
+  advance), and _apply_reset_projection (model_copy with projected reset_at).
+  Apply _apply_reset_projection to every last-good and cross-window re-parse result
+  in _fetch_claude_dual on all affected code paths.
+  Add 3 guideline-compliant reproducer tests in test_claude_dual_stale_reset_projection.py.; Update docs/WORKFLOW.md and docs/REFERENCES.md.
 - discard past reset_at timestamps to fix asymmetric Resets-in display [useReq] *(claude_oauth._parse_response)*
-Root cause: _parse_response stored any parsed resets_at datetime including
-past timestamps; _print_result suppressed 'Resets in:' when reset_at was
-None OR delta<=0, causing 5h window (stale cache) to silently suppress the
-field while 7d window (future reset) showed it (REQ-002 symmetry defect).
-Fix: added past-timestamp guard in _parse_response; sets reset_at=None when
-parsed datetime <= datetime.now(UTC), so stale cached timestamps never reach
-the display layer.
-Added 6 reproducer/regression tests in test_claude_parse_response_reset_at.py; Updated docs/WORKFLOW.md and docs/REFERENCES.md with accurate symbol metadata.
+  Root cause: _parse_response stored any parsed resets_at datetime including
+  past timestamps; _print_result suppressed 'Resets in:' when reset_at was
+  None OR delta<=0, causing 5h window (stale cache) to silently suppress the
+  field while 7d window (future reset) showed it (REQ-002 symmetry defect).
+  Fix: added past-timestamp guard in _parse_response; sets reset_at=None when
+  parsed datetime <= datetime.now(UTC), so stale cached timestamps never reach
+  the display layer.
+  Added 6 reproducer/regression tests in test_claude_parse_response_reset_at.py; Updated docs/WORKFLOW.md and docs/REFERENCES.md with accurate symbol metadata.
 - extend post-fetch 429 cross-window re-parse to restore 5h symmetry [useReq] *(cli)*
 - derive missing Claude window from sibling raw payload during rate-limit cooldown [useReq] *(cli)*
 - improve 429 retry backoff and add cross-process rate-limit cooldown [useReq] *(claude_oauth)*
-Increase MAX_RETRIES from 2 to 3 and RETRY_BACKOFF_BASE from 1.0 to 2.0
-with random jitter to prevent thundering-herd synchronization.
-Add rate-limit cooldown mechanism in ResultCache: on 429 error, write
-cooldown marker to disk; subsequent CLI invocations within 30s return
-last-good cached data instead of hammering the API.
-Add cooldown check in _fetch_result and _fetch_claude_dual before API calls.; Add 4 new tests for cooldown activation, clearing, expiry, and CLI integration.; Update WORKFLOW.md call-traces for changed symbols.
+  Increase MAX_RETRIES from 2 to 3 and RETRY_BACKOFF_BASE from 1.0 to 2.0
+  with random jitter to prevent thundering-herd synchronization.
+  Add rate-limit cooldown mechanism in ResultCache: on 429 error, write
+  cooldown marker to disk; subsequent CLI invocations within 30s return
+  last-good cached data instead of hammering the API.
+  Add cooldown check in _fetch_result and _fetch_claude_dual before API calls.; Add 4 new tests for cooldown activation, clearing, expiry, and CLI integration.; Update WORKFLOW.md call-traces for changed symbols.
 - add 429 retry, CLI cache integration, single-call dual-window [useReq] *(claude_oauth)*
-Add _request_usage with retry-after-aware retry (max 2) for HTTP 429.; Add fetch_all_windows for single-API-call dual-window parsing (5h+7d).; Integrate ResultCache in CLI show path (CTN-004 compliance).; Add _fetch_claude_dual for cache-aware single-call dual-window fetch.; Add _fetch_result cache lookup, store, and last-good fallback on error.; Add reproducer tests for retry, single-call, cache, and fallback.; Update WORKFLOW.md and REFERENCES.md.
+  Add _request_usage with retry-after-aware retry (max 2) for HTTP 429.; Add fetch_all_windows for single-API-call dual-window parsing (5h+7d).; Integrate ResultCache in CLI show path (CTN-004 compliance).; Add _fetch_claude_dual for cache-aware single-call dual-window fetch.; Add _fetch_result cache lookup, store, and last-good fallback on error.; Add reproducer tests for retry, single-call, cache, and fallback.; Update WORKFLOW.md and REFERENCES.md.
 - Remove unused scripts.
 - Fix version numer.
 - Include .req directory to support worktree.
@@ -1347,73 +1423,73 @@ Add _request_usage with retry-after-aware retry (max 2) for HTTP 429.; Add fetch
 
 ### 🚜  Changes
 - BREAKING CHANGE: remove subcommand, execute nested shell directly [useReq] *(test-gnome-extension)*
-test-gnome-extension.sh no longer requires any parameter; runs
-install + nested shell launch directly on invocation
-Removed case/esac dispatch; script body calls update_extension
-then launches MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800 nested shell
-PRJ-004, REQ-031, REQ-033, TST-004 updated to reflect no-argument
-invocation
-Requirements updated to v0.3.7
+  test-gnome-extension.sh no longer requires any parameter; runs
+  install + nested shell launch directly on invocation
+  Removed case/esac dispatch; script body calls update_extension
+  then launches MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800 nested shell
+  PRJ-004, REQ-031, REQ-033, TST-004 updated to reflect no-argument
+  invocation
+  Requirements updated to v0.3.7
 - BREAKING CHANGE: installer enables extension, test script keeps only start [useReq] *(scripts)*
-install-gnome-extension.sh now runs gnome-extensions enable after
-file copy (REQ-032), with graceful fallback when CLI unavailable
-test-gnome-extension.sh stripped to start-only subcommand (REQ-033);
-enable/disable/reload/logs removed
-REQ-031 narrowed to start command only; Requirements updated to v0.3.6 with REQ-032, REQ-033; Tests updated: removed enable/reload assertions, added start-only
-and enable-presence tests
+  install-gnome-extension.sh now runs gnome-extensions enable after
+  file copy (REQ-032), with graceful fallback when CLI unavailable
+  test-gnome-extension.sh stripped to start-only subcommand (REQ-033);
+  enable/disable/reload/logs removed
+  REQ-031 narrowed to start command only; Requirements updated to v0.3.6 with REQ-032, REQ-033; Tests updated: removed enable/reload assertions, added start-only
+  and enable-presence tests
 - invoke install before start/enable/reload commands [useReq] *(test-gnome-extension)*
-Modify scripts/test-gnome-extension.sh to call install-gnome-extension.sh
-before start, enable, and reload commands (REQ-031).
-Update PRJ-004 reference from dev.sh to scripts/test-gnome-extension.sh.; Add REQ-031: MUST invoke installer before start/enable/reload.; Update tests/test_extension_dev_script.py: fix path from dev.sh to
-scripts/test-gnome-extension.sh, add 4 new tests for install invocation.
-Update docs/WORKFLOW.md with PROC:test-ext unit and EDGE-004.; Regenerate docs/REFERENCES.md.
+  Modify scripts/test-gnome-extension.sh to call install-gnome-extension.sh
+  before start, enable, and reload commands (REQ-031).
+  Update PRJ-004 reference from dev.sh to scripts/test-gnome-extension.sh.; Add REQ-031: MUST invoke installer before start/enable/reload.; Update tests/test_extension_dev_script.py: fix path from dev.sh to
+  scripts/test-gnome-extension.sh, add 4 new tests for install invocation.
+  Update docs/WORKFLOW.md with PROC:test-ext unit and EDGE-004.; Regenerate docs/REFERENCES.md.
 - add pyproject.toml uv/uvx packaging and README install section [useReq] *(core)*
 - add 7d panel percentages and primary bold labels [useReq] *(extension)*
-modify REQ-021/REQ-022 and TST-007 for five-label panel order; add Claude 7d and Codex 7d percentages in status bar; keep provider colors for new 7d labels; enforce bold primary percentages for Claude 5h, Copilot, Codex 5h; update panel hide/error paths for new labels; update tests, WORKFLOW, and regenerate REFERENCES
+  modify REQ-021/REQ-022 and TST-007 for five-label panel order; add Claude 7d and Codex 7d percentages in status bar; keep provider colors for new 7d labels; enforce bold primary percentages for Claude 5h, Copilot, Codex 5h; update panel hide/error paths for new labels; update tests, WORKFLOW, and regenerate REFERENCES
 - update credit/reset labels and format [useReq] *(extension)*
-modify REQ-017 and TST-004 for new credit/reset wording; render quota label as Remaining credits: <n>/<total> with bold <n>; change extension reset labels to Reset in:; update extension tests for wording and formatting; refresh WORKFLOW and REFERENCES documentation
+  modify REQ-017 and TST-004 for new credit/reset wording; render quota label as Remaining credits: <n>/<total> with bold <n>; change extension reset labels to Reset in:; update extension tests for wording and formatting; refresh WORKFLOW and REFERENCES documentation
 - standardize doxygen metadata and references [useReq] *(core)*
-update REQ-020 and TST-006 for Doxygen field extraction; standardize declaration documentation in Python and GNOME JS sources; refresh docs/REFERENCES.md and update workflow runtime notes; verify with req --here --static-check and ./tests.sh
+  update REQ-020 and TST-006 for Doxygen field extraction; standardize declaration documentation in Python and GNOME JS sources; refresh docs/REFERENCES.md and update workflow runtime notes; verify with req --here --static-check and ./tests.sh
 - force nested 1024x800 dev start [useReq] *(extension)*
-Update PRJ-004 and TST-004 for fixed nested-shell resolution in dev launcher start.
-Force dev.sh start to set MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800 before nested GNOME launch.
-Add regression test for dev.sh start command and refresh workflow/reference docs.
+  Update PRJ-004 and TST-004 for fixed nested-shell resolution in dev launcher start.
+  Force dev.sh start to set MUTTER_DEBUG_DUMMY_MODE_SPECS=1024x800 before nested GNOME launch.
+  Add regression test for dev.sh start command and refresh workflow/reference docs.
 - normalize UI branding casing [useReq] *(extension)*
-Update REQ-017 and TST-004 to require AIBar branding labels in GNOME popup UI.
-Replace graphical strings 'aibar' with 'AIBar' in extension header and open-UI action label.
-Add regression test assertions for popup branding labels and refresh workflow/reference docs.
+  Update REQ-017 and TST-004 to require AIBar branding labels in GNOME popup UI.
+  Replace graphical strings 'aibar' with 'AIBar' in extension header and open-UI action label.
+  Add regression test assertions for popup branding labels and refresh workflow/reference docs.
 - replace metadata owner with Ogekuri [useReq] *(extension)*
-Update PRJ-004 requirement for metadata owner identifiers.
-Replace metadata.json url/github owner from OmegAshEnr01n to Ogekuri.
-Regenerate docs/REFERENCES.md for synchronized symbol inventory.
+  Update PRJ-004 requirement for metadata owner identifiers.
+  Replace metadata.json url/github owner from OmegAshEnr01n to Ogekuri.
+  Regenerate docs/REFERENCES.md for synchronized symbol inventory.
 - align copilot reset/bar layout with window bars [useReq] *(extension)*
-Update REQ-017 and TST-004 for Copilot card bar/reset placement requirements.\nRender Copilot quota as a 30d window bar using existing window-bar styling and label placement.\nPlace reset text under that bar and keep remaining-credits row below in stats area.\nAdd regression test assertions for Copilot 30d bar/reset source behavior.\nRefresh WORKFLOW and REFERENCES documentation for updated extension symbols.
+  Update REQ-017 and TST-004 for Copilot card bar/reset placement requirements.\nRender Copilot quota as a 30d window bar using existing window-bar styling and label placement.\nPlace reset text under that bar and keep remaining-credits row below in stats area.\nAdd regression test assertions for Copilot 30d bar/reset source behavior.\nRefresh WORKFLOW and REFERENCES documentation for updated extension symbols.
 - print remaining credits for quota providers [useReq] *(cli-show)*
-Update REQ-002 and TST-001 for show remaining-credits output behavior.\nPrint 'Remaining credits: <remaining> / <limit>' in show text output for Claude/Codex/Copilot when both values exist.\nAdd regression assertion in tests/test_cli_show_reset_format.py.\nRefresh WORKFLOW and REFERENCES documents for updated CLI symbols.
+  Update REQ-002 and TST-001 for show remaining-credits output behavior.\nPrint 'Remaining credits: <remaining> / <limit>' in show text output for Claude/Codex/Copilot when both values exist.\nAdd regression assertion in tests/test_cli_show_reset_format.py.\nRefresh WORKFLOW and REFERENCES documents for updated CLI symbols.
 - align reset countdown with UI format [useReq] *(cli-show)*
-Update REQ-002 to require day-aware reset countdown text in show output.\nImplement _format_reset_duration and emit 'Resets in:' text in CLI renderer.\nAdd CLI regression test for day-token reset formatting.\nRefresh WORKFLOW and REFERENCES documentation for updated symbols.
+  Update REQ-002 to require day-aware reset countdown text in show output.\nImplement _format_reset_duration and emit 'Resets in:' text in CLI renderer.\nAdd CLI regression test for day-token reset formatting.\nRefresh WORKFLOW and REFERENCES documentation for updated symbols.
 - rename credits label to remaining credits [useReq] *(gnome-extension)*
-Update REQ-017 and TST-004 for quota-card label text behavior.\nSwitch GNOME extension quota-only card suffix from "credits" to "remaining credits".\nAdd regression test to assert new quota label string in extension source.\nRefresh WORKFLOW runtime note for quota-label composition path.
+  Update REQ-017 and TST-004 for quota-card label text behavior.\nSwitch GNOME extension quota-only card suffix from "credits" to "remaining credits".\nAdd regression test to assert new quota label string in extension source.\nRefresh WORKFLOW runtime note for quota-label composition path.
 - rename monitor label to IABar Monitor [useReq] *(extension)*
-update PRJ-004 requirement to enforce extension name IABar Monitor; rename GNOME extension display labels in metadata and panel indicator; refresh WORKFLOW and REFERENCES documentation paths/evidence
+  update PRJ-004 requirement to enforce extension name IABar Monitor; rename GNOME extension display labels in metadata and panel indicator; refresh WORKFLOW and REFERENCES documentation paths/evidence
 - BREAKING CHANGE: finalize AIBar rename refactor [useReq] *(core)*
-Apply requirement updates for renamed project identity and command surface.
-Traceability marker commit for req-change workflow completion.
-Verified static check, regression tests, and keyword absence constraints.
+  Apply requirement updates for renamed project identity and command surface.
+  Traceability marker commit for req-change workflow completion.
+  Verified static check, regression tests, and keyword absence constraints.
 - document code inventory and Doxygen headers [useReq] *(usage_tui)*
-update existing SRS IDs and add documentation inventory requirements; add parser-first Doxygen module/file headers across src components; fix static-check lint issues found during verification loop; add pytest regression for references inventory completeness; regenerate WORKFLOW.md and REFERENCES.md from current repository state
+  update existing SRS IDs and add documentation inventory requirements; add parser-first Doxygen module/file headers across src components; fix static-check lint issues found during verification loop; add pytest regression for references inventory completeness; regenerate WORKFLOW.md and REFERENCES.md from current repository state
 
 ### 📚  Documentation
 - Update README.md.
 - Add screenshots.
 - Update README.md document.
 - regenerate runtime model for CLI and GNOME flow [useReq] *(workflow)*
-rewrite docs/WORKFLOW.md with required schema\n- use declaration file paths only\n- refresh call traces and communication edges
+  rewrite docs/WORKFLOW.md with required schema\n- use declaration file paths only\n- refresh call traces and communication edges
 - Update README.md document.
 - update acknowledgments and licensing notice [useReq] *(core)*
-add credit to Shobhit Narayanan for GnomeCodexBar; declare program license reference in LICENSE; declare modified GnomeCodexBar files covered by LICENSE_GnomeCodexBar
+  add credit to Shobhit Narayanan for GnomeCodexBar; declare program license reference in LICENSE; declare modified GnomeCodexBar files covered by LICENSE_GnomeCodexBar
 - regenerate runtime execution model [useReq] *(workflow)*
-rebuild Execution Units Index for usage_tui and GNOME extension; add internal call-trace trees and external boundaries; add communication edges with mechanisms, channels, and payload shapes
+  rebuild Execution Units Index for usage_tui and GNOME extension; add internal call-trace trees and external boundaries; add communication edges with mechanisms, channels, and payload shapes
 
 
 # History
@@ -1477,7 +1553,7 @@ rebuild Execution Units Index for usage_tui and GNOME extension; add internal ca
 - \[0.57.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.57.0
 - \[0.58.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.58.0
 - \[0.59.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.59.0
-- \[0.59.3\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.59.3
+- \[0.59.4\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.59.4
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1538,4 +1614,4 @@ rebuild Execution Units Index for usage_tui and GNOME extension; add internal ca
 [0.57.0]: https://github.com/Ogekuri/AIBar/compare/v0.56.0..v0.57.0
 [0.58.0]: https://github.com/Ogekuri/AIBar/compare/v0.57.0..v0.58.0
 [0.59.0]: https://github.com/Ogekuri/AIBar/compare/v0.58.0..v0.59.0
-[0.59.3]: https://github.com/Ogekuri/AIBar/compare/v0.59.0..v0.59.3
+[0.59.4]: https://github.com/Ogekuri/AIBar/compare/v0.59.0..v0.59.4
