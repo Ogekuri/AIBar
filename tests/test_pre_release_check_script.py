@@ -3,7 +3,8 @@
 @brief Pre-release verification pipeline script regression tests.
 @details Verifies the executable surface and stage composition of
 `scripts/pre-release-check.sh`: dirty-tree gate with `--allow-dirty`
-opt-out, locked dependency synchronization, pytest execution, sdist+wheel
+opt-out, locked dependency synchronization, pytest execution, removal and
+verification of pre-existing generated `dist/` release artifacts, sdist+wheel
 build into `dist/`, built-artifact verification, and stage ordering.
 Tests are source-level and deterministic; they never execute the pipeline.
 @satisfies PRJ-020
@@ -11,7 +12,10 @@ Tests are source-level and deterministic; they never execute the pipeline.
 @satisfies PRJ-022
 @satisfies PRJ-023
 @satisfies PRJ-024
+@satisfies PRJ-054
+@satisfies PRJ-055
 @satisfies TST-084
+@satisfies TST-107
 """
 
 import stat
@@ -134,6 +138,46 @@ def test_script_verifies_dist_artifacts_and_labeled_stages() -> None:
         "run_stage 'clean working tree' check_clean_working_tree",
         "run_stage 'sync dependencies (uv.lock)' uv sync --locked",
         "run_stage 'unit tests' uv run pytest tests/",
+        "run_stage 'remove pre-existing release artifacts' "
+        "clean_preexisting_release_artifacts",
         "run_stage 'build sdist and wheel' build_distribution",
         "run_stage 'verify dist artifacts' require_dist_artifacts",
     ]
+
+
+def test_script_removes_and_verifies_preexisting_release_artifacts() -> None:
+    """
+    @brief Verify pre-existing generated `dist/` artifacts are removed then verified.
+    @details Arrange: load the script source. Act: inspect the classifier,
+    removal, verification, and stage wrapper functions. Assert: the classifier
+    mirrors the version-agnostic build patterns, removal deletes matched files,
+    verification re-scans and fails non-zero on a surviving artifact, the
+    wrapper removes before verifying, and the removal stage precedes the build
+    stage.
+    @return {None} Function return value.
+    @satisfies PRJ-054
+    @satisfies PRJ-055
+    @satisfies TST-107
+    """
+    source = _script_source()
+    assert '"${PROJECT_NAME}-"*.tar.gz) return 0 ;;' in source
+    assert '"${PROJECT_NAME}-"*.whl) return 0 ;;' in source
+    assert '"$EXTENSION_ZIP_NAME") return 0 ;;' in source
+    assert "*) return 1 ;;" in source
+    assert "is_generated_dist_entry \"$entry\"" in source
+    assert 'rm -f -- "$entry"' in source
+    assert "pre-existing release artifact survived removal" in source
+    assert (
+        'fail "pre-existing release artifact removal verification failed."'
+        in source
+    )
+    clean_body = source.split("clean_preexisting_release_artifacts() {", 1)[1]
+    clean_body = clean_body.split("\n}\n", 1)[0]
+    assert clean_body.index("remove_preexisting_dist_artifacts") < clean_body.index(
+        "verify_preexisting_dist_artifacts_removed"
+    )
+    removal_stage_index = source.index(
+        "run_stage 'remove pre-existing release artifacts'"
+    )
+    build_stage_index = source.index("run_stage 'build sdist and wheel'")
+    assert removal_stage_index < build_stage_index

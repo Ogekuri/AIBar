@@ -7,7 +7,8 @@
 # required toolchain and layout, resolves the distribution name and version
 # from `pyproject.toml`, removes every previously generated `dist/` artifact
 # matching the project sdist, wheel, or GNOME extension zip pattern
-# regardless of version number, removes intermediate build artifacts, executes
+# regardless of version number, verifies that no generated release artifact
+# survived that removal, removes intermediate build artifacts, executes
 # the canonical `python -m build` invocation used by
 # `.github/workflows/release-pypi.yml`, creates the GNOME Shell extension zip
 # byte-reproducibly (fixed member order, fixed member timestamps, fixed member
@@ -36,6 +37,7 @@
 # @satisfies PRJ-032
 # @satisfies PRJ-033
 # @satisfies PRJ-034
+# @satisfies PRJ-056
 # @satisfies PRJ-039
 # @satisfies PRJ-040
 # @satisfies PRJ-041
@@ -143,12 +145,13 @@ Usage: scripts/build.sh
 Runs a clean build of every aibar release artifact into dist/:
   1. validates the required toolchain (uv, zip, find)
   2. removes every previously generated dist/ artifact for every version
-  3. removes intermediate build artifacts (build/, .pytest_cache/,
+  3. verifies that no generated release artifact survived that removal
+  4. removes intermediate build artifacts (build/, .pytest_cache/,
      *.egg-info, __pycache__)
-  4. builds the sdist and wheel (python -m build)
-  5. packages the GNOME Shell extension zip reproducibly
-  6. verifies artifact size, archive integrity, and required members
-  7. removes the intermediate artifacts created by the build and verifies
+  5. builds the sdist and wheel (python -m build)
+  6. packages the GNOME Shell extension zip reproducibly
+  7. verifies artifact size, archive integrity, and required members
+  8. removes the intermediate artifacts created by the build and verifies
      that none remains outside dist/
 
 The versioned artifacts stay in dist/. Non-generated dist/ content is never
@@ -305,6 +308,36 @@ remove_generated_dist_artifacts() {
       printf '  removed previous artifact: %s\n' "$entry"
     fi
   done < <(find "$DIST_DIR" -mindepth 1 -maxdepth 1 -type f -print)
+}
+
+## @fn verify_no_generated_dist_artifacts
+# @brief Verify that no generated release artifact survived the pre-build removal.
+# @details Re-scans every top-level `dist/` file after
+# `remove_generated_dist_artifacts` and emits one diagnostic per entry still
+# accepted by `is_generated_dist_entry`. Foreign entries are ignored because
+# they are preserved by contract, while any surviving generated artifact turns
+# the bootstrap into a failing run instead of a clean-slate build.
+# @return {int} 0 when `dist/` holds no generated release artifact.
+# @satisfies PRJ-056
+verify_no_generated_dist_artifacts() {
+  if [ ! -d "$DIST_DIR" ]; then
+    printf '  pre-existing release artifacts: none\n'
+    return 0
+  fi
+  local entry
+  local residual_found=0
+  while IFS= read -r entry; do
+    if [ -n "$entry" ] && is_generated_dist_entry "$entry"; then
+      printf 'ERROR: pre-existing release artifact survived removal: %s\n' \
+        "$entry" >&2
+      residual_found=1
+    fi
+  done < <(find "$DIST_DIR" -mindepth 1 -maxdepth 1 -type f -print)
+  if [ "$residual_found" -ne 0 ]; then
+    return 1
+  fi
+  printf '  pre-existing release artifacts: removed\n'
+  return 0
 }
 
 ## @fn remove_intermediate_artifacts
@@ -647,6 +680,7 @@ load_project_metadata
 CURRENT_STAGE="pre-build cleanup"
 assert_dist_safe_to_clean
 remove_generated_dist_artifacts
+verify_no_generated_dist_artifacts
 remove_intermediate_artifacts
 
 CURRENT_STAGE="python distribution build"

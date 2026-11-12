@@ -110,6 +110,9 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **PRJ-051**: `.github/workflows/release-pypi.yml` MUST fail with non-zero status when the sdist, wheel, or GNOME extension zip is missing from `dist/` after artifact resolution.
 - **PRJ-052**: `.github/workflows/release-pypi.yml` MUST execute no pytest suite and no `scripts/pre-release-check.sh`, and MUST generate release artifacts at most once per run through `scripts/build.sh`.
 - **PRJ-053**: A release MUST NOT require the sdist, wheel, or GNOME extension zip to be tracked in `dist/` by the tagged commit.
+- **PRJ-054**: `scripts/pre-release-check.sh` MUST remove every `dist/` entry matching the project sdist, project wheel, or GNOME extension zip pattern before delegating to `scripts/build.sh`.
+- **PRJ-055**: `scripts/pre-release-check.sh` MUST verify after that removal that no generated release artifact remains in `dist/` and MUST exit non-zero otherwise.
+- **PRJ-056**: `scripts/build.sh` MUST verify at bootstrap that no generated release artifact remains after the pre-build removal and MUST exit non-zero otherwise.
 - **PRJ-028**: MUST validate repository structure, required executables (`uv`, `git`, `zip`, `find`, `bash`), and the syntax of every `scripts/*.sh` file before generating artifacts.
 - **PRJ-029**: MUST validate Python syntax under `src/` and MUST execute `uv run --locked --with pyright pyright --project pyrightconfig.json`, failing when type checking exits non-zero.
 - **PRJ-030**: MUST provide executable `scripts/build.sh` that resolves the repository root from its own path and generates the sdist, wheel, and GNOME extension zip inside `dist/`.
@@ -502,6 +505,8 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-100**: MUST verify `scripts/build.sh` registers EXIT, SIGINT, and SIGTERM cleanup handlers that remove `build/`, `.pytest_cache/`, `*.egg-info`, and `__pycache__` artifacts, preserve the original exit status, and retain versioned `dist/` artifacts.
 - **TST-101**: MUST verify `scripts/build.sh` checks for residual intermediate build artifacts after cleanup and exits non-zero when one remains outside `dist/`.
 - **TST-102**: MUST verify `scripts/clean.sh` is absent from the repository and that no script under `scripts/` references it.
+- **TST-107**: MUST verify `scripts/pre-release-check.sh` removes every versioned generated `dist/` artifact before `scripts/build.sh` delegation and verifies their absence.
+- **TST-108**: MUST verify `scripts/build.sh` rejects a generated `dist/` artifact that survives the pre-build removal.
 
 ## 5. Evidence
 
@@ -813,3 +818,8 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | TST-100 | `tests/test_build_script.py` + EXIT/INT/TERM trap assertions plus `remove_intermediate_artifacts` coverage of `build/`, `.pytest_cache/`, `*.egg-info`, and `__pycache__` with `dist/` retention. |
 | TST-101 | `tests/test_build_script.py` + `verify_no_intermediate_artifacts` assertions covering residual-artifact detection and non-zero exit. |
 | TST-102 | `tests/test_build_script.py` + absence assertions for `scripts/clean.sh` and for `clean.sh` references inside `scripts/*.sh`. |
+| PRJ-054 | `scripts/pre-release-check.sh` + `is_generated_dist_entry`/`remove_preexisting_dist_artifacts`/`clean_preexisting_release_artifacts` + version-agnostic generated-artifact removal executed before `scripts/build.sh` delegation. |
+| PRJ-055 | `scripts/pre-release-check.sh` + `verify_preexisting_dist_artifacts_removed` + post-removal `dist/` re-scan that fails on any surviving generated artifact. |
+| PRJ-056 | `scripts/build.sh` + `verify_no_generated_dist_artifacts` + post-removal bootstrap `dist/` re-scan that fails on any surviving generated artifact. |
+| TST-107 | `tests/test_pre_release_check_script.py` + assertions for pre-build removal ordering, version-agnostic artifact patterns, and removal verification. |
+| TST-108 | `tests/test_build_script.py` + assertions for the bootstrap post-removal verification gate and its non-zero failure path. |
