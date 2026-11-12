@@ -4,14 +4,18 @@
 @details Verifies the executable surface and stage composition of
 `scripts/pre-release-check.sh`: dirty-tree gate with `--allow-dirty`
 opt-out, locked dependency synchronization, pytest execution, sdist+wheel
-build into `dist/`, built-artifact verification, and stage ordering.
+build into a pipeline-created temporary artifact directory, built-artifact
+verification, `dist/` independence, and stage ordering.
 Tests are source-level and deterministic; they never execute the pipeline.
 @satisfies PRJ-020
 @satisfies PRJ-021
 @satisfies PRJ-022
 @satisfies PRJ-023
 @satisfies PRJ-024
+@satisfies PRJ-054
+@satisfies PRJ-056
 @satisfies TST-084
+@satisfies TST-107
 """
 
 import stat
@@ -73,30 +77,53 @@ def test_script_runs_locked_dependency_sync_and_pytest() -> None:
     assert "uv run pytest tests/" in source
 
 
-def test_script_builds_sdist_and_wheel_into_dist() -> None:
+def test_script_builds_sdist_and_wheel_into_temporary_directory() -> None:
     """
     @brief Verify the build stage delegates artifact generation to build.sh.
-    @details The build stage must delegate to `scripts/build.sh`, which removes
-    only stale generated artifacts, and must not remove the versioned `dist/`
-    directory itself. The delegated build still runs `python -m build`.
+    @details The build stage must delegate to `scripts/build.sh` with a
+    `--dist-dir` destination located inside a `mktemp -d` temporary root, and
+    must never remove the repository artifact directory.
     @return {None} Function return value.
     @satisfies PRJ-024
-    @satisfies PRJ-041
+    @satisfies PRJ-056
     @satisfies TST-084
     """
     source = _script_source()
     assert "scripts/build.sh" in source
+    assert '--dist-dir "$TEST_BUILD_ARTIFACT_DIR"' in source
+    assert "mktemp -d" in source
     assert "rm -rf dist" not in source
     assert "python -m build" in source
+
+
+def test_script_has_no_dist_directory_dependency() -> None:
+    """
+    @brief Verify the pipeline never reads, cleans, or verifies `dist/`.
+    @details Arrange: load the script source. Act: search every construct that
+    could address the repository `dist/` directory. Assert: no artifact
+    destination assignment, no `dist/` safety probe, no `dist/`-scoped git
+    pathspec, and no `dist/` artifact glob remains in the script.
+    @return {None} Function return value.
+    @satisfies PRJ-036
+    @satisfies PRJ-056
+    @satisfies TST-107
+    """
+    source = _script_source()
+    assert "REPO_ROOT/dist" not in source
+    assert "assert_dist_safe_to_clean" not in source
+    assert ":(exclude)dist" not in source
+    assert "rm -rf -- dist" not in source
+    assert "dist/*.tar.gz" not in source
+    assert "dist/*.whl" not in source
 
 
 def test_script_cleans_pipeline_artifacts_on_exit() -> None:
     """
     @brief Verify the EXIT trap removes pipeline artifacts after execution.
     @details The script must register `cleanup_pipeline_artifacts` as an
-    EXIT trap so `.pytest_cache/` and `__pycache__` trees under `src/` and
-    `tests/` are removed whether the pipeline succeeds or fails. The versioned
-    `dist/` directory must not be removed by the trap.
+    EXIT trap so `.pytest_cache/`, `__pycache__` trees under `src/` and
+    `tests/`, and the pipeline-created temporary artifact directory are removed
+    whether the pipeline succeeds or fails.
     @return {None} Function return value.
     @satisfies PRJ-025
     @satisfies TST-085
@@ -105,24 +132,25 @@ def test_script_cleans_pipeline_artifacts_on_exit() -> None:
     assert "trap cleanup_pipeline_artifacts EXIT" in source
     assert "rm -rf -- .pytest_cache" in source
     assert "rm -rf -- dist" not in source
+    assert 'rm -rf -- "$TEST_BUILD_ROOT"' in source
     assert "-name __pycache__" in source
 
 
-def test_script_verifies_dist_artifacts_and_labeled_stages() -> None:
+def test_script_verifies_temporary_artifacts_and_labeled_stages() -> None:
     """
     @brief Verify artifact checks, labeled stage headers, and stage ordering.
-    @details Artifact verification must check both `dist/*.tar.gz` and
-    `dist/*.whl`; every stage must print a `[<index>/<total>]` labeled
-    header; and the main pipeline must execute stages in canonical order
-    (tree gate, sync, tests, build, artifacts).
+    @details Artifact verification must check both `*.tar.gz` and `*.whl`
+    inside the temporary artifact destination directory; every stage must print
+    a `[<index>/<total>]` labeled header; and the main pipeline must execute
+    stages in canonical order (tree gate, sync, tests, build, artifacts).
     @return {None} Function return value.
     @satisfies PRJ-022
-    @satisfies PRJ-024
+    @satisfies PRJ-054
     @satisfies TST-084
     """
     source = _script_source()
-    assert "dist/*.tar.gz" in source
-    assert "dist/*.whl" in source
+    assert '"$TEST_BUILD_ARTIFACT_DIR"/*.tar.gz' in source
+    assert '"$TEST_BUILD_ARTIFACT_DIR"/*.whl' in source
     assert '[%d/%d]' in source
     main_section = source.split("# Main pipeline:", 1)[1]
     stage_lines = [
@@ -135,5 +163,5 @@ def test_script_verifies_dist_artifacts_and_labeled_stages() -> None:
         "run_stage 'sync dependencies (uv.lock)' uv sync --locked",
         "run_stage 'unit tests' uv run pytest tests/",
         "run_stage 'build sdist and wheel' build_distribution",
-        "run_stage 'verify dist artifacts' require_dist_artifacts",
+        "run_stage 'verify test-build artifacts' require_test_build_artifacts",
     ]

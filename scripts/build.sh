@@ -3,28 +3,33 @@
 #
 # @file
 # @brief Canonical clean build pipeline for the aibar repository.
-# @details Resolves the repository root from its own path, validates the
-# required toolchain and layout, resolves the distribution name and version
-# from `pyproject.toml`, removes every previously generated `dist/` artifact
-# matching the project sdist, wheel, or GNOME extension zip pattern
-# regardless of version number, removes intermediate build artifacts, executes
-# the canonical `python -m build` invocation used by
-# `.github/workflows/release-pypi.yml`, creates the GNOME Shell extension zip
+# @details Resolves the repository root from its own path, resolves the
+# artifact destination directory from `--dist-dir <Path>` (default
+# `<repository-root>/dist`), validates the required toolchain and layout,
+# resolves the distribution name and version from `pyproject.toml`, removes
+# every previously generated artifact matching the project sdist, wheel, or
+# GNOME extension zip pattern regardless of version number, removes
+# intermediate build artifacts, executes the canonical `python -m build`
+# invocation used by `.github/workflows/release-pypi.yml`,
+# creates the GNOME Shell extension zip
 # byte-reproducibly (fixed member order, fixed member timestamps, fixed member
 # permissions, stripped extra fields), validates every produced artifact
 # (non-empty size, archive integrity,
 # required member entries), removes every intermediate artifact created by the
-# build, verifies that no intermediate artifact remains outside `dist/`, and
-# retains all versioned artifacts in `dist/` while printing a summary.
-# Non-generated content inside `dist/` is never deleted; a failed build never
+# build, verifies that no intermediate artifact remains outside the artifact
+# destination directory, and retains all versioned artifacts there while
+# printing a summary.
+# Non-generated content inside the artifact destination directory is never
+# deleted; a failed build never
 # reports success and never leaves intermediate artifacts behind.
 # Time complexity O(A + T) over produced artifacts A and removed trees T;
 # space O(A + T).
 # @pre `uv`, `zip`, and `find` are available in `PATH`.
 # @pre `pyproject.toml` declares `project.name` and `project.version`.
-# @post `dist/` contains one sdist, one wheel, and one GNOME extension zip.
+# @post The artifact destination directory contains one sdist, one wheel, and
+# one GNOME extension zip.
 # @post No `build/`, `.pytest_cache/`, `*.egg-info`, or `__pycache__` artifact
-# remains outside `dist/`.
+# remains outside the artifact destination directory.
 # @return Exit status of the build.
 # @retval 0 Every artifact was generated and verified, and the intermediate
 # artifact cleanup plus the residual-artifact verification succeeded.
@@ -42,6 +47,7 @@
 # @satisfies PRJ-047
 # @satisfies PRJ-048
 # @satisfies PRJ-049
+# @satisfies PRJ-055
 
 set -Eeuo pipefail
 
@@ -51,7 +57,7 @@ SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 # var REPO_ROOT {string} Absolute repository root derived from the script path.
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
-# var DIST_DIR {string} Canonical release-artifact destination directory.
+# var DIST_DIR {string} Release-artifact destination directory (default `<repository-root>/dist`).
 DIST_DIR="$REPO_ROOT/dist"
 # var BUILD_DIR {string} Python distribution build directory created by `python -m build`.
 BUILD_DIR="$REPO_ROOT/build"
@@ -102,7 +108,7 @@ on_error() {
 # @brief Remove intermediate build artifacts on every process termination path.
 # @details Registered as the EXIT trap so success, failure, help, argument
 # errors, SIGINT, and SIGTERM all leave the repository free of intermediate
-# artifacts while keeping the versioned `dist/` artifacts in place. The
+# artifacts while keeping the versioned artifact-destination artifacts in place. The
 # captured exit status is preserved; a cleanup failure or a residual-artifact
 # finding turns a successful run into a failing run.
 # @return {void} The function never returns.
@@ -138,22 +144,23 @@ trap 'exit 143' TERM
 # @return {void} No return value.
 usage() {
   cat <<'EOF'
-Usage: scripts/build.sh
+Usage: scripts/build.sh [--dist-dir <Path>]
 
-Runs a clean build of every aibar release artifact into dist/:
+Runs a clean build of every aibar release artifact into the artifact
+destination directory (--dist-dir, default <repository-root>/dist):
   1. validates the required toolchain (uv, zip, find)
-  2. removes every previously generated dist/ artifact for every version
+  2. removes every previously generated artifact for every version
   3. removes intermediate build artifacts (build/, .pytest_cache/,
      *.egg-info, __pycache__)
   4. builds the sdist and wheel (python -m build)
   5. packages the GNOME Shell extension zip reproducibly
   6. verifies artifact size, archive integrity, and required members
   7. removes the intermediate artifacts created by the build and verifies
-     that none remains outside dist/
+     that none remains outside the artifact destination directory
 
-The versioned artifacts stay in dist/. Non-generated dist/ content is never
-deleted. Intermediate artifacts are removed on success, failure, and signal
-termination.
+The versioned artifacts stay in the artifact destination directory.
+Non-generated content there is never deleted. Intermediate artifacts are
+removed on success, failure, and signal termination.
 EOF
 }
 
@@ -241,12 +248,12 @@ print(data["project"]["version"])
 }
 
 ## @fn is_generated_dist_entry
-# @brief Report whether one `dist/` entry is a build-generated artifact.
+# @brief Report whether one artifact-destination entry is a build-generated artifact.
 # @details Generated entries are the project sdist archive, project wheel
 # archives, and the GNOME extension zip; every other entry is foreign. The
 # sdist and wheel patterns carry no version literal, so entries produced by
 # every previous build version match them.
-# @param entry_path {string} Absolute or repository-relative `dist/` entry path.
+# @param entry_path {string} Absolute or repository-relative artifact-destination entry path.
 # @return {int} 0 when the entry matches a generated artifact pattern.
 # @satisfies PRJ-031
 is_generated_dist_entry() {
@@ -262,11 +269,12 @@ is_generated_dist_entry() {
 }
 
 ## @fn assert_dist_safe_to_clean
-# @brief Abort when `dist/` holds content this script must not delete.
-# @details Refuses to proceed when `dist/` contains entries outside the
-# generated artifact patterns, so non-generated content is never destroyed.
-# Tracked generated artifacts are permitted because the build replaces them.
-# @return {void} Returns when `dist/` is absent or contains only generated artifacts.
+# @brief Abort when the artifact destination directory holds content this script must not delete.
+# @details Refuses to proceed when the artifact destination directory contains
+# entries outside the generated artifact patterns, so non-generated content is
+# never destroyed. Tracked generated artifacts are permitted because the build
+# replaces them.
+# @return {void} Returns when the destination directory is absent or holds only generated artifacts.
 # @satisfies PRJ-032
 assert_dist_safe_to_clean() {
   if [ ! -d "$DIST_DIR" ]; then
@@ -275,26 +283,26 @@ assert_dist_safe_to_clean() {
   local entry
   while IFS= read -r entry; do
     if [ -n "$entry" ] && ! is_generated_dist_entry "$entry"; then
-      printf 'ERROR: dist/ contains a non-generated entry; refusing to delete it: %s\n' \
+      printf 'ERROR: artifact destination contains a non-generated entry; refusing to delete it: %s\n' \
         "$entry" >&2
       exit 1
     fi
   done < <(find "$DIST_DIR" -mindepth 1 -maxdepth 1 -print)
-  printf '  dist/ safety check: OK\n'
+  printf '  artifact destination safety check: OK\n'
 }
 
 ## @fn remove_generated_dist_artifacts
-# @brief Remove every previously generated release artifact from `dist/`.
-# @details Iterates `dist/` top-level regular files and deletes every entry
-# accepted by `is_generated_dist_entry`, which matches the project sdist
-# pattern, the project wheel pattern, and the GNOME extension zip name for any
-# version number. Repeated builds therefore never accumulate obsolete outputs
-# and never touch foreign files.
+# @brief Remove every previously generated release artifact from the destination directory.
+# @details Iterates artifact-destination top-level regular files and deletes
+# every entry accepted by `is_generated_dist_entry`, which matches the project
+# sdist pattern, the project wheel pattern, and the GNOME extension zip name for
+# any version number. Repeated builds therefore never accumulate obsolete
+# outputs and never touch foreign files.
 # @return {void} Returns after targeted removal.
 # @satisfies PRJ-031
 remove_generated_dist_artifacts() {
   if [ ! -d "$DIST_DIR" ]; then
-    printf '  no previous dist/ directory to clean\n'
+    printf '  no previous artifact destination directory to clean\n'
     return 0
   fi
   local entry
@@ -311,9 +319,9 @@ remove_generated_dist_artifacts() {
 # @brief Remove every intermediate artifact created by the build process.
 # @details Deletes the `build/` tree, the `.pytest_cache/` tree, every
 # `*.egg-info` directory under the repository root and `src/`, and every
-# `__pycache__` tree under `src/` and `tests/`. Versioned `dist/` artifacts are
-# never removed here. Emits one line per removed path plus a deterministic
-# no-work line when nothing was present.
+# `__pycache__` tree under `src/` and `tests/`. Versioned artifacts inside the
+# artifact destination directory are never removed here. Emits one line per
+# removed path plus a deterministic no-work line when nothing was present.
 # @return {int} 0 when every removal succeeded.
 # @satisfies PRJ-047
 remove_intermediate_artifacts() {
@@ -368,7 +376,7 @@ remove_intermediate_artifacts() {
 }
 
 ## @fn verify_no_intermediate_artifacts
-# @brief Verify that no intermediate build artifact remains outside `dist/`.
+# @brief Verify that no intermediate build artifact remains outside the artifact destination directory.
 # @details Probes the intermediate artifact locations (`build/`,
 # `.pytest_cache/`, `*.egg-info` directories, and `__pycache__` trees under
 # `src/` and `tests/`) and prints one diagnostic per residual path so a failed
@@ -411,26 +419,31 @@ verify_no_intermediate_artifacts() {
   if [ "$residual_found" -ne 0 ]; then
     return 1
   fi
-  printf '  no intermediate build artifact remains outside dist/\n'
+  printf '  no intermediate build artifact remains outside the artifact destination directory\n'
   return 0
 }
 
 ## @fn build_python_distributions
 # @brief Build the sdist and wheel with the canonical workload command.
 # @details Mirrors `.github/workflows/release-pypi.yml` exactly while pinning
-# dependency resolution to the tracked `uv.lock`.
+# dependency resolution to the tracked `uv.lock`, and directs the produced
+# artifacts into the resolved artifact destination directory through
+# `--outdir`.
 # @return {void} Returns on build success.
 # @satisfies PRJ-030
+# @satisfies PRJ-055
 build_python_distributions() {
-  printf '  build command: %s\n' "$BUILD_COMMAND_DISPLAY"
+  printf '  build command: %s --outdir %s\n' "$BUILD_COMMAND_DISPLAY" "$DIST_DIR"
+  mkdir -p -- "$DIST_DIR"
   (
     cd "$REPO_ROOT"
-    uv run --locked --with build --with setuptools --with wheel python -m build
+    uv run --locked --with build --with setuptools --with wheel python -m build \
+      --outdir "$DIST_DIR"
   )
 }
 
 ## @fn build_extension_archive
-# @brief Package the GNOME Shell extension into `dist/` byte-reproducibly.
+# @brief Package the GNOME Shell extension into the artifact destination directory byte-reproducibly.
 # @details Copies every non-markdown extension source file into the intermediate
 # staging directory `$EXTENSION_STAGING_DIR`, normalizes every staged member to
 # the fixed modification time `$EXTENSION_MEMBER_TIMESTAMP` and the fixed
@@ -443,7 +456,7 @@ build_python_distributions() {
 # directory lives inside `$BUILD_DIR`, so the existing intermediate-artifact
 # cleanup removes it on success, failure, and signal termination.
 # @pre `$EXTENSION_SOURCE_DIR` exists and carries at least one packageable file.
-# @post `dist/$EXTENSION_ZIP_NAME` carries exactly the non-markdown source files
+# @post `<artifact-destination>/$EXTENSION_ZIP_NAME` carries exactly the non-markdown source files
 # as flat members and no directory entry.
 # @return {void} Returns on archive success.
 # @satisfies PRJ-030
@@ -607,7 +620,7 @@ PY
 }
 
 ## @fn print_artifact_summary
-# @brief Print the absolute path and byte size of every artifact retained in `dist/`.
+# @brief Print the absolute path and byte size of every retained artifact.
 # @details Emits one deterministic line per artifact in sorted order. Each line
 # carries the full artifact path (`DIST_DIR` joined with the file name; absolute
 # because `DIST_DIR` derives from `readlink -f`) followed by its byte size, so the
@@ -620,15 +633,28 @@ print_artifact_summary() {
   find "$DIST_DIR" -mindepth 1 -maxdepth 1 -type f -printf '  %p (%s bytes)\n' | sort
 }
 
-# Argument parsing: this script accepts only the help flags.
-for arg in "$@"; do
-  case "$arg" in
+# Argument parsing: `--dist-dir <Path>` selects the artifact destination
+# directory; only the documented help flags and this option are accepted.
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --dist-dir)
+      if [ "$#" -lt 2 ] || [ -z "$2" ]; then
+        printf 'ERROR: --dist-dir requires a directory path argument.\n' >&2
+        usage >&2
+        exit 2
+      fi
+      DIST_DIR="$2"
+      if [[ "$DIST_DIR" != /* ]]; then
+        DIST_DIR="$REPO_ROOT/$DIST_DIR"
+      fi
+      shift 2
+      ;;
     -h | --help)
       usage
       exit 0
       ;;
     *)
-      printf 'ERROR: unknown argument: %s\n' "$arg" >&2
+      printf 'ERROR: unknown argument: %s\n' "$1" >&2
       usage >&2
       exit 2
       ;;

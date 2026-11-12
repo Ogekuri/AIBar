@@ -7,20 +7,23 @@
 # working-tree gate skippable with `--allow-dirty`, pre-run baseline capture,
 # project-structure validation, toolchain validation, shell syntax validation
 # of every `scripts/*.sh` file, Python syntax validation, `pyright` type
-# checking, `.gitignore` contract validation, and `dist/` cleanup safety),
-# (2) locked dependency synchronization, (3) the full pytest suite, (4)
-# release-artifact generation delegated to `scripts/build.sh`, and (5)
-# artifact verification. Cleanup runs through EXIT, SIGINT, and SIGTERM traps,
-# preserves the original exit status, and is followed by a repository-integrity
-# verification that compares the post-run state with the pre-run baseline.
-# The script exits 0 only when every mandatory check and the final cleanup
-# succeed.
+# checking, and `.gitignore` source contract validation), (2) locked dependency
+# synchronization, (3) the full pytest suite, (4) verification-artifact
+# generation delegated to `scripts/build.sh --dist-dir <temporary-artifact-directory>`,
+# and (5) verification of those temporary artifacts. The pipeline never reads,
+# verifies, deletes, or cleans the repository `dist/` directory, so its behavior
+# is invariant under any `dist/` content. Cleanup runs through EXIT, SIGINT, and
+# SIGTERM traps, preserves the original exit status, and is followed by a
+# repository-integrity verification that compares the post-run state with the
+# pre-run baseline. The script exits 0 only when every mandatory check and the
+# final cleanup succeed.
 # Time complexity O(S + T + A) over scripts S, tests T, and artifacts A;
-# space O(1) beyond tool output.
+# space O(1) beyond tool output and the temporary artifact directory.
 # @pre Invoked from any directory inside a git checkout of this repository.
 # @pre `uv`, `git`, `bash`, `find`, and `zip` are available in `PATH`.
-# @post `build/`, `.pytest_cache/`, `__pycache__` trees, and a
-# script-created `.venv` are removed; versioned `dist/` artifacts are retained.
+# @post `build/`, `.pytest_cache/`, `__pycache__` trees, a script-created
+# `.venv`, and the pipeline-created temporary artifact directory are removed;
+# the repository `dist/` directory is never touched.
 # @return Exit status of the pre-release pipeline.
 # @retval 0 Every mandatory check passed and the repository is unchanged.
 # @retval 1 A mandatory check, the cleanup, or the integrity check failed.
@@ -39,6 +42,8 @@
 # @satisfies PRJ-036
 # @satisfies PRJ-037
 # @satisfies PRJ-039
+# @satisfies PRJ-054
+# @satisfies PRJ-056
 
 set -Eeuo pipefail
 
@@ -48,8 +53,10 @@ SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 # var REPO_ROOT {string} Absolute repository root derived from the script path.
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
-# var DIST_DIR {string} Release-artifact directory created and removed by this pipeline.
-DIST_DIR="$REPO_ROOT/dist"
+# var TEST_BUILD_ROOT {string} Pipeline-created temporary directory hosting the verification build output.
+TEST_BUILD_ROOT=""
+# var TEST_BUILD_ARTIFACT_DIR {string} Artifact destination directory passed to `scripts/build.sh` inside `TEST_BUILD_ROOT`.
+TEST_BUILD_ARTIFACT_DIR=""
 # var BUILD_DIR {string} Intermediate packaging directory removed when created by this pipeline.
 BUILD_DIR="$REPO_ROOT/build"
 # var PYTEST_CACHE_DIR {string} Pytest cache directory created by the test stage.
@@ -76,8 +83,6 @@ BASELINE_STATUS=""
 VENV_PREEXISTING=false
 # var BUILD_DIR_PREEXISTING {bool} True when `build/` existed before the pipeline ran.
 BUILD_DIR_PREEXISTING=false
-# var DIST_PREEXISTING {bool} True when `dist/` existed before the pipeline ran.
-DIST_PREEXISTING=false
 # var PROJECT_NAME {string} Distribution name resolved from `pyproject.toml`.
 PROJECT_NAME=""
 # var PROJECT_VERSION {string} Distribution version resolved from `pyproject.toml`.
@@ -120,11 +125,12 @@ handle_interrupt() {
 # @brief Remove pipeline artifacts and verify repository integrity on exit.
 # @details Registered as the EXIT trap so it runs on success, failure, help,
 # argument errors, and signal termination. Removes `.pytest_cache/`,
-# `__pycache__` trees under `src/` and `tests/`, plus `build/` and `.venv` when
-# this run created them. After removal, when the pipeline reached its first
-# stage, `verify_repository_integrity` compares the repository against the
-# pre-run baseline. The captured exit status is preserved; a cleanup or
-# integrity failure only turns a successful run into a failing one.
+# `__pycache__` trees under `src/` and `tests/`, plus `build/`, `.venv`, and the
+# temporary artifact directory when this run created them. After removal, when
+# the pipeline reached its first stage, `verify_repository_integrity` compares
+# the repository against the pre-run baseline. The captured exit status is
+# preserved; a cleanup or integrity failure only turns a successful run into a
+# failing one.
 # Time complexity O(T) over removed trees T.
 # @return {void} The function never returns.
 # @satisfies PRJ-025
@@ -157,8 +163,14 @@ cleanup_pipeline_artifacts() {
       cleanup_status=1
     fi
   fi
+  if [ -n "$TEST_BUILD_ROOT" ] && [ -e "$TEST_BUILD_ROOT" ]; then
+    if ! rm -rf -- "$TEST_BUILD_ROOT"; then
+      printf 'ERROR: failed to remove the temporary artifact directory created by this run.\n' >&2
+      cleanup_status=1
+    fi
+  fi
   if [ "$cleanup_status" -eq 0 ]; then
-    printf '  removed pipeline artifacts (build/, .pytest_cache/, __pycache__ trees, script-created .venv)\n'
+    printf '  removed pipeline artifacts (build/, .pytest_cache/, __pycache__ trees, script-created .venv, temporary artifact directory)\n'
   fi
   if [ "$PIPELINE_ACTIVE" = "true" ]; then
     printf '\n==> [integrity] verifying repository state\n'
@@ -193,15 +205,17 @@ Usage: scripts/pre-release-check.sh [--allow-dirty]
 Runs the authoritative pre-release verification pipeline:
   1. preflight: clean working-tree gate (skippable with --allow-dirty),
      baseline capture, project structure, toolchain, shell syntax,
-     Python syntax, pyright type checking, .gitignore contract, dist/ safety
+     Python syntax, pyright type checking, .gitignore source contract
   2. dependency sync locked to uv.lock
   3. full pytest unit-test suite
-  4. release artifacts generated by scripts/build.sh in dist/
-  5. artifact verification (sdist, wheel, GNOME extension zip)
+  4. verification artifacts generated by scripts/build.sh into a temporary
+     directory (--dist-dir)
+  5. verification of those temporary artifacts (sdist, wheel, extension zip)
 
-Cleanup always removes the generated artifacts; the script exits non-zero on
-the first failing check, on cleanup failure, or when the repository differs
-from its pre-run state.
+Cleanup always removes the generated artifacts and the temporary directory;
+the script exits non-zero on the first failing check, on cleanup failure, or
+when the repository differs from its pre-run state. The repository dist/
+directory is never read, verified, cleaned, or modified.
 EOF
 }
 
@@ -268,23 +282,19 @@ assert_git_repository() {
 ## @fn capture_preexisting_paths
 # @brief Record whether pipeline-owned paths already existed before the run.
 # @details Cleanup must preserve pre-existing content and remove only what this
-# run created, so `.venv`, `build/`, and `dist/` presence is recorded up front.
+# run created, so `.venv` and `build/` presence is recorded up front.
 # @return {void} No return value.
 # @satisfies PRJ-025
 capture_preexisting_paths() {
   VENV_PREEXISTING=false
   BUILD_DIR_PREEXISTING=false
-  DIST_PREEXISTING=false
   if [ -d "$VENV_DIR" ]; then
     VENV_PREEXISTING=true
   fi
   if [ -e "$BUILD_DIR" ]; then
     BUILD_DIR_PREEXISTING=true
   fi
-  if [ -e "$DIST_DIR" ]; then
-    DIST_PREEXISTING=true
-  fi
-  report_check "pre-existing .venv: $VENV_PREEXISTING, build/: $BUILD_DIR_PREEXISTING, dist/: $DIST_PREEXISTING"
+  report_check "pre-existing .venv: $VENV_PREEXISTING, build/: $BUILD_DIR_PREEXISTING"
 }
 
 ## @fn load_project_metadata
@@ -434,16 +444,15 @@ assert_path_visible_to_git() {
 }
 
 ## @fn validate_gitignore_rules
-# @brief Validate the `.gitignore` artifact and source-exclusion contract.
-# @details Confirms generated release artifacts, the release scripts, package
-# sources, documentation, and lockfile stay visible to git for versioning.
+# @brief Validate the `.gitignore` source-exclusion contract.
+# @details Confirms the release scripts, package sources, documentation, and
+# lockfile stay visible to git for versioning. The probe targets repository
+# source paths only, so it never inspects the generated-artifact directory.
 # @return {void} Returns when the contract holds.
+# @satisfies PRJ-036
 # @satisfies PRJ-038
 # @satisfies PRJ-041
 validate_gitignore_rules() {
-  assert_path_visible_to_git "dist/${PROJECT_NAME}-${PROJECT_VERSION}.tar.gz"
-  assert_path_visible_to_git "dist/${PROJECT_NAME}-${PROJECT_VERSION}-py3-none-any.whl"
-  assert_path_visible_to_git "dist/${EXTENSION_ZIP_NAME}"
   assert_path_visible_to_git "src/aibar/aibar/cli.py"
   assert_path_visible_to_git "scripts/build.sh"
   assert_path_visible_to_git "scripts/pre-release-check.sh"
@@ -452,49 +461,19 @@ validate_gitignore_rules() {
   report_check ".gitignore contract: OK"
 }
 
-## @fn assert_dist_safe_to_clean
-# @brief Abort when `dist/` holds content this pipeline must not delete.
-# @details Refuses to proceed when `dist/` contains entries outside the
-# generated artifact patterns, so non-generated content is never destroyed.
-# Tracked generated artifacts are permitted because the build replaces them.
-# @return {void} Returns when `dist/` is absent or only generated artifacts.
-# @satisfies PRJ-036
-assert_dist_safe_to_clean() {
-  if [ ! -d "$DIST_DIR" ]; then
-    report_check "dist/ safety: absent"
-    return 0
-  fi
-  local entry
-  local entry_name
-  while IFS= read -r entry; do
-    if [ -z "$entry" ]; then
-      continue
-    fi
-    entry_name="$(basename "$entry")"
-    case "$entry_name" in
-      "${PROJECT_NAME}-"*.tar.gz | "${PROJECT_NAME}-"*.whl | "$EXTENSION_ZIP_NAME") ;;
-      *)
-        printf 'ERROR: dist/ contains a non-generated entry; refusing to remove it: %s\n' \
-          "$entry" >&2
-        exit 1
-        ;;
-    esac
-  done < <(find "$DIST_DIR" -mindepth 1 -maxdepth 1 -print)
-  report_check "dist/ safety: only generated artifacts present"
-}
-
 ## @fn check_clean_working_tree
 # @brief Execute the repository preflight group and the working-tree gate.
 # @details Runs the clean-tree gate with the `--allow-dirty` opt-out, captures
 # the pre-run baseline, then executes every read-only preflight check:
-# structure, toolchain, shell syntax, Python syntax, type checking, the
-# `.gitignore` contract, and the `dist/` cleanup-safety check.
+# structure, toolchain, shell syntax, Python syntax, type checking, and the
+# `.gitignore` source contract. No `dist/`-scoped operation runs here.
 # @return {void} Returns when the tree state is acceptable and every preflight check passed.
 # @satisfies PRJ-021
 # @satisfies PRJ-028
 # @satisfies PRJ-029
 # @satisfies PRJ-036
 # @satisfies PRJ-038
+# @satisfies PRJ-056
 check_clean_working_tree() {
   assert_git_repository
   local status_output
@@ -509,7 +488,7 @@ check_clean_working_tree() {
   else
     report_check "working tree gate: clean"
   fi
-  BASELINE_STATUS="$(git status --porcelain -- . ':(exclude)dist')"
+  BASELINE_STATUS="$(git status --porcelain)"
   PIPELINE_ACTIVE=true
   capture_preexisting_paths
   validate_project_structure
@@ -519,72 +498,92 @@ check_clean_working_tree() {
   validate_python_syntax
   validate_type_checking
   validate_gitignore_rules
-  assert_dist_safe_to_clean
+}
+
+## @fn create_test_build_output_dir
+# @brief Create the pipeline temporary directory hosting the verification build.
+# @details Allocates one `mktemp -d` root outside the repository and an `artifacts`
+# destination directory inside it, so the delegated build writes its artifacts
+# there instead of the repository artifact directory. The EXIT trap removes the
+# whole root on every termination path.
+# @return {void} Returns after populating `TEST_BUILD_ROOT` and `TEST_BUILD_ARTIFACT_DIR`.
+# @satisfies PRJ-024
+# @satisfies PRJ-056
+create_test_build_output_dir() {
+  TEST_BUILD_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/aibar-pre-release-check.XXXXXXXXXX")"
+  if [ -z "$TEST_BUILD_ROOT" ] || [ ! -d "$TEST_BUILD_ROOT" ]; then
+    fail "unable to create the temporary artifact directory."
+  fi
+  TEST_BUILD_ARTIFACT_DIR="$TEST_BUILD_ROOT/artifacts"
+  if ! mkdir -p -- "$TEST_BUILD_ARTIFACT_DIR"; then
+    fail "unable to create the temporary artifact destination directory."
+  fi
+  report_check "temporary artifact directory: $TEST_BUILD_ARTIFACT_DIR"
 }
 
 ## @fn build_distribution
-# @brief Generate release artifacts through the canonical build script.
-# @details Re-checks the `dist/` cleanup safety and delegates artifact
-# generation, including removal of stale generated artifacts, to
-# `scripts/build.sh` so the build logic has a single implementation. Versioned
-# `dist/` content outside the generated patterns is never removed here.
+# @brief Generate verification artifacts inside the temporary directory.
+# @details Creates the temporary artifact destination directory and delegates
+# artifact generation, including removal of stale generated artifacts, to
+# `scripts/build.sh --dist-dir <temporary-artifact-directory>` so the build logic has a
+# single implementation and the repository artifact directory is never touched.
 # @return {void} Returns when `scripts/build.sh` succeeded.
 # @satisfies PRJ-024
 # @satisfies PRJ-036
-# @satisfies PRJ-041
+# @satisfies PRJ-054
 build_distribution() {
-  assert_dist_safe_to_clean
+  create_test_build_output_dir
   report_check "delegating artifact generation to scripts/build.sh ($BUILD_COMMAND_DISPLAY)"
-  if ! "$REPO_ROOT/scripts/build.sh"; then
+  if ! "$REPO_ROOT/scripts/build.sh" --dist-dir "$TEST_BUILD_ARTIFACT_DIR"; then
     fail "scripts/build.sh failed; release artifact generation aborted."
   fi
 }
 
-## @fn require_dist_artifacts
-# @brief Verify the generated release artifacts and their git visibility.
-# @details Requires exactly one sdist, one wheel, and the GNOME extension zip,
-# validates archive integrity and required members through the project
-# interpreter, and confirms every produced artifact stays visible to git.
-# @return {void} Returns when every artifact is valid and git-visible.
-# @satisfies PRJ-024
+## @fn require_test_build_artifacts
+# @brief Verify the generated verification artifacts.
+# @details Requires exactly one sdist, one wheel, and the GNOME extension zip
+# inside the temporary artifact destination directory, and validates archive
+# integrity plus required members through the project interpreter.
+# @return {void} Returns when every artifact is valid.
 # @satisfies PRJ-033
-require_dist_artifacts() {
-  if [ ! -d "$DIST_DIR" ]; then
-    fail "dist/ directory is missing after the build."
+# @satisfies PRJ-054
+require_test_build_artifacts() {
+  if [ ! -d "$TEST_BUILD_ARTIFACT_DIR" ]; then
+    fail "temporary artifact destination directory is missing after the build."
   fi
   local artifact
   local sdist_count=0
   local wheel_count=0
-  for artifact in dist/*.tar.gz; do
+  for artifact in "$TEST_BUILD_ARTIFACT_DIR"/*.tar.gz; do
     if [ -f "$artifact" ]; then
       sdist_count=$((sdist_count + 1))
       report_check "artifact: $artifact"
     fi
   done
-  for artifact in dist/*.whl; do
+  for artifact in "$TEST_BUILD_ARTIFACT_DIR"/*.whl; do
     if [ -f "$artifact" ]; then
       wheel_count=$((wheel_count + 1))
       report_check "artifact: $artifact"
     fi
   done
   if [ "$sdist_count" -ne 1 ]; then
-    fail "expected exactly one sdist (*.tar.gz) under dist/, found $sdist_count."
+    fail "expected exactly one sdist (*.tar.gz) in the temporary artifact destination directory, found $sdist_count."
   fi
   if [ "$wheel_count" -ne 1 ]; then
-    fail "expected exactly one wheel (*.whl) under dist/, found $wheel_count."
+    fail "expected exactly one wheel (*.whl) in the temporary artifact destination directory, found $wheel_count."
   fi
-  if [ ! -f "dist/$EXTENSION_ZIP_NAME" ]; then
-    fail "expected GNOME extension zip under dist/: $EXTENSION_ZIP_NAME"
+  if [ ! -f "$TEST_BUILD_ARTIFACT_DIR/$EXTENSION_ZIP_NAME" ]; then
+    fail "expected GNOME extension zip in the temporary artifact destination directory: $EXTENSION_ZIP_NAME"
   fi
-  report_check "artifact: dist/$EXTENSION_ZIP_NAME"
+  report_check "artifact: $TEST_BUILD_ARTIFACT_DIR/$EXTENSION_ZIP_NAME"
   uv run --locked --project "$REPO_ROOT" python - \
-    "$DIST_DIR" "$PROJECT_NAME" "$PROJECT_VERSION" "$EXTENSION_ZIP_NAME" <<'PY'
+    "$TEST_BUILD_ARTIFACT_DIR" "$PROJECT_NAME" "$PROJECT_VERSION" "$EXTENSION_ZIP_NAME" <<'PY'
 import pathlib
 import sys
 import tarfile
 import zipfile
 
-dist_dir = pathlib.Path(sys.argv[1])
+artifact_dir = pathlib.Path(sys.argv[1])
 project_name = sys.argv[2]
 project_version = sys.argv[3]
 extension_zip_name = sys.argv[4]
@@ -601,7 +600,7 @@ def fail(message: str) -> None:
     failures.append(message)
 
 
-sdist_path = dist_dir / f"{project_name}-{project_version}.tar.gz"
+sdist_path = artifact_dir / f"{project_name}-{project_version}.tar.gz"
 if not sdist_path.is_file() or sdist_path.stat().st_size == 0:
     fail(f"missing or empty sdist artifact: {sdist_path}")
 else:
@@ -622,7 +621,7 @@ else:
             fail(f"sdist missing required members: {', '.join(missing)}")
         report(f"sdist OK: {sdist_path.name}")
 
-wheel_paths = sorted(dist_dir.glob(f"{project_name}-{project_version}-*.whl"))
+wheel_paths = sorted(artifact_dir.glob(f"{project_name}-{project_version}-*.whl"))
 if len(wheel_paths) != 1 or wheel_paths[0].stat().st_size == 0:
     fail(f"expected one non-empty wheel matching {project_name}-{project_version}-*.whl")
 else:
@@ -647,7 +646,7 @@ else:
             fail(f"wheel missing required members: {', '.join(missing)}")
         report(f"wheel OK: {wheel_path.name}")
 
-extension_zip_path = dist_dir / extension_zip_name
+extension_zip_path = artifact_dir / extension_zip_name
 if not extension_zip_path.is_file() or extension_zip_path.stat().st_size == 0:
     fail(f"missing or empty GNOME extension zip: {extension_zip_path}")
 else:
@@ -673,27 +672,23 @@ for message in failures:
     print(f"ERROR: {message}", file=sys.stderr)
 sys.exit(1 if failures else 0)
 PY
-  for artifact in dist/*; do
-    if [ -f "$artifact" ]; then
-      assert_path_visible_to_git "$artifact"
-    fi
-  done
-  report_check "artifact git visibility: OK"
 }
 
 ## @fn verify_repository_integrity
 # @brief Compare the post-run repository state with the pre-run baseline.
-# @details Fails when tracked files outside `dist/` changed, when the `git status --porcelain` (excluding `dist/`)
+# @details Fails when tracked files changed, when the `git status --porcelain`
 # output differs from the baseline, when any pipeline artifact survived
 # cleanup, or when a script-created environment directory remains. Ignored
 # build output is inspected explicitly because `git status` alone cannot
-# detect it.
+# detect it. Only repository state is inspected, so the generated-artifact
+# directory is never read or verified.
 # @return {int} 0 when the repository matches the baseline, 1 otherwise.
 # @satisfies PRJ-037
+# @satisfies PRJ-056
 verify_repository_integrity() {
   local failures=0
   local current_status=""
-  if ! current_status="$(git status --porcelain -- . ':(exclude)dist')"; then
+  if ! current_status="$(git status --porcelain)"; then
     printf 'ERROR: unable to read git status during integrity verification.\n' >&2
     return 1
   fi
@@ -705,9 +700,9 @@ verify_repository_integrity() {
   else
     printf '  working tree matches the pre-run baseline\n'
   fi
-  if [ "$ALLOW_DIRTY" = "false" ] && ! git diff --quiet HEAD -- . ':(exclude)dist'; then
+  if [ "$ALLOW_DIRTY" = "false" ] && ! git diff --quiet HEAD; then
     printf 'ERROR: tracked files differ from HEAD after the pipeline.\n' >&2
-    git diff --stat HEAD -- . ':(exclude)dist' >&2
+    git diff --stat HEAD >&2
     failures=1
   fi
   local generated_path
@@ -761,6 +756,6 @@ run_stage 'clean working tree' check_clean_working_tree
 run_stage 'sync dependencies (uv.lock)' uv sync --locked
 run_stage 'unit tests' uv run pytest tests/
 run_stage 'build sdist and wheel' build_distribution
-run_stage 'verify dist artifacts' require_dist_artifacts
+run_stage 'verify test-build artifacts' require_test_build_artifacts
 
 printf '\n==> pre-release checks passed (%d/%d stages OK)\n' "$STAGE_TOTAL" "$STAGE_TOTAL"

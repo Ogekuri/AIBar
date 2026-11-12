@@ -43,7 +43,7 @@
 - `id: PROC:pre-release-check`
   - `type: Process`
   - `parent_process: null`
-  - `role: Local pre-release verification pipeline process (preflight validation group, tree gate, locked dependency sync, pytest, delegated artifact build, artifact checks, trap cleanup, repository integrity verification)`
+  - `role: Local pre-release verification pipeline process (preflight validation group, tree gate, locked dependency sync, pytest, delegated artifact build into a temporary artifact directory, artifact checks, trap cleanup, repository integrity verification)`
   - `entrypoint_symbols: main script body`
   - `defining_files: scripts/pre-release-check.sh`
   - `thread_model: no explicit threads detected`
@@ -51,7 +51,7 @@
 - `id: PROC:build`
   - `type: Process`
   - `parent_process: PROC:pre-release-check`
-  - `role: Clean build pipeline producing the sdist, wheel, and GNOME extension zip in dist/ while removing every previously generated artifact for every version and every intermediate build artifact before and after the build`
+  - `role: Clean build pipeline producing the sdist, wheel, and GNOME extension zip in the resolved artifact destination directory (--dist-dir <Path>, default dist/) while removing every previously generated artifact for every version and every intermediate build artifact before and after the build`
   - `entrypoint_symbols: main script body`
   - `defining_files: scripts/build.sh`
   - `thread_model: no explicit threads detected`
@@ -493,14 +493,15 @@
 - `Lifecycle/Trigger`
   - Starts when a maintainer invokes `scripts/pre-release-check.sh` before tagging an official release.
   - Accepts the optional `--allow-dirty` flag; `-h`/`--help` prints usage and exits; unknown arguments exit with code 2.
-  - Executes five labeled stages in order and aborts at the first failing stage with a non-zero exit status: (1) repository preflight group plus clean git working-tree gate (gate skipped only with `--allow-dirty`), (2) dependency sync locked to `uv.lock`, (3) full pytest unit-test suite, (4) artifact generation delegated to `PROC:build`, (5) artifact verification.
-  - Stage 1 also performs every read-only preflight check before any artifact mutation: pre-run baseline capture, project-structure validation, toolchain validation, `bash -n` validation of every `scripts/*.sh` file with optional `shellcheck`, Python syntax compilation, `pyright` type checking, `.gitignore` artifact/source contract validation, and `dist/` cleanup-safety validation.
-  - On exit (success, failure, help, unknown arguments, dirty-tree abort, SIGINT, SIGTERM), traps remove the pipeline artifacts `build/`, `.pytest_cache/`, `__pycache__` trees under `src/` and `tests/`, and a `.venv` created by the run, then run `verify_repository_integrity(...)`; the captured exit status is preserved and cleanup or integrity failure turns a successful run into exit 1.
+  - Executes five labeled stages in order and aborts at the first failing stage with a non-zero exit status: (1) repository preflight group plus clean git working-tree gate (gate skipped only with `--allow-dirty`), (2) dependency sync locked to `uv.lock`, (3) full pytest unit-test suite, (4) artifact generation delegated to `PROC:build` with `--dist-dir <temporary-artifact-directory>`, (5) verification of those temporary artifacts.
+  - Performs no read, deletion, cleanup, or verification operation on the repository `dist/` directory, so pipeline behavior is invariant under any `dist/` content.
+  - Stage 1 also performs every read-only preflight check before any artifact mutation: pre-run baseline capture, project-structure validation, toolchain validation, `bash -n` validation of every `scripts/*.sh` file with optional `shellcheck`, Python syntax compilation, `pyright` type checking, and `.gitignore` source-visibility validation.
+  - On exit (success, failure, help, unknown arguments, dirty-tree abort, SIGINT, SIGTERM), traps remove the pipeline artifacts `build/`, `.pytest_cache/`, `__pycache__` trees under `src/` and `tests/`, a `.venv` created by the run, and the pipeline-created temporary artifact directory, then run `verify_repository_integrity(...)`; the captured exit status is preserved and cleanup or integrity failure turns a successful run into exit 1.
 - `Internal Call-Trace Tree`
   - No internal functions defined under `src/`; orchestration occurs at external process boundaries.
     - `run_stage(...)`: labeled `[<executed>/<total>]` stage wrapper providing progress headers and first-failure abort via `set -Eeuo pipefail` [`scripts/pre-release-check.sh`]
       - `check_clean_working_tree(...)`: dirty-tree gate with `--allow-dirty` opt-out, pre-run baseline capture, and the ordered preflight validation group [`scripts/pre-release-check.sh`]
-        - `capture_preexisting_paths(...)`: record pre-existing `.venv`, `build/`, and `dist/` presence so cleanup removes only run-created content [`scripts/pre-release-check.sh`]
+        - `capture_preexisting_paths(...)`: record pre-existing `.venv` and `build/` presence so cleanup removes only run-created content [`scripts/pre-release-check.sh`]
         - `validate_project_structure(...)`: required manifest, lockfile, package, test, script, and extension-metadata presence plus executable-bit check [`scripts/pre-release-check.sh`]
         - `load_project_metadata(...)`: resolve distribution name and version from `pyproject.toml` through the project interpreter [`scripts/pre-release-check.sh`]
         - `validate_toolchain(...)`: `uv`, `git`, `bash`, `find`, and `zip` availability plus the Python 3.12 interpreter floor [`scripts/pre-release-check.sh`]
@@ -508,33 +509,35 @@
         - `validate_shell_syntax(...)`: `bash -n` over every `scripts/*.sh` file plus optional `shellcheck` at warning severity [`scripts/pre-release-check.sh`]
         - `validate_python_syntax(...)`: `compileall` pass over `src/` through the project interpreter [`scripts/pre-release-check.sh`]
         - `validate_type_checking(...)`: `pyright --project pyrightconfig.json` with the checker provisioned as an ephemeral `--with pyright` tool [`scripts/pre-release-check.sh`]
-        - `validate_gitignore_rules(...)`: artifact-ignored and source-visible assertions over the effective `.gitignore` [`scripts/pre-release-check.sh`]
+        - `validate_gitignore_rules(...)`: source-visible assertions over the effective `.gitignore` [`scripts/pre-release-check.sh`]
           - `assert_path_ignored(...)`: `git check-ignore --no-index` positive assertion [`scripts/pre-release-check.sh`]
-          - `assert_path_visible_to_git(...)`: `git check-ignore --no-index` negative assertion [`scripts/pre-release-check.sh`]
-        - `assert_dist_safe_to_clean(...)`: abort when `dist/` holds non-generated entries [`scripts/pre-release-check.sh`]
-      - `build_distribution(...)`: re-check `dist/` safety, then delegate artifact generation (including stale generated-artifact removal) to `PROC:build` [`scripts/pre-release-check.sh`]
-      - `require_dist_artifacts(...)`: require exactly one sdist, one wheel, and the GNOME extension zip, validate archives and required members through the project interpreter, and assert every produced artifact stays git-ignored [`scripts/pre-release-check.sh`]
-    - `cleanup_pipeline_artifacts(...)`: EXIT-trap handler removing `build/`, `.pytest_cache/`, `__pycache__` trees, and a run-created `.venv` while leaving versioned `dist/` untouched, preserving the captured status [`scripts/pre-release-check.sh`]
-      - `verify_repository_integrity(...)`: post-cleanup comparison of `git status --porcelain` (pathspec excludes `dist/`) against the pre-run baseline plus explicit artifact-absence checks for build output outside `dist/` [`scripts/pre-release-check.sh`]
+          - `assert_path_visible_to_git(...)`: `git check-ignore --no-index` negative assertion limited to repository source paths [`scripts/pre-release-check.sh`]
+        - `assert_dist_safe_to_clean(...)`: absent from this unit; the foreign-entry gate now runs only inside `PROC:build` on the resolved artifact destination directory [`scripts/build.sh`]
+      - `create_test_build_output_dir(...)`: allocate one `mktemp -d` root outside the repository plus an `artifacts` destination directory inside it, so the delegated build never writes into the repository artifact directory [`scripts/pre-release-check.sh`]
+      - `build_distribution(...)`: create the temporary artifact destination, then delegate artifact generation (including stale generated-artifact removal) to `PROC:build` through `scripts/build.sh --dist-dir <temporary-artifact-directory>` [`scripts/pre-release-check.sh`]
+      - `require_test_build_artifacts(...)`: require exactly one sdist, one wheel, and the GNOME extension zip inside the temporary artifact destination directory, and validate archives and required members through the project interpreter [`scripts/pre-release-check.sh`]
+    - `cleanup_pipeline_artifacts(...)`: EXIT-trap handler removing `build/`, `.pytest_cache/`, `__pycache__` trees, a run-created `.venv`, and the pipeline-created temporary artifact directory, preserving the captured status [`scripts/pre-release-check.sh`]
+      - `verify_repository_integrity(...)`: post-cleanup comparison of the whole-tree `git status --porcelain` against the pre-run baseline plus explicit artifact-absence checks for build output outside the artifact destination [`scripts/pre-release-check.sh`]
     - `handle_interrupt(...)`: SIGINT/SIGTERM handler exiting 130/143 with cleanup still active [`scripts/pre-release-check.sh`]
     - `on_error(...)`: ERR-trap diagnostic naming the active stage and failing command [`scripts/pre-release-check.sh`]
 - `External Boundaries`
   - Declaration: `scripts/pre-release-check.sh`.
-  - `git status --porcelain`, `git diff`, and `git check-ignore --no-index`: working-tree baseline, tracked-content, and ignore-contract gates.
+  - `git status --porcelain`, `git diff`, and `git check-ignore --no-index`: whole-tree working-tree baseline, tracked-content, and ignore-contract gates.
   - `bash -n` and optional `shellcheck`: shell syntax and lint validation of `scripts/*.sh`.
   - `uv run --locked --project <root> python -m compileall -q src`: Python syntax validation.
   - `uv run --locked --project <root> --with pyright pyright --project pyrightconfig.json`: type checking.
   - `uv sync --locked`: dependency synchronization validated against the tracked `uv.lock` (CTN-018, REQ-087).
   - `uv run pytest tests/`: pytest suite execution resolving the project environment.
-  - `scripts/build.sh`: subprocess invocation delegating all release artifact generation to `PROC:build`.
-  - Exit cleanup removals: `rm -rf -- .pytest_cache`, `find src tests -type d -name __pycache__ -prune -exec rm -rf -- '{}' +`, and conditional removal of run-created `build/` and `.venv`, executed by the EXIT trap on every script termination path.
+  - `scripts/build.sh --dist-dir <temporary-artifact-directory>`: subprocess invocation delegating all verification-artifact generation to `PROC:build`.
+  - `mktemp -d` and `mkdir -p`: allocation of the pipeline temporary artifact root outside the repository.
+  - Exit cleanup removals: `rm -rf -- .pytest_cache`, `find src tests -type d -name __pycache__ -prune -exec rm -rf -- '{}' +`, conditional removal of run-created `build/` and `.venv`, and removal of the pipeline-created temporary artifact root, executed by the EXIT trap on every script termination path.
 
 ### PROC:build
 - `Entrypoints`
   - External entrypoint: script body [`scripts/build.sh`].
 - `Lifecycle/Trigger`
   - Starts when invoked directly by a maintainer or as the stage-4 subprocess of `PROC:pre-release-check`.
-  - Accepts only `-h`/`--help` (usage, exit 0); unknown arguments exit with code 2.
+  - Accepts only `-h`/`--help` (usage, exit 0) and `--dist-dir <Path>` (artifact destination directory, default `<repository-root>/dist`); a missing `--dist-dir` value or an unknown argument exits with code 2.
   - Resolves the repository root from its own path, validates toolchain and layout, resolves name/version from `pyproject.toml`, aborts when `dist/` holds non-generated entries, removes every previously generated `dist/` artifact matching the project sdist, project wheel, or GNOME extension zip pattern for every version number, removes intermediate build artifacts, builds the sdist and wheel, packages the GNOME extension zip byte-reproducibly, verifies every artifact, removes the intermediate artifacts created by the build, verifies that no intermediate artifact remains outside `dist/`, and retains the versioned artifacts in `dist/`.
   - Registers EXIT, SIGINT, and SIGTERM handlers so the intermediate-artifact cleanup and the residual-artifact verification run on every termination path while the captured exit status is preserved; a cleanup failure turns a successful run into a failing run.
 - `Internal Call-Trace Tree`
@@ -543,27 +546,27 @@
       - `require_tool(...)`: `command -v` executable validation with explicit non-zero abort [`scripts/build.sh`]
     - `validate_project_layout(...)`: required `pyproject.toml`, package tree, and extension source presence [`scripts/build.sh`]
     - `load_project_metadata(...)`: resolve distribution name and version from `pyproject.toml` through the project interpreter [`scripts/build.sh`]
-    - Pre-build cleanup group: refuse and abort when `dist/` holds non-generated entries, then remove every previously generated `dist/` artifact and every intermediate build artifact [`scripts/build.sh`]
-      - `assert_dist_safe_to_clean(...)`: abort when `dist/` holds non-generated entries so preserved content is never deleted [`scripts/build.sh`]
+    - Pre-build cleanup group: refuse and abort when the artifact destination directory holds non-generated entries, then remove every previously generated artifact there and every intermediate build artifact [`scripts/build.sh`]
+      - `assert_dist_safe_to_clean(...)`: abort when the artifact destination directory holds non-generated entries so preserved content is never deleted [`scripts/build.sh`]
         - `is_generated_dist_entry(...)`: match project sdist, project wheel, or extension zip name for every version number [`scripts/build.sh`]
-      - `remove_generated_dist_artifacts(...)`: delete every `dist/` top-level file accepted by `is_generated_dist_entry(...)` so obsolete artifacts of all previous versions are removed before the build [`scripts/build.sh`]
+      - `remove_generated_dist_artifacts(...)`: delete every top-level file of the artifact destination directory accepted by `is_generated_dist_entry(...)` so obsolete artifacts of all previous versions are removed before the build [`scripts/build.sh`]
       - `remove_intermediate_artifacts(...)`: delete the `build/` tree, the `.pytest_cache/` tree, `*.egg-info` directories, and `__pycache__` trees under `src/` and `tests/`, recording every removed path while never removing versioned `dist/` artifacts [`scripts/build.sh`]
-    - `build_python_distributions(...)`: canonical `python -m build` invocation pinned to `uv.lock` [`scripts/build.sh`]
+    - `build_python_distributions(...)`: canonical `python -m build --outdir "$DIST_DIR"` invocation pinned to `uv.lock` and targeting the resolved artifact destination directory [`scripts/build.sh`]
     - `build_extension_archive(...)`: byte-reproducible GNOME extension zip creation into `dist/` from a staging copy under `build/extension-archive-staging` with `LC_ALL=C` sorted members, a fixed member modification time, fixed `0644` member permissions, and stripped extra fields [`scripts/build.sh`]
     - `verify_artifacts(...)`: archive integrity, required-member, and size verification through `tarfile` and `zipfile` [`scripts/build.sh`]
     - `remove_intermediate_artifacts(...)`: post-build intermediate-artifact removal covering `build/`, `.pytest_cache/`, `*.egg-info`, and `__pycache__` trees [`scripts/build.sh`]
-    - `verify_no_intermediate_artifacts(...)`: probe every intermediate artifact location outside `dist/`, emit one diagnostic per residual path, and return non-zero on any residual [`scripts/build.sh`]
+    - `verify_no_intermediate_artifacts(...)`: probe every intermediate artifact location outside the artifact destination directory, emit one diagnostic per residual path, and return non-zero on any residual [`scripts/build.sh`]
     - `print_artifact_summary(...)`: deterministic artifact path and byte-size listing for the retained artifacts [`scripts/build.sh`]
     - `cleanup_on_exit(...)`: EXIT-trap handler running `remove_intermediate_artifacts(...)` plus `verify_no_intermediate_artifacts(...)` and escalating a successful status to exit 1 on cleanup or verification failure [`scripts/build.sh`]
     - `on_error(...)`: ERR-trap diagnostic naming the active phase and failing command; failure exits through the EXIT trap so cleanup still runs [`scripts/build.sh`]
 - `External Boundaries`
   - Declaration: `scripts/build.sh`.
-  - `uv run --locked --with build --with setuptools --with wheel python -m build`: canonical sdist+wheel build producing the versioned `dist/` artifacts consumed by `PROC:release-pypi`, writing `dist/aibar-<version>.tar.gz` and `dist/aibar-<version>-py3-none-any.whl`.
+  - `uv run --locked --with build --with setuptools --with wheel python -m build --outdir <artifact-destination>`: canonical sdist+wheel build producing the versioned artifacts consumed by `PROC:release-pypi` when the default destination is used, writing `aibar-<version>.tar.gz` and `aibar-<version>-py3-none-any.whl` into that destination.
   - `hatch_build.py` (`CustomBuildHook`, `[tool.hatch.build.hooks.custom]`): hatchling build hook invoked for the sdist target that removes the force-included `.gitignore` from the sdist.
   - `zip -X`: GNOME extension archive `dist/aibar@aibar.panel.shell-extension.zip`, fed the sorted staged member names so archive bytes never depend on filesystem enumeration order, checkout mtimes, umask, or host timezone.
   - `cp`, `chmod`, and `touch`, plus `find` with `LC_ALL=C sort` member enumeration: copy-only deterministic archive staging under `build/extension-archive-staging` that never mutates `src/` and is removed by the intermediate-artifact cleanup.
   - `uv run --locked --project <root> python -` archive validation through `tarfile`/`zipfile`.
-  - `find`, `rm -f`, and `rm -rf`: filesystem mutation primitives restricted to generated `dist/` artifact patterns and intermediate artifact trees (`build/`, `.pytest_cache/`, `*.egg-info`, `__pycache__`), with versioned `dist/` artifacts always retained.
+  - `find`, `rm -f`, and `rm -rf`: filesystem mutation primitives restricted to generated artifact patterns inside the resolved artifact destination directory and intermediate artifact trees (`build/`, `.pytest_cache/`, `*.egg-info`, `__pycache__`), with versioned destination artifacts always retained.
 
 ## Communication Edges
 
@@ -617,6 +620,6 @@
   - `destination: PROC:build`
   - `direction: request-response`
   - `mechanism: subprocess spawn with exit-status propagation`
-  - `endpoint_or_channel: argv [scripts/build.sh] + inherited environment and repository root`
-  - `payload_data_shape: filesystem payload written to dist/ (aibar-<version>.tar.gz, aibar-<version>-py3-none-any.whl, aibar@aibar.panel.shell-extension.zip) plus the process exit status`
+  - `endpoint_or_channel: argv [scripts/build.sh, --dist-dir, <temporary-artifact-directory>] + inherited environment and repository root`
+  - `payload_data_shape: filesystem payload written to the temporary artifact destination (aibar-<version>.tar.gz, aibar-<version>-py3-none-any.whl, aibar@aibar.panel.shell-extension.zip) plus the process exit status`
   - `declaration_files: scripts/pre-release-check.sh, scripts/build.sh`

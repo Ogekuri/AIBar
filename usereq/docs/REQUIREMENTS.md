@@ -104,22 +104,25 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **PRJ-021**: `scripts/pre-release-check.sh` MUST abort with non-zero exit status before any pipeline stage when the git working tree contains uncommitted changes, unless the `--allow-dirty` flag is passed.
 - **PRJ-022**: `scripts/pre-release-check.sh` MUST execute each pipeline stage with a labeled progress header and MUST abort at the first failing stage with a non-zero exit status.
 - **PRJ-023**: `scripts/pre-release-check.sh` MUST execute the unit-test suite via `uv run pytest` and MUST fail with non-zero exit status when any test fails.
-- **PRJ-024**: `scripts/pre-release-check.sh` MUST generate release artifacts by invoking `scripts/build.sh` and MUST fail when the sdist, wheel, or GNOME extension zip is missing from `dist/` after the build.
-- **PRJ-025**: `scripts/pre-release-check.sh` MUST remove the `build/` and `.pytest_cache/` directories, `__pycache__` trees under `src/` and `tests/`, and script-created `.venv` on pipeline exit, regardless of pipeline outcome, and MUST leave versioned `dist/` artifacts untouched.
+- **PRJ-024**: `scripts/pre-release-check.sh` MUST generate the verification artifacts by invoking `scripts/build.sh` with an artifact destination directory inside a pipeline-created temporary directory.
+- **PRJ-054**: `scripts/pre-release-check.sh` MUST exit non-zero when the sdist, wheel, or GNOME extension zip is missing from the temporary artifact destination directory after the build.
+- **PRJ-025**: `scripts/pre-release-check.sh` MUST remove `build/`, `.pytest_cache/`, `__pycache__` trees under `src/` and `tests/`, a script-created `.venv`, and the pipeline-created temporary directory on pipeline exit, regardless of pipeline outcome.
 - **PRJ-050**: `.github/workflows/release-pypi.yml` MUST reuse the sdist, wheel, and GNOME extension zip from `dist/` when all three exist in the tagged commit, and MUST generate them with `scripts/build.sh` otherwise.
 - **PRJ-051**: `.github/workflows/release-pypi.yml` MUST fail with non-zero status when the sdist, wheel, or GNOME extension zip is missing from `dist/` after artifact resolution.
 - **PRJ-052**: `.github/workflows/release-pypi.yml` MUST execute no pytest suite and no `scripts/pre-release-check.sh`, and MUST generate release artifacts at most once per run through `scripts/build.sh`.
 - **PRJ-053**: A release MUST NOT require the sdist, wheel, or GNOME extension zip to be tracked in `dist/` by the tagged commit.
 - **PRJ-028**: MUST validate repository structure, required executables (`uv`, `git`, `zip`, `find`, `bash`), and the syntax of every `scripts/*.sh` file before generating artifacts.
 - **PRJ-029**: MUST validate Python syntax under `src/` and MUST execute `uv run --locked --with pyright pyright --project pyrightconfig.json`, failing when type checking exits non-zero.
-- **PRJ-030**: MUST provide executable `scripts/build.sh` that resolves the repository root from its own path and generates the sdist, wheel, and GNOME extension zip inside `dist/`.
-- **PRJ-031**: `scripts/build.sh` MUST remove, before building, every `dist/` entry matching the project sdist, project wheel, or GNOME extension zip pattern for any version number.
-- **PRJ-032**: `scripts/build.sh` MUST preserve every non-generated file inside `dist/` and MUST NOT delete it.
-- **PRJ-033**: `scripts/build.sh` MUST verify that `dist/` contains a non-empty sdist, wheel, and GNOME extension zip and MUST exit non-zero otherwise.
-- **PRJ-034**: `scripts/build.sh` MUST leave the generated release artifacts in `dist/` and MUST print a summary listing every produced artifact path.
+- **PRJ-030**: MUST provide executable `scripts/build.sh` that resolves the repository root from its own path and generates the sdist, wheel, and GNOME extension zip inside the resolved artifact destination directory.
+- **PRJ-055**: `scripts/build.sh` MUST resolve the artifact destination directory from the `--dist-dir <Path>` argument when provided and MUST default it to `<repository-root>/dist`.
+- **PRJ-056**: `scripts/pre-release-check.sh` MUST behave identically regardless of the presence, absence, or content of the repository `dist/` directory.
+- **PRJ-031**: `scripts/build.sh` MUST remove, before building, every artifact-destination entry matching the project sdist, project wheel, or GNOME extension zip pattern for any version number.
+- **PRJ-032**: `scripts/build.sh` MUST preserve every non-generated file inside the artifact destination directory and MUST NOT delete it.
+- **PRJ-033**: `scripts/build.sh` MUST verify that the artifact destination directory contains a non-empty sdist, wheel, and GNOME extension zip and MUST exit non-zero otherwise.
+- **PRJ-034**: `scripts/build.sh` MUST leave the generated release artifacts in the artifact destination directory and MUST print a summary listing every produced artifact path.
 - **PRJ-035**: `scripts/pre-release-check.sh` MUST register `trap` handlers for EXIT, SIGINT, and SIGTERM that run cleanup, preserve the original exit status, and fail the run when cleanup fails.
-- **PRJ-036**: `scripts/pre-release-check.sh` MUST abort before any artifact mutation when `dist/` contains entries not matching generated artifact patterns.
-- **PRJ-037**: `scripts/pre-release-check.sh` MUST verify after cleanup that tracked files outside `dist/` are unchanged, no pipeline artifacts remain outside `dist/`, and git status outside `dist/` matches the pre-run status.
+- **PRJ-036**: `scripts/pre-release-check.sh` MUST NOT read, verify, delete, clean, or otherwise operate on the repository `dist/` directory or its content.
+- **PRJ-037**: `scripts/pre-release-check.sh` MUST verify after cleanup that tracked files are unchanged, no pipeline artifact remains in the working tree, and the post-run git status matches the pre-run status.
 - **PRJ-038**: `.gitignore` MUST keep exclude-all-then-reinclude semantics and MUST re-include `dist/` and `dist/**/*` in the "Include specific files and directories" section so optionally committed release artifacts stay git-visible.
 - **PRJ-039**: `scripts/build.sh` and `scripts/pre-release-check.sh` MUST locate the repository root from their own paths and MUST work from any invocation directory, including paths with spaces.
 - **PRJ-040**: `scripts/build.sh` MUST validate that `uv`, `zip`, and `find` are available and MUST exit non-zero when a required tool is missing.
@@ -481,12 +484,13 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-081**: MUST verify `.github/workflows/release-pypi.yml` contains no transitional Node20 opt-out variables `ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION` and `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24`.
 - **TST-082**: MUST verify GitHub release and upgrade URLs compose from the program-name constant and the `--develop` upgrade argv pins the fetched `tag_name`.
 - **TST-083**: MUST verify the `--version` GitHub report performs one fresh releases/latest fetch per invocation and its reported version equals the tag pinned by the `--develop` upgrade argv.
-- **TST-084**: MUST verify `scripts/pre-release-check.sh` exists, is executable, gates on a dirty git tree with `--allow-dirty` opt-out, runs `uv sync --locked` and `uv run pytest`, delegates building to `scripts/build.sh`, and verifies the sdist and wheel artifacts.
-- **TST-085**: MUST verify `scripts/pre-release-check.sh` registers an EXIT trap removing `build/`, `.pytest_cache/`, and `__pycache__` trees under `src/` and `tests/`, independent of pipeline outcome, and leaves `dist/` untouched.
+- **TST-084**: MUST verify `scripts/pre-release-check.sh` exists, is executable, gates on a dirty git tree with `--allow-dirty` opt-out, runs `uv sync --locked` and `uv run pytest`, delegates building to `scripts/build.sh` with a temporary artifact destination, and verifies the sdist and wheel there.
+- **TST-085**: MUST verify `scripts/pre-release-check.sh` registers an EXIT trap removing `build/`, `.pytest_cache/`, `__pycache__` trees under `src/` and `tests/`, and the temporary artifact directory, independent of pipeline outcome.
 - **TST-103**: MUST verify `.github/workflows/release-pypi.yml` reuses `dist/` artifacts when present, generates them with `scripts/build.sh` otherwise, and uploads them as GitHub Release assets.
 - **TST-104**: MUST verify `.github/workflows/release-pypi.yml` fails with non-zero status when a required `dist/` artifact is missing after artifact resolution.
 - **TST-105**: MUST verify `.github/workflows/release-pypi.yml` contains no `scripts/pre-release-check.sh`, no `python -m build`, no `uv sync`, and no `uv run pytest` step.
 - **TST-106**: MUST verify `.github/workflows/release-pypi.yml` declares a conditional `astral-sh/setup-uv` toolchain step and keeps no `unit-tests` job.
+- **TST-107**: MUST verify `scripts/pre-release-check.sh` performs no read, deletion, cleanup, or verification operation on the repository `dist/` directory and delegates artifact generation to a temporary directory.
 - **TST-087**: MUST verify Linux `--upgrade --force` executes the PyPI forced lifecycle argv `uv tool install aibar --force --reinstall --refresh` with exit-code propagation and non-Linux `--upgrade --force` prints manual guidance containing the forced command without subprocess execution.
 - **TST-088**: MUST verify Linux `--upgrade` with `--develop`/`--dev` and `--force` executes the tag-pinned GitHub forced lifecycle argv `uv tool install --force --reinstall --refresh git+https://github.com/Ogekuri/<program-name>@<tag_name>` with exit-code propagation.
 - **TST-089**: MUST verify `--version` output is exactly the three aligned stdout lines with equal label field width, aligned colons, package `__version__` installed value, and GitHub failure value `unknown (<reason>)` on fetch failure.
@@ -498,7 +502,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-095**: MUST verify bootstrap writes `RuntimeConfig` defaults when `config.json` is missing and preserves an existing valid file untouched.
 - **TST-096**: MUST verify every command example published by `--info` uses a complete canonical path, is shell-parsable, and succeeds when executed against a temporary configuration file.
 - **TST-097**: MUST verify `.gitignore` contains `!dist/` and `!dist/**/*` inside the "Include specific files and directories" section and that `git check-ignore --no-index` reports `dist/` release artifacts as not ignored.
-- **TST-099**: MUST verify `scripts/build.sh` is executable, resolves the repository root from its own path, validates `uv`/`zip`/`find`, removes every versioned sdist, wheel, and extension-zip `dist/` entry, and preserves foreign `dist/` entries.
+- **TST-099**: MUST verify `scripts/build.sh` is executable, resolves the repository root from its own path, accepts `--dist-dir <Path>` defaulting to `<repository-root>/dist`, validates `uv`/`zip`/`find`, removes every versioned sdist, wheel, and extension-zip destination entry, and preserves foreign entries.
 - **TST-100**: MUST verify `scripts/build.sh` registers EXIT, SIGINT, and SIGTERM cleanup handlers that remove `build/`, `.pytest_cache/`, `*.egg-info`, and `__pycache__` artifacts, preserve the original exit status, and retain versioned `dist/` artifacts.
 - **TST-101**: MUST verify `scripts/build.sh` checks for residual intermediate build artifacts after cleanup and exits non-zero when one remains outside `dist/`.
 - **TST-102**: MUST verify `scripts/clean.sh` is absent from the repository and that no script under `scripts/` references it.
@@ -735,20 +739,23 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | PRJ-021 | `scripts/pre-release-check.sh` + `check_clean_working_tree` + `git status --porcelain` gate with `--allow-dirty` opt-out and non-zero abort. |
 | PRJ-022 | `scripts/pre-release-check.sh` + `run_stage` + labeled `[<index>/<total>]` stage headers with `set -euo pipefail` first-failure abort. |
 | PRJ-023 | `scripts/pre-release-check.sh` + tests stage + `uv run pytest tests/` execution with exit-code propagation. |
-| PRJ-024 | `scripts/pre-release-check.sh` + `build_distribution` + `scripts/build.sh` delegation (stale generated-artifact removal occurs inside build.sh); `require_dist_artifacts` validates non-empty `dist/*.tar.gz`, `dist/*.whl`, and the GNOME extension zip. |
-| TST-084 | `tests/test_pre_release_check_script.py` + source-level assertions for executable bit, dirty-tree gate with `--allow-dirty`, stage commands (`uv sync --locked`, `uv run pytest`, delegated build), `dist/` artifact checks, and stage ordering. |
-| PRJ-025 | `scripts/pre-release-check.sh` + `cleanup_pipeline_artifacts` trap + `rm -rf -- .pytest_cache`, `find src tests` removal of `__pycache__` trees, and removal of script-created `build/` and `.venv`. |
-| TST-085 | `tests/test_pre_release_check_script.py` + `test_script_cleans_pipeline_artifacts_on_exit` + EXIT trap registration and cleanup command assertions. |
+| PRJ-024 | `scripts/pre-release-check.sh` + `build_distribution` + `scripts/build.sh --dist-dir "$TEST_BUILD_DIST_DIR"` delegation into a `mktemp -d` temporary directory (stale generated-artifact removal occurs inside build.sh); `require_test_build_artifacts` validates non-empty `*.tar.gz`, `*.whl`, and the GNOME extension zip inside `$TEST_BUILD_DIST_DIR`. |
+| PRJ-054 | `scripts/pre-release-check.sh` + `require_test_build_artifacts` + `fail` on missing sdist, wheel, or GNOME extension zip inside `$TEST_BUILD_DIST_DIR` after the delegated build. |
+| TST-084 | `tests/test_pre_release_check_script.py` + source-level assertions for executable bit, dirty-tree gate with `--allow-dirty`, stage commands (`uv sync --locked`, `uv run pytest`, delegated build with `--dist-dir`), temporary artifact checks, and stage ordering. |
+| PRJ-025 | `scripts/pre-release-check.sh` + `cleanup_pipeline_artifacts` trap + `rm -rf -- .pytest_cache`, `find src tests` removal of `__pycache__` trees, removal of script-created `build/` and `.venv`, and removal of `$TEST_BUILD_ROOT`. |
+| TST-085 | `tests/test_pre_release_check_script.py` + `test_script_cleans_pipeline_artifacts_on_exit` + EXIT trap registration and cleanup command assertions covering the temporary artifact directory. |
 | PRJ-028 | `scripts/pre-release-check.sh` + `validate_project_structure`/`validate_toolchain`/`validate_shell_syntax` calls inside `check_clean_working_tree` + structure, executable, and `bash -n` checks before any artifact generation. |
 | PRJ-029 | `scripts/pre-release-check.sh` + `validate_python_syntax`/`validate_type_checking` + `uv run --locked python -m compileall -q src` and `uv run --locked --with pyright pyright --project pyrightconfig.json`. |
-| PRJ-030 | `scripts/build.sh` + script body + `readlink -f` repository-root resolution, `uv run ... python -m build`, and the GNOME extension `zip` written into `dist/`. |
-| PRJ-031 | `scripts/build.sh` + `remove_generated_dist_artifacts`/`is_generated_dist_entry` + removal of every `dist/` entry matching `${PROJECT_NAME}-*.tar.gz`, `${PROJECT_NAME}-*.whl`, or the extension zip name, so obsolete artifacts from every version number are deleted before the build. |
-| PRJ-032 | `scripts/build.sh` + `assert_dist_has_no_untracked_foreign_files` + abort when `dist/` contains files outside generated patterns, so non-generated content is never deleted. |
-| PRJ-033 | `scripts/build.sh` + `verify_artifacts` + non-empty sdist, wheel, and extension zip checks with archive-integrity validation through `zipfile` and `tarfile`. |
-| PRJ-034 | `scripts/build.sh` + `print_artifact_summary` + artifact path and byte-size listing emitted after successful verification, artifacts retained in `dist/`. |
+| PRJ-030 | `scripts/build.sh` + script body + `readlink -f` repository-root resolution, `uv run ... python -m build --outdir "$DIST_DIR"`, and the GNOME extension `zip` written into the resolved artifact destination directory. |
+| PRJ-055 | `scripts/build.sh` + argument parser + `--dist-dir <Path>` override assigning `DIST_DIR` from the absolute argument value, with the default `DIST_DIR="$REPO_ROOT/dist"`. |
+| PRJ-031 | `scripts/build.sh` + `remove_generated_dist_artifacts`/`is_generated_dist_entry` + removal of every artifact-destination entry matching `${PROJECT_NAME}-*.tar.gz`, `${PROJECT_NAME}-*.whl`, or the extension zip name, so obsolete artifacts from every version number are deleted before the build. |
+| PRJ-032 | `scripts/build.sh` + `assert_dist_safe_to_clean` + abort when the artifact destination directory contains files outside generated patterns, so non-generated content is never deleted. |
+| PRJ-033 | `scripts/build.sh` + `verify_artifacts` + non-empty sdist, wheel, and extension zip checks inside `$DIST_DIR` with archive-integrity validation through `zipfile` and `tarfile`. |
+| PRJ-034 | `scripts/build.sh` + `print_artifact_summary` + artifact path and byte-size listing emitted after successful verification, artifacts retained in the resolved artifact destination directory. |
+| PRJ-056 | `scripts/pre-release-check.sh` + `mktemp -d` verification build target plus complete absence of `dist/`-scoped operations, so pipeline behavior is invariant under any repository `dist/` content. |
 | PRJ-035 | `scripts/pre-release-check.sh` + `on_exit`/`on_signal` traps + EXIT, INT, and TERM handlers that run cleanup, preserve the captured status, and escalate cleanup failure to exit 1. |
-| PRJ-036 | `scripts/pre-release-check.sh` + `assert_dist_safe_to_clean` + abort when `dist/` holds entries outside generated artifact patterns. |
-| PRJ-037 | `scripts/pre-release-check.sh` + `verify_repository_integrity` + pre-run `git status --porcelain` baseline comparison (pathspec excludes `dist/`), artifact-absence checks, and script-created-environment checks after cleanup. |
+| PRJ-036 | `scripts/pre-release-check.sh` + absence of every `dist/`-scoped operation: no artifact-destination safety probe, no artifact git-visibility probe, and no `:(exclude)dist` git pathspec remains in the script (the foreign-entry gate lives only in `scripts/build.sh`). |
+| PRJ-037 | `scripts/pre-release-check.sh` + `verify_repository_integrity` + whole-tree pre-run `git status --porcelain` baseline comparison, artifact-absence checks, and script-created-environment checks after cleanup. |
 | PRJ-038 | `.gitignore` + `!dist/` and `!dist/**/*` re-include lines in the "Include specific files and directories" section; no dist-scoped exclusion rules. |
 | PRJ-039 | `scripts/build.sh` and `scripts/pre-release-check.sh` + `readlink -f "${BASH_SOURCE[0]}"` root resolution with double-quoted path handling throughout. |
 | PRJ-040 | `scripts/build.sh` + `require_tool` + `command -v` validation of `uv`, `zip`, and `find` before any build step, exiting non-zero on a missing tool. |
@@ -809,7 +816,8 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | PRJ-047 | `scripts/build.sh` + `remove_intermediate_artifacts` + removal of `build/`, `.pytest_cache/`, `*.egg-info` directories, and `__pycache__` trees under `src/` and `tests/` after every build while `dist/` versioned artifacts stay untouched. |
 | PRJ-048 | `scripts/build.sh` + `cleanup_on_exit` EXIT handler plus `trap 'exit 130' INT` and `trap 'exit 143' TERM` + intermediate-artifact cleanup preserving the captured exit status. |
 | PRJ-049 | `scripts/build.sh` + `verify_no_intermediate_artifacts` + residual-artifact detection outside `dist/` with non-zero exit. |
-| TST-099 | `tests/test_build_script.py` + source-level assertions for executable bit, root resolution, toolchain validation, all-version generated-artifact deletion, and foreign `dist/` entry preservation. |
+| TST-099 | `tests/test_build_script.py` + source-level assertions for executable bit, root resolution, `--dist-dir` override with the `dist` default, toolchain validation, all-version generated-artifact deletion, and foreign artifact-destination entry preservation. |
+| TST-107 | `tests/test_pre_release_check_script.py` + `test_script_has_no_dist_directory_dependency` + absence assertions for a `REPO_ROOT/dist` destination, `assert_dist_safe_to_clean`, `:(exclude)dist` git pathspec, and `dist/` artifact globs. |
 | TST-100 | `tests/test_build_script.py` + EXIT/INT/TERM trap assertions plus `remove_intermediate_artifacts` coverage of `build/`, `.pytest_cache/`, `*.egg-info`, and `__pycache__` with `dist/` retention. |
 | TST-101 | `tests/test_build_script.py` + `verify_no_intermediate_artifacts` assertions covering residual-artifact detection and non-zero exit. |
 | TST-102 | `tests/test_build_script.py` + absence assertions for `scripts/clean.sh` and for `clean.sh` references inside `scripts/*.sh`. |

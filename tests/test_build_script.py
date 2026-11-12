@@ -228,6 +228,24 @@ def test_script_prints_artifact_summary_and_handles_arguments() -> None:
     assert "exit 2" in source
 
 
+def test_script_accepts_dist_dir_override_with_default() -> None:
+    """
+    @brief Verify the `--dist-dir` artifact-destination override.
+    @details Arrange: load the script source. Act: inspect the destination
+    assignment, the argument parser, and the build invocation. Assert: the
+    destination defaults to `<repository-root>/dist`, `--dist-dir <Path>`
+    replaces it, and the distribution build forwards it through `--outdir`.
+    @return {None} Function return value.
+    @satisfies PRJ-055
+    @satisfies TST-099
+    """
+    source = _script_source()
+    assert 'DIST_DIR="$REPO_ROOT/dist"' in source
+    assert "--dist-dir)" in source
+    assert 'DIST_DIR="$2"' in source
+    assert '--outdir "$DIST_DIR"' in source
+
+
 def test_retired_clean_script_is_absent() -> None:
     """
     @brief Verify `scripts/clean.sh` was removed and is no longer referenced.
