@@ -1,12 +1,13 @@
 """
 @file
 @brief Unit tests for PyPI release automation compliance.
-@details Verifies the renamed release workflow `.github/workflows/release-pypi.yml`
+@details Verifies the release workflow `.github/workflows/release-pypi.yml`
 preserves the canonical tag-triggered release pipeline, declares PyPI Trusted
-Publishing via `pypa/gh-action-pypi-publish` under `id-token: write`, pins the
-Python 3.12 setup version, and that `README.md` documents PyPI installation
-commands. All assertions are static file-content checks: deterministic,
-isolated, and free of network/filesystem side effects beyond repository reads.
+Publishing via `pypa/gh-action-pypi-publish` under `id-token: write`, publishes
+the tagged-commit `dist/` artifacts, and that `README.md` documents PyPI
+installation commands. All assertions are static file-content checks:
+deterministic, isolated, and free of network/filesystem side effects beyond
+repository reads.
 @satisfies TST-065
 @satisfies TST-068
 @satisfies TST-069
@@ -123,40 +124,29 @@ class TestTrustedPublishing:
             "workflow must publish via pypa/gh-action-pypi-publish"
         )
 
-    def test_publish_job_gated_on_build(self, workflow_text: str) -> None:
+    def test_publish_job_gated_on_release_assets(self, workflow_text: str) -> None:
         """
-        @brief Verify publishing runs after the gated build job.
+        @brief Verify publishing runs after the release-assets job.
         @details Asserts a `publish-pypi` job exists and depends on
-        `build-release`, which itself is gated on the master-branch check, so
-        distributions publish only for tagged master releases.
+        `release-assets`, which itself is gated on the branch check, so
+        tagged-commit distributions publish only for tagged master releases.
         @param workflow_text {str} Workflow YAML content.
         @return {None} Function return value.
         @satisfies PRJ-013
+        @satisfies TST-073
         """
         assert "publish-pypi:" in workflow_text
-        assert "needs: build-release" in workflow_text
+        assert "needs: release-assets" in workflow_text
+        assert "needs.release-assets.outputs.is_master == 'true'" in workflow_text
 
 
 class TestPythonVersionPins:
     """
-    @brief Validates Python 3.12 interpreter pins.
-    @details Ensures the workflow setup pins python-version "3.12" and the
-    repository `.python-version` tracks 3.12 so release builds and local uv
-    execution resolve the same interpreter floor.
+    @brief Validates the repository Python 3.12 interpreter pin.
+    @details Ensures the repository `.python-version` tracks 3.12 so local uv
+    execution resolves the documented interpreter floor. The release workflow
+    installs no Python toolchain because it publishes pre-built artifacts.
     """
-
-    def test_workflow_pins_python_312(self, workflow_text: str) -> None:
-        """
-        @brief Verify workflow python-version pin equals 3.12.
-        @details Asserts `python-version: "3.12"` appears in the workflow
-        setup steps.
-        @param workflow_text {str} Workflow YAML content.
-        @return {None} Function return value.
-        @satisfies TST-065
-        """
-        assert 'python-version: "3.12"' in workflow_text, (
-            'release workflow must pin python-version: "3.12"'
-        )
 
     def test_python_version_file_tracks_312(self) -> None:
         """

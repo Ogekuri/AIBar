@@ -3,7 +3,7 @@ name: Release (PyPI+extension)
 on:
   push:
     tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+' # push di una versione canonica (es. v1.2.3) senza pre-release
+      - 'v[0-9]+.[0-9]+.[0-9]+' # canonical version tag (e.g. v1.2.3) without pre-release suffix
 
 permissions:
   contents: write
@@ -11,7 +11,7 @@ permissions:
   attestations: write
 
 jobs:
-  # 1. Controlla se siamo sul branch corretto
+  # 1. Resolve whether the tagged commit belongs to master or develop
   check-branch:
     runs-on: ubuntu-latest
     outputs:
@@ -21,7 +21,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          fetch-depth: 0 
+          fetch-depth: 0
 
       - name: Resolve tagged release branch
         id: check
@@ -29,45 +29,23 @@ jobs:
           git fetch origin master
           git fetch origin develop || echo "origin/develop not found on remote"
           if git branch -r --contains "${GITHUB_SHA}" | grep -q "origin/master"; then
-            echo "✅ Tag ${{ github.ref }} is on master branch: release build and PyPI publication enabled."
+            echo "Tag ${{ github.ref }} is on master branch: release asset publication and PyPI publication enabled."
             echo "is_master=true" >> "$GITHUB_OUTPUT"
             echo "is_release_branch=true" >> "$GITHUB_OUTPUT"
           elif git branch -r --contains "${GITHUB_SHA}" | grep -q "origin/develop"; then
-            echo "ℹ️ Tag ${{ github.ref }} is on develop branch: release build enabled, PyPI publication skipped."
+            echo "Tag ${{ github.ref }} is on develop branch: release asset publication enabled, PyPI publication skipped."
             echo "is_master=false" >> "$GITHUB_OUTPUT"
             echo "is_release_branch=true" >> "$GITHUB_OUTPUT"
           else
-            echo "❌ Tag ${{ github.ref }} is not on master or develop branch: skipping release."
+            echo "Tag ${{ github.ref }} is not on master or develop branch: skipping release."
             echo "is_master=false" >> "$GITHUB_OUTPUT"
             echo "is_release_branch=false" >> "$GITHUB_OUTPUT"
           fi
 
-  # Run the pytest unit-test suite gating release artifact creation and publication.
-  unit-tests:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 1
-
-      - name: Set up Python
-        uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v10.3.3
-
-      - name: Sync dependencies locked to uv.lock
-        run: uv sync --locked
-
-      - name: Run pytest unit-test suite
-        run: uv run pytest tests/
-
-  # 2. Effetua la build
-  build-release:
-    needs: [check-branch, unit-tests]
+  # 2. Publish the release artifacts already committed under dist/ by the local build pipeline.
+  # No build runs here: the tagged commit is the single source of every artifact.
+  release-assets:
+    needs: check-branch
     # Runs for version tags on either the master or the develop branch
     if: needs.check-branch.outputs.is_release_branch == 'true'
     outputs:
@@ -75,26 +53,26 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout tagged release commit
         uses: actions/checkout@v7
         with:
-          fetch-depth: 0 
+          fetch-depth: 1
 
-      - name: Set up Python
-        uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v10.3.3
-
-      - name: Build Python distributions
-        run: uv run --with build --with setuptools --with wheel python -m build
-
-      - name: Build GNOME extension zip
+      - name: Verify pre-built dist artifacts
         run: |
-          cd src/aibar/aibar/gnome-extension/aibar@aibar.panel
-          zip -r "$GITHUB_WORKSPACE/dist/aibar@aibar.panel.shell-extension.zip" . -x "*.md"
+          set -euo pipefail
+          missing=0
+          for pattern in 'dist/*.tar.gz' 'dist/*.whl' 'dist/aibar@aibar.panel.shell-extension.zip'; do
+            if ! compgen -G "$pattern" > /dev/null; then
+              echo "ERROR: missing pre-built release artifact in the tagged commit: $pattern" >&2
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "ERROR: the tagged commit must contain the sdist, wheel, and GNOME extension zip in dist/." >&2
+            exit 1
+          fi
+          ls -l dist
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@v4
@@ -172,11 +150,11 @@ jobs:
             dist/*.whl
           if-no-files-found: error
 
-  # 3. Pubblica il pacchetto Python su PyPI via Trusted Publishing (OIDC)
+  # 3. Publish the tagged-commit distributions to PyPI via Trusted Publishing (OIDC)
   publish-pypi:
-    needs: build-release
+    needs: release-assets
     # Publishes to PyPI only for version tags on the master branch
-    if: needs.build-release.outputs.is_master == 'true'
+    if: needs.release-assets.outputs.is_master == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Download distribution artifacts

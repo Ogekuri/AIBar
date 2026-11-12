@@ -35,8 +35,8 @@
 - `id: PROC:release-pypi`
   - `type: Process`
   - `parent_process: null`
-  - `role: GitHub Actions release pipeline for unit-test gating, PyPI publication, Python package, and GNOME extension assets`
-  - `entrypoint_symbols: workflow trigger (push tag), check-branch job, unit-tests job, build-release job, publish-pypi job`
+  - `role: GitHub Actions release pipeline publishing the tagged-commit dist/ artifacts as GitHub Release assets and PyPI distributions without executing any build`
+  - `entrypoint_symbols: workflow trigger (push tag), check-branch job, release-assets job, publish-pypi job`
   - `defining_files: .github/workflows/release-pypi.yml`
   - `thread_model: no explicit threads detected`
 
@@ -460,20 +460,23 @@
   - workflow trigger: push tags matching `v[0-9]+.[0-9]+.[0-9]+` [`.github/workflows/release-pypi.yml`]
 - `Lifecycle/Trigger`
   - Starts when a matching release tag is pushed.
-  - Runs `check-branch` gate job resolving whether the tag SHA is on `master` or `develop`; runs `unit-tests` job executing the locked pytest suite; runs `build-release` packaging job only when both `check-branch` and `unit-tests` succeed, so release artifacts are never created for versions whose tests fail; runs `publish-pypi` Trusted Publishing job only for `master` tags, transitively gated by the test suite through its `build-release` dependency.
+  - Runs the `check-branch` gate job resolving whether the tag SHA is on `master` or `develop`.
+  - Runs the `release-assets` job for tags on either branch: checks out the tagged commit, verifies the pre-built `dist/` sdist, wheel, and GNOME extension zip, attests provenance, builds the changelog, publishes the GitHub Release with `dist/**/*` assets, and uploads the distributions as a workflow artifact; any missing artifact aborts the job with a non-zero exit.
+  - Runs the `publish-pypi` Trusted Publishing job only for `master` tags, downloading the uploaded distributions and publishing them unchanged.
+  - Executes no build command, no Python or `uv` toolchain setup, no pytest suite, and no local release script, so the tagged commit is the single artifact source.
 - `Internal Call-Trace Tree`
   - workflow trigger dispatch [`.github/workflows/release-pypi.yml`]
     - `check-branch` job: checkout + `git branch -r --contains ${GITHUB_SHA}` gate resolving `is_master` and `is_release_branch` outputs from `origin/master`/`origin/develop` tag containment [`.github/workflows/release-pypi.yml`]
-    - `unit-tests` job: checkout + python/uv setup + dependency synchronization locked to `uv.lock` + full pytest suite execution; failing tests block the `build-release` job [`.github/workflows/release-pypi.yml`]
-    - `build-release` job (gated on `check-branch` output `is_release_branch == 'true'` and on `unit-tests` success via `needs: [check-branch, unit-tests]`, re-exporting `is_master` for the publish gate): checkout + python/uv setup [`.github/workflows/release-pypi.yml`]
-      - build step: `uv run --with build --with setuptools --with wheel python -m build` [`.github/workflows/release-pypi.yml`]
-      - extension asset step: zip `src/aibar/aibar/gnome-extension/aibar@aibar.panel` into release artifact [`.github/workflows/release-pypi.yml`]
-      - release publication steps: attest provenance and publish GitHub release assets [`.github/workflows/release-pypi.yml`]
-      - distribution artifact upload step: upload `dist/*.tar.gz` and `dist/*.whl` (excluding the GNOME extension zip) as workflow artifact [`.github/workflows/release-pypi.yml`]
-    - `publish-pypi` job (needs `build-release`, gated on `needs.build-release.outputs.is_master == 'true'` so `develop`-only tags build the release but skip PyPI publication): download distribution artifact and publish sdist+wheel to PyPI project `aibar` [`.github/workflows/release-pypi.yml`]
+    - `release-assets` job (gated on `check-branch` output `is_release_branch == 'true'`, re-exporting `is_master` for the publish gate): checkout of the tagged release commit + pre-built `dist/` artifact handling [`.github/workflows/release-pypi.yml`]
+      - artifact verification step: shell `compgen -G` presence probe over `dist/*.tar.gz`, `dist/*.whl`, and `dist/aibar@aibar.panel.shell-extension.zip`, reporting each missing artifact on stderr and exiting non-zero
+      - provenance attestation step: attest every `dist/` artifact as subject
+      - changelog step: categorized changelog derived from commit history
+      - release publication step: publish `dist/**/*` as GitHub Release assets with `fail_on_unmatched_files`
+      - distribution artifact upload step: upload the tagged-commit `dist/*.tar.gz` and `dist/*.whl` as workflow artifact
+    - `publish-pypi` job (needs `release-assets`, gated on `needs.release-assets.outputs.is_master == 'true'` so `develop`-only tags publish release assets but skip PyPI publication): download distribution artifact and publish the pre-built sdist+wheel to PyPI project `aibar` [`.github/workflows/release-pypi.yml`]
 - `External Boundaries`
   - GitHub Actions runtime and hosted runners.
-  - `uv`, `python`, `git`, `zip`, and GitHub release APIs/actions.
+  - `git` and GitHub release APIs/actions.
   - PyPI Trusted Publishing (OIDC) endpoint authenticated via workflow-level `id-token: write` permission; Trusted Publisher registered for project `aibar`, repository `Ogekuri/AiBar`, workflow `release-pypi.yml`; the project is published at `https://pypi.org/project/aibar/`.
 
 ### PROC:pre-release-check
@@ -547,7 +550,7 @@
     - `on_error(...)`: ERR-trap diagnostic naming the active phase and failing command; failure exits through the EXIT trap so cleanup still runs [`scripts/build.sh`]
 - `External Boundaries`
   - Declaration: `scripts/build.sh`.
-  - `uv run --locked --with build --with setuptools --with wheel python -m build`: sdist+wheel build identical to the `build-release` job of `PROC:release-pypi`, writing `dist/aibar-<version>.tar.gz` and `dist/aibar-<version>-py3-none-any.whl`.
+  - `uv run --locked --with build --with setuptools --with wheel python -m build`: canonical sdist+wheel build producing the versioned `dist/` artifacts consumed by `PROC:release-pypi`, writing `dist/aibar-<version>.tar.gz` and `dist/aibar-<version>-py3-none-any.whl`.
   - `hatch_build.py` (`CustomBuildHook`, `[tool.hatch.build.hooks.custom]`): hatchling build hook invoked for the sdist target that removes the force-included `.gitignore` from the sdist.
   - `zip -r`: GNOME extension archive `dist/aibar@aibar.panel.shell-extension.zip`.
   - `uv run --locked --project <root> python -` archive validation through `tarfile`/`zipfile`.
