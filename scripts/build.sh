@@ -8,7 +8,10 @@
 # `<repository-root>/dist`), validates the required toolchain and layout,
 # resolves the distribution name and version from `pyproject.toml`, removes
 # every previously generated artifact matching the project sdist, wheel, or
-# GNOME extension zip pattern regardless of version number, removes
+# GNOME extension zip pattern regardless of version number and regardless of
+# whether the entry is a regular file, a directory, or a symbolic link, then
+# verifies that the artifact destination directory holds no generated
+# artifact before the build starts, removes
 # intermediate build artifacts, executes the canonical `python -m build`
 # invocation used by `.github/workflows/release-pypi.yml`,
 # creates the GNOME Shell extension zip
@@ -48,6 +51,7 @@
 # @satisfies PRJ-048
 # @satisfies PRJ-049
 # @satisfies PRJ-055
+# @satisfies PRJ-057
 
 set -Eeuo pipefail
 
@@ -149,7 +153,8 @@ Usage: scripts/build.sh [--dist-dir <Path>]
 Runs a clean build of every aibar release artifact into the artifact
 destination directory (--dist-dir, default <repository-root>/dist):
   1. validates the required toolchain (uv, zip, find)
-  2. removes every previously generated artifact for every version
+  2. removes every previously generated artifact for every version and
+     every entry type, then verifies the destination holds none of them
   3. removes intermediate build artifacts (build/, .pytest_cache/,
      *.egg-info, __pycache__)
   4. builds the sdist and wheel (python -m build)
@@ -293,11 +298,17 @@ assert_dist_safe_to_clean() {
 
 ## @fn remove_generated_dist_artifacts
 # @brief Remove every previously generated release artifact from the destination directory.
-# @details Iterates artifact-destination top-level regular files and deletes
-# every entry accepted by `is_generated_dist_entry`, which matches the project
-# sdist pattern, the project wheel pattern, and the GNOME extension zip name for
-# any version number. Repeated builds therefore never accumulate obsolete
-# outputs and never touch foreign files.
+# @details Iterates every artifact-destination top-level entry and deletes each
+# entry accepted by `is_generated_dist_entry`, which matches the project sdist
+# pattern, the project wheel pattern, and the GNOME extension zip name for any
+# version number. Regular files are unlinked with `rm -f`; matching directories
+# and symbolic links are removed recursively with `rm -rf` so no obsolete
+# generated entry of any type survives the cleanup. Repeated builds therefore
+# never accumulate obsolete outputs and never touch foreign files. Time
+# complexity O(E) over artifact-destination entries E; space O(R) over removed
+# paths R.
+# @post No artifact-destination entry accepted by `is_generated_dist_entry`
+# remains; foreign entries are untouched.
 # @return {void} Returns after targeted removal.
 # @satisfies PRJ-031
 remove_generated_dist_artifacts() {
@@ -313,6 +324,46 @@ remove_generated_dist_artifacts() {
       printf '  removed previous artifact: %s\n' "$entry"
     fi
   done < <(find "$DIST_DIR" -mindepth 1 -maxdepth 1 -type f -print)
+  while IFS= read -r entry; do
+    if [ -n "$entry" ] && is_generated_dist_entry "$entry"; then
+      rm -rf -- "$entry"
+      REMOVED_PATHS+=("$entry")
+      printf '  removed previous artifact entry: %s\n' "$entry"
+    fi
+  done < <(find "$DIST_DIR" -mindepth 1 -maxdepth 1 ! -type f -print)
+}
+
+## @fn verify_generated_dist_artifacts_removed
+# @brief Verify that no generated artifact remains in the destination directory before the build.
+# @details Probes every artifact-destination top-level entry against
+# `is_generated_dist_entry` and prints one diagnostic per residual entry, so a
+# failed cleanup is never followed by a build that mixes artifacts of different
+# versions. Foreign entries are ignored and never reported because they are
+# preserved by design. Time complexity O(E) over artifact-destination entries E;
+# space O(1).
+# @pre `PROJECT_NAME` is resolved from `pyproject.toml`.
+# @return {int} 0 when no generated artifact remains.
+# @retval 1 At least one generated artifact entry survived the cleanup.
+# @satisfies PRJ-031
+# @satisfies PRJ-057
+verify_generated_dist_artifacts_removed() {
+  if [ ! -d "$DIST_DIR" ]; then
+    return 0
+  fi
+  local residual_found=0
+  local residual
+  while IFS= read -r residual; do
+    if [ -n "$residual" ] && is_generated_dist_entry "$residual"; then
+      printf 'ERROR: residual generated artifact before the build: %s\n' \
+        "$residual" >&2
+      residual_found=1
+    fi
+  done < <(find "$DIST_DIR" -mindepth 1 -maxdepth 1 -print)
+  if [ "$residual_found" -ne 0 ]; then
+    return 1
+  fi
+  printf '  artifact destination holds no generated artifact before the build\n'
+  return 0
 }
 
 ## @fn remove_intermediate_artifacts
@@ -673,6 +724,7 @@ load_project_metadata
 CURRENT_STAGE="pre-build cleanup"
 assert_dist_safe_to_clean
 remove_generated_dist_artifacts
+verify_generated_dist_artifacts_removed
 remove_intermediate_artifacts
 
 CURRENT_STAGE="python distribution build"

@@ -51,7 +51,7 @@
 - `id: PROC:build`
   - `type: Process`
   - `parent_process: PROC:pre-release-check`
-  - `role: Clean build pipeline producing the sdist, wheel, and GNOME extension zip in the resolved artifact destination directory (--dist-dir <Path>, default dist/) while removing every previously generated artifact for every version and every intermediate build artifact before and after the build`
+  - `role: Clean build pipeline producing the sdist, wheel, and GNOME extension zip in the resolved artifact destination directory (--dist-dir <Path>, default dist/) while removing every previously generated artifact for every version and every entry type, verifying the destination holds no generated artifact before the build, and removing every intermediate build artifact before and after the build`
   - `entrypoint_symbols: main script body`
   - `defining_files: scripts/build.sh`
   - `thread_model: no explicit threads detected`
@@ -538,7 +538,7 @@
 - `Lifecycle/Trigger`
   - Starts when invoked directly by a maintainer or as the stage-4 subprocess of `PROC:pre-release-check`.
   - Accepts only `-h`/`--help` (usage, exit 0) and `--dist-dir <Path>` (artifact destination directory, default `<repository-root>/dist`); a missing `--dist-dir` value or an unknown argument exits with code 2.
-  - Resolves the repository root from its own path, validates toolchain and layout, resolves name/version from `pyproject.toml`, aborts when `dist/` holds non-generated entries, removes every previously generated `dist/` artifact matching the project sdist, project wheel, or GNOME extension zip pattern for every version number, removes intermediate build artifacts, builds the sdist and wheel, packages the GNOME extension zip byte-reproducibly, verifies every artifact, removes the intermediate artifacts created by the build, verifies that no intermediate artifact remains outside `dist/`, and retains the versioned artifacts in `dist/`.
+  - Resolves the repository root from its own path, validates toolchain and layout, resolves name/version from `pyproject.toml`, aborts when `dist/` holds non-generated entries, removes every previously generated `dist/` artifact matching the project sdist, project wheel, or GNOME extension zip pattern for every version number and every entry type (regular file via `rm -f`, directory or symbolic link via `rm -rf`), verifies that no generated artifact remains in `dist/` before the build, removes intermediate build artifacts, builds the sdist and wheel, packages the GNOME extension zip byte-reproducibly, verifies every artifact, removes the intermediate artifacts created by the build, verifies that no intermediate artifact remains outside `dist/`, and retains the versioned artifacts in `dist/`.
   - Registers EXIT, SIGINT, and SIGTERM handlers so the intermediate-artifact cleanup and the residual-artifact verification run on every termination path while the captured exit status is preserved; a cleanup failure turns a successful run into a failing run.
 - `Internal Call-Trace Tree`
   - No internal functions defined under `src/`; orchestration occurs at external process boundaries.
@@ -546,10 +546,11 @@
       - `require_tool(...)`: `command -v` executable validation with explicit non-zero abort [`scripts/build.sh`]
     - `validate_project_layout(...)`: required `pyproject.toml`, package tree, and extension source presence [`scripts/build.sh`]
     - `load_project_metadata(...)`: resolve distribution name and version from `pyproject.toml` through the project interpreter [`scripts/build.sh`]
-    - Pre-build cleanup group: refuse and abort when the artifact destination directory holds non-generated entries, then remove every previously generated artifact there and every intermediate build artifact [`scripts/build.sh`]
+    - Pre-build cleanup group: refuse and abort when the artifact destination directory holds non-generated entries, then remove every previously generated artifact of every entry type there, verify that none remains, and remove every intermediate build artifact [`scripts/build.sh`]
       - `assert_dist_safe_to_clean(...)`: abort when the artifact destination directory holds non-generated entries so preserved content is never deleted [`scripts/build.sh`]
         - `is_generated_dist_entry(...)`: match project sdist, project wheel, or extension zip name for every version number [`scripts/build.sh`]
-      - `remove_generated_dist_artifacts(...)`: delete every top-level file of the artifact destination directory accepted by `is_generated_dist_entry(...)` so obsolete artifacts of all previous versions are removed before the build [`scripts/build.sh`]
+      - `remove_generated_dist_artifacts(...)`: delete every top-level entry of the artifact destination directory accepted by `is_generated_dist_entry(...)` (regular files via `rm -f`, matching directories and symbolic links via `rm -rf`) so obsolete artifacts of all previous versions are removed before the build [`scripts/build.sh`]
+      - `verify_generated_dist_artifacts_removed(...)`: probe every top-level artifact-destination entry against `is_generated_dist_entry(...)`, emit one diagnostic per residual generated artifact, and return non-zero before the distribution build stage so a failed cleanup never mixes versions [`scripts/build.sh`]
       - `remove_intermediate_artifacts(...)`: delete the `build/` tree, the `.pytest_cache/` tree, `*.egg-info` directories, and `__pycache__` trees under `src/` and `tests/`, recording every removed path while never removing versioned `dist/` artifacts [`scripts/build.sh`]
     - `build_python_distributions(...)`: canonical `python -m build --outdir "$DIST_DIR"` invocation pinned to `uv.lock` and targeting the resolved artifact destination directory [`scripts/build.sh`]
     - `build_extension_archive(...)`: byte-reproducible GNOME extension zip creation into `dist/` from a staging copy under `build/extension-archive-staging` with `LC_ALL=C` sorted members, a fixed member modification time, fixed `0644` member permissions, and stripped extra fields [`scripts/build.sh`]
@@ -566,7 +567,7 @@
   - `zip -X`: GNOME extension archive `dist/aibar@aibar.panel.shell-extension.zip`, fed the sorted staged member names so archive bytes never depend on filesystem enumeration order, checkout mtimes, umask, or host timezone.
   - `cp`, `chmod`, and `touch`, plus `find` with `LC_ALL=C sort` member enumeration: copy-only deterministic archive staging under `build/extension-archive-staging` that never mutates `src/` and is removed by the intermediate-artifact cleanup.
   - `uv run --locked --project <root> python -` archive validation through `tarfile`/`zipfile`.
-  - `find`, `rm -f`, and `rm -rf`: filesystem mutation primitives restricted to generated artifact patterns inside the resolved artifact destination directory and intermediate artifact trees (`build/`, `.pytest_cache/`, `*.egg-info`, `__pycache__`), with versioned destination artifacts always retained.
+  - `find`, `rm -f`, and `rm -rf`: filesystem mutation primitives restricted to generated artifact patterns inside the resolved artifact destination directory (regular files unlinked, matching directories and symbolic links removed recursively) and intermediate artifact trees (`build/`, `.pytest_cache/`, `*.egg-info`, `__pycache__`), with versioned destination artifacts always retained.
 
 ## Communication Edges
 
