@@ -527,7 +527,7 @@
 - `Lifecycle/Trigger`
   - Starts when invoked directly by a maintainer or as the stage-4 subprocess of `PROC:pre-release-check`.
   - Accepts only `-h`/`--help` (usage, exit 0); unknown arguments exit with code 2.
-  - Resolves the repository root from its own path, validates toolchain and layout, resolves name/version from `pyproject.toml`, aborts when `dist/` holds non-generated entries, removes every previously generated `dist/` artifact matching the project sdist, project wheel, or GNOME extension zip pattern for every version number, removes intermediate build artifacts, builds the sdist and wheel, packages the GNOME extension zip, verifies every artifact, removes the intermediate artifacts created by the build, verifies that no intermediate artifact remains outside `dist/`, and retains the versioned artifacts in `dist/`.
+  - Resolves the repository root from its own path, validates toolchain and layout, resolves name/version from `pyproject.toml`, aborts when `dist/` holds non-generated entries, removes every previously generated `dist/` artifact matching the project sdist, project wheel, or GNOME extension zip pattern for every version number, removes intermediate build artifacts, builds the sdist and wheel, packages the GNOME extension zip byte-reproducibly, verifies every artifact, removes the intermediate artifacts created by the build, verifies that no intermediate artifact remains outside `dist/`, and retains the versioned artifacts in `dist/`.
   - Registers EXIT, SIGINT, and SIGTERM handlers so the intermediate-artifact cleanup and the residual-artifact verification run on every termination path while the captured exit status is preserved; a cleanup failure turns a successful run into a failing run.
 - `Internal Call-Trace Tree`
   - No internal functions defined under `src/`; orchestration occurs at external process boundaries.
@@ -541,7 +541,7 @@
       - `remove_generated_dist_artifacts(...)`: delete every `dist/` top-level file accepted by `is_generated_dist_entry(...)` so obsolete artifacts of all previous versions are removed before the build [`scripts/build.sh`]
       - `remove_intermediate_artifacts(...)`: delete the `build/` tree, the `.pytest_cache/` tree, `*.egg-info` directories, and `__pycache__` trees under `src/` and `tests/`, recording every removed path while never removing versioned `dist/` artifacts [`scripts/build.sh`]
     - `build_python_distributions(...)`: canonical `python -m build` invocation pinned to `uv.lock` [`scripts/build.sh`]
-    - `build_extension_archive(...)`: GNOME extension zip creation into `dist/` [`scripts/build.sh`]
+    - `build_extension_archive(...)`: byte-reproducible GNOME extension zip creation into `dist/` from a staging copy under `build/extension-archive-staging` with `LC_ALL=C` sorted members, a fixed member modification time, fixed `0644` member permissions, and stripped extra fields [`scripts/build.sh`]
     - `verify_artifacts(...)`: archive integrity, required-member, and size verification through `tarfile` and `zipfile` [`scripts/build.sh`]
     - `remove_intermediate_artifacts(...)`: post-build intermediate-artifact removal covering `build/`, `.pytest_cache/`, `*.egg-info`, and `__pycache__` trees [`scripts/build.sh`]
     - `verify_no_intermediate_artifacts(...)`: probe every intermediate artifact location outside `dist/`, emit one diagnostic per residual path, and return non-zero on any residual [`scripts/build.sh`]
@@ -552,7 +552,8 @@
   - Declaration: `scripts/build.sh`.
   - `uv run --locked --with build --with setuptools --with wheel python -m build`: canonical sdist+wheel build producing the versioned `dist/` artifacts consumed by `PROC:release-pypi`, writing `dist/aibar-<version>.tar.gz` and `dist/aibar-<version>-py3-none-any.whl`.
   - `hatch_build.py` (`CustomBuildHook`, `[tool.hatch.build.hooks.custom]`): hatchling build hook invoked for the sdist target that removes the force-included `.gitignore` from the sdist.
-  - `zip -r`: GNOME extension archive `dist/aibar@aibar.panel.shell-extension.zip`.
+  - `zip -X`: GNOME extension archive `dist/aibar@aibar.panel.shell-extension.zip`, fed the sorted staged member names so archive bytes never depend on filesystem enumeration order, checkout mtimes, umask, or host timezone.
+  - `cp`, `chmod`, and `touch`, plus `find` with `LC_ALL=C sort` member enumeration: copy-only deterministic archive staging under `build/extension-archive-staging` that never mutates `src/` and is removed by the intermediate-artifact cleanup.
   - `uv run --locked --project <root> python -` archive validation through `tarfile`/`zipfile`.
   - `find`, `rm -f`, and `rm -rf`: filesystem mutation primitives restricted to generated `dist/` artifact patterns and intermediate artifact trees (`build/`, `.pytest_cache/`, `*.egg-info`, `__pycache__`), with versioned `dist/` artifacts always retained.
 

@@ -9,8 +9,10 @@
 # matching the project sdist, wheel, or GNOME extension zip pattern
 # regardless of version number, removes intermediate build artifacts, executes
 # the canonical `python -m build` invocation used by
-# `.github/workflows/release-pypi.yml`, creates the GNOME Shell extension zip,
-# validates every produced artifact (non-empty size, archive integrity,
+# `.github/workflows/release-pypi.yml`, creates the GNOME Shell extension zip
+# byte-reproducibly (fixed member order, fixed member timestamps, fixed member
+# permissions, stripped extra fields), validates every produced artifact
+# (non-empty size, archive integrity,
 # required member entries), removes every intermediate artifact created by the
 # build, verifies that no intermediate artifact remains outside `dist/`, and
 # retains all versioned artifacts in `dist/` while printing a summary.
@@ -53,6 +55,10 @@ REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 DIST_DIR="$REPO_ROOT/dist"
 # var BUILD_DIR {string} Python distribution build directory created by `python -m build`.
 BUILD_DIR="$REPO_ROOT/build"
+# var EXTENSION_STAGING_DIR {string} Intermediate staging directory used to archive extension members deterministically.
+EXTENSION_STAGING_DIR="$BUILD_DIR/extension-archive-staging"
+# var EXTENSION_MEMBER_TIMESTAMP {string} Fixed modification time applied to every staged extension member.
+EXTENSION_MEMBER_TIMESTAMP="2000-01-01T00:00:00Z"
 # var PYTEST_CACHE_DIR {string} Pytest cache directory created by build-side tooling.
 PYTEST_CACHE_DIR="$REPO_ROOT/.pytest_cache"
 # var SRC_DIR {string} Source tree scanned for intermediate artifacts.
@@ -140,7 +146,7 @@ Runs a clean build of every aibar release artifact into dist/:
   3. removes intermediate build artifacts (build/, .pytest_cache/,
      *.egg-info, __pycache__)
   4. builds the sdist and wheel (python -m build)
-  5. packages the GNOME Shell extension zip
+  5. packages the GNOME Shell extension zip reproducibly
   6. verifies artifact size, archive integrity, and required members
   7. removes the intermediate artifacts created by the build and verifies
      that none remains outside dist/
@@ -424,16 +430,61 @@ build_python_distributions() {
 }
 
 ## @fn build_extension_archive
-# @brief Package the GNOME Shell extension into `dist/`.
-# @details Archives the extension source directory content excluding markdown
-# notes, using the same exclusion policy as the release workflow.
+# @brief Package the GNOME Shell extension into `dist/` byte-reproducibly.
+# @details Copies every non-markdown extension source file into the intermediate
+# staging directory `$EXTENSION_STAGING_DIR`, normalizes every staged member to
+# the fixed modification time `$EXTENSION_MEMBER_TIMESTAMP` and the fixed
+# permission `0644`, then adds the members to the archive in `LC_ALL=C` sorted
+# order with `zip -X` under `TZ=UTC0`. Member order, member timestamps, member
+# permissions, and archive extra fields are therefore independent of filesystem
+# enumeration order, checkout mtimes, umask, and host timezone, so repeated
+# builds from the same sources produce an identical archive. The markdown
+# exclusion policy of the release workflow is preserved, and the staging
+# directory lives inside `$BUILD_DIR`, so the existing intermediate-artifact
+# cleanup removes it on success, failure, and signal termination.
+# @pre `$EXTENSION_SOURCE_DIR` exists and carries at least one packageable file.
+# @post `dist/$EXTENSION_ZIP_NAME` carries exactly the non-markdown source files
+# as flat members and no directory entry.
 # @return {void} Returns on archive success.
 # @satisfies PRJ-030
+# @satisfies PRJ-047
+# @satisfies PRJ-049
 build_extension_archive() {
-  mkdir -p "$DIST_DIR"
+  mkdir -p -- "$DIST_DIR"
+  local archive_path="$DIST_DIR/$EXTENSION_ZIP_NAME"
+  local staging_dir="$EXTENSION_STAGING_DIR"
+  local -a member_names=()
+  local source_path
+  local relative_name
+  local member_dir
+  rm -rf -- "$staging_dir"
+  mkdir -p -- "$staging_dir"
+  while IFS= read -r source_path; do
+    if [ -z "$source_path" ]; then
+      continue
+    fi
+    relative_name="${source_path#"$EXTENSION_SOURCE_DIR"/}"
+    case "$relative_name" in
+      *.md) continue ;;
+    esac
+    if [[ "$relative_name" == */* ]]; then
+      member_dir="$staging_dir/${relative_name%/*}"
+    else
+      member_dir="$staging_dir"
+    fi
+    mkdir -p -- "$member_dir"
+    cp -- "$source_path" "$staging_dir/$relative_name"
+    chmod 0644 -- "$staging_dir/$relative_name"
+    member_names+=("$relative_name")
+  done < <(find "$EXTENSION_SOURCE_DIR" -mindepth 1 -type f -print | LC_ALL=C sort)
+  if [ "${#member_names[@]}" -eq 0 ]; then
+    fail "GNOME extension source directory has no packageable file: $EXTENSION_SOURCE_DIR"
+  fi
+  find "$staging_dir" -exec touch -d "$EXTENSION_MEMBER_TIMESTAMP" -- {} +
+  rm -f -- "$archive_path"
   (
-    cd "$EXTENSION_SOURCE_DIR"
-    zip -r -q "$DIST_DIR/$EXTENSION_ZIP_NAME" . -x "*.md"
+    cd "$staging_dir"
+    LC_ALL=C TZ=UTC0 zip -X -q "$archive_path" "${member_names[@]}"
   )
   printf '  extension archive: %s\n' "$EXTENSION_ZIP_NAME"
 }
