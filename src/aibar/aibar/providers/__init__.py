@@ -12,6 +12,7 @@ from aibar.providers.copilot import CopilotProvider
 from aibar.providers.codex import CodexProvider
 from aibar.providers.geminiai import GeminiAIProvider
 from aibar.providers.zai import ZaiProvider
+from aibar.providers.deepseek import DeepSeekProvider
 
 __all__ = [
     "BaseProvider",
@@ -24,4 +25,5 @@ __all__ = [
     "CodexProvider",
     "GeminiAIProvider",
     "ZaiProvider",
+    "DeepSeekProvider",
 ]

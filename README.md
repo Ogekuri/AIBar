@@ -43,7 +43,7 @@ It caches provider results locally, gates refreshes with idle-time windows, thro
 
 AIBar brings every supported AI provider quota and cost into one place, on the terminal and in the GNOME panel.
 
-- Unified `show` command for multiple providers (`agy`, `openai`, `openrouter`, `copilot`, `codex`, `geminiai`, `zai`).
+- Unified `show` command for multiple providers (`agy`, `openai`, `openrouter`, `copilot`, `codex`, `geminiai`, `zai`, `deepseek`).
 - Text output and machine output (`show --json`) with stable top-level sections (`payload`, `status`, `idle_time`, `freshness`, `extension`, `enabled_providers`).
 - Per-run refresh override with `show --force` (bypasses idle-time gating for that execution).
 - Direct configuration inspection and mutation with canonical colon-separated paths: `--print [PATH]`, `--info [PATH]`, `--print-raw`, `--get PATH`, `--set PATH VALUE`, `--unset PATH`.
@@ -102,6 +102,7 @@ in the [User's Guide](#users-guide).
 | `codex` | Existing Codex login read from `~/.codex/auth.json` |
 | `geminiai` | Google Cloud project with Desktop OAuth 2.0 client, Cloud Monitoring API, BigQuery API, and a billing export dataset (details in the User's Guide) |
 | `zai` | `ZAI_API_KEY` |
+| `deepseek` | `DEEPSEEK_API_KEY` (balance only; no aggregated per-key usage report) |
 
 # User's Guide
 
@@ -204,6 +205,7 @@ Credentials resolve in this order: environment variable, then
 | `codex` | Existing Codex login read from `~/.codex/auth.json` |
 | `geminiai` | Google OAuth configured during `aibar setup` or `aibar login --provider geminiai` |
 | `zai` | `ZAI_API_KEY` |
+| `deepseek` | `DEEPSEEK_API_KEY` (account balance; no aggregated per-key usage report) |
 
 API keys entered during `aibar setup` are stored in `~/.config/aibar/env`.
 
@@ -269,7 +271,7 @@ aibar --help
 aibar show
 
 # Provider selection
-# allowed values: agy, openai, openrouter, copilot, codex, geminiai, zai, all
+# allowed values: agy, openai, openrouter, copilot, codex, geminiai, zai, deepseek, all
 aibar show --provider codex --window 5h
 aibar show -p codex -w 5h
 
@@ -362,13 +364,13 @@ aibar --disable-debug
 
 - Allowed windows: `5h`, `7d`, `30d`.
 - `codex` supports dual-window rendering (`5h` and `7d`) in default text output when `--window` is not explicitly set.
-- For `agy`, `copilot`, `openrouter`, `openai`, `geminiai`, and `zai`, the effective window is fixed to `30d` even if another `--window` is provided.
+- For `agy`, `copilot`, `openrouter`, `openai`, `geminiai`, `zai`, and `deepseek`, the effective window is fixed to `30d` even if another `--window` is provided.
 
 ### Text output layout
 
-- Each provider renders one colored panel in the canonical order `agy`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, `zai`; all panels share the same width.
+- Each provider renders one colored panel in the canonical order `agy`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, `zai`, `deepseek`; all panels share the same width.
 - `Status` is the first line on successful panels, and every panel ends with a right-aligned `Updated: <datetime>, Next: <datetime>` freshness line.
-- Usage rows use `Usage: <window> <progress_bar> <percent>%` for `agy`, `openrouter`, `copilot`, `codex`, and `zai`; `openai` and `geminiai` render `Usage: <window> <percent>%` without a bar.
+- Usage rows use `Usage: <window> <progress_bar> <percent>%` for `agy`, `openrouter`, `copilot`, `codex`, and `zai`; `openai` and `geminiai` render `Usage: <window> <percent>%` without a bar, and `deepseek` renders monetary `Balance:` rows only.
 - `Remaining credits: <remaining> / <limit>` is printed for `codex` and `copilot` when the status is `OK`.
 - Percentages above 100% render the over-limit segment with the 100% boundary marker.
 - Failed providers render `Status: FAIL`, the failure `Reason:`, and the `Updated/Next` freshness line instead of usage statistics.
@@ -396,7 +398,15 @@ aibar --disable-debug
 - One quota request returns all quotas; the effective window is fixed to `30d`.
 - Text output renders one progress bar per quota with the short labels `5h`, `1w`, and `1m` (5-hour quota, weekly quota, and total monthly Web Search/Reader quota), each followed by its own `Resets in: <duration>` countdown.
 - Usage above 100% on any quota renders the shared over-limit bar segment with the 100% boundary marker.
-- In the GNOME extension, Z.ai renders as the last provider tab/card (cyan accent): one progress bar per quota with `Reset in: <duration>`, and the panel status bar shows the `5h` quota percentage followed by the bold `1w` quota percentage.
+- In the GNOME extension, Z.ai renders as the last provider tab/card before DeepSeek (cyan accent): one progress bar per quota with `Reset in: <duration>`, and the panel status bar shows the `5h` quota percentage followed by the bold `1w` quota percentage.
+
+### DeepSeek
+
+- Provider key `deepseek`; the API key is read from `DEEPSEEK_API_KEY` (environment variable or `~/.config/aibar/env`) and can be entered during `aibar setup`.
+- The key authorizes `GET https://api.deepseek.com/user/balance` only. Aggregated per-key usage, request, and token reporting is available exclusively in the DeepSeek web console, so AIBar renders account balance rows and MUST NOT fabricate usage counters.
+- One balance request returns all `balance_infos[]` entries; the effective window is fixed to `30d`.
+- Text output renders `Balance: <currency_symbol><remaining>` (plus one `Balance (<currency>): ...` row per additional currency bucket) with no progress bar, `Usage:` row, `Requests`, or `Tokens` row.
+- In the GNOME extension, DeepSeek renders as the last provider tab/card (indigo accent) with a `Balance: <currency_symbol><value>` card row and a panel balance token.
 
 ## GNOME Shell extension
 

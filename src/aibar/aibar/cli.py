@@ -61,6 +61,7 @@ from aibar.providers import (
     CodexProvider,
     GeminiAIProvider,
     ZaiProvider,
+    DeepSeekProvider,
 )
 from aibar.providers.base import (
     BaseProvider,
@@ -100,6 +101,7 @@ _PROVIDER_PANEL_COLOR_CODES: dict[ProviderName, str] = {
     ProviderName.OPENAI: "\033[94m",
     ProviderName.GEMINIAI: "\033[95m",
     ProviderName.ZAI: "\033[96m",
+    ProviderName.DEEPSEEK: "\033[38;5;69m",
 }
 _API_COUNTER_PROVIDERS: frozenset[ProviderName] = frozenset(
     {
@@ -116,6 +118,7 @@ _SHOW_PROVIDER_ORDER: tuple[ProviderName, ...] = (
     ProviderName.OPENAI,
     ProviderName.GEMINIAI,
     ProviderName.ZAI,
+    ProviderName.DEEPSEEK,
 )
 _FIXED_WINDOW_BY_PROVIDER: dict[ProviderName, WindowPeriod] = {
     ProviderName.AGY: WindowPeriod.DAY_30,
@@ -124,6 +127,7 @@ _FIXED_WINDOW_BY_PROVIDER: dict[ProviderName, WindowPeriod] = {
     ProviderName.OPENAI: WindowPeriod.DAY_30,
     ProviderName.GEMINIAI: WindowPeriod.DAY_30,
     ProviderName.ZAI: WindowPeriod.DAY_30,
+    ProviderName.DEEPSEEK: WindowPeriod.DAY_30,
 }
 _STARTUP_UPDATE_PROGRAM = "aibar"
 _STARTUP_UPDATE_URL = "https://pypi.org/pypi/aibar/json"
@@ -2251,7 +2255,7 @@ def _project_cached_window(
     @brief Project cached raw payload to requested window without network I/O.
     @details Attempts provider-specific `_parse_response` projection when cached
     window differs from requested window; providers with fixed effective windows
-    (`copilot`, `openrouter`, `openai`, `geminiai`) bypass projection and preserve
+    (`copilot`, `openrouter`, `openai`, `geminiai`, `zai`, `deepseek`) bypass projection and preserve
     canonical window values.
     Returns original result on projection failure or when parser is unavailable.
     @param result {ProviderResult} Cached normalized provider result.
@@ -2508,6 +2512,7 @@ def get_providers() -> dict[ProviderName, BaseProvider]:
         ProviderName.CODEX: CodexProvider(),
         ProviderName.GEMINIAI: GeminiAIProvider(),
         ProviderName.ZAI: ZaiProvider(),
+        ProviderName.DEEPSEEK: DeepSeekProvider(),
     }
 
 
@@ -3175,7 +3180,7 @@ def main(ctx: click.Context) -> None:
     "--provider",
     "-p",
     default="all",
-    help="Provider to query (agy, openai, openrouter, copilot, codex, geminiai, zai, all)",
+    help="Provider to query (agy, openai, openrouter, copilot, codex, geminiai, zai, deepseek, all)",
 )
 @click.option(
     "--window",
@@ -3201,8 +3206,8 @@ def show(provider: str, window: str, output_json: bool, force_refresh: bool) -> 
     @details Delegates provider retrieval to a shared cache-based pipeline that
     applies force handling, idle-time gating, conditional cache refresh, and
     deterministic readback from `cache.json` before rendering. When `--provider`
-    targets `copilot`, `openrouter`, `openai`, or `geminiai`, effective window is
-    forced to `30d` regardless of `--window`.
+    targets `agy`, `copilot`, `openrouter`, `openai`, `geminiai`, `zai`, or
+    `deepseek`, effective window is forced to `30d` regardless of `--window`.
     @param provider {str} CLI provider selector string.
     @param window {str} CLI window period string.
     @param output_json {bool} When True, emit JSON output instead of formatted text.
@@ -3429,7 +3434,7 @@ def _provider_display_name(provider_name: ProviderName) -> str:
 def _provider_panel_sort_key(provider_name: ProviderName) -> tuple[int, str]:
     """
     @brief Build deterministic provider sort key for CLI `show` panel ordering.
-    @details Applies canonical provider order `agy/openrouter/copilot/codex/openai/geminiai`;
+    @details Applies canonical provider order `agy/openrouter/copilot/codex/openai/geminiai/zai/deepseek`;
     unknown providers are appended after known providers using lexical fallback.
     @param provider_name {ProviderName} Provider enum key.
     @return {tuple[int, str]} `(rank, provider_name.value)` sort key.
@@ -3448,7 +3453,7 @@ def _ordered_rendered_panels(
     """
     @brief Order rendered CLI provider panels by canonical provider sequence.
     @details Sorts the already-filtered CLI render queue with `_provider_panel_sort_key(...)`
-    so visible panels keep stable `agy/openrouter/copilot/codex/openai/geminiai`
+    so visible panels keep stable `agy/openrouter/copilot/codex/openai/geminiai/zai/deepseek`
     ordering regardless of which disabled providers were removed earlier. Time
     complexity O(P log P). Space complexity O(P).
     @param rendered_panels {list[tuple[ProviderName, str, list[str]]]} CLI render queue after provider filtering.
@@ -3490,8 +3495,8 @@ def _should_render_cli_progress_bar(provider_name: ProviderName) -> bool:
     @brief Determine whether one CLI usage row must include a progress bar.
     @details Returns true only for providers whose CLI `show` rows use the
     fixed-width bracketed progress-bar surface: `agy`, `openrouter`,
-    `copilot`, `codex`, and `zai`. Returns false for `openai` and `geminiai`,
-    which render text-only usage rows. Time complexity O(1). Space complexity O(1).
+    `copilot`, `codex`, and `zai`. Returns false for `openai`, `geminiai`, and
+    `deepseek`, which render text-only usage or balance rows. Time complexity O(1). Space complexity O(1).
     @param provider_name {ProviderName} Provider enum key.
     @return {bool} True when CLI usage rendering must include bar glyphs.
     @satisfies REQ-122
@@ -3964,6 +3969,55 @@ def _build_agy_quota_lines(result: ProviderResult) -> list[str]:
         lines.append(_build_cli_usage_line(ProviderName.AGY, str(label), percentage_value))
     return lines
 
+
+def _build_deepseek_balance_lines(result: ProviderResult) -> list[str]:
+    """
+    @brief Build DeepSeek monetary balance rows for CLI text panels.
+    @details Projects `metrics.remaining` into one
+    `Balance: <currency_symbol><value>` row rendered in bold bright white. The
+    DeepSeek balance API exposes no quota, percentage, request, or token basis,
+    so no `Usage:`, progress-bar, `Requests`, or `Tokens` row is produced
+    (REQ-246). Additional normalized `raw.deepseek_balance_infos` records are
+    appended as `Balance (<currency>): <currency_symbol><value>` rows so
+    multi-currency accounts stay visible without re-parsing API strings.
+    @param result {ProviderResult} DeepSeek provider result.
+    @return {list[str]} Ordered balance detail lines.
+    @satisfies REQ-245
+    @satisfies REQ-246
+    """
+    metrics = result.metrics
+    lines: list[str] = []
+    if metrics.remaining is not None:
+        lines.append(
+            "Balance: "
+            + _format_bright_white_bold(
+                f"{metrics.currency_symbol}{metrics.remaining:.2f}"
+            )
+        )
+
+    balance_infos = (
+        result.raw.get("deepseek_balance_infos")
+        if isinstance(result.raw, dict)
+        else None
+    )
+    if not isinstance(balance_infos, list) or len(balance_infos) <= 1:
+        return lines
+
+    for record in balance_infos:
+        if not isinstance(record, dict):
+            continue
+        total_balance = record.get("total_balance")
+        if not isinstance(total_balance, (int, float)):
+            continue
+        currency_code = record.get("currency") or ""
+        currency_symbol = record.get("currency_symbol") or metrics.currency_symbol
+        lines.append(
+            f"Balance ({currency_code}): "
+            + _format_bright_white_bold(f"{currency_symbol}{total_balance:.2f}")
+        )
+    return lines
+
+
 def _build_result_panel(
     name: ProviderName,
     result: ProviderResult,
@@ -3978,7 +4032,9 @@ def _build_result_panel(
     separated by blank lines. `OK` states emit `Status: OK` first, render
     `agy/openrouter/copilot/codex` usage rows as
     `Usage: <window> <progress_bar> <percent>%`, render `openai/geminiai`
-    usage rows as `Usage: <window> <percent>%`, default OpenRouter usage display
+    usage rows as `Usage: <window> <percent>%`, render `deepseek` as monetary
+    balance rows only (`Balance: <currency_symbol><remaining>`), default
+    OpenRouter usage display
     to `0.0%` when quota inputs are unavailable so the CLI stays aligned with
     GNOME single-window progress-bar behavior, do not emit `Window <window>`
     headings, insert one blank separator between Copilot `Remaining credits`
@@ -4008,6 +4064,8 @@ def _build_result_panel(
     @satisfies REQ-132
     @satisfies REQ-155
     @satisfies REQ-157
+    @satisfies REQ-245
+    @satisfies REQ-246
     """
     title = _provider_display_name(name)
     if label:
@@ -4040,6 +4098,15 @@ def _build_result_panel(
             "Status: OK",
             "",
             *_build_agy_quota_lines(result),
+            "",
+            freshness_line,
+        ]
+
+    if name == ProviderName.DEEPSEEK:
+        return title, [
+            "Status: OK",
+            "",
+            *_build_deepseek_balance_lines(result),
             "",
             freshness_line,
         ]
@@ -4610,6 +4677,7 @@ def setup() -> None:
         ProviderName.OPENAI,
         ProviderName.GEMINIAI,
         ProviderName.ZAI,
+        ProviderName.DEEPSEEK,
     ]
     enabled_providers: dict[str, bool] = {}
     for activation_provider in activation_provider_order:
@@ -4857,6 +4925,21 @@ def setup() -> None:
     ).strip()
     if zai_key:
         updates["ZAI_API_KEY"] = zai_key
+        click.echo("  -> Set")
+    else:
+        click.echo("  -> Skipped")
+    click.echo()
+
+    # DeepSeek API key
+    click.echo(click.style("DeepSeek", bold=True))
+    click.echo("  Get your API key from: https://platform.deepseek.com/api_keys")
+    click.echo("  The key authorizes the account balance endpoint only.")
+    click.echo("  Aggregated per-key usage is available only in the DeepSeek console.")
+    deepseek_key = click.prompt(
+        "  DEEPSEEK_API_KEY", default="", show_default=False
+    ).strip()
+    if deepseek_key:
+        updates["DEEPSEEK_API_KEY"] = deepseek_key
         click.echo("  -> Set")
     else:
         click.echo("  -> Skipped")

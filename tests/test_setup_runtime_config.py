@@ -64,12 +64,13 @@ def test_setup_prompts_runtime_config_before_credentials(
 ) -> None:
     """
     @brief Verify setup prompt order and runtime-config persistence.
-    @details Ensures setup asks provider activation toggles first through sixth
+    @details Ensures setup asks provider activation toggles first through eighth
     in order `agy`, `openrouter`, `copilot`, `codex`, `openai`,
-    `geminiai`, then asks `idle-delay` seventh, `api-call delay` eighth,
-    `api-call timeout` ninth, `default-retry-after` tenth,
-    `gnome-refresh-interval` eleventh, `billing_data` twelfth, Copilot extra
-    premium-request unit cost thirteenth, then per-provider currency symbols,
+    `geminiai`, `zai`, `deepseek`, then asks `idle-delay` ninth,
+    `api-call delay` tenth, `api-call timeout` eleventh,
+    `default-retry-after` twelfth, `gnome-refresh-interval` thirteenth,
+    `billing_data` fourteenth, Copilot extra premium-request unit cost
+    fifteenth, then per-provider currency symbols,
     then GeminiAI OAuth source prompt, provider credential prompts, final
     logging prompts, then writes all selected values to runtime config JSON.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
@@ -83,10 +84,11 @@ def test_setup_prompts_runtime_config_before_credentials(
     """
     config_dir = _patch_config_paths(monkeypatch, tmp_path)
     prompts: list[str] = []
-    # 7 provider toggles + 6 runtime values + Copilot overage
-    # + 6 currency symbols (agy excluded) + OAuth source + empty credentials + 2 logging modes
+    # 8 provider toggles + 6 runtime values + Copilot overage
+    # + 7 currency symbols (agy excluded) + OAuth source + empty credentials + 2 logging modes
     responses = iter(
         [
+            "enable",
             "enable",
             "enable",
             "enable",
@@ -107,7 +109,9 @@ def test_setup_prompts_runtime_config_before_credentials(
             "$",
             "$",
             "$",
+            "$",
             "skip",
+            "",
             "",
             "",
             "",
@@ -148,26 +152,29 @@ def test_setup_prompts_runtime_config_before_credentials(
     assert prompts[4] == "  openai statistics mode"
     assert prompts[5] == "  geminiai statistics mode"
     assert prompts[6] == "  zai statistics mode"
-    assert prompts[7] == "  idle-delay seconds"
-    assert prompts[8] == "  api-call delay milliseconds"
-    assert prompts[9] == "  api-call timeout milliseconds"
-    assert prompts[10] == "  default-retry-after seconds"
-    assert prompts[11] == "  gnome-refresh-interval seconds"
-    assert prompts[12] == "  billing_data"
-    assert prompts[13] == "  copilot extra premium request cost (USD/request)"
-    assert prompts[14] == "  openai currency symbol"
-    assert prompts[15] == "  openrouter currency symbol"
-    assert prompts[16] == "  copilot currency symbol"
-    assert prompts[17] == "  codex currency symbol"
-    assert prompts[18] == "  geminiai currency symbol"
-    assert prompts[19] == "  zai currency symbol"
-    assert prompts[20] == "  geminiai oauth source"
-    assert prompts[21] == "  OPENROUTER_API_KEY"
-    assert prompts[22] == "  OPENAI_ADMIN_KEY"
-    assert prompts[23] == "  GITHUB_TOKEN"
-    assert prompts[24] == "  ZAI_API_KEY"
-    assert prompts[25] == "  execution log mode"
-    assert prompts[26] == "  debug api log mode"
+    assert prompts[7] == "  deepseek statistics mode"
+    assert prompts[8] == "  idle-delay seconds"
+    assert prompts[9] == "  api-call delay milliseconds"
+    assert prompts[10] == "  api-call timeout milliseconds"
+    assert prompts[11] == "  default-retry-after seconds"
+    assert prompts[12] == "  gnome-refresh-interval seconds"
+    assert prompts[13] == "  billing_data"
+    assert prompts[14] == "  copilot extra premium request cost (USD/request)"
+    assert prompts[15] == "  openai currency symbol"
+    assert prompts[16] == "  openrouter currency symbol"
+    assert prompts[17] == "  copilot currency symbol"
+    assert prompts[18] == "  codex currency symbol"
+    assert prompts[19] == "  geminiai currency symbol"
+    assert prompts[20] == "  zai currency symbol"
+    assert prompts[21] == "  deepseek currency symbol"
+    assert prompts[22] == "  geminiai oauth source"
+    assert prompts[23] == "  OPENROUTER_API_KEY"
+    assert prompts[24] == "  OPENAI_ADMIN_KEY"
+    assert prompts[25] == "  GITHUB_TOKEN"
+    assert prompts[26] == "  ZAI_API_KEY"
+    assert prompts[27] == "  DEEPSEEK_API_KEY"
+    assert prompts[28] == "  execution log mode"
+    assert prompts[29] == "  debug api log mode"
 
     runtime_config = json.loads(
         (config_dir / "config.json").read_text(encoding="utf-8")
@@ -186,6 +193,7 @@ def test_setup_prompts_runtime_config_before_credentials(
         "openai": True,
         "geminiai": True,
         "zai": True,
+        "deepseek": True,
     }
     assert runtime_config["copilot_extra_premium_request_cost"] == 0.04
     assert runtime_config["currency_symbols"] == {
@@ -195,6 +203,7 @@ def test_setup_prompts_runtime_config_before_credentials(
         "codex": "$",
         "geminiai": "$",
         "zai": "$",
+        "deepseek": "$",
     }
     assert runtime_config["geminiai_project_id"] is None
     assert runtime_config["log_enabled"] is True
@@ -248,6 +257,7 @@ def test_setup_accepts_geminiai_oauth_json_paste_and_persists_runtime_fields(
             "enable",
             "enable",
             "enable",
+            "enable",
             300,
             1000,
             5000,
@@ -261,9 +271,11 @@ def test_setup_accepts_geminiai_oauth_json_paste_and_persists_runtime_fields(
             "$",
             "$",
             "$",
+            "$",
             "paste",
             oauth_payload,
             "gen-lang-client-0834428245",
+            "",
             "",
             "",
             "",
@@ -318,6 +330,7 @@ def test_setup_accepts_geminiai_oauth_json_paste_and_persists_runtime_fields(
         "openai": True,
         "geminiai": True,
         "zai": True,
+        "deepseek": True,
     }
     assert runtime_doc["log_enabled"] is True
     assert runtime_doc["debug_enabled"] is True
@@ -393,6 +406,7 @@ def test_setup_geminiai_oauth_login_source_reauthorizes_with_current_scopes(
             "enable",
             "enable",
             "enable",
+            "enable",
             300,
             1000,
             5000,
@@ -406,7 +420,9 @@ def test_setup_geminiai_oauth_login_source_reauthorizes_with_current_scopes(
             "$",
             "$",
             "$",
+            "$",
             "login",
+            "",
             "",
             "",
             "",
@@ -450,6 +466,7 @@ def test_setup_geminiai_oauth_login_source_reauthorizes_with_current_scopes(
         "openai": True,
         "geminiai": True,
         "zai": True,
+        "deepseek": True,
     }
     assert runtime_doc["log_enabled"] is False
     assert runtime_doc["debug_enabled"] is True

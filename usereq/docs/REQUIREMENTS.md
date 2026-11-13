@@ -1,8 +1,8 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.4.0"
-date: "2026-11-11"
+version: "0.5.0"
+date: "2026-11-13"
 author: "req-new"
 scope:
   paths:
@@ -83,7 +83,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 
 ### 2.1 Project Functions
 - **PRJ-001**: MUST expose CLI subcommands `show`, `doctor`, `env`, `setup`, `login`, `gnome-install`, and `gnome-uninstall` under one Click command group.
-- **PRJ-002**: MUST aggregate provider metrics through a normalized provider contract for `agy`, `openai`, `openrouter`, `copilot`, and `codex`.
+- **PRJ-002**: MUST aggregate provider metrics through a normalized provider contract for `agy`, `openai`, `openrouter`, `copilot`, `codex`, `geminiai`, `zai`, and `deepseek`.
 - **PRJ-004**: MUST provide GNOME Shell extension `AIBar Monitor` that executes `aibar show --json`, renders provider-specific cards, exposes owner metadata `url=https://github.com/Ogekuri/AIBar` and `donations.github=Ogekuri`, and forces `scripts/test-gnome-extension.sh` resolution to `1280x720` via `MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720`.
 - **PRJ-005**: MUST maintain a machine-readable symbol inventory in `pi-usereq/docs/REFERENCES.md` for symbols discovered from configured source directories.
 - **PRJ-006**: MUST provide a PEP 621-compliant `pyproject.toml` at repository root enabling `uv tool install` distribution execution and `uv run`/`uvx` live execution without external virtualenv bootstrap scripts.
@@ -148,7 +148,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **CTN-013**: MUST persist startup update-check idle state in `~/.cache/aibar/check_version_idle-time.json` JSON with epoch and human-readable `last_success_at` and `idle_until`.
 - **CTN-014**: MUST perform at most one startup update HTTP check per 300 seconds unless `~/.cache/aibar/check_version_idle-time.json` is missing or expired.
 - **CTN-015**: MUST use standard-process lifecycle command strings exactly as `uv tool install aibar --force` (PyPI), `uv tool install --force git+https://github.com/Ogekuri/<program-name>@<tag_name>` (GitHub), and `uv tool uninstall aibar`.
-- **CTN-017**: MUST persist `enabled_providers` in `~/.config/aibar/config.json` as provider-keyed booleans for `agy`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, and `zai`; missing keys MUST default to `true`.
+- **CTN-017**: MUST persist `enabled_providers` in `~/.config/aibar/config.json` as provider-keyed booleans for `agy`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, `zai`, and `deepseek`; missing keys MUST default to `true`.
 - **CTN-018**: MUST declare `requires-python >= 3.12` in `pyproject.toml` and pin `.python-version` to a Python 3.12+ interpreter so `uv run` never resolves Python 3.11.
 - **CTN-019**: MUST declare `pytest` under `[dependency-groups]` `dev` in `pyproject.toml`, outside runtime `[project]` `dependencies`.
 - **CTN-020**: MUST fetch latest GitHub release metadata from `https://api.github.com/repos/Ogekuri/<program-name>/releases/latest` parsing `tag_name`, where `<program-name>` is the current program name.
@@ -158,13 +158,13 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 
 ### 3.1 Design and Implementation
 - **DES-001**: MUST define `BaseProvider` as an abstract interface with `fetch`, `is_configured`, and `get_config_help`.
-- **DES-002**: MUST encode supported windows as `5h`, `7d`, `30d`, and `code_review` and provider names as `agy`, `openai`, `openrouter`, `copilot`, `codex`, `geminiai`, and `zai`.
+- **DES-002**: MUST encode supported windows as `5h`, `7d`, `30d`, and `code_review` and provider names as `agy`, `openai`, `openrouter`, `copilot`, `codex`, `geminiai`, `zai`, and `deepseek`.
 - **DES-003**: MUST reject invalid CLI window values and provider values using Click `BadParameter`.
 - **DES-004**: MUST sanitize sensitive keys (`token`, `key`, `secret`, `password`, `authorization`) from cached raw payloads before disk writes.
 - **DES-005**: MUST parse env-file assignments with optional `export`, quoted values, and inline comments in GNOME extension env loading.
 - **DES-006**: MUST auto-refresh GNOME extension data at interval read from `extension.gnome_refresh_interval_seconds` in the `aibar show --json` output (fallback `60` seconds when field absent), execute popup `Refresh Now` actions with `aibar show --json --force`, and apply the new interval on each successful data refresh.
 - **DES-007**: MUST use provider-registry-driven instantiation so adding `geminiai` introduces no duplicated control-flow branches in `show`, `doctor`, `setup`, `login`, or refresh/load orchestration.
-- **DES-008**: MUST include `geminiai` in provider-name typing and validation while preserving compatibility for `openai`, `openrouter`, `copilot`, and `codex`.
+- **DES-008**: MUST include `geminiai`, `zai`, and `deepseek` in provider-name typing and validation while preserving compatibility for `openai`, `openrouter`, `copilot`, and `codex`.
 
 ### 3.2 Functions
 - **REQ-001**: MUST skip unconfigured providers in `show` output and print missing environment-variable hints when text mode is used.
@@ -172,7 +172,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-003**: MUST emit pretty-printed JSON (`indent=2`) for `show --json` with top-level sections `payload`, `status`, `idle_time`, `freshness`, and `extension`; `freshness` MUST expose provider-keyed `last_success_timestamp`/`idle_until_timestamp` plus local-time `%Y-%m-%d %H:%M` strings, and `extension` MUST expose `gnome_refresh_interval_seconds`, `idle_delay_seconds`, `copilot_extra_premium_request_cost`, and provider-keyed `window_labels` values consumed by GNOME provider bars.
 - **REQ-004**: MUST run provider health checks in `doctor` using the 5-hour window and report per-provider configuration and test status.
 - **REQ-005**: MUST prompt `setup` for `idle_delay_seconds` (`300`) first, `api_call_delay_milliseconds` (`100`) second, `api_call_timeout_milliseconds` (`5000`) third, `default_retry_after_seconds` (`3600`) fourth, `gnome_refresh_interval_seconds` (`60`) fifth, and `billing_data` (`billing_data`) sixth, then persist values in `~/.config/aibar/config.json`.
-- **REQ-123**: `setup` MUST present a dedicated provider activation section before all other setup sections and prompt toggleable `enable`/`disable` values for `agy`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, and `zai`.
+- **REQ-123**: `setup` MUST present a dedicated provider activation section before all other setup sections and prompt toggleable `enable`/`disable` values for `agy`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, `zai`, and `deepseek`.
 - **REQ-007**: MUST execute GitHub device-flow login for Copilot and save the token in `~/.config/aibar/copilot.json`.
 - **REQ-172**: `aibar login` without `--provider` MUST sequentially execute login flows for login-capable providers whose cached last-attempt status in `~/.cache/aibar/cache.json` contains `result=FAIL`.
 - **REQ-173**: `aibar login` without `--provider` MUST NOT execute login flows for login-capable providers whose cached window statuses are all `OK` or absent.
@@ -211,10 +211,10 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-016**: MUST load `~/.config/aibar/env` into subprocess environment before GNOME extension executes `aibar show --json` and before popup `Refresh Now` executes `aibar show --json --force`.
 - **REQ-017**: GNOME provider cards MUST render `FAIL` blocks as `Status: FAIL`, blank line, `Reason: <reason>`, blank line, and `Updated: <datetime>, Next: <datetime>`, and MUST NOT render `Window 5h:`, `Window 7d:`, or `Window 30d:` text.
 - **REQ-018**: MUST set GNOME panel label to `Err` and truncate popup error text to 40 characters when command execution or JSON parsing fails.
-- **REQ-019**: SHOULD order extension provider tabs/cards by `agy`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, `zai`, with providers not listed in ordering array appended alphabetically.
+- **REQ-019**: SHOULD order extension provider tabs/cards by `agy`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, `zai`, `deepseek`, with providers not listed in ordering array appended alphabetically.
 - **REQ-020**: MUST include each discovered configured-source symbol in `pi-usereq/docs/REFERENCES.md` with file path, symbol kind, line-range evidence, and parsed Doxygen fields (`@brief`, `@param`, `@return`, `@throws`) when present in source declarations.
 - **REQ-021**: GNOME panel status labels MUST render `Err` only for providers whose `status.result=FAIL` category is OAuth or rate-limit, while providers without those failures MUST keep normal percentage/cost labels.
-- **REQ-022**: MUST style GNOME panel tab and label fonts with provider classes and bright colors: Antigravity red, OpenRouter orange, Copilot yellow, Codex green, OpenAI blue, GeminiAI purple, Z.ai cyan; cost labels MUST use the same font family, render when numeric value is `0`, and hide only when cost metric is unavailable.
+- **REQ-022**: MUST style GNOME panel tab and label fonts with provider classes and bright colors: Antigravity red, OpenRouter orange, Copilot yellow, Codex green, OpenAI blue, GeminiAI purple, Z.ai cyan, DeepSeek indigo; cost labels MUST use the same font family, render when numeric value is `0`, and hide only when cost metric is unavailable.
 - **REQ-023**: MUST declare a `[project.scripts]` entry `aibar = "aibar.cli:main"` in `pyproject.toml` so that `uv pip install` and `uvx` resolve the `aibar` console command.
 - **REQ-024**: MUST provide `src/aibar/aibar/__main__.py` that delegates to `aibar.cli:main` to enable `python -m aibar` execution.
 - **REQ-025**: MUST resolve GNOME extension source files from within the `aibar` Python package directory via module-relative path resolution (`Path(__file__).resolve().parent / "gnome-extension" / <UUID>`) in `gnome-install`, independent of git repository, working directory, or installation method (editable, wheel, `uv tool`).
@@ -248,7 +248,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-045**: MUST overwrite a provider/window payload in `cache.json` only when the current fetch for that provider/window succeeds.
 - **REQ-046**: MUST preserve the previous provider/window payload in `cache.json` when the current fetch for that provider/window fails, including HTTP `429`.
 - **REQ-047**: MUST store and load all last-success fallback payloads from `~/.cache/aibar/cache.json` and MUST NOT require legacy per-provider snapshot files.
-- **REQ-049**: `setup` MUST prompt for per-provider default currency symbol (choices: `$`, `£`, `€`; default `$`) for providers `openai`, `openrouter`, `copilot`, `codex`, `geminiai`, and `zai` in a dedicated section after timeout configuration, then persist selections in `~/.config/aibar/config.json` `currency_symbols`; provider `agy` MUST be excluded because it exposes no monetary metrics.
+- **REQ-049**: `setup` MUST prompt for per-provider default currency symbol (choices: `$`, `£`, `€`; default `$`) for providers `openai`, `openrouter`, `copilot`, `codex`, `geminiai`, `zai`, and `deepseek` in a dedicated section after timeout configuration, then persist selections in `~/.config/aibar/config.json` `currency_symbols`; provider `agy` MUST be excluded because it exposes no monetary metrics.
 - **REQ-107**: MUST expose global flags `--enable-log`, `--disable-log`, `--enable-debug`, and `--disable-debug` that update `~/.config/aibar/config.json` and persist until reconfigured.
 - **REQ-108**: `setup` MUST present a final logging section after all existing setup sections and MUST configure `log_enabled` and `debug_enabled` in `~/.config/aibar/config.json`.
 - **REQ-109**: `--enable-log` and `--disable-log` MUST set `log_enabled` to `true` and `false` respectively without modifying `debug_enabled`.
@@ -279,7 +279,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-064**: GeminiAI billing fetch MUST read `<project_id>` from `~/.config/aibar/geminiai_oauth_client.json`, discover `<table_id>` by listing tables in dataset `RuntimeConfig.billing_data` (default `billing_data`), and fail with structured error when billing export table is unavailable.
 - **REQ-065**: GeminiAI billing fetch MUST query `<billing_dataset>.gcp_billing_export_v1_<table_id>` using explicit column projection and aggregate the latest available invoice month (`MAX(invoice.month)`); when invoice month is unavailable, implementation MUST fallback to `usage_start_time >= TIMESTAMP_TRUNC(CURRENT_TIMESTAMP(), MONTH)`.
 - **REQ-066**: MUST guard every read/write of `~/.cache/aibar/cache.json` and `~/.cache/aibar/idle-time.json` with lock files under `~/.cache/aibar/`, polling every 250 milliseconds, and fail with explicit error after 5 seconds if lock acquisition remains blocked.
-- **REQ-067**: CLI `show` text mode MUST render ANSI provider-colored bordered panels ordered `agy`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, keep one shared panel width, and render `Status` first on `OK`.
+- **REQ-067**: CLI `show` text mode MUST render ANSI provider-colored bordered panels ordered `agy`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, `zai`, `deepseek`, keep one shared panel width, and render `Status` first on `OK`.
 - **REQ-128**: CLI `show` text mode MUST render `Usage: <window> <progress_bar> <percent>%` for `agy`, `copilot`, `codex`, and `zai`.
 - **REQ-132**: CLI `show` text mode for `openrouter` MUST render `Usage: <window> <progress_bar> <percent>%` using the standard fixed-width CLI progress-bar format.
 - **REQ-131**: CLI text `show` for `openai` and `geminiai` MUST render `Usage: <window> <percent>%` and MUST NOT print progress bars.
@@ -313,7 +313,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-122**: CLI text `show` progress bars for `agy`, `openrouter`, `copilot`, `codex`, and `zai` MUST render >100 with a visible over-limit segment and preserved 100% boundary marker.
 - **REQ-086**: `scripts/aibar.sh` MUST execute CLI via `uv run python -m aibar.cli` and MUST NOT create, activate, or install dependencies into repository-local or system virtual environments.
 - **REQ-087**: Repository root MUST track `uv.lock`, MUST NOT track `requirements.txt`, and MUST keep `README.md` instructions for optional export command `uv export --format requirements-txt > requirements.txt`.
-- **REQ-133**: CLI `show` panels, GNOME tabs/cards, and GNOME panel status labels MUST preserve canonical order `agy`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, `zai` after disabled providers are filtered out.
+- **REQ-133**: CLI `show` panels, GNOME tabs/cards, and GNOME panel status labels MUST preserve canonical order `agy`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, `zai`, `deepseek` after disabled providers are filtered out.
 
 ### 3.3 Z.ai Provider
 - **REQ-134**: MUST implement provider `zai` (Z.ai) that fetches quota data from `https://api.z.ai/api/monitor/usage/quota/limit` using `Authorization: Bearer <key>` and `Accept: application/json` headers.
@@ -329,7 +329,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-141**: MUST treat Z.ai as a single fixed-window provider with effective window `30d` that ignores the requested window and fetches all quotas in one API call.
 - **REQ-142**: MUST reuse the shared provider cache and idle-time lifecycle for Z.ai without modifying cache, idle-time, retry, or throttling logic.
 - **REQ-143**: MUST render Z.ai GNOME panel status bar with the `5h` quota percentage (non-bold) followed by the `1w` quota percentage (bold), and MUST NOT hide Z.ai panel status labels when the Z.ai provider is enabled and has available quota data.
-- **REQ-144**: GNOME extension `_handleError` MUST reset text and hide every panel status label created in `_buildPanelButton` including `_panelOpenAICostLabel`, `_panelAgyPctLabel`, `_panelAgy7dPctLabel`, `_panelOpenRouterCostLabel`, `_panelCopilotPctLabel`, `_panelCopilotExtraCostLabel`, `_panelCodexPctLabel`, `_panelCodex7dPctLabel`, `_panelCodexCostLabel`, `_panelGeminiaiCostLabel`, `_panelZaiPctLabel`, and `_panelZaiWeeklyPctLabel`.
+- **REQ-144**: GNOME extension `_handleError` MUST reset text and hide every panel status label created in `_buildPanelButton` including `_panelOpenAICostLabel`, `_panelAgyPctLabel`, `_panelAgy7dPctLabel`, `_panelOpenRouterCostLabel`, `_panelCopilotPctLabel`, `_panelCopilotExtraCostLabel`, `_panelCodexPctLabel`, `_panelCodex7dPctLabel`, `_panelCodexCostLabel`, `_panelGeminiaiCostLabel`, `_panelZaiPctLabel`, `_panelZaiWeeklyPctLabel`, and `_panelDeepSeekBalanceLabel`.
 
 ### 3.4 Antigravity (AGY) Provider
 - **REQ-158**: MUST implement provider `agy` (Antigravity CLI) that extracts quota metrics by executing `agy -p /usage` as one local subprocess and parsing tab-separated `<group>\t<field>\t<value>` rows after stripping ANSI escape sequences.
@@ -401,6 +401,20 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-236**: MUST abort at import time when the shared configuration schema field set diverges from `RuntimeConfig` model fields.
 - **REQ-237**: MUST list `--print`, `--info`, `--print-raw`, `--get`, `--set`, and `--unset` in `aibar --help` with complete canonical path examples.
 - **REQ-238**: MUST emit every configuration CLI identifier, description, help text, diagnostic, and rendered value in English.
+
+### 3.7 DeepSeek Provider
+- **REQ-239**: MUST implement provider `deepseek` that fetches `https://api.deepseek.com/user/balance` with `Authorization: Bearer <key>` and `Accept: application/json` headers.
+- **REQ-240**: MUST resolve the DeepSeek API key from `DEEPSEEK_API_KEY` with environment then `~/.config/aibar/env` precedence and MUST prompt it in `setup`.
+- **REQ-241**: MUST map `is_available` and `balance_infos[]` fields `currency`, `total_balance`, `granted_balance`, and `topped_up_balance` into `raw.deepseek_balance_infos` records and `UsageMetrics`.
+- **REQ-242**: MUST set DeepSeek `metrics.remaining` to the preferred balance record `total_balance`, leave `limit` and `cost` unset, and resolve `currency_symbol` via `resolve_currency_symbol`.
+- **REQ-243**: MUST treat `deepseek` as a single fixed-window provider with effective window `30d` that ignores the requested window and fetches all balances in one API call.
+- **REQ-244**: MUST reuse the shared provider cache, idle-time, throttling, and retry lifecycle for `deepseek` without modifying those shared mechanisms.
+- **REQ-245**: MUST render DeepSeek CLI text blocks as `Status: OK`, blank line, `Balance: <currency_symbol><remaining>`, blank line, and the freshness line.
+- **REQ-246**: DeepSeek CLI text blocks and GNOME cards MUST NOT render progress bars, `Usage:` rows, `Requests`, or `Tokens` because the balance API exposes no usage counters.
+- **REQ-247**: MUST map DeepSeek HTTP `401` to `AuthenticationError`, HTTP `429` to a rate-limit error result carrying `retry_after_seconds`, and other non-200 responses to provider error results.
+- **REQ-248**: MUST render GNOME DeepSeek tab, card, and panel status labels last with indigo style classes, card `Balance: <currency_symbol><value>`, and enable-state filtering.
+- **REQ-249**: MUST exclude `deepseek` from GNOME progress-bar providers, API-counter providers, and panel percentage aggregation while listing it in provider ordering arrays.
+- **REQ-250**: MUST document in DeepSeek `get_config_help` and `README.md` that the API key authorizes balance retrieval but exposes no aggregated per-key usage report.
 
 ## 4. Test Requirements
 
@@ -507,13 +521,17 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-100**: MUST verify `scripts/build.sh` registers EXIT, SIGINT, and SIGTERM cleanup handlers that remove `build/`, `.pytest_cache/`, `*.egg-info`, and `__pycache__` artifacts, preserve the original exit status, and retain versioned `dist/` artifacts.
 - **TST-101**: MUST verify `scripts/build.sh` checks for residual intermediate build artifacts after cleanup and exits non-zero when one remains outside `dist/`.
 - **TST-102**: MUST verify `scripts/clean.sh` is absent from the repository and that no script under `scripts/` references it.
+- **TST-108**: MUST verify DeepSeek provider normalizes `is_available` and `balance_infos[]` into `raw.deepseek_balance_infos` and `UsageMetrics.remaining` with effective window `30d` and null usage counters.
+- **TST-109**: MUST verify CLI `show` renders DeepSeek `Balance: <currency_symbol><remaining>` without progress bars, `Usage:` rows, `Requests`, or `Tokens`.
+- **TST-110**: MUST verify `setup` prompts `DEEPSEEK_API_KEY` and persists `deepseek` in `enabled_providers` and `currency_symbols`.
+- **TST-111**: MUST verify GNOME extension renders `deepseek` last with indigo style classes, card balance label, panel balance token, and `_handleError` label reset.
 
 ## 5. Evidence
 
 | Requirement ID | Evidence (file + symbol + excerpt) |
 |---|---|
 | PRJ-001 | `src/aibar/aibar/cli.py` + `main/show/doctor/env/setup/login/gnome_install/gnome_uninstall` + `@main.command()` declarations for all subcommands. |
-| PRJ-002 | `src/aibar/aibar/cli.py` + `get_providers` + returns Antigravity/OpenAI/OpenRouter/Copilot/Codex provider instances keyed by `ProviderName`. |
+| PRJ-002 | `src/aibar/aibar/cli.py` + `get_providers` + returns Antigravity/OpenAI/OpenRouter/Copilot/Codex/GeminiAI/Z.ai/DeepSeek provider instances keyed by `ProviderName`. |
 | PRJ-004 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/metadata.json` + `name = AIBar Monitor`, `url = https://github.com/Ogekuri/AIBar`, and `donations.github = Ogekuri`; `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + provider-card rendering path; `scripts/test-gnome-extension.sh` + `MUTTER_DEBUG_DUMMY_MODE_SPECS=1280x720`. |
 | PRJ-005 | `pi-usereq/docs/REFERENCES.md` + machine-readable symbol sections for configured-source files. |
 | PRJ-006 | `pyproject.toml` + `[build-system]`/`[project]`/`[project.scripts]` sections + `aibar = "aibar.cli:main"` console entry point used by `uv tool install`, `uv run`, and `uvx` execution without external virtualenv bootstrap; `requires-python = ">= 3.12"` floor per CTN-018. |
@@ -530,7 +548,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | CTN-009 | `src/aibar/aibar/config.py` + `build_idle_time_state/load_idle_time/save_idle_time` + provider-scoped idle-time epoch fields and local-timezone `*_human` serialization in `~/.cache/aibar/idle-time.json`. |
 | CTN-010 | `src/aibar/aibar/cli.py` + `_refresh_and_persist_cache_payload` upserts payload only on successful provider/window fetch and preserves previous payload on failed attempts including HTTP `429`. |
 | DES-001 | `src/aibar/aibar/providers/base.py` + `class BaseProvider(ABC)` + abstract methods `fetch`, `is_configured`, `get_config_help`. |
-| DES-002 | `src/aibar/aibar/providers/base.py` + `WindowPeriod/ProviderName` + enum literals `5h/7d/30d/code_review` and provider names. |
+| DES-002 | `src/aibar/aibar/providers/base.py` + `WindowPeriod/ProviderName` + enum literals `5h/7d/30d/code_review` and provider names including `deepseek`. |
 | DES-003 | `src/aibar/aibar/cli.py` + `parse_window/parse_provider` + raises `click.BadParameter` for invalid inputs. |
 | DES-004 | `src/aibar/aibar/config.py` + `_sanitize_cache_payload` redacts keys in the sensitive set before `cache.json` writes. |
 | DES-005 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_loadEnvFromFile` + parses `export KEY=VALUE`, handles quotes/comments/semicolon cleanup. |
@@ -561,7 +579,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-016 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_refreshData` and popup `Refresh Now` handler + loads env file and `launcher.setenv(key, value, true)` before command spawn, including `--force` manual refresh path. |
 | REQ-017 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_buildPopupMenu/_parseOutput/_updateUI/_populateProviderCard` + popup removes `Open AIBar Report`, `copilot/openrouter` render single `30d` window bars with labels sourced from JSON `extension.window_labels` (fallback `30d`), `openai/geminiai` render `Usage: <window> <percent>%` text without progress bars, freshness uses `freshness` data with status+`extension.idle_delay_seconds` fallback, and cost/API-counter rows stay normalized. |
 | REQ-018 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_handleError` + `this._panelLabel.set_text('Err')` and `message.substring(0, 40)`. |
-| REQ-019 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_providerOrder` and `_updateUI` sorting enforce `agy/openrouter/copilot/codex/openai/geminiai`; unknown providers rank `999` then lexical order. |
+| REQ-019 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_providerOrder` and `_updateUI` sorting enforce `agy/openrouter/copilot/codex/openai/geminiai/zai/deepseek`; unknown providers rank `999` then lexical order. |
 | REQ-020 | `pi-usereq/docs/REFERENCES.md` + per-symbol entries containing symbol identifier, file path, line-range spans, and parsed `@brief/@param/@return/@throws` fields. |
 | REQ-021 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_buildPanelButton/_updateUI` + panel labels preserve fixed order for normal state and collapse to one provider-colored bold `Err` token for OAuth/rate-limit failure states. |
 | REQ-022 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_buildPanelButton/_updateUI` + panel labels use provider classes/colors; cost labels render provider currency for numeric `0` values and hide only when cost metric is unavailable. |
@@ -626,7 +644,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-128 | `src/aibar/aibar/cli.py` + `_should_render_cli_progress_bar/_build_cli_usage_line/_build_result_panel/_build_agy_quota_lines` + usage rows render `Usage: <window> <progress_bar> <percent>%` for `agy/copilot/codex/zai`. |
 | REQ-132 | `src/aibar/aibar/cli.py` + `_should_render_cli_progress_bar/_build_cli_usage_line/_build_result_panel` + `openrouter` usage rows render the standard fixed-width CLI progress-bar format. |
 | REQ-131 | `src/aibar/aibar/cli.py` + `_should_render_cli_progress_bar/_build_cli_usage_line/_build_result_panel` + `openai/geminiai` usage rows render `Usage: <window> <percent>%` without progress bars. |
-| REQ-133 | `src/aibar/aibar/cli.py` + `_ordered_rendered_panels/_provider_panel_sort_key` and `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_orderedEnabledProviderNames/_updateUI` + all visible provider surfaces keep canonical order after disabled-provider filtering. |
+| REQ-133 | `src/aibar/aibar/cli.py` + `_ordered_rendered_panels/_provider_panel_sort_key` and `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_orderedEnabledProviderNames/_updateUI` + all visible provider surfaces keep canonical order including trailing `deepseek` after disabled-provider filtering. |
 | REQ-129 | `src/aibar/aibar/cli.py` + `_build_result_panel` + Copilot cost line stays one blank line after `Remaining credits`, and `_build_dual_window_panel` strips `Window <window>` headings from CLI panels. |
 | REQ-084 | `src/aibar/aibar/cli.py` + `_build_result_panel/_emit_provider_panel/show` + per-provider freshness line renders `Updated: <datetime>, Next: <datetime>` from provider `idle_time` timestamps with local-timezone `%Y-%m-%d %H:%M` and right-aligned panel layout; `show --json` exports equivalent provider freshness under top-level `freshness` for extension alignment. |
 | REQ-085 | `src/aibar/aibar/cli.py` + text renderer surfaces cached authentication/rate-limit failures and suppresses statistics lines for `FAIL` states. |
@@ -823,3 +841,19 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | TST-100 | `tests/test_build_script.py` + EXIT/INT/TERM trap assertions plus `remove_intermediate_artifacts` coverage of `build/`, `.pytest_cache/`, `*.egg-info`, and `__pycache__` with `dist/` retention. |
 | TST-101 | `tests/test_build_script.py` + `verify_no_intermediate_artifacts` assertions covering residual-artifact detection and non-zero exit. |
 | TST-102 | `tests/test_build_script.py` + absence assertions for `scripts/clean.sh` and for `clean.sh` references inside `scripts/*.sh`. |
+| REQ-239 | `src/aibar/aibar/providers/deepseek.py` + `DeepSeekProvider.fetch` + `https://api.deepseek.com/user/balance` with `Authorization: Bearer <key>` and `Accept: application/json`. |
+| REQ-240 | `src/aibar/aibar/config.py` + `Config.ENV_VARS[ProviderName.DEEPSEEK] = "DEEPSEEK_API_KEY"`; `src/aibar/aibar/cli.py` + `setup` DeepSeek API-key prompt writing `DEEPSEEK_API_KEY` to `~/.config/aibar/env`. |
+| REQ-241 | `src/aibar/aibar/providers/deepseek.py` + `_parse_response`/`_normalize_balance_infos` + `raw.deepseek_balance_infos` records and `UsageMetrics`. |
+| REQ-242 | `src/aibar/aibar/providers/deepseek.py` + `_parse_response` + `metrics.remaining` from preferred `total_balance`, unset `limit`/`cost`, and `resolve_currency_symbol(data, "deepseek")`. |
+| REQ-243 | `src/aibar/aibar/cli.py` + `_FIXED_WINDOW_BY_PROVIDER[ProviderName.DEEPSEEK] = WindowPeriod.DAY_30`; `src/aibar/aibar/providers/deepseek.py` single-call fetch. |
+| REQ-244 | `src/aibar/aibar/providers/deepseek.py` returns `ProviderResult` consumed by unmodified `retrieve_results_via_cache_pipeline`, idle-time, throttling, and retry helpers. |
+| REQ-245 | `src/aibar/aibar/cli.py` + `_build_result_panel`/`_build_deepseek_balance_lines` + `Balance: <currency_symbol><remaining>` block. |
+| REQ-246 | `src/aibar/aibar/cli.py` + DeepSeek branch returns before generic usage/counter rows; `PROGRESS_BAR_PROVIDERS`/`API_COUNTER_PROVIDERS` exclude `deepseek`. |
+| REQ-247 | `src/aibar/aibar/providers/deepseek.py` + `fetch` + 401 `AuthenticationError`, 429 error result with `retry_after_seconds`, other non-200 provider error result. |
+| REQ-248 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_updateUI`/`_buildPanelButton`/`_populateProviderCard` DeepSeek balance label; `stylesheet.css` + `aibar-tab-label-deepseek`. |
+| REQ-249 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `PROGRESS_BAR_PROVIDERS`/`API_COUNTER_PROVIDERS`/`panelPercents` exclude `deepseek`; ordering arrays include it last. |
+| REQ-250 | `src/aibar/aibar/providers/deepseek.py` + `get_config_help` + balance-only API note; `README.md` + DeepSeek provider section. |
+| TST-108 | `tests/test_deepseek_provider.py` + balance mapping, fixed `30d` window, currency symbol, and null-counter assertions. |
+| TST-109 | `tests/test_deepseek_provider.py` + CLI panel assertions for `Balance:` row and absent usage/bar/counter rows. |
+| TST-110 | `tests/test_setup_runtime_config.py` + DeepSeek activation, currency-symbol, and `DEEPSEEK_API_KEY` prompt assertions. |
+| TST-111 | `tests/test_deepseek_provider.py` + GNOME source assertions for trailing `deepseek` order, indigo classes, balance labels, and `_handleError` reset. |

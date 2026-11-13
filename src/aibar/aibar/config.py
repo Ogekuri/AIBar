@@ -749,6 +749,7 @@ class Config:
         ProviderName.CODEX: "CODEX_ACCESS_TOKEN",
         ProviderName.GEMINIAI: "GEMINIAI_OAUTH_ACCESS_TOKEN",
         ProviderName.ZAI: "ZAI_API_KEY",
+        ProviderName.DEEPSEEK: "DEEPSEEK_API_KEY",
     }
 
     # Provider descriptions
@@ -794,6 +795,12 @@ class Config:
             "description": "Z.ai account quota usage via monitor API",
             "official": True,
             "note": "Uses Z.ai monitor quota-limit endpoint",
+        },
+        ProviderName.DEEPSEEK: {
+            "name": "DeepSeek",
+            "description": "DeepSeek account balance via official balance API",
+            "official": True,
+            "note": "Balance only; no aggregated per-key usage report exists",
         },
     }
 
@@ -854,6 +861,7 @@ class Config:
             CodexProvider,
             GeminiAIProvider,
             ZaiProvider,
+            DeepSeekProvider,
         )
 
         provider_map = {
@@ -864,6 +872,7 @@ class Config:
             ProviderName.CODEX: CodexProvider,
             ProviderName.GEMINIAI: GeminiAIProvider,
             ProviderName.ZAI: ZaiProvider,
+            ProviderName.DEEPSEEK: DeepSeekProvider,
         }
 
         provider_class = provider_map.get(provider)

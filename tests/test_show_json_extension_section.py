@@ -99,6 +99,7 @@ def test_show_json_emits_extension_section_with_default_gnome_refresh_interval(
         "openai": "30d",
         "geminiai": "30d",
         "zai": "30d",
+        "deepseek": "30d",
     }
     assert doc["enabled_providers"] == {
         "agy": True,
@@ -108,6 +109,7 @@ def test_show_json_emits_extension_section_with_default_gnome_refresh_interval(
         "codex": True,
         "geminiai": True,
         "zai": True,
+        "deepseek": True,
     }
 
 
@@ -178,6 +180,7 @@ def test_show_json_emits_extension_section_with_configured_gnome_refresh_interva
         "copilot": "30d",
         "geminiai": "30d",
         "zai": "30d",
+        "deepseek": "30d",
     }
     assert doc["enabled_providers"] == {
         "agy": True,
@@ -187,6 +190,7 @@ def test_show_json_emits_extension_section_with_configured_gnome_refresh_interva
         "openai": False,
         "geminiai": True,
         "zai": True,
+        "deepseek": True,
     }
 
 
@@ -241,6 +245,7 @@ def test_show_json_extension_section_does_not_appear_in_cache_payload(
         "openai": "30d",
         "geminiai": "30d",
         "zai": "30d",
+        "deepseek": "30d",
     }
 
     cache_file = cache_dir / "cache.json"

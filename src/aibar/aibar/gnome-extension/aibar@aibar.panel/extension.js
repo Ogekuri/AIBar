@@ -30,6 +30,7 @@ const PROVIDER_PROGRESS_CLASSES = {
     openai: 'aibar-progress-provider-openai',
     geminiai: 'aibar-progress-provider-geminiai',
     zai: 'aibar-progress-provider-zai',
+    deepseek: 'aibar-progress-provider-deepseek',
 };
 const PANEL_ICON_COLORS = {
     white: '#FFFFFF',
@@ -45,7 +46,7 @@ const PROVIDER_DISPLAY_NAMES = {
 const API_COUNTER_PROVIDERS = new Set(['openai', 'codex', 'geminiai']);
 const PROGRESS_BAR_PROVIDERS = new Set(['agy', 'openrouter', 'copilot', 'codex', 'zai']);
 const AGY_QUOTA_LABELS = Object.freeze(['G 7d', 'G 5h', 'CG 7d', 'CG 5h', 'A 7d']);
-const TEXT_USAGE_PROVIDERS = new Set(['openai', 'geminiai']);
+const TEXT_USAGE_PROVIDERS = new Set(['openai', 'geminiai', 'deepseek']);
 const WINDOW_BAR_30D_PROVIDERS = new Set(['copilot', 'openrouter']);
 const DEFAULT_WINDOW_LABELS = Object.freeze({
     agy: '30d',
@@ -54,6 +55,7 @@ const DEFAULT_WINDOW_LABELS = Object.freeze({
     openai: '30d',
     geminiai: '30d',
     zai: '30d',
+    deepseek: '30d',
 });
 const ALL_PROVIDER_NAMES = Object.freeze([
     'agy',
@@ -63,6 +65,7 @@ const ALL_PROVIDER_NAMES = Object.freeze([
     'openai',
     'geminiai',
     'zai',
+    'deepseek',
 ]);
 const DEFAULT_ENABLED_PROVIDERS = Object.freeze({
     agy: true,
@@ -72,6 +75,7 @@ const DEFAULT_ENABLED_PROVIDERS = Object.freeze({
     openai: true,
     geminiai: true,
     zai: true,
+    deepseek: true,
 });
 /**
  * @brief Maximum popup viewport height for provider cards in pixels.
@@ -155,7 +159,7 @@ function _filterProviderObjectByEnabledProviders(providerData, enabledProviders)
  * @brief Order visible provider names by canonical extension surface sequence.
  * @details Returns provider keys present in `providerData`, excludes keys whose
  * normalized enable-state is `false`, preserves canonical order
- * `agy/openrouter/copilot/codex/openai/geminiai`, and appends unknown keys
+ * `agy/openrouter/copilot/codex/openai/geminiai/zai/deepseek`, and appends unknown keys
  * in lexical order. Time complexity O(P log P). Space complexity O(P).
  * @param {string[]} providerOrder Canonical provider order array.
  * @param {Object<string, boolean>} enabledProviders Normalized provider-enabled mapping.
@@ -747,7 +751,7 @@ class AIBarIndicator extends PanelMenu.Button {
         this._windowLabels = {...DEFAULT_WINDOW_LABELS};
         this._copilotExtraPremiumRequestCost = DEFAULT_COPILOT_EXTRA_PREMIUM_REQUEST_COST;
         this._activeProvider = null;
-        this._providerOrder = ['agy', 'openrouter', 'copilot', 'codex', 'openai', 'geminiai', 'zai'];
+        this._providerOrder = ['agy', 'openrouter', 'copilot', 'codex', 'openai', 'geminiai', 'zai', 'deepseek'];
         this._iconBlinkTimeout = null;
         this._iconBlinkOn = false;
 
@@ -858,6 +862,12 @@ class AIBarIndicator extends PanelMenu.Button {
             style_class: 'aibar-panel-pct aibar-panel-pct-primary aibar-tab-label-zai',
         });
 
+        this._panelDeepSeekBalanceLabel = new St.Label({
+            text: '',
+            y_align: Clutter.ActorAlign.CENTER,
+            style_class: 'aibar-panel-pct aibar-panel-cost aibar-tab-label-deepseek',
+        });
+
         this._panelAgyPctLabel.hide();
         this._panelAgy7dPctLabel.hide();
         this._panelOpenRouterCostLabel.hide();
@@ -870,6 +880,7 @@ class AIBarIndicator extends PanelMenu.Button {
         this._panelGeminiaiCostLabel.hide();
         this._panelZaiPctLabel.hide();
         this._panelZaiWeeklyPctLabel.hide();
+        this._panelDeepSeekBalanceLabel.hide();
         this._panelLabel.hide();
 
         this._panelPercentages.add_child(this._panelAgyPctLabel);
@@ -884,6 +895,7 @@ class AIBarIndicator extends PanelMenu.Button {
         this._panelPercentages.add_child(this._panelGeminiaiCostLabel);
         this._panelPercentages.add_child(this._panelZaiPctLabel);
         this._panelPercentages.add_child(this._panelZaiWeeklyPctLabel);
+        this._panelPercentages.add_child(this._panelDeepSeekBalanceLabel);
 
         this._panelBox.add_child(this._icon);
         this._panelBox.add_child(this._panelPercentages);
@@ -1876,6 +1888,18 @@ class AIBarIndicator extends PanelMenu.Button {
                 `Remaining credits: ${_boldWhiteMarkup(remainingText)} / ${_escapeMarkup(limitText)}`
             );
             card.byokLabel.show();
+        } else if (
+            providerName === 'deepseek' &&
+            metrics.remaining !== null &&
+            metrics.remaining !== undefined &&
+            Number.isFinite(Number(metrics.remaining))
+        ) {
+            const balanceCurrency = metrics.currency_symbol || '$';
+            const balanceText = `${balanceCurrency}${Number(metrics.remaining).toFixed(2)}`;
+            card.byokLabel.clutter_text.set_markup(
+                `Balance: ${_boldWhiteMarkup(balanceText)}`
+            );
+            card.byokLabel.show();
         } else if (providerName === 'openrouter' && raw.data) {
             let byokValue = null;
             if (data.window === '5h')
@@ -2219,6 +2243,29 @@ class AIBarIndicator extends PanelMenu.Button {
     }
 
     /**
+     * @brief Build panel status token for DeepSeek monetary balance rendering.
+     * @details DeepSeek exposes no usage percentage; the panel therefore renders
+     * the normalized `metrics.remaining` balance as `<currency_symbol><value>` so
+     * the provider stays visible without entering the icon percentage aggregation.
+     * @param {Object<string, any> | null} data DeepSeek provider payload object.
+     * @returns {string | null} Formatted `<currency><value>` token or null.
+     * @satisfies REQ-248
+     * @satisfies REQ-249
+     */
+    _panelBalanceText(data) {
+        if (!data || !data.metrics)
+            return null;
+        const metrics = data.metrics;
+        if (metrics.remaining === null || metrics.remaining === undefined)
+            return null;
+        const numeric = Number(metrics.remaining);
+        if (!Number.isFinite(numeric))
+            return null;
+        const currencySymbol = metrics.currency_symbol || '$';
+        return `${currencySymbol}${numeric.toFixed(2)}`;
+    }
+
+    /**
      * @brief Build panel status token for Copilot cost label rendering.
      * @details Uses payload `metrics.cost` as primary source and falls back to
      * computed premium-request overage when metrics cost is unavailable.
@@ -2320,6 +2367,7 @@ class AIBarIndicator extends PanelMenu.Button {
             geminiaiCost: this._panelGeminiaiCostLabel,
             zai: this._panelZaiPctLabel,
             zaiWeekly: this._panelZaiWeeklyPctLabel,
+            deepseekBalance: this._panelDeepSeekBalanceLabel,
         };
 
         const toPercent = (value) => {
@@ -2557,6 +2605,7 @@ class AIBarIndicator extends PanelMenu.Button {
             zai: zaiUsage.primary,
             zaiWeekly: zaiUsage.secondary,
             zaiMax: zaiUsage.max,
+            deepseekBalance: this._panelBalanceText(this._usageData.deepseek),
         };
         const providerFailureStates = {
             agy: _panelProviderFailureState(this._statusData, 'agy', ['30d']),
@@ -2566,6 +2615,7 @@ class AIBarIndicator extends PanelMenu.Button {
             openai: _panelProviderFailureState(this._statusData, 'openai', ['30d']),
             geminiai: _panelProviderFailureState(this._statusData, 'geminiai', ['30d']),
             zai: _panelProviderFailureState(this._statusData, 'zai', ['30d']),
+            deepseek: _panelProviderFailureState(this._statusData, 'deepseek', ['30d']),
         };
         const providerErrClassNames = {
             agy: 'aibar-tab-label-agy',
@@ -2575,8 +2625,9 @@ class AIBarIndicator extends PanelMenu.Button {
             openai: 'aibar-tab-label-openai',
             geminiai: 'aibar-tab-label-geminiai',
             zai: 'aibar-tab-label-zai',
+            deepseek: 'aibar-tab-label-deepseek',
         };
-        const providerErrPriority = ['agy', 'openrouter', 'copilot', 'codex', 'openai', 'geminiai', 'zai'];
+        const providerErrPriority = ['agy', 'openrouter', 'copilot', 'codex', 'openai', 'geminiai', 'zai', 'deepseek'];
         const errProviders = [];
         for (const providerName of providerErrPriority) {
             if (this._enabledProviders[providerName] === false)
@@ -2730,6 +2781,7 @@ class AIBarIndicator extends PanelMenu.Button {
         this._panelGeminiaiCostLabel.set_text('');
         this._panelZaiPctLabel.set_text('');
         this._panelZaiWeeklyPctLabel.set_text('');
+        this._panelDeepSeekBalanceLabel.set_text('');
         this._panelAgyPctLabel.hide();
         this._panelAgy7dPctLabel.hide();
         this._panelOpenRouterCostLabel.hide();
@@ -2742,6 +2794,7 @@ class AIBarIndicator extends PanelMenu.Button {
         this._panelGeminiaiCostLabel.hide();
         this._panelZaiPctLabel.hide();
         this._panelZaiWeeklyPctLabel.hide();
+        this._panelDeepSeekBalanceLabel.hide();
         if (this._iconBlinkTimeout) {
             GLib.source_remove(this._iconBlinkTimeout);
             this._iconBlinkTimeout = null;

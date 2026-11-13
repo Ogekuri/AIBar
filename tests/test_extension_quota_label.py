@@ -106,7 +106,7 @@ def test_quota_providers_scope_30d_bars_and_text_only_usage_rendering() -> None:
         "const PROGRESS_BAR_PROVIDERS = new Set(['agy', 'openrouter', 'copilot', 'codex', 'zai']);"
         in source
     )
-    assert "const TEXT_USAGE_PROVIDERS = new Set(['openai', 'geminiai']);" in source
+    assert "const TEXT_USAGE_PROVIDERS = new Set(['openai', 'geminiai', 'deepseek']);" in source
     assert (
         "const WINDOW_BAR_30D_PROVIDERS = new Set(['copilot', 'openrouter']);"
         in source
@@ -502,7 +502,7 @@ def test_panel_labels_render_provider_scoped_bold_colored_err_for_oauth_or_rate_
     assert "function _panelProviderFailureState(statusData, providerName, windows)" in source
     assert "const providerFailureStates = {" in source
     assert "const providerErrClassNames = {" in source
-    assert "const providerErrPriority = ['agy', 'openrouter', 'copilot', 'codex', 'openai', 'geminiai', 'zai'];" in source
+    assert "const providerErrPriority = ['agy', 'openrouter', 'copilot', 'codex', 'openai', 'geminiai', 'zai', 'deepseek'];" in source
     assert "const errProviders = [];" in source
     assert "if (state.category === 'oauth' || state.category === 'rate_limit')" in source
     assert "if (errProviders.length > 0) {" in source
@@ -603,7 +603,7 @@ def test_geminiai_extension_tab_order_label_and_bright_pink_styles() -> None:
     stylesheet_source = STYLESHEET_PATH.read_text(encoding="utf-8")
 
     assert (
-        "this._providerOrder = ['agy', 'openrouter', 'copilot', 'codex', 'openai', 'geminiai', 'zai'];"
+        "this._providerOrder = ['agy', 'openrouter', 'copilot', 'codex', 'openai', 'geminiai', 'zai', 'deepseek'];"
         in extension_source
     )
     assert "const PROVIDER_DISPLAY_NAMES = {" in extension_source

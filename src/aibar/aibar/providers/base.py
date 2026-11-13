@@ -36,6 +36,7 @@ class ProviderName(str, Enum):
     CODEX = "codex"
     GEMINIAI = "geminiai"
     ZAI = "zai"
+    DEEPSEEK = "deepseek"
 
 
 class UsageMetrics(BaseModel):
