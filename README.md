@@ -21,7 +21,7 @@
 
 <p align="center">
 <strong>Monitor AI usage and quota in one CLI.</strong><br>
-AIBar aggregates usage metrics for Antigravity (agy), OpenAI, OpenRouter, GitHub Copilot, Codex, GeminiAI, and Z.ai, with colored terminal panels and a GNOME Shell panel extension.
+AIBar aggregates usage metrics for Antigravity (agy), OpenAI, OpenRouter, GitHub Copilot, Codex, GeminiAI, and Z.ai, and tracks the DeepSeek account balance, with colored terminal panels and a GNOME Shell panel extension.
 It caches provider results locally, gates refreshes with idle-time windows, throttles provider API calls, and exposes both human-readable text output and a stable machine-readable JSON contract.
 </p>
 
@@ -47,7 +47,8 @@ AIBar brings every supported AI provider quota and cost into one place, on the t
 - Text output and machine output (`show --json`) with stable top-level sections (`payload`, `status`, `idle_time`, `freshness`, `extension`, `enabled_providers`).
 - Per-run refresh override with `show --force` (bypasses idle-time gating for that execution).
 - Direct configuration inspection and mutation with canonical colon-separated paths: `--print [PATH]`, `--info [PATH]`, `--print-raw`, `--get PATH`, `--set PATH VALUE`, `--unset PATH`.
-- Interactive `setup` for provider enable/disable state, runtime throttling, Copilot overage pricing, provider currency symbols, GeminiAI OAuth/project settings, and logging flags.
+- Interactive `setup` for provider enable/disable state, runtime throttling, Copilot overage pricing, provider currency symbols, provider API keys (including `DEEPSEEK_API_KEY`), GeminiAI OAuth/project settings, and logging flags.
+- DeepSeek account balance monitoring (`Balance`, `Topped up`, `Granted`) rendered without progress bars or fabricated usage counters.
 - Built-in lifecycle and observability flags: `--version|--ver`, `--upgrade`, `--upgrade --develop|--dev`, `--upgrade --force` (forced full re-install), `--uninstall`, `--enable-log`, `--disable-log`, `--enable-debug`, `--disable-debug`.
 - Startup release preflight that can emit update notices or fetch diagnostics before normal command output.
 - GNOME Shell extension support via `gnome-install` / `gnome-uninstall`, popup `Refresh Now`, and JSON-driven refresh/window metadata.
@@ -406,6 +407,10 @@ aibar --disable-debug
 - The key authorizes `GET https://api.deepseek.com/user/balance` only. Aggregated per-key usage, request, and token reporting is available exclusively in the DeepSeek web console, so AIBar renders account balance rows and MUST NOT fabricate usage counters.
 - One balance request returns all `balance_infos[]` entries; the effective window is fixed to `30d`.
 - Text output renders `Balance: <currency_symbol><remaining>`, `Topped up: <currency_symbol><topped_up_balance>`, and `Granted: <currency_symbol><granted_balance>` from the preferred balance record (plus one `Balance (<currency>): ...` row per additional currency bucket), with no progress bar, `Usage:` row, `Requests`, `Tokens`, `Spent`, or `Cost` row because the endpoint exposes no spend or usage field.
+- `aibar setup` prompts `DEEPSEEK_API_KEY` and states that the key authorizes the account balance endpoint only; `deepseek` is part of the provider activation toggles and the per-provider currency-symbol prompts (the symbol only affects balance display).
+- `show --json` exposes `raw.is_available` and the normalized `raw.deepseek_balance_infos` records (currency code, resolved currency symbol, `total_balance`, `granted_balance`, `topped_up_balance`); `metrics.remaining` carries the preferred record balance while `limit`, `cost`, `total_cost`, `reset_at`, and every usage counter stay `null`.
+- An HTTP `401` with a rejected key renders `Status: FAIL` with the invalid-key reason, and an HTTP `429` renders `Status: FAIL` with the rate-limit reason while extending the idle gate by the reported retry delay (falling back to `default_retry_after_seconds`); other non-200 responses surface the HTTP status in the failure reason.
+- DeepSeek has no login flow: `aibar login` (with or without `--provider`) targets only login-capable providers (`copilot`, `geminiai`).
 - In the GNOME extension, DeepSeek renders as the last provider tab/card (rose accent `#FF375F`) with the same `Balance`, `Topped up`, and `Granted` card rows and a panel balance token that shows only the balance.
 
 ## GNOME Shell extension
