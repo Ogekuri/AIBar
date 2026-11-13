@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.59.5](https://github.com/Ogekuri/AIBar/compare/v0.59.0..v0.59.5) - 2026-11-12
+## [0.59.6](https://github.com/Ogekuri/AIBar/compare/v0.59.0..v0.59.6) - 2026-11-13
 ### ⛰️  Features
 - Update gitalias config.
 - add scripts/clean.sh removing build.sh artifacts [useReq] *(clean.sh)*
@@ -1563,7 +1563,7 @@
 - \[0.57.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.57.0
 - \[0.58.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.58.0
 - \[0.59.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.59.0
-- \[0.59.5\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.59.5
+- \[0.59.6\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.59.6
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1624,4 +1624,4 @@
 [0.57.0]: https://github.com/Ogekuri/AIBar/compare/v0.56.0..v0.57.0
 [0.58.0]: https://github.com/Ogekuri/AIBar/compare/v0.57.0..v0.58.0
 [0.59.0]: https://github.com/Ogekuri/AIBar/compare/v0.58.0..v0.59.0
-[0.59.5]: https://github.com/Ogekuri/AIBar/compare/v0.59.0..v0.59.5
+[0.59.6]: https://github.com/Ogekuri/AIBar/compare/v0.59.0..v0.59.6
