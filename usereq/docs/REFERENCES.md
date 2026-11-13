@@ -2601,7 +2601,7 @@ output can be piped into JSON tools.
 
 ---
 
-# extension.js | JavaScript | 2899L | 53 symbols | 9 imports | 68 comments
+# extension.js | JavaScript | 2912L | 53 symbols | 9 imports | 68 comments
 > Path: `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`
 - @brief GNOME Shell panel extension for aibar metrics.
 - @details Collects usage JSON from the aibar CLI and renders provider-specific quota/cost cards in the GNOME panel popup.
@@ -2877,7 +2877,7 @@ Time O(1); space O(1).
 - @return {Object<string, any>} Container, row, fill and label actors.
 - @satisfies REQ-187
 
-### fn `const updateWindowBar = (bar, pct, resetTime, useDays, allowResetPendingHint = true) =>` (L1639-1703)
+### fn `const updateWindowBar = (bar, pct, resetTime, useDays, allowResetPendingHint = true) =>` (L1645-1709)
 - @brief Execute populate provider card.
 - @details Projects provider payload and cached status into one card surface.
 Failed states render a strict block with `Status: FAIL` and `Reason: ...`
@@ -2893,7 +2893,12 @@ providers preserve fixed left labels `5h` and `7d`; progress-width
 geometry recalculation must not blank those labels. OpenRouter cards hide
 the `requests`/`tokens` labels (the key API exposes no per-key request/token
 counters) and render a `Total cost: <currency_symbol><total_cost>` label
-from `metrics.total_cost` in the removed counters position.
+from `metrics.total_cost` in the removed counters position. The generic
+`Costs:` row renders only when the provider exposes the cost dimension and
+the payload carries a non-null finite `metrics.cost`; providers without a
+cost basis (`deepseek`) therefore never render the row, because
+`Number(null)` collapses to `0` and would emit an unpopulated
+`Costs: <currency>0.0000` value.
 - @param {any} card Input parameter `card`.
 - @param {any} providerName Input parameter `providerName`.
 - @param {any} data Input parameter `data`.
@@ -2905,12 +2910,13 @@ from `metrics.total_cost` in the removed counters position.
 - @satisfies REQ-130
 - @satisfies REQ-155
 - @satisfies REQ-157
+- @satisfies REQ-252
 
-### fn `const setResetLabel = (baseText) =>` (L1645-1651)
+### fn `const setResetLabel = (baseText) =>` (L1651-1657)
 
-### fn `const showResetPendingHint = () =>` (L1658-1660)
+### fn `const showResetPendingHint = () =>` (L1664-1666)
 
-### fn `const toPercent = (value) =>` (L2397-2402)
+### fn `const toPercent = (value) =>` (L2410-2415)
 - @brief Execute update u i.
 - @details Applies update u i logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 Resolves provider-window failure metadata from cache `status` section and forwards it
@@ -2928,7 +2934,7 @@ After card refresh, re-sizes the popup provider viewport to the visible card hei
 - @satisfies REQ-120
 - @satisfies REQ-127
 
-### fn `const getPanelUsageValues = (providerName, data) =>` (L2423-2608)
+### fn `const getPanelUsageValues = (providerName, data) =>` (L2436-2621)
 - @brief Resolve panel icon threshold percentage inputs for one provider payload.
 - @details Returns `{primary, secondary[, max]}` percentages consumed by the
 `_updateUI(...)` panel aggregation. Provider sources: AGY reads
@@ -2948,7 +2954,7 @@ provider quotas Q. Space complexity O(1).
 - @satisfies REQ-149
 - @satisfies REQ-170
 
-### class `export default class AIBarExtension extends Extension` : Extension (L2873-2899)
+### class `export default class AIBarExtension extends Extension` : Extension (L2886-2912)
 - @brief GNOME extension lifecycle adapter for AIBarIndicator registration.
 - @brief Execute enable.
 - @details Extends Extension (GNOME Shell 45+ API) to integrate with the extension lifecycle.
@@ -3007,12 +3013,12 @@ Uses this.uuid (provided by the Extension base class) as the status-area key.
 |`_applyProgressFillGeometry`|fn||680-728|function _applyProgressFillGeometry(fillActor, background...|
 |`AIBarIndicator`|class||732-1031|class AIBarIndicator extends PanelMenu.Button|
 |`createWindowBar`|fn||1219-1265|const createWindowBar = (labelText) =>|
-|`updateWindowBar`|fn||1639-1703|const updateWindowBar = (bar, pct, resetTime, useDays, al...|
-|`setResetLabel`|fn||1645-1651|const setResetLabel = (baseText) =>|
-|`showResetPendingHint`|fn||1658-1660|const showResetPendingHint = () =>|
-|`toPercent`|fn||2397-2402|const toPercent = (value) =>|
-|`getPanelUsageValues`|fn||2423-2608|const getPanelUsageValues = (providerName, data) =>|
-|`AIBarExtension`|class||2873-2899|export default class AIBarExtension extends Extension|
+|`updateWindowBar`|fn||1645-1709|const updateWindowBar = (bar, pct, resetTime, useDays, al...|
+|`setResetLabel`|fn||1651-1657|const setResetLabel = (baseText) =>|
+|`showResetPendingHint`|fn||1664-1666|const showResetPendingHint = () =>|
+|`toPercent`|fn||2410-2415|const toPercent = (value) =>|
+|`getPanelUsageValues`|fn||2436-2621|const getPanelUsageValues = (providerName, data) =>|
+|`AIBarExtension`|class||2886-2912|export default class AIBarExtension extends Extension|
 
 
 ---

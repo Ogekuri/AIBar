@@ -13,6 +13,7 @@ provider ordering with rose style classes.
 
 import asyncio
 import json
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -315,3 +316,27 @@ def test_gnome_extension_orders_deepseek_last_with_rose_surfaces() -> None:
     assert "#FF375F" in stylesheet
     assert "#4D6BFE" not in stylesheet
     assert "#FF375F" in stylesheet
+
+
+def test_gnome_extension_deepseek_card_omits_unavailable_cost_row() -> None:
+    """
+    @brief Verify the DeepSeek GNOME card suppresses the unavailable cost row.
+    @details Level 1 HDT fixture executing the real extension implementation with
+    isolated GNOME 50 substitutes. One DeepSeek payload carrying
+    `metrics.cost = null` (the balance endpoint exposes no cost basis) MUST hide
+    the provider-card cost label so no unpopulated `Costs:` value renders, while
+    the `Balance`, `Topped up`, and `Granted` monetary rows stay visible.
+    @return {None} Function return value.
+    @satisfies REQ-246
+    @satisfies REQ-252
+    @satisfies TST-112
+    """
+    result = subprocess.run(
+        ["node", "tests/fixtures/deepseek-card-cost.cjs", str(EXTENSION_PATH)],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "DeepSeek card cost suppression" in result.stdout

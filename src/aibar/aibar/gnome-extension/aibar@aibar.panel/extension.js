@@ -1379,7 +1379,12 @@ class AIBarIndicator extends PanelMenu.Button {
      * geometry recalculation must not blank those labels. OpenRouter cards hide
      * the `requests`/`tokens` labels (the key API exposes no per-key request/token
      * counters) and render a `Total cost: <currency_symbol><total_cost>` label
-     * from `metrics.total_cost` in the removed counters position.
+     * from `metrics.total_cost` in the removed counters position. The generic
+     * `Costs:` row renders only when the provider exposes the cost dimension and
+     * the payload carries a non-null finite `metrics.cost`; providers without a
+     * cost basis (`deepseek`) therefore never render the row, because
+     * `Number(null)` collapses to `0` and would emit an unpopulated
+     * `Costs: <currency>0.0000` value.
      * @param {any} card Input parameter `card`.
      * @param {any} providerName Input parameter `providerName`.
      * @param {any} data Input parameter `data`.
@@ -1391,6 +1396,7 @@ class AIBarIndicator extends PanelMenu.Button {
      * @satisfies REQ-130
      * @satisfies REQ-155
      * @satisfies REQ-157
+     * @satisfies REQ-252
      */
     _populateProviderCard(card, providerName, data, statusEntry = null, freshnessState = null) {
         const metrics = data.metrics || {};
@@ -1839,7 +1845,14 @@ class AIBarIndicator extends PanelMenu.Button {
             data,
             this._copilotExtraPremiumRequestCost,
         );
-        const metricsCost = Number(metrics.cost);
+        const supportsCostRow = providerName !== 'deepseek';
+        const metricsCost = (
+            supportsCostRow &&
+            metrics.cost !== null &&
+            metrics.cost !== undefined
+        )
+            ? Number(metrics.cost)
+            : Number.NaN;
         const hasMetricsCost = Number.isFinite(metricsCost);
         if (providerName === 'copilot') {
             const effectiveCopilotCost = hasMetricsCost
