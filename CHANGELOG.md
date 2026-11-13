@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.60.1](https://github.com/Ogekuri/AIBar/compare/v0.60.0..v0.60.1) - 2026-11-13
+### 🚜  Changes
+- run gnome-install of the newly installed version after successful --upgrade [useReq] *(cli)*
+  Requirements: add REQ-254/REQ-255/REQ-256 and TST-114 for the post-upgrade GNOME extension sync.; Source: _handle_upgrade_option now executes _run_post_upgrade_gnome_install after a zero install exit status, spawning the aibar console script re-resolved from PATH with the gnome-install subcommand and propagating its exit status.; Docs: refresh WORKFLOW.md runtime model and regenerate REFERENCES.md.
+
 ## [0.60.0](https://github.com/Ogekuri/AIBar/compare/v0.59.0..v0.60.0) - 2026-11-13
 ### ⛰️  Features
 - Update gitalias config.
@@ -1587,6 +1592,7 @@
 - \[0.58.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.58.0
 - \[0.59.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.59.0
 - \[0.60.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.60.0
+- \[0.60.1\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.60.1
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1648,3 +1654,4 @@
 [0.58.0]: https://github.com/Ogekuri/AIBar/compare/v0.57.0..v0.58.0
 [0.59.0]: https://github.com/Ogekuri/AIBar/compare/v0.58.0..v0.59.0
 [0.60.0]: https://github.com/Ogekuri/AIBar/compare/v0.59.0..v0.60.0
+[0.60.1]: https://github.com/Ogekuri/AIBar/compare/v0.60.0..v0.60.1
