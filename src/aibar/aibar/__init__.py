@@ -4,7 +4,7 @@
 @details Exposes the package version for the multi-provider usage monitoring application.
 """
 
-__version__ = "0.60.1"
+__version__ = "0.60.2"
 
 # @brief Program name of the aibar distribution.
 # @details Single source of truth for the current program/project name
