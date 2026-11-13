@@ -9,7 +9,7 @@ resolution-markers = [
 
 [[package]]
 name = "aibar"
-version = "0.59.6"
+version = "0.60.0"
 source = { editable = "." }
 dependencies = [
     { name = "click" },

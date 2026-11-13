@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.59.6](https://github.com/Ogekuri/AIBar/compare/v0.59.0..v0.59.6) - 2026-11-13
+## [0.60.0](https://github.com/Ogekuri/AIBar/compare/v0.59.0..v0.60.0) - 2026-11-13
 ### ⛰️  Features
 - Update gitalias config.
 - add scripts/clean.sh removing build.sh artifacts [useReq] *(clean.sh)*
@@ -23,6 +23,29 @@
   clean.sh in the same copy exit 0; uv run pytest tests/ 333 passed, 1 skipped.
 
 ### 🚜  Changes
+- render monetary rows and switch to rose palette [useReq] *(deepseek)*
+  CLI DeepSeek panel now renders Balance, Topped up, and Granted rows from
+  raw.deepseek_balance_infos[0] with bold bright white values.
+  GNOME DeepSeek card renders the same three monetary rows; the panel status
+  token keeps only the balance.
+  Replace indigo #4D6BFE with rose #FF375F across all DeepSeek stylesheet
+  classes and use ANSI \033[38;5;204m for the CLI panel color.
+  No Spent/Cost/usage rows are rendered because /user/balance exposes no
+  spend field.
+  Update REQUIREMENTS.md (REQ-022, REQ-248, new REQ-251..REQ-253,
+  TST-109/TST-111, new TST-112/TST-113), WORKFLOW.md, REFERENCES.md,
+  README, and DeepSeek provider tests.
+- add DeepSeek balance provider and requirements [useReq] *(providers)*
+  Add DeepSeekProvider for GET https://api.deepseek.com/user/balance with
+  DEEPSEEK_API_KEY precedence, balance normalization, fixed 30d window,
+  401/429/other error mapping, and no fabricated usage counters.
+  Register deepseek in ProviderName, config maps, CLI registry, colors,
+  ordering, setup activation/currency/API-key prompts, and CLI balance panel.
+  Render DeepSeek last in the GNOME extension with indigo classes, card
+  balance row, panel balance token, and error-state label reset.
+  Update REQUIREMENTS.md (PRJ-002, DES-002, DES-008, CTN-017, REQ-019,
+  REQ-022, REQ-049, REQ-067, REQ-123, REQ-133, REQ-144, new REQ-239..REQ-250,
+  TST-108..TST-111), WORKFLOW.md call traces, REFERENCES.md, README, and tests.
 - remove every generated dist entry type and verify pre-build cleanup [useReq] *(build-script)*
   PRJ-031: pre-build cleanup removes every artifact-destination entry whose name
   matches a generated artifact pattern regardless of entry type (regular files
@@ -1563,7 +1586,7 @@
 - \[0.57.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.57.0
 - \[0.58.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.58.0
 - \[0.59.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.59.0
-- \[0.59.6\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.59.6
+- \[0.60.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.60.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1624,4 +1647,4 @@
 [0.57.0]: https://github.com/Ogekuri/AIBar/compare/v0.56.0..v0.57.0
 [0.58.0]: https://github.com/Ogekuri/AIBar/compare/v0.57.0..v0.58.0
 [0.59.0]: https://github.com/Ogekuri/AIBar/compare/v0.58.0..v0.59.0
-[0.59.6]: https://github.com/Ogekuri/AIBar/compare/v0.59.0..v0.59.6
+[0.60.0]: https://github.com/Ogekuri/AIBar/compare/v0.59.0..v0.60.0
