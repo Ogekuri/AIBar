@@ -163,6 +163,14 @@ _UPGRADE_LIFECYCLE_COMMAND: list[str] = [
     "--force",
 ]
 _UNINSTALL_LIFECYCLE_COMMAND: list[str] = ["uv", "tool", "uninstall", "aibar"]
+# @brief Subcommand executed by the newly installed version after a successful upgrade.
+# @details Appended to the `aibar` console script path freshly resolved from
+# `PATH` after the `--upgrade` install subprocess exits `0`, so the extension
+# files installed by `gnome-install` always come from the version just
+# installed (REQ-254, REQ-255).
+# @satisfies REQ-254
+# @satisfies REQ-255
+_POST_UPGRADE_SUBCOMMAND: list[str] = ["gnome-install"]
 # @brief Forcing options inserted into upgrade lifecycle argv on `--force`.
 # @details Inserted by `_insert_upgrade_force_options` immediately after the
 # `--force` token of the resolved upgrade command so `--upgrade --force`
@@ -959,6 +967,57 @@ def _execute_lifecycle_subprocess(command: list[str]) -> int:
     return int(completed.returncode)
 
 
+def _resolve_installed_aibar_executable() -> str | None:
+    """
+    @brief Resolve the freshly installed `aibar` console script from `PATH`.
+    @details Executes `shutil.which(PROGRAM_NAME)` after the upgrade
+    subprocess completes so the lookup observes the console script written by
+    `uv tool install` (the same `PATH` entry that started the current process).
+    An absent or blank resolution yields None so the caller can abort with a
+    deterministic diagnostic instead of spawning an unknown executable.
+    @return {str | None} Absolute console-script path, or None when unresolved.
+    @note Complexity O(P) over `PATH` entries P; space O(1).
+    @satisfies REQ-255
+    @satisfies REQ-256
+    """
+    executable = shutil.which(PROGRAM_NAME)
+    if executable is None:
+        return None
+    normalized = executable.strip()
+    if not normalized:
+        return None
+    return normalized
+
+
+def _run_post_upgrade_gnome_install() -> int:
+    """
+    @brief Execute `gnome-install` of the newly installed version.
+    @details Resolves the freshly installed `aibar` console script through
+    `_resolve_installed_aibar_executable` and spawns
+    `[<aibar>, gnome-install]` through `_execute_lifecycle_subprocess` so the
+    extension synchronize step runs the upgraded package. When the console
+    script cannot be resolved, emits one bright-red stderr diagnostic and
+    returns a non-zero status without spawning any subprocess.
+    @return {int} Post-upgrade subprocess exit status, or `1` when the console
+    script is unresolved.
+    @satisfies REQ-254
+    @satisfies REQ-255
+    @satisfies REQ-256
+    """
+    executable = _resolve_installed_aibar_executable()
+    if executable is None:
+        _emit_startup_preflight_message(
+            message=(
+                "Upgrade succeeded but the installed 'aibar' console script "
+                "could not be resolved from PATH; skipping 'gnome-install'."
+            ),
+            color_code=_ANSI_BRIGHT_RED,
+            err=True,
+        )
+        return 1
+    return _execute_lifecycle_subprocess([executable, *_POST_UPGRADE_SUBCOMMAND])
+
+
 def _is_linux_runtime() -> bool:
     """
     @brief Determine whether lifecycle subprocess execution is allowed.
@@ -1013,6 +1072,10 @@ def _handle_upgrade_option(
     exits without subprocess execution. When the latest GitHub release tag
     cannot be resolved, exits non-zero with the bright-red diagnostic emitted
     by the resolver and without executing any install command (REQ-190).
+    On Linux, a zero install exit status is followed by `gnome-install` of the
+    newly installed version through `_run_post_upgrade_gnome_install`, whose
+    exit status becomes the command exit status; a non-zero install status
+    skips that step (REQ-254, REQ-255, REQ-256).
     @param ctx {click.Context} Active Click context.
     @param param {click.Parameter} Option metadata (unused).
     @param value {bool} Parsed `--upgrade` flag value.
@@ -1024,6 +1087,9 @@ def _handle_upgrade_option(
     @satisfies REQ-089
     @satisfies REQ-189
     @satisfies REQ-190
+    @satisfies REQ-254
+    @satisfies REQ-255
+    @satisfies REQ-256
     """
     del param
     if not value or ctx.resilient_parsing:
@@ -1033,6 +1099,8 @@ def _handle_upgrade_option(
         ctx.exit(1)
     if _is_linux_runtime():
         exit_code = _execute_lifecycle_subprocess(upgrade_command)
+        if exit_code == 0:
+            exit_code = _run_post_upgrade_gnome_install()
     else:
         exit_code = _emit_non_linux_lifecycle_guidance(
             option_name="--upgrade",

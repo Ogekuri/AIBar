@@ -191,6 +191,9 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-194**: MUST resolve GitHub releases/latest HTTP failures, including HTTP 404, into failure responses carrying the HTTP status code and failure reason text.
 - **REQ-195**: The `--version` GitHub latest-release report MUST render the aligned `Latest @ GitHub` line with failure value `unknown (<reason>)`, where `<reason>` is the GitHub fetch failure message, when the releases/latest check fails.
 - **REQ-199**: The `--version`/`--ver` output MUST be exactly three stdout lines labeled `Current Installed`, `Latest @ PyPI`, and `Latest @ GitHub`, each label left-justified in one shared 18-character field followed by `: <version-value>`, so all colons align.
+- **REQ-254**: MUST execute `gnome-install` of the newly installed version after the `--upgrade` install subprocess exits `0`, for every `--upgrade` invocation including `--develop`/`--dev` and `--force` variants.
+- **REQ-255**: MUST execute the post-upgrade `gnome-install` by spawning the `aibar` console script re-resolved from `PATH` after the install subprocess completes, so the command runs the newly installed version.
+- **REQ-256**: MUST propagate the post-upgrade `gnome-install` exit status as the `--upgrade` exit status and MUST NOT execute it when the install subprocess exits non-zero or on non-Linux runtimes.
 - **REQ-009**: MUST execute provider retrieval for `show` in this order: force-flag handling, per-provider idle-time evaluation, per-provider conditional refresh to `~/.cache/aibar/cache.json`, then data load from `~/.cache/aibar/cache.json`.
 - **REQ-124**: `show` refresh execution MUST exclude disabled providers from fetch scheduling and MUST NOT apply idle-time, API-delay, API-timeout, or retry-after handling to disabled providers.
 - **REQ-125**: CLI text `show` MUST omit disabled providers and MUST NOT render panels or not-configured hints for providers whose `enabled_providers.<provider>` flag is `false`.
@@ -530,6 +533,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-111**: MUST verify GNOME extension renders `deepseek` last with rose style classes, card monetary rows, panel balance token, and `_handleError` label reset.
 - **TST-112**: MUST verify CLI and GNOME DeepSeek render `Balance`, `Topped up`, and `Granted` rows and never render `Spent`, `Cost`, or usage rows.
 - **TST-113**: MUST verify DeepSeek rose palette classes use `#FF375F` in `stylesheet.css` and ANSI `\033[38;5;204m` in the CLI provider color map.
+- **TST-114**: MUST verify `--upgrade` executes the `aibar gnome-install` argv resolved from `PATH` after a successful install, propagates its exit status, and skips it on install failure or non-Linux runtimes.
 
 ## 5. Evidence
 
@@ -755,6 +759,10 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-194 | `src/aibar/aibar/cli.py` + `_fetch_github_latest_release` + `urllib_error.HTTPError` branch returning failure response with `status_code=exc.code` and `error_message="GitHub release check failed: HTTP <code> <reason>."` for every GitHub HTTP error, including 404. |
 | REQ-195 | `src/aibar/aibar/cli.py` + `_emit_version_option_release_report` + `_GITHUB_REPORT_UNKNOWN_PREFIX="unknown"` failure value rendered inside the aligned `Latest @ GitHub   : unknown (<reason>)` line via `_format_release_report_value(..., failure_prefix=_GITHUB_REPORT_UNKNOWN_PREFIX)` and `_format_version_report_line`. |
 | REQ-199 | `src/aibar/aibar/cli.py` + `_format_version_report_line`/`_VERSION_REPORT_LABEL_WIDTH`/`_VERSION_REPORT_INSTALLED_LABEL`/`_VERSION_REPORT_PYPI_LABEL`/`_VERSION_REPORT_GITHUB_LABEL` + `_emit_version_option_release_report` emitting exactly three stdout lines with 18-character left-justified labels and aligned colons. |
+| REQ-254 | `src/aibar/aibar/cli.py` + `_handle_upgrade_option` + post-install branch executing `_run_post_upgrade_gnome_install` only when the resolved upgrade argv exits `0`. |
+| REQ-255 | `src/aibar/aibar/cli.py` + `_run_post_upgrade_gnome_install`/`_resolve_installed_aibar_executable` + `shutil.which(PROGRAM_NAME)` re-resolution after the install subprocess and `[<aibar>, gnome-install]` argv. |
+| REQ-256 | `src/aibar/aibar/cli.py` + `_handle_upgrade_option`/`_run_post_upgrade_gnome_install` + propagated post-upgrade exit status and non-zero-install/non-Linux suppression. |
+| TST-114 | `src/aibar/aibar/cli.py` + `_handle_upgrade_option`/`_run_post_upgrade_gnome_install` provide the post-upgrade `gnome-install` branch points requiring regression coverage; dedicated standalone test pending (no existing test maps to this behavior). |
 | TST-083 | `tests/test_version_github_report_parity.py` + `TestVersionGithubReportParity` + one-fetch-per-invocation assertion and report-value/tag-parity assertions under deterministic fetch substitutes. |
 | CTN-021 | `.github/workflows/release-pypi.yml` + `actions/checkout@v7`, `actions/attest-build-provenance@v4`, `softprops/action-gh-release@v3`, `actions/upload-artifact@v7`, `actions/download-artifact@v8`, `astral-sh/setup-uv@v7` (upstream `runs.using: node24` verified; `setup-uv@v3` Node20-era pin retired); `mikepenz/release-changelog-builder-action@v6` resolves to node24-native `v6.5`; `pypa/gh-action-pypi-publish@release/v1` is Docker-based and Node-independent. |
 | TST-080 | `tests/test_workflow_node24_actions.py` + `TestNode24ActionPins` + Node24-major pin assertions over the workflow `uses:` references retained by the conditional artifact-resolution release pipeline. |
