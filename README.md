@@ -16,7 +16,6 @@
   <img src="https://img.shields.io/badge/python-3.12%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.12+">
   <img src="https://img.shields.io/badge/license-GPL--3.0-491?style=flat-square" alt="License: GPL-3.0">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-6A7EC2?style=flat-square&logo=terminal&logoColor=white" alt="Platforms">
-  <img src="https://img.shields.io/badge/docs-live-b31b1b" alt="Docs">
 <img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json" alt="uv">
 </p>
 
@@ -47,6 +46,7 @@ AIBar brings every supported AI provider quota and cost into one place, on the t
 - Unified `show` command for multiple providers (`agy`, `openai`, `openrouter`, `copilot`, `codex`, `geminiai`, `zai`).
 - Text output and machine output (`show --json`) with stable top-level sections (`payload`, `status`, `idle_time`, `freshness`, `extension`, `enabled_providers`).
 - Per-run refresh override with `show --force` (bypasses idle-time gating for that execution).
+- Direct configuration inspection and mutation with canonical colon-separated paths: `--print [PATH]`, `--info [PATH]`, `--print-raw`, `--get PATH`, `--set PATH VALUE`, `--unset PATH`.
 - Interactive `setup` for provider enable/disable state, runtime throttling, Copilot overage pricing, provider currency symbols, GeminiAI OAuth/project settings, and logging flags.
 - Built-in lifecycle and observability flags: `--version|--ver`, `--upgrade`, `--upgrade --develop|--dev`, `--upgrade --force` (forced full re-install), `--uninstall`, `--enable-log`, `--disable-log`, `--enable-debug`, `--disable-debug`.
 - Startup release preflight that can emit update notices or fetch diagnostics before normal command output.
@@ -54,7 +54,7 @@ AIBar brings every supported AI provider quota and cost into one place, on the t
 
 # Quick Start
 
-Bring-up follows three steps: install, configure, run. AIBar is published on
+Bring-up follows four steps: install, configure, verify, run. AIBar is published on
 [PyPI](https://pypi.org/project/aibar/). The primary installation method is
 `pipx`; execution and live runs use [Astral uv](https://docs.astral.sh/uv/).
 
@@ -64,7 +64,7 @@ sudo apt install pipx
 pipx ensurepath
 pipx install aibar
 
-# 2) Alternative installation from PyPI (requires Python >= 3.12 and uv)
+# Optional alternative installation from PyPI (requires Python >= 3.12 and uv)
 uv tool install aibar
 
 # 2) Configure credentials and runtime settings
@@ -90,7 +90,7 @@ in the [User's Guide](#users-guide).
 - Published package on [PyPI](https://pypi.org/project/aibar/) (project `aibar`) as the default distribution source.
 - Network access to `pypi.org` and `api.github.com` for startup update checks and `--version` reporting, plus each provider's API endpoint.
 - Linux for the lifecycle flags `--upgrade` and `--uninstall` (on non-Linux platforms AIBar prints the equivalent manual `uv` command).
-- GNOME Shell `45`, `46`, `47`, or `48` with the `gnome-extensions` CLI, for the panel extension.
+- GNOME Shell `50` (validated on `50.1`) with the `gnome-extensions` CLI, for the panel extension.
 - Provider-specific prerequisites:
 
 | Provider | Prerequisite |
@@ -163,8 +163,7 @@ aibar --upgrade --develop
 
 `aibar --upgrade --develop` and `aibar --upgrade --dev` are equivalent.
 
-Force the full download and reinstallation of the GitHub package (bypasses any
-uv install cache for that run):
+Force the full download and reinstallation of the GitHub package (requests a forced package download and full reinstallation for that run):
 
 ```bash
 aibar --upgrade --develop --force
@@ -261,6 +260,10 @@ To enable GeminiAI features, configure Google Cloud before running `aibar setup`
 ### Core commands
 
 ```bash
+# Usage help (aibar without arguments prints the command list and examples)
+aibar
+aibar --help
+
 # Show all configured providers
 # (default flow renders dual windows for codex when --window is not set)
 aibar show
@@ -268,6 +271,7 @@ aibar show
 # Provider selection
 # allowed values: agy, openai, openrouter, copilot, codex, geminiai, zai, all
 aibar show --provider codex --window 5h
+aibar show -p codex -w 5h
 
 # JSON output for scripts/integrations
 aibar show --json
@@ -286,6 +290,43 @@ aibar gnome-uninstall
 ```
 
 Providers disabled during `aibar setup` (stored under `enabled_providers`) are skipped by refresh/idle-time handling and omitted from `show` text and `show --json` output.
+
+### Configuration CLI
+
+Inspect or change `~/.config/aibar/config.json` without running `setup`:
+
+```bash
+# Print the whole configuration tree (current values)
+aibar --print
+
+# Print one parameter or one map entry
+aibar --print idle_delay_seconds
+aibar --print enabled_providers:openai
+
+# Print the schema documentation (types, defaults, allowed values, commands)
+aibar --info
+aibar --info currency_symbols
+
+# Print the raw on-disk config.json bytes
+aibar --print-raw
+
+# Read one value as JSON
+aibar --get idle_delay_seconds
+
+# Write one value (JSON input is type-checked; plain text is accepted for string fields)
+aibar --set idle_delay_seconds 600
+aibar --set enabled_providers:openai false
+aibar --set currency_symbols:openai '"€"'
+
+# Reset a field to its schema default or delete one map key
+aibar --unset idle_delay_seconds
+aibar --unset enabled_providers:openai
+```
+
+- Paths are case-sensitive colon-separated tokens: `<Field>` or `<Field>:<MapKey>`; `Application_Configuration`, `append`, `+`, and `insert` are rejected tokens.
+- Success output goes to stdout and diagnostics go to stderr with exit status `1`.
+- `--set` and `--unset` print nothing on success and update the file through an atomic replace.
+- A missing `config.json` is created from schema defaults; a file with invalid JSON is rejected and never rewritten.
 
 ### Global lifecycle and logging options
 
@@ -313,7 +354,7 @@ aibar --disable-debug
 
 - Startup behavior: every CLI invocation runs a latest-release preflight (PyPI) before command parsing. Notices and fetch diagnostics are idle-cached for about `300` seconds; `aibar --version` and `aibar --ver` still force one online check.
 - `--version`/`--ver` print the installed version and the latest releases available on PyPI and GitHub.
-- `--upgrade` upgrades from PyPI; `--upgrade --develop` (or `--dev`) upgrades from the latest GitHub release instead. Adding `--force` (`aibar --upgrade --force`, `aibar --upgrade --develop --force`) forces the full package download and reinstallation by executing `uv tool install ... --force --reinstall --refresh`; without `--force` the standard install/update process runs without any forcing. Both execute only on Linux; on non-Linux platforms, AIBar prints the equivalent manual `uv` command.
+- `--upgrade` upgrades from PyPI; `--upgrade --develop` (or `--dev`) upgrades from the latest GitHub release instead. Adding `--force` (`aibar --upgrade --force`, `aibar --upgrade --develop --force`) requests the forced full download and reinstallation mode (`--reinstall --refresh` added to the `uv tool install ... --force` command); without `--force` the standard upgrade command runs unchanged. Both execute only on Linux; on non-Linux platforms, AIBar prints the equivalent manual `uv` command.
 - `--uninstall` executes only on Linux. On non-Linux platforms, AIBar prints the equivalent manual `uv` command.
 - Debug rows are emitted only when execution logging is enabled. For verbose API diagnostics, enable both `--enable-log` and `--enable-debug`.
 
@@ -331,6 +372,7 @@ aibar --disable-debug
 - `Remaining credits: <remaining> / <limit>` is printed for `codex` and `copilot` when the status is `OK`.
 - Percentages above 100% render the over-limit segment with the 100% boundary marker.
 - Failed providers render `Status: FAIL`, the failure `Reason:`, and the `Updated/Next` freshness line instead of usage statistics.
+- Enabled providers that are not configured render `Status: NOT CONFIGURED` with a missing environment-variable hint, or a missing `agy` CLI hint for Antigravity.
 
 ### Antigravity (agy)
 
@@ -366,7 +408,7 @@ aibar gnome-uninstall    # disable the extension and remove its files
 ```
 
 - Installed path: `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/`.
-- Supported GNOME Shell versions: `45`, `46`, `47`, `48`.
+- Supported GNOME Shell versions: `50` (validated on `50.1`; later major versions require compatibility verification).
 - Scheduled refreshes run `aibar show --json`.
 - Popup `Refresh Now` runs `aibar show --json --force`.
 - Disabled providers from `aibar setup` are hidden from panel labels, tabs, and cards.
@@ -393,8 +435,20 @@ aibar --uninstall
 scripts/aibar.sh --help
 
 # GNOME nested-shell test helper
-# runs gnome-install, then starts a nested Wayland GNOME Shell (1280x720)
+# requires Ubuntu 26.04 with gnome-shell, dbus-daemon, and mutter-dev-bin;
+# runs gnome-install, then opens a windowed GNOME Shell Devkit session
+# (nested Wayland shell + interactive debug shell on a shared D-Bus session;
+# no screenshots are captured)
 scripts/test-gnome-extension.sh
+
+# Release artifact builder (sdist, wheel, GNOME extension zip)
+# default destination: dist/; override with --dist-dir <Path>
+scripts/build.sh
+
+# Authoritative pre-release pipeline (dirty-tree gate with --allow-dirty opt-out,
+# locked dependency sync, pytest, temporary-directory build, artifact verification,
+# trap cleanup, repository-integrity check)
+scripts/pre-release-check.sh
 ```
 
 # Documentation
