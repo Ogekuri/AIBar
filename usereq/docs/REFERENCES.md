@@ -62,7 +62,7 @@ from aibar.cli import main
 
 ---
 
-# cli.py | Python | 5511L | 140 symbols | 30 imports | 227 comments
+# cli.py | Python | 5542L | 140 symbols | 30 imports | 227 comments
 > Path: `src/aibar/aibar/cli.py`
 - @brief Command-line interface for aibar.
 - @details Defines command parsing, provider dispatch, formatted output, setup helpers, login flows, and UI launch hooks.
@@ -1250,24 +1250,26 @@ freshness line (`Updated: ..., Next: ...`) using provider freshness state.
 - @satisfies REQ-137
 - @satisfies REQ-140
 
-### fn `def _build_agy_quota_lines(result: ProviderResult) -> list[str]` `priv` (L3939-3971)
+### fn `def _build_agy_quota_lines(result: ProviderResult) -> list[str]` `priv` (L3939-3972)
 - @brief Build Antigravity per-quota usage rows for CLI text panels.
 - @details Projects the normalized `raw.agy_quotas` array into one `Usage: <label> <progress_bar> <percent>%` row per quota. Quotas without a parseable percentage normalize to `0.0%`. Usage rows delegate to `_build_cli_usage_line(ProviderName.AGY, ...)` so Antigravity renders the standard fixed-width bracketed progress bar like the other bar providers. Quota labels resolve from the `label` field with the round-trip-safe `quota_key` fallback and a `Quota` terminal fallback.
 - @param result {ProviderResult} Antigravity provider result.
 - @return {list[str]} Ordered quota usage detail lines.
 - @satisfies REQ-168
 
-### fn `def _build_deepseek_balance_lines(result: ProviderResult) -> list[str]` `priv` (L3972-4018)
+### fn `def _build_deepseek_balance_lines(result: ProviderResult) -> list[str]` `priv` (L3973-4049)
 - @brief Build DeepSeek monetary balance rows for CLI text panels.
-- @details Projects `metrics.remaining` into one `Balance: <currency_symbol><value>` row rendered in bold bright white. The DeepSeek balance API exposes no quota, percentage, request, or token basis, so no `Usage:`, progress-bar, `Requests`, or `Tokens` row is produced (REQ-246). Additional normalized `raw.deepseek_balance_infos` records are appended as `Balance (<currency>): <currency_symbol><value>` rows so multi-currency accounts stay visible without re-parsing API strings.
+- @details Projects `metrics.remaining` into one `Balance: <currency_symbol><value>` row rendered in bold bright white, then appends `Topped up: <currency_symbol><topped_up_balance>` and `Granted: <currency_symbol><granted_balance>` from the preferred `raw.deepseek_balance_infos[0]` record when those values are finite (REQ-251). The DeepSeek balance API exposes no quota, percentage, request, token, or spend basis, so no `Usage:`, progress-bar, `Requests`, `Tokens`, `Spent`, or `Cost` row is produced (REQ-246, REQ-252). Additional normalized `raw.deepseek_balance_infos` records are appended as `Balance (<currency>): <currency_symbol><value>` rows so multi-currency accounts stay visible without re-parsing API strings.
 - @param result {ProviderResult} DeepSeek provider result.
 - @return {list[str]} Ordered balance detail lines.
 - @satisfies REQ-245
 - @satisfies REQ-246
+- @satisfies REQ-251
+- @satisfies REQ-252
 
-### fn `def _build_result_panel(` `priv` (L4019-4023)
+### fn `def _build_result_panel(` `priv` (L4050-4054)
 
-### fn `def _format_billing_service_descriptions(services: list[object]) -> str | None` `priv` (L4288-4315)
+### fn `def _format_billing_service_descriptions(services: list[object]) -> str | None` `priv` (L4319-4346)
 - @brief Build one provider panel title/body payload for CLI text rendering.
 - @brief Build human-readable GeminiAI billing service summary.
 - @details Formats deterministic panel lines for one provider/window result and
@@ -1315,9 +1317,9 @@ carrying `last_success_timestamp` and `idle_until_timestamp` freshness values.
 - @satisfies REQ-246
 - @satisfies REQ-106
 
-### fn `def _build_dual_window_section(` `priv` (L4316-4318)
+### fn `def _build_dual_window_section(` `priv` (L4347-4349)
 
-### fn `def _build_dual_window_panel(` `priv` (L4334-4338)
+### fn `def _build_dual_window_panel(` `priv` (L4365-4369)
 - @brief Build one labeled dual-window CLI section.
 - @details Prepends the raw window label (`5h` or `7d`) to the ordered detail
 lines for one dual-window provider section. The helper intentionally preserves
@@ -1328,7 +1330,7 @@ rows remain visible in both windows.
 - @return {list[str]} Section heading followed by the provided detail lines.
 - @satisfies REQ-002
 
-### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L4444-4468)
+### fn `def _print_result(name: ProviderName, result, label: str | None = None) -> None` `priv` (L4475-4499)
 - @brief Build one grouped CLI panel for dual-window providers.
 - @brief Render CLI text output for one provider result.
 - @details Produces one provider panel from `5h` and `7d` results while
@@ -1364,13 +1366,13 @@ line.
 - @satisfies REQ-131
 - @satisfies REQ-132
 
-### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L4469-4484)
+### fn `def _format_reset_duration(seconds: float) -> str` `priv` (L4500-4515)
 - @brief Execute format reset duration.
 - @details Applies format reset duration logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @param seconds {float} Input parameter `seconds`.
 - @return {str} Function return value.
 
-### fn `def _progress_bar_layout(percent: float, width: int) -> tuple[int, int, int]` `priv` (L4485-4517)
+### fn `def _progress_bar_layout(percent: float, width: int) -> tuple[int, int, int]` `priv` (L4516-4548)
 - @brief Compute fixed-width CLI progress-bar segment widths.
 - @details Normalizes `percent` to a non-negative finite value. Percentages up to `100` allocate provider-color fill plus empty cells. Percentages above `100` allocate one 100%-boundary marker cell and one over-limit segment scaled across the extra `0..100` range, clamped for larger values, and forced visible for any positive over-limit usage. Time complexity O(1). Space complexity O(1).
 - @param percent {float} Raw usage percentage.
@@ -1378,7 +1380,7 @@ line.
 - @return {tuple[int, int, int]} Tuple `(base_width, over_limit_width, marker_width)`.
 - @satisfies REQ-122
 
-### fn `def _progress_bar(percent: float, provider_name: ProviderName, width: int = 20) -> str` `priv` (L4518-4542)
+### fn `def _progress_bar(percent: float, provider_name: ProviderName, width: int = 20) -> str` `priv` (L4549-4573)
 - @brief Render one fixed-width CLI usage bar.
 - @details Uses provider-color fill for in-limit usage. Percentages above `100` preserve fixed bar width by rendering a bright-white `|` marker at the 100% boundary and a neutral shaded over-limit segment (`▓`) inside the same bar. Time complexity O(width). Space complexity O(width).
 - @param percent {float} Raw usage percentage.
@@ -1388,17 +1390,17 @@ line.
 - @satisfies REQ-122
 - @satisfies REQ-128
 
-### fn `def doctor() -> None` (L4547-4602)
+### fn `def doctor() -> None` (L4578-4633)
 - @brief Execute doctor.
 - @details Applies doctor logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def env() -> None` (L4607-4615)
+### fn `def env() -> None` (L4638-4646)
 - @brief Execute env.
 - @details Applies env logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def setup() -> None` (L4620-4819)
+### fn `def setup() -> None` (L4651-4850)
 - @brief Execute setup.
 - @details Prompts dedicated provider-activation section first, then prompts `idle_delay_seconds`, `api_call_delay_milliseconds`, `api_call_timeout_milliseconds`, `default_retry_after_seconds`, `gnome_refresh_interval_seconds`, and `billing_data` in order, then prompts dedicated Copilot overage pricing field `copilot_extra_premium_request_cost` (USD/request), then prompts provider currency symbols including `geminiai` (choices: `$`, `£`, `€`, default `$`), then persists all values to `~/.config/aibar/config.json`. Final setup section configures logging flags (`log_enabled`, `debug_enabled`). GeminiAI OAuth source supports `skip`, `file`, `paste`, and `login` (re-authorization with current scopes). Also prompts for provider API keys and writes them to `~/.config/aibar/env`.
 - @return {None} Function return value.
@@ -1411,7 +1413,7 @@ line.
 - @satisfies REQ-056
 - @satisfies REQ-059
 
-### fn `def login(provider: str | None) -> None` (L5028-5056)
+### fn `def login(provider: str | None) -> None` (L5059-5087)
 - @brief Execute provider login dispatch.
 - @details With `--provider`, executes the single provider login flow and prints diagnostics with non-zero exit for unsupported provider values. Without `--provider`, delegates to `_login_error_state_providers(...)` so only login-capable providers whose cached last-attempt status is `FAIL` are re-authenticated (the former default `copilot` fallback is removed).
 - @param provider {str | None} Optional provider selector (`copilot`, `geminiai`); `None` selects cached error-state providers.
@@ -1422,19 +1424,19 @@ line.
 - @satisfies REQ-174
 - @satisfies REQ-175
 
-### fn `def _login_copilot() -> None` `priv` (L5057-5084)
+### fn `def _login_copilot() -> None` `priv` (L5088-5115)
 - @brief Execute login copilot.
 - @details Applies login copilot logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_geminiai() -> None` `priv` (L5085-5123)
+### fn `def _login_geminiai() -> None` `priv` (L5116-5154)
 - @brief Execute GeminiAI OAuth login flow.
 - @details Reuses persisted OAuth client configuration to launch browser-based authorization and persist refresh-capable Google credentials.
 - @return {None} Function return value.
 - @satisfies REQ-055
 - @satisfies REQ-056
 
-### fn `def _select_login_error_providers() -> list[ProviderName]` `priv` (L5130-5159)
+### fn `def _select_login_error_providers() -> list[ProviderName]` `priv` (L5161-5190)
 - @brief Select login-capable providers whose cached last-attempt status is FAIL.
 - @details Reads `~/.cache/aibar/cache.json` through the locked `load_cli_cache` reader, extracts the canonical `status` section via `_cache_status_section(...)`, and returns one registry-ordered entry per login-capable provider carrying at least one cached window status with `result == "FAIL"`. Providers whose cached window statuses are all `OK` or absent are skipped (REQ-173). Missing, corrupt, or empty cache documents yield an empty selection.
 - @return {list[ProviderName]} Registry-ordered login-capable providers in error state.
@@ -1442,7 +1444,7 @@ line.
 - @satisfies REQ-172
 - @satisfies REQ-173
 
-### fn `def _login_error_state_providers() -> None` `priv` (L5160-5205)
+### fn `def _login_error_state_providers() -> None` `priv` (L5191-5236)
 - @brief Re-authenticate login-capable providers currently in cached error state.
 - @details Selects cached `result=FAIL` login-capable providers via `_select_login_error_providers(...)`. An empty selection prints one informational message and returns with exit status 0 (REQ-174). Each selected provider executes its login flow sequentially in registry order (REQ-172); `SystemExit` raised by a failed flow and any flow exception are captured per provider so remaining providers still execute. When at least one flow fails, one `ClickException` forces a non-zero exit after all flows complete (REQ-175).
 - @return {None} Function return value.
@@ -1451,7 +1453,7 @@ line.
 - @satisfies REQ-174
 - @satisfies REQ-175
 
-### fn `def _resolve_extension_target_dir() -> Path` `priv` (L5206-5227)
+### fn `def _resolve_extension_target_dir() -> Path` `priv` (L5237-5258)
 - @brief Resolve the GNOME Shell extension installation target directory.
 - @details Returns `Path(AIBAR_EXT_TARGET_DIR)` when that environment override is set to a non-blank value, otherwise returns the module-level canonical target `~/.local/share/gnome-shell/extensions/aibar@aibar.panel` read at call time so per-test monkeypatching of `_EXT_TARGET_DIR` stays effective. The override lets isolated executions (unit-test suites, CI jobs) guarantee that no install/update/remove operation can mutate the developer's real extension directory (REQ-026, REQ-081).
 - @return {Path} Absolute extension target directory candidate.
@@ -1460,7 +1462,7 @@ line.
 - @satisfies REQ-026
 - @satisfies REQ-081
 
-### fn `def _validate_extension_metadata(metadata_path: Path) -> str | None` `priv` (L5228-5268)
+### fn `def _validate_extension_metadata(metadata_path: Path) -> str | None` `priv` (L5259-5299)
 - @brief Validate one GNOME Shell extension `metadata.json` document.
 - @details Decodes `metadata_path` as UTF-8 JSON and enforces the GNOME Shell load contract: the root node MUST be a JSON object, `uuid` MUST be a non-empty string, and `shell-version` MUST be a non-empty array of non-empty strings. Every failure mode (missing file, unreadable file, invalid JSON, contract violation) returns one deterministic diagnostic instead of raising, so `gnome_install` can abort before `os.makedirs`, `shutil.copy2`, `gnome-extensions disable`, or `gnome-extensions enable` execute. This prevents a source tree with placeholder metadata (`{}`) from overwriting a valid installed extension and making it unloadable (REQ-027, REQ-029).
 - @param metadata_path {Path} Candidate extension metadata file path.
@@ -1470,13 +1472,13 @@ line.
 - @satisfies REQ-027
 - @satisfies REQ-030
 
-### fn `def _resolve_extension_source_dir() -> Path` `priv` (L5269-5281)
+### fn `def _resolve_extension_source_dir() -> Path` `priv` (L5300-5312)
 - @brief Resolve GNOME extension source directory from within the `aibar` package.
 - @details Uses `Path(__file__).resolve().parent` to locate the `aibar` package directory, then appends `gnome-extension/<UUID>/`. Works in development (editable install), wheel-installed, and `uv tool install` layouts because the extension directory resides inside the `aibar` Python package subtree.
 - @return {Path} Absolute path to the extension source directory.
 - @satisfies REQ-025, REQ-083
 
-### fn `def gnome_install() -> None` (L5292-5428)
+### fn `def gnome_install() -> None` (L5323-5459)
 - @brief Install or update the AIBar GNOME Shell extension to the user's local extensions directory.
 - @details Resolves extension source from the installed package path, validates source directory contains `metadata.json` and is non-empty, validates the metadata document against the GNOME Shell load contract (`uuid`, `shell-version`) before any target mutation, then executes one of two flows: install flow (`target` absent) creates target and copies files before enabling extension; update flow (`target` present) disables extension, copies files, then enables extension. The target directory resolves through `_resolve_extension_target_dir`, so an `AIBAR_EXT_TARGET_DIR` override keeps isolated executions away from the real user extension directory. Update flow masks non-zero disable outcomes caused by missing extension and continues. Produces colored Click-styled terminal output for all status messages.
 - @return {None} Function return value.
@@ -1484,7 +1486,7 @@ line.
 - @see _validate_extension_metadata
 - @satisfies PRJ-008, REQ-025, REQ-026, REQ-027, REQ-028, REQ-029, REQ-030, REQ-032, REQ-099
 
-### fn `def gnome_uninstall() -> None` (L5438-5509)
+### fn `def gnome_uninstall() -> None` (L5469-5540)
 - @brief Remove the AIBar GNOME Shell extension from the user's local extensions directory.
 - @details Disables the extension via `gnome-extensions disable`, then removes the entire extension directory resolved by `_resolve_extension_target_dir` (canonical `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/`, overridable through `AIBAR_EXT_TARGET_DIR`). Exits with code 1 if the extension directory does not exist. Produces colored Click-styled terminal output for all status messages.
 - @return {None} Function return value.
@@ -1611,29 +1613,29 @@ line.
 |`_build_copilot_extra_premium_cost_line`|fn|priv|3840-3855|def _build_copilot_extra_premium_cost_line(result: Provid...|
 |`_coerce_zai_quota_reset_at`|fn|priv|3856-3891|def _coerce_zai_quota_reset_at(quota: dict[str, object]) ...|
 |`_build_zai_quota_lines`|fn|priv|3892-3938|def _build_zai_quota_lines(result: ProviderResult) -> lis...|
-|`_build_agy_quota_lines`|fn|priv|3939-3971|def _build_agy_quota_lines(result: ProviderResult) -> lis...|
-|`_build_deepseek_balance_lines`|fn|priv|3972-4018|def _build_deepseek_balance_lines(result: ProviderResult)...|
-|`_build_result_panel`|fn|priv|4019-4023|def _build_result_panel(|
-|`_format_billing_service_descriptions`|fn|priv|4288-4315|def _format_billing_service_descriptions(services: list[o...|
-|`_build_dual_window_section`|fn|priv|4316-4318|def _build_dual_window_section(|
-|`_build_dual_window_panel`|fn|priv|4334-4338|def _build_dual_window_panel(|
-|`_print_result`|fn|priv|4444-4468|def _print_result(name: ProviderName, result, label: str ...|
-|`_format_reset_duration`|fn|priv|4469-4484|def _format_reset_duration(seconds: float) -> str|
-|`_progress_bar_layout`|fn|priv|4485-4517|def _progress_bar_layout(percent: float, width: int) -> t...|
-|`_progress_bar`|fn|priv|4518-4542|def _progress_bar(percent: float, provider_name: Provider...|
-|`doctor`|fn|pub|4547-4602|def doctor() -> None|
-|`env`|fn|pub|4607-4615|def env() -> None|
-|`setup`|fn|pub|4620-4819|def setup() -> None|
-|`login`|fn|pub|5028-5056|def login(provider: str | None) -> None|
-|`_login_copilot`|fn|priv|5057-5084|def _login_copilot() -> None|
-|`_login_geminiai`|fn|priv|5085-5123|def _login_geminiai() -> None|
-|`_select_login_error_providers`|fn|priv|5130-5159|def _select_login_error_providers() -> list[ProviderName]|
-|`_login_error_state_providers`|fn|priv|5160-5205|def _login_error_state_providers() -> None|
-|`_resolve_extension_target_dir`|fn|priv|5206-5227|def _resolve_extension_target_dir() -> Path|
-|`_validate_extension_metadata`|fn|priv|5228-5268|def _validate_extension_metadata(metadata_path: Path) -> ...|
-|`_resolve_extension_source_dir`|fn|priv|5269-5281|def _resolve_extension_source_dir() -> Path|
-|`gnome_install`|fn|pub|5292-5428|def gnome_install() -> None|
-|`gnome_uninstall`|fn|pub|5438-5509|def gnome_uninstall() -> None|
+|`_build_agy_quota_lines`|fn|priv|3939-3972|def _build_agy_quota_lines(result: ProviderResult) -> lis...|
+|`_build_deepseek_balance_lines`|fn|priv|3973-4049|def _build_deepseek_balance_lines(result: ProviderResult)...|
+|`_build_result_panel`|fn|priv|4050-4054|def _build_result_panel(|
+|`_format_billing_service_descriptions`|fn|priv|4319-4346|def _format_billing_service_descriptions(services: list[o...|
+|`_build_dual_window_section`|fn|priv|4347-4349|def _build_dual_window_section(|
+|`_build_dual_window_panel`|fn|priv|4365-4369|def _build_dual_window_panel(|
+|`_print_result`|fn|priv|4475-4499|def _print_result(name: ProviderName, result, label: str ...|
+|`_format_reset_duration`|fn|priv|4500-4515|def _format_reset_duration(seconds: float) -> str|
+|`_progress_bar_layout`|fn|priv|4516-4548|def _progress_bar_layout(percent: float, width: int) -> t...|
+|`_progress_bar`|fn|priv|4549-4573|def _progress_bar(percent: float, provider_name: Provider...|
+|`doctor`|fn|pub|4578-4633|def doctor() -> None|
+|`env`|fn|pub|4638-4646|def env() -> None|
+|`setup`|fn|pub|4651-4850|def setup() -> None|
+|`login`|fn|pub|5059-5087|def login(provider: str | None) -> None|
+|`_login_copilot`|fn|priv|5088-5115|def _login_copilot() -> None|
+|`_login_geminiai`|fn|priv|5116-5154|def _login_geminiai() -> None|
+|`_select_login_error_providers`|fn|priv|5161-5190|def _select_login_error_providers() -> list[ProviderName]|
+|`_login_error_state_providers`|fn|priv|5191-5236|def _login_error_state_providers() -> None|
+|`_resolve_extension_target_dir`|fn|priv|5237-5258|def _resolve_extension_target_dir() -> Path|
+|`_validate_extension_metadata`|fn|priv|5259-5299|def _validate_extension_metadata(metadata_path: Path) -> ...|
+|`_resolve_extension_source_dir`|fn|priv|5300-5312|def _resolve_extension_source_dir() -> Path|
+|`gnome_install`|fn|pub|5323-5459|def gnome_install() -> None|
+|`gnome_uninstall`|fn|pub|5469-5540|def gnome_uninstall() -> None|
 
 
 ---
@@ -2574,7 +2576,7 @@ output can be piped into JSON tools.
 
 ---
 
-# extension.js | JavaScript | 2875L | 53 symbols | 9 imports | 68 comments
+# extension.js | JavaScript | 2899L | 53 symbols | 9 imports | 68 comments
 > Path: `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js`
 - @brief GNOME Shell panel extension for aibar metrics.
 - @details Collects usage JSON from the aibar CLI and renders provider-specific quota/cost cards in the GNOME panel popup.
@@ -2883,7 +2885,7 @@ from `metrics.total_cost` in the removed counters position.
 
 ### fn `const showResetPendingHint = () =>` (L1658-1660)
 
-### fn `const toPercent = (value) =>` (L2373-2378)
+### fn `const toPercent = (value) =>` (L2397-2402)
 - @brief Execute update u i.
 - @details Applies update u i logic for GNOME extension runtime behavior with deterministic UI and subprocess side effects.
 Resolves provider-window failure metadata from cache `status` section and forwards it
@@ -2901,7 +2903,7 @@ After card refresh, re-sizes the popup provider viewport to the visible card hei
 - @satisfies REQ-120
 - @satisfies REQ-127
 
-### fn `const getPanelUsageValues = (providerName, data) =>` (L2399-2584)
+### fn `const getPanelUsageValues = (providerName, data) =>` (L2423-2608)
 - @brief Resolve panel icon threshold percentage inputs for one provider payload.
 - @details Returns `{primary, secondary[, max]}` percentages consumed by the
 `_updateUI(...)` panel aggregation. Provider sources: AGY reads
@@ -2921,7 +2923,7 @@ provider quotas Q. Space complexity O(1).
 - @satisfies REQ-149
 - @satisfies REQ-170
 
-### class `export default class AIBarExtension extends Extension` : Extension (L2849-2875)
+### class `export default class AIBarExtension extends Extension` : Extension (L2873-2899)
 - @brief GNOME extension lifecycle adapter for AIBarIndicator registration.
 - @brief Execute enable.
 - @details Extends Extension (GNOME Shell 45+ API) to integrate with the extension lifecycle.
@@ -2983,9 +2985,9 @@ Uses this.uuid (provided by the Extension base class) as the status-area key.
 |`updateWindowBar`|fn||1639-1703|const updateWindowBar = (bar, pct, resetTime, useDays, al...|
 |`setResetLabel`|fn||1645-1651|const setResetLabel = (baseText) =>|
 |`showResetPendingHint`|fn||1658-1660|const showResetPendingHint = () =>|
-|`toPercent`|fn||2373-2378|const toPercent = (value) =>|
-|`getPanelUsageValues`|fn||2399-2584|const getPanelUsageValues = (providerName, data) =>|
-|`AIBarExtension`|class||2849-2875|export default class AIBarExtension extends Extension|
+|`toPercent`|fn||2397-2402|const toPercent = (value) =>|
+|`getPanelUsageValues`|fn||2423-2608|const getPanelUsageValues = (providerName, data) =>|
+|`AIBarExtension`|class||2873-2899|export default class AIBarExtension extends Extension|
 
 
 ---

@@ -5,7 +5,7 @@
 `is_available`/`balance_infos[]` into `raw.deepseek_balance_infos` and
 `UsageMetrics`, uses the fixed `30d` effective window, renders CLI monetary
 balance rows without usage counters, and appears last in the GNOME extension
-provider ordering with indigo style classes.
+provider ordering with rose style classes.
 @satisfies TST-108
 @satisfies TST-109
 @satisfies TST-111
@@ -22,6 +22,7 @@ from aibar.cli import _build_result_panel
 from aibar.providers.base import AuthenticationError, ProviderName, WindowPeriod
 from aibar.providers.deepseek import DeepSeekProvider
 
+CLI_PATH = Path("src/aibar/aibar/cli.py")
 EXTENSION_PATH = Path(
     "src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js"
 )
@@ -237,12 +238,16 @@ def test_fetch_maps_authentication_and_rate_limit_failures(
 def test_cli_panel_renders_balance_without_usage_counters() -> None:
     """
     @brief Verify DeepSeek CLI panel monetary-only rendering.
-    @details Asserts the panel renders `Status: OK` plus one `Balance:` row and
-    never renders progress bars, `Usage:` rows, `Requests`, or `Tokens`.
+    @details Asserts the panel renders `Status: OK` plus `Balance`, `Topped up`,
+    and `Granted` monetary rows and never renders progress bars, `Usage:` rows,
+    `Requests`, `Tokens`, `Spent`, or `Cost` rows.
     @return {None} Function return value.
     @satisfies REQ-245
     @satisfies REQ-246
+    @satisfies REQ-251
+    @satisfies REQ-252
     @satisfies TST-109
+    @satisfies TST-112
     """
     provider = DeepSeekProvider(api_key="deepseek-key")
     result = provider._parse_response(dict(BALANCE_PAYLOAD), WindowPeriod.DAY_30)
@@ -254,26 +259,35 @@ def test_cli_panel_renders_balance_without_usage_counters() -> None:
     assert "Status: OK" in body_lines
     assert "Balance: " in rendered
     assert "12.50" in rendered
+    assert "Topped up: " in rendered
+    assert "10.00" in rendered
+    assert "Granted: " in rendered
+    assert "2.50" in rendered
     assert "Usage:" not in rendered
     assert "Requests:" not in rendered
     assert "Tokens:" not in rendered
+    assert "Spent:" not in rendered
+    assert "Cost:" not in rendered
     assert "█" not in rendered
     assert "░" not in rendered
 
 
-def test_gnome_extension_orders_deepseek_last_with_indigo_surfaces() -> None:
+def test_gnome_extension_orders_deepseek_last_with_rose_surfaces() -> None:
     """
     @brief Verify GNOME extension DeepSeek ordering, styling, and reset wiring.
-    @details Asserts the trailing provider order, indigo style classes, balance
-    labels, card balance row, and `_handleError` label reset for DeepSeek.
+    @details Asserts the trailing provider order, rose style classes, monetary
+    rows, panel balance token, and `_handleError` label reset for DeepSeek.
     @return {None} Function return value.
     @satisfies REQ-022
     @satisfies REQ-248
     @satisfies REQ-249
+    @satisfies REQ-253
     @satisfies TST-111
+    @satisfies TST-113
     """
     source = EXTENSION_PATH.read_text(encoding="utf-8")
     stylesheet = STYLESHEET_PATH.read_text(encoding="utf-8")
+    cli_source = CLI_PATH.read_text(encoding="utf-8")
 
     assert (
         "this._providerOrder = ['agy', 'openrouter', 'copilot', 'codex', 'openai', 'geminiai', 'zai', 'deepseek'];"
@@ -287,9 +301,17 @@ def test_gnome_extension_orders_deepseek_last_with_indigo_surfaces() -> None:
     assert "aibar-tab-label-deepseek" in source
     assert "this._panelDeepSeekBalanceLabel.set_text('');" in source
     assert "this._panelDeepSeekBalanceLabel.hide();" in source
-    assert "Balance: ${_boldWhiteMarkup(balanceText)}" in source
+    assert "['Balance', Number(metrics.remaining)]" in source
+    assert "['Topped up', deepseekRecord.topped_up_balance]" in source
+    assert "['Granted', deepseekRecord.granted_balance]" in source
+    assert "`${deepseekRowLabel}: ${_boldWhiteMarkup(deepseekValueText)}`" in source
+    assert "deepseekMarkup.join('\\n')" in source
+    assert "Spent" not in source
+    assert 'ProviderName.DEEPSEEK: "\\033[38;5;204m",' in cli_source
     assert "const PROGRESS_BAR_PROVIDERS = new Set(['agy', 'openrouter', 'copilot', 'codex', 'zai']);" in source
     assert "const API_COUNTER_PROVIDERS = new Set(['openai', 'codex', 'geminiai']);" in source
     assert "const TEXT_USAGE_PROVIDERS = new Set(['openai', 'geminiai', 'deepseek']);" in source
     assert ".aibar-tab-label-deepseek {" in stylesheet
-    assert "#4D6BFE" in stylesheet
+    assert "#FF375F" in stylesheet
+    assert "#4D6BFE" not in stylesheet
+    assert "#FF375F" in stylesheet

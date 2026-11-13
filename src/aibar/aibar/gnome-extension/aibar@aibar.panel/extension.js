@@ -1894,11 +1894,35 @@ class AIBarIndicator extends PanelMenu.Button {
             metrics.remaining !== undefined &&
             Number.isFinite(Number(metrics.remaining))
         ) {
-            const balanceCurrency = metrics.currency_symbol || '$';
-            const balanceText = `${balanceCurrency}${Number(metrics.remaining).toFixed(2)}`;
-            card.byokLabel.clutter_text.set_markup(
-                `Balance: ${_boldWhiteMarkup(balanceText)}`
-            );
+            const deepseekRecord = (
+                Array.isArray(raw.deepseek_balance_infos) &&
+                raw.deepseek_balance_infos.length > 0 &&
+                raw.deepseek_balance_infos[0] &&
+                typeof raw.deepseek_balance_infos[0] === 'object'
+            )
+                ? raw.deepseek_balance_infos[0]
+                : {};
+            const deepseekCurrency = metrics.currency_symbol || '$';
+            const deepseekRows = [
+                ['Balance', Number(metrics.remaining)],
+                ['Topped up', deepseekRecord.topped_up_balance],
+                ['Granted', deepseekRecord.granted_balance],
+            ];
+            const deepseekMarkup = [];
+            for (const [deepseekRowLabel, deepseekRowValue] of deepseekRows) {
+                if (
+                    typeof deepseekRowValue !== 'number' ||
+                    !Number.isFinite(deepseekRowValue)
+                )
+                    continue;
+                const deepseekValueText = (
+                    `${deepseekCurrency}${deepseekRowValue.toFixed(2)}`
+                );
+                deepseekMarkup.push(
+                    `${deepseekRowLabel}: ${_boldWhiteMarkup(deepseekValueText)}`
+                );
+            }
+            card.byokLabel.clutter_text.set_markup(deepseekMarkup.join('\n'));
             card.byokLabel.show();
         } else if (providerName === 'openrouter' && raw.data) {
             let byokValue = null;

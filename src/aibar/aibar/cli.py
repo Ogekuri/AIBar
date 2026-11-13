@@ -101,7 +101,7 @@ _PROVIDER_PANEL_COLOR_CODES: dict[ProviderName, str] = {
     ProviderName.OPENAI: "\033[94m",
     ProviderName.GEMINIAI: "\033[95m",
     ProviderName.ZAI: "\033[96m",
-    ProviderName.DEEPSEEK: "\033[38;5;69m",
+    ProviderName.DEEPSEEK: "\033[38;5;204m",
 }
 _API_COUNTER_PROVIDERS: frozenset[ProviderName] = frozenset(
     {
@@ -3974,16 +3974,22 @@ def _build_deepseek_balance_lines(result: ProviderResult) -> list[str]:
     """
     @brief Build DeepSeek monetary balance rows for CLI text panels.
     @details Projects `metrics.remaining` into one
-    `Balance: <currency_symbol><value>` row rendered in bold bright white. The
-    DeepSeek balance API exposes no quota, percentage, request, or token basis,
-    so no `Usage:`, progress-bar, `Requests`, or `Tokens` row is produced
-    (REQ-246). Additional normalized `raw.deepseek_balance_infos` records are
-    appended as `Balance (<currency>): <currency_symbol><value>` rows so
-    multi-currency accounts stay visible without re-parsing API strings.
+    `Balance: <currency_symbol><value>` row rendered in bold bright white, then
+    appends `Topped up: <currency_symbol><topped_up_balance>` and
+    `Granted: <currency_symbol><granted_balance>` from the preferred
+    `raw.deepseek_balance_infos[0]` record when those values are finite
+    (REQ-251). The DeepSeek balance API exposes no quota, percentage, request,
+    token, or spend basis, so no `Usage:`, progress-bar, `Requests`, `Tokens`,
+    `Spent`, or `Cost` row is produced (REQ-246, REQ-252). Additional normalized
+    `raw.deepseek_balance_infos` records are appended as
+    `Balance (<currency>): <currency_symbol><value>` rows so multi-currency
+    accounts stay visible without re-parsing API strings.
     @param result {ProviderResult} DeepSeek provider result.
     @return {list[str]} Ordered balance detail lines.
     @satisfies REQ-245
     @satisfies REQ-246
+    @satisfies REQ-251
+    @satisfies REQ-252
     """
     metrics = result.metrics
     lines: list[str] = []
@@ -4000,6 +4006,29 @@ def _build_deepseek_balance_lines(result: ProviderResult) -> list[str]:
         if isinstance(result.raw, dict)
         else None
     )
+    preferred_record: dict[str, object] = {}
+    if (
+        isinstance(balance_infos, list)
+        and balance_infos
+        and isinstance(balance_infos[0], dict)
+    ):
+        preferred_record = balance_infos[0]
+
+    for row_label, row_field in (
+        ("Topped up", "topped_up_balance"),
+        ("Granted", "granted_balance"),
+    ):
+        row_value = preferred_record.get(row_field)
+        if not isinstance(row_value, (int, float)) or isinstance(row_value, bool):
+            continue
+        row_symbol = (
+            preferred_record.get("currency_symbol") or metrics.currency_symbol
+        )
+        lines.append(
+            f"{row_label}: "
+            + _format_bright_white_bold(f"{row_symbol}{float(row_value):.2f}")
+        )
+
     if not isinstance(balance_infos, list) or len(balance_infos) <= 1:
         return lines
 

@@ -1,7 +1,7 @@
 ---
 title: "AIBar Requirements"
 description: Software requirements specification
-version: "0.5.0"
+version: "0.6.0"
 date: "2026-11-13"
 author: "req-new"
 scope:
@@ -214,7 +214,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-019**: SHOULD order extension provider tabs/cards by `agy`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, `zai`, `deepseek`, with providers not listed in ordering array appended alphabetically.
 - **REQ-020**: MUST include each discovered configured-source symbol in `pi-usereq/docs/REFERENCES.md` with file path, symbol kind, line-range evidence, and parsed Doxygen fields (`@brief`, `@param`, `@return`, `@throws`) when present in source declarations.
 - **REQ-021**: GNOME panel status labels MUST render `Err` only for providers whose `status.result=FAIL` category is OAuth or rate-limit, while providers without those failures MUST keep normal percentage/cost labels.
-- **REQ-022**: MUST style GNOME panel tab and label fonts with provider classes and bright colors: Antigravity red, OpenRouter orange, Copilot yellow, Codex green, OpenAI blue, GeminiAI purple, Z.ai cyan, DeepSeek indigo; cost labels MUST use the same font family, render when numeric value is `0`, and hide only when cost metric is unavailable.
+- **REQ-022**: MUST style GNOME panel tab and label fonts with provider classes and bright colors: Antigravity red, OpenRouter orange, Copilot yellow, Codex green, OpenAI blue, GeminiAI purple, Z.ai cyan, DeepSeek rose (`#FF375F`); cost labels MUST use the same font family, render when numeric value is `0`, and hide only when cost metric is unavailable.
 - **REQ-023**: MUST declare a `[project.scripts]` entry `aibar = "aibar.cli:main"` in `pyproject.toml` so that `uv pip install` and `uvx` resolve the `aibar` console command.
 - **REQ-024**: MUST provide `src/aibar/aibar/__main__.py` that delegates to `aibar.cli:main` to enable `python -m aibar` execution.
 - **REQ-025**: MUST resolve GNOME extension source files from within the `aibar` Python package directory via module-relative path resolution (`Path(__file__).resolve().parent / "gnome-extension" / <UUID>`) in `gnome-install`, independent of git repository, working directory, or installation method (editable, wheel, `uv tool`).
@@ -411,8 +411,11 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-244**: MUST reuse the shared provider cache, idle-time, throttling, and retry lifecycle for `deepseek` without modifying those shared mechanisms.
 - **REQ-245**: MUST render DeepSeek CLI text blocks as `Status: OK`, blank line, `Balance: <currency_symbol><remaining>`, blank line, and the freshness line.
 - **REQ-246**: DeepSeek CLI text blocks and GNOME cards MUST NOT render progress bars, `Usage:` rows, `Requests`, or `Tokens` because the balance API exposes no usage counters.
+- **REQ-251**: DeepSeek CLI text blocks MUST render `Topped up: <currency_symbol><topped_up_balance>` and `Granted: <currency_symbol><granted_balance>` after the `Balance` row when `raw.deepseek_balance_infos[0]` carries finite values.
+- **REQ-252**: DeepSeek CLI text blocks and GNOME cards MUST render `Balance`, `Topped up`, and `Granted` from `raw.deepseek_balance_infos[0]` and MUST NOT render `Spent`, `Cost`, or usage rows because the endpoint exposes no spend field.
+- **REQ-253**: GNOME DeepSeek cards MUST render `Balance`, `Topped up`, and `Granted` monetary rows from `raw.deepseek_balance_infos[0]` while the panel status token keeps only the balance.
 - **REQ-247**: MUST map DeepSeek HTTP `401` to `AuthenticationError`, HTTP `429` to a rate-limit error result carrying `retry_after_seconds`, and other non-200 responses to provider error results.
-- **REQ-248**: MUST render GNOME DeepSeek tab, card, and panel status labels last with indigo style classes, card `Balance: <currency_symbol><value>`, and enable-state filtering.
+- **REQ-248**: MUST render GNOME DeepSeek tab, card, and panel status labels last with rose style classes (`#FF375F`), card `Balance: <currency_symbol><value>`, and enable-state filtering.
 - **REQ-249**: MUST exclude `deepseek` from GNOME progress-bar providers, API-counter providers, and panel percentage aggregation while listing it in provider ordering arrays.
 - **REQ-250**: MUST document in DeepSeek `get_config_help` and `README.md` that the API key authorizes balance retrieval but exposes no aggregated per-key usage report.
 
@@ -522,9 +525,11 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-101**: MUST verify `scripts/build.sh` checks for residual intermediate build artifacts after cleanup and exits non-zero when one remains outside `dist/`.
 - **TST-102**: MUST verify `scripts/clean.sh` is absent from the repository and that no script under `scripts/` references it.
 - **TST-108**: MUST verify DeepSeek provider normalizes `is_available` and `balance_infos[]` into `raw.deepseek_balance_infos` and `UsageMetrics.remaining` with effective window `30d` and null usage counters.
-- **TST-109**: MUST verify CLI `show` renders DeepSeek `Balance: <currency_symbol><remaining>` without progress bars, `Usage:` rows, `Requests`, or `Tokens`.
+- **TST-109**: MUST verify CLI `show` renders DeepSeek `Balance`, `Topped up`, and `Granted` rows without progress bars, `Usage:` rows, `Requests`, or `Tokens`.
 - **TST-110**: MUST verify `setup` prompts `DEEPSEEK_API_KEY` and persists `deepseek` in `enabled_providers` and `currency_symbols`.
-- **TST-111**: MUST verify GNOME extension renders `deepseek` last with indigo style classes, card balance label, panel balance token, and `_handleError` label reset.
+- **TST-111**: MUST verify GNOME extension renders `deepseek` last with rose style classes, card monetary rows, panel balance token, and `_handleError` label reset.
+- **TST-112**: MUST verify CLI and GNOME DeepSeek render `Balance`, `Topped up`, and `Granted` rows and never render `Spent`, `Cost`, or usage rows.
+- **TST-113**: MUST verify DeepSeek rose palette classes use `#FF375F` in `stylesheet.css` and ANSI `\033[38;5;204m` in the CLI provider color map.
 
 ## 5. Evidence
 
@@ -850,10 +855,15 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 | REQ-245 | `src/aibar/aibar/cli.py` + `_build_result_panel`/`_build_deepseek_balance_lines` + `Balance: <currency_symbol><remaining>` block. |
 | REQ-246 | `src/aibar/aibar/cli.py` + DeepSeek branch returns before generic usage/counter rows; `PROGRESS_BAR_PROVIDERS`/`API_COUNTER_PROVIDERS` exclude `deepseek`. |
 | REQ-247 | `src/aibar/aibar/providers/deepseek.py` + `fetch` + 401 `AuthenticationError`, 429 error result with `retry_after_seconds`, other non-200 provider error result. |
-| REQ-248 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_updateUI`/`_buildPanelButton`/`_populateProviderCard` DeepSeek balance label; `stylesheet.css` + `aibar-tab-label-deepseek`. |
+| REQ-248 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_updateUI`/`_buildPanelButton`/`_populateProviderCard` DeepSeek monetary labels; `stylesheet.css` + `aibar-tab-label-deepseek` using `#FF375F`. |
 | REQ-249 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `PROGRESS_BAR_PROVIDERS`/`API_COUNTER_PROVIDERS`/`panelPercents` exclude `deepseek`; ordering arrays include it last. |
 | REQ-250 | `src/aibar/aibar/providers/deepseek.py` + `get_config_help` + balance-only API note; `README.md` + DeepSeek provider section. |
 | TST-108 | `tests/test_deepseek_provider.py` + balance mapping, fixed `30d` window, currency symbol, and null-counter assertions. |
-| TST-109 | `tests/test_deepseek_provider.py` + CLI panel assertions for `Balance:` row and absent usage/bar/counter rows. |
+| TST-109 | `tests/test_deepseek_provider.py` + CLI panel assertions for `Balance`/`Topped up`/`Granted` rows and absent usage/bar/counter rows. |
 | TST-110 | `tests/test_setup_runtime_config.py` + DeepSeek activation, currency-symbol, and `DEEPSEEK_API_KEY` prompt assertions. |
-| TST-111 | `tests/test_deepseek_provider.py` + GNOME source assertions for trailing `deepseek` order, indigo classes, balance labels, and `_handleError` reset. |
+| TST-111 | `tests/test_deepseek_provider.py` + GNOME source assertions for trailing `deepseek` order, rose classes, monetary labels, and `_handleError` reset. |
+| REQ-251 | `src/aibar/aibar/cli.py` + `_build_deepseek_balance_lines` + `Topped up:`/`Granted:` rows from `raw.deepseek_balance_infos[0]`. |
+| REQ-252 | `src/aibar/aibar/cli.py` + `_build_deepseek_balance_lines` and `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_populateProviderCard` render only the three monetary rows. |
+| REQ-253 | `src/aibar/aibar/gnome-extension/aibar@aibar.panel/extension.js` + `_populateProviderCard` DeepSeek monetary markup; `_panelBalanceText` keeps the panel token on `metrics.remaining`. |
+| TST-112 | `tests/test_deepseek_provider.py` + monetary-row and absent `Spent`/`Cost` assertions for CLI and GNOME. |
+| TST-113 | `tests/test_deepseek_provider.py` + `#FF375F` stylesheet and `\033[38;5;204m` CLI color assertions. |

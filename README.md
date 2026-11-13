@@ -405,8 +405,8 @@ aibar --disable-debug
 - Provider key `deepseek`; the API key is read from `DEEPSEEK_API_KEY` (environment variable or `~/.config/aibar/env`) and can be entered during `aibar setup`.
 - The key authorizes `GET https://api.deepseek.com/user/balance` only. Aggregated per-key usage, request, and token reporting is available exclusively in the DeepSeek web console, so AIBar renders account balance rows and MUST NOT fabricate usage counters.
 - One balance request returns all `balance_infos[]` entries; the effective window is fixed to `30d`.
-- Text output renders `Balance: <currency_symbol><remaining>` (plus one `Balance (<currency>): ...` row per additional currency bucket) with no progress bar, `Usage:` row, `Requests`, or `Tokens` row.
-- In the GNOME extension, DeepSeek renders as the last provider tab/card (indigo accent) with a `Balance: <currency_symbol><value>` card row and a panel balance token.
+- Text output renders `Balance: <currency_symbol><remaining>`, `Topped up: <currency_symbol><topped_up_balance>`, and `Granted: <currency_symbol><granted_balance>` from the preferred balance record (plus one `Balance (<currency>): ...` row per additional currency bucket), with no progress bar, `Usage:` row, `Requests`, `Tokens`, `Spent`, or `Cost` row because the endpoint exposes no spend or usage field.
+- In the GNOME extension, DeepSeek renders as the last provider tab/card (rose accent `#FF375F`) with the same `Balance`, `Topped up`, and `Granted` card rows and a panel balance token that shows only the balance.
 
 ## GNOME Shell extension
 

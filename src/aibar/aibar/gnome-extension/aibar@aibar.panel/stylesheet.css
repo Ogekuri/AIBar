@@ -88,7 +88,7 @@
 }
 
 .aibar-tab-active-deepseek {
-    border-bottom: 2px solid #4D6BFE;
+    border-bottom: 2px solid #FF375F;
 }
 
 /* Tab label (base + per-provider color) */
@@ -129,7 +129,7 @@
 }
 
 .aibar-tab-label-deepseek {
-    color: #4D6BFE;
+    color: #FF375F;
 }
 
 /* Separator */
@@ -193,7 +193,7 @@
 }
 
 .aibar-provider-deepseek {
-    border-left: 3px solid #4D6BFE;
+    border-left: 3px solid #FF375F;
 }
 
 /* Progress bars */
@@ -317,7 +317,7 @@
 }
 
 .aibar-progress-provider-deepseek {
-    background-color: #4D6BFE;
+    background-color: #FF375F;
 }
 
 .aibar-progress-danger {
