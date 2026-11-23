@@ -4728,11 +4728,12 @@ def setup() -> None:
     currency symbols including `geminiai`
     (choices: `$`, `£`, `€`, default `$`), then persists all values to
     `~/.config/aibar/config.json`. Final setup section configures logging flags
-    (`log_enabled`, `debug_enabled`). GeminiAI OAuth source supports `skip`,
-    `file`, `paste`, and `login` (re-authorization with current scopes); a
-    credential JSON carrying `type=service_account` provided via `file` or
-    `paste` is detected and persisted as a service-account key. Also
-    prompts for provider API keys and writes them to `~/.config/aibar/env`.
+    (`log_enabled`, `debug_enabled`). GeminiAI credential source supports `skip`,
+    `file`, and `paste`; the source accepts a Google service-account key JSON
+    (field `type=service_account`, validated on `project_id`, `private_key`, and
+    `client_email`) and persists the document verbatim to
+    `~/.config/aibar/geminiai_service_account.json`. Also prompts for provider
+    API keys and writes them to `~/.config/aibar/env`.
     @return {None} Function return value.
     @satisfies REQ-005
     @satisfies REQ-049
@@ -4744,6 +4745,7 @@ def setup() -> None:
     @satisfies REQ-059
     @satisfies REQ-257
     """
+
     from aibar.config import (
         ENV_FILE_PATH,
         RUNTIME_CONFIG_PATH,
@@ -4754,7 +4756,7 @@ def setup() -> None:
         save_runtime_config,
         write_env_file,
     )
-    from aibar.providers.geminiai import GEMINIAI_OAUTH_SCOPES, GeminiAICredentialStore
+    from aibar.providers.geminiai import GeminiAICredentialStore
 
     click.echo()
     click.echo("Usage UI Setup")
@@ -4874,106 +4876,78 @@ def setup() -> None:
     credential_store = GeminiAICredentialStore()
 
     click.echo()
-    click.echo(click.style("GeminiAI (Google Cloud OAuth)", bold=True))
+    click.echo(click.style("GeminiAI (Google Cloud service account)", bold=True))
     click.echo(
-        "  Configure OAuth desktop client JSON or a Google service-account key"
-        " for Cloud Monitoring and BigQuery billing access."
+        "  Configure a Google service-account key JSON (field"
+        " `type=service_account`) for Cloud Monitoring and BigQuery billing access."
     )
     click.echo(
         "  billing_data must be the dataset name created in Google BigQuery console."
     )
-    oauth_source = click.prompt(
-        "  geminiai oauth source",
-        type=click.Choice(["skip", "file", "paste", "login"]),
+    service_account_source = click.prompt(
+        "  geminiai service-account source",
+        type=click.Choice(["skip", "file", "paste"]),
         default="skip",
         show_choices=True,
     )
-    if oauth_source == "skip":
+    if service_account_source == "skip":
         click.echo("  -> Skipped")
     else:
-        client_payload_raw: dict[str, object] | None = None
-        if oauth_source == "login":
-            if not credential_store.has_client_config():
-                click.echo(
-                    click.style(
-                        "  -> GeminiAI OAuth client config not found.", fg="red"
-                    )
-                )
-                click.echo(
-                    "  -> Configure OAuth client with source 'file' or 'paste' first."
-                )
-            else:
-                try:
-                    credential_store.authorize_interactively(
-                        scopes=GEMINIAI_OAUTH_SCOPES
-                    )
-                    click.echo("  -> OAuth token saved")
-                except (FileNotFoundError, ValueError, OSError, ProviderError) as exc:
-                    click.echo(
-                        click.style(
-                            f"  -> GeminiAI OAuth setup failed: {exc}", fg="red"
-                        )
-                    )
-        elif oauth_source == "file":
-            default_path = str(credential_store.client_config_path)
-            oauth_path_raw = click.prompt(
-                "  geminiai oauth client json path",
+        service_account_payload_raw: dict[str, object] | None = None
+        if service_account_source == "file":
+            default_path = str(credential_store.service_account_path)
+            service_account_path_raw = click.prompt(
+                "  geminiai service-account key json path",
                 default=default_path,
                 show_default=True,
             ).strip()
             try:
-                client_payload_raw = json.loads(
-                    Path(oauth_path_raw).read_text(encoding="utf-8")
+                service_account_payload_raw = json.loads(
+                    Path(service_account_path_raw).read_text(encoding="utf-8")
                 )
             except OSError as exc:
-                click.echo(click.style(f"  -> OAuth file error: {exc}", fg="red"))
+                click.echo(
+                    click.style(
+                        f"  -> Service-account file error: {exc}", fg="red"
+                    )
+                )
             except ValueError as exc:
                 click.echo(
-                    click.style(f"  -> OAuth JSON decode error: {exc}", fg="red")
+                    click.style(
+                        f"  -> Service-account JSON decode error: {exc}", fg="red"
+                    )
                 )
         else:
             pasted_json = click.prompt(
-                "  geminiai oauth client json (single-line)",
+                "  geminiai service-account key json (single-line)",
                 default="",
                 show_default=False,
             ).strip()
             if pasted_json:
                 try:
-                    client_payload_raw = json.loads(pasted_json)
+                    service_account_payload_raw = json.loads(pasted_json)
                 except ValueError as exc:
                     click.echo(
-                        click.style(f"  -> OAuth JSON decode error: {exc}", fg="red")
+                        click.style(
+                            f"  -> Service-account JSON decode error: {exc}", fg="red"
+                        )
                     )
 
-        if client_payload_raw is not None:
+        if service_account_payload_raw is not None:
             try:
-                if client_payload_raw.get("type") == "service_account":
-                    credential_store.save_service_account(client_payload_raw)
-                    detected_project_id = (
-                        credential_store.load_service_account_project_id()
-                    )
-                    if detected_project_id is not None:
-                        geminiai_project_id = detected_project_id
-                    click.echo("  -> Service-account key saved")
-                else:
-                    credential_store.save_client_config(client_payload_raw)
-                    saved_payload = credential_store.load_client_config()
-                    detected_project_id = credential_store.extract_project_id(
-                        saved_payload
-                    )
-                    if detected_project_id is not None:
-                        geminiai_project_id = detected_project_id
-                    click.echo("  -> OAuth client saved")
-                    if click.confirm(
-                        "  Open browser and authorize GeminiAI now?", default=True
-                    ):
-                        credential_store.authorize_interactively(
-                            scopes=GEMINIAI_OAUTH_SCOPES
-                        )
-                        click.echo("  -> OAuth token saved")
+                credential_store.save_service_account(service_account_payload_raw)
+                detected_project_id = (
+                    credential_store.load_service_account_project_id()
+                )
+                if detected_project_id is not None:
+                    geminiai_project_id = detected_project_id
+                click.echo("  -> Service-account key saved")
             except (FileNotFoundError, ValueError, OSError, ProviderError) as exc:
                 click.echo(
-                    click.style(f"  -> GeminiAI OAuth setup failed: {exc}", fg="red")
+                    click.style(
+                        f"  -> GeminiAI service-account setup failed: {exc}",
+                        fg="red",
+                    )
                 )
 
         project_default = geminiai_project_id or ""
@@ -5198,53 +5172,27 @@ def _login_copilot() -> None:
 
 def _login_geminiai() -> None:
     """
-    @brief Execute GeminiAI OAuth login flow.
-    @details Reuses persisted OAuth client configuration to launch browser-based
-    authorization and persist refresh-capable Google credentials. Skips the
-    interactive flow with an informational message and exit status 0 when
-    service-account credentials are configured.
+    @brief Print the GeminiAI service-account authentication guidance.
+    @details GeminiAI authenticates exclusively through the service-account key
+    JSON persisted by `aibar setup`; no interactive OAuth authorization flow
+    exists, so the command prints an informational message and returns with
+    exit status 0.
     @return {None} Function return value.
-    @satisfies REQ-055
-    @satisfies REQ-056
     @satisfies REQ-261
     """
-    from aibar.providers.geminiai import GEMINIAI_OAUTH_SCOPES, GeminiAICredentialStore
-
     click.echo()
     click.echo("GeminiAI Login")
     click.echo("=" * 40)
     click.echo()
-
-    credential_store = GeminiAICredentialStore()
-    if credential_store.has_service_account():
-        click.echo(
-            click.style(
-                " Service-account credentials are active;"
-                " interactive OAuth login is not required.",
-                fg="green",
-            )
+    click.echo(
+        click.style(
+            " GeminiAI authenticates through the service-account key JSON"
+            " configured by 'aibar setup'",
+            fg="green",
         )
-        return
-    if not credential_store.has_client_config():
-        click.echo(click.style(" GeminiAI OAuth client config not found.", fg="red"))
-        click.echo("Run 'aibar setup' and configure GeminiAI OAuth first.")
-        sys.exit(1)
-
-    try:
-        credentials = credential_store.authorize_interactively(
-            scopes=GEMINIAI_OAUTH_SCOPES
-        )
-    except (FileNotFoundError, ValueError, OSError, ProviderError) as exc:
-        click.echo(click.style(f"\n Login failed: {exc}", fg="red"))
-        sys.exit(1)
-
-    click.echo(click.style(" Login successful!", fg="green", bold=True))
-    click.echo()
-    click.echo(f"  OAuth token saved to: {credential_store.token_path}")
-    if credentials.token:
-        click.echo(f"  Access token: {credentials.token[:12]}...")
-    click.echo()
-    click.echo("You can now run: aibar show --provider geminiai")
+    )
+    click.echo(" (file: ~/.config/aibar/geminiai_service_account.json).")
+    click.echo(" No interactive OAuth login is required.")
 
 
 _LOGIN_FLOW_REGISTRY: tuple[tuple[ProviderName, Callable[[], None]], ...] = (

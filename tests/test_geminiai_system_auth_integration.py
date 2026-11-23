@@ -1,8 +1,8 @@
 """
 @file
 @brief Optional GeminiAI system-auth integration verification.
-@details Executes a live GeminiAI provider fetch using host OAuth credentials and
-project configuration when explicitly enabled via environment variable.
+@details Executes a live GeminiAI provider fetch using host service-account
+credentials and project configuration when explicitly enabled via environment variable.
 @satisfies REQ-056
 @satisfies REQ-057
 @satisfies REQ-060
@@ -22,7 +22,7 @@ SYSTEM_AUTH_TEST_ENV = "AIBAR_RUN_GEMINIAI_SYSTEM_AUTH_TEST"
 
 def test_geminiai_system_auth_fetch_reports_usage_and_billing() -> None:
     """
-    @brief Validate live GeminiAI fetch with system OAuth credentials.
+    @brief Validate live GeminiAI fetch with system service-account credentials.
     @details The test is opt-in and skipped unless
     `AIBAR_RUN_GEMINIAI_SYSTEM_AUTH_TEST=1` is set.
     @return {None} Function return value.

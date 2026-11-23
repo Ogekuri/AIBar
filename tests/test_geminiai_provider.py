@@ -2,7 +2,7 @@
 @file
 @brief GeminiAI provider integration tests.
 @details Verifies GeminiAI provider Monitoring + BigQuery metric normalization,
-OAuth-backed fetch flow error handling for HTTP 429 and missing billing tables,
+service-account fetch flow error handling for HTTP 429 and missing billing tables,
 and Monitoring time-series aggregation behavior.
 @satisfies REQ-054
 @satisfies REQ-057
@@ -22,9 +22,8 @@ from typing import cast
 
 import pytest
 from google.api_core.exceptions import Forbidden
-from google.auth.exceptions import RefreshError
+from google.auth.credentials import Credentials as AuthCredentials
 from google.cloud import bigquery  # pyright: ignore[reportAttributeAccessIssue]
-from google.oauth2.credentials import Credentials
 from googleapiclient.errors import HttpError
 from httplib2 import Response
 
@@ -35,7 +34,7 @@ from aibar.providers.base import (
     WindowPeriod,
 )
 from aibar.providers.geminiai import (
-    GEMINIAI_OAUTH_SCOPES,
+    GEMINIAI_SERVICE_ACCOUNT_SCOPES,
     GeminiAICredentialStore,
     GeminiAIProvider,
 )
@@ -44,8 +43,8 @@ from aibar.providers.geminiai import (
 class _FakeCredentialStore(GeminiAICredentialStore):
     """
     @brief Minimal credential-store stub for GeminiAI provider unit tests.
-    @details Supplies deterministic OAuth material without filesystem or network
-    dependencies. Inherits from GeminiAICredentialStore for type-safe substitution.
+    @details Supplies deterministic service-account material without filesystem or
+    network dependencies. Inherits from GeminiAICredentialStore for type-safe substitution.
     """
 
     def __init__(self) -> None:
@@ -54,49 +53,27 @@ class _FakeCredentialStore(GeminiAICredentialStore):
         @return {None} Function return value.
         """
         super().__init__(
-            client_config_path=Path("/tmp/fake-geminiai-client.json"),
-            token_path=Path("/tmp/fake-geminiai-token.json"),
+            service_account_path=Path("/tmp/fake-geminiai-service-account.json"),
         )
 
-    def has_authorized_credentials(self) -> bool:
+    def has_service_account(self) -> bool:
         """
         @brief Return deterministic configured state for tests.
         @return {bool} Always True.
         """
         return True
 
-    def has_client_config(self) -> bool:
-        """
-        @brief Return deterministic client-config availability for tests.
-        @return {bool} Always True.
-        """
-        return True
-
-    def load_client_config(self) -> dict:
-        """
-        @brief Return deterministic OAuth payload fixture.
-        @return {dict} Minimal OAuth payload containing `project_id`.
-        """
-        return {"installed": {"project_id": "demo-project"}}
-
-    def extract_project_id(self, payload: dict) -> str | None:
-        """
-        @brief Extract project id from payload fixture.
-        @param payload {dict} OAuth payload fixture.
-        @return {str | None} Embedded project id.
-        """
-        return payload.get("installed", {}).get("project_id")
-
-    def load_credentials(
+    def load_service_account_credentials(
         self,
-        scopes: tuple[str, ...] = GEMINIAI_OAUTH_SCOPES,
-    ) -> Credentials | None:
+        scopes: tuple[str, ...] = GEMINIAI_SERVICE_ACCOUNT_SCOPES,
+    ) -> AuthCredentials | None:
         """
-        @brief Return opaque credential sentinel object cast to Credentials.
-        @param scopes {tuple[str, ...]} OAuth scopes (unused in fake).
-        @return {Credentials | None} Non-null sentinel used by patched provider internals.
+        @brief Return opaque credential sentinel object cast to AuthCredentials.
+        @param scopes {tuple[str, ...]} Service-account scopes (unused in fake).
+        @return {AuthCredentials | None} Non-null sentinel used by patched provider internals.
         """
-        return cast(Credentials, object())
+        del scopes
+        return cast(AuthCredentials, object())
 
 
 def test_geminiai_fetch_maps_monitoring_and_billing_metrics(monkeypatch) -> None:
@@ -468,70 +445,54 @@ def test_geminiai_sum_time_series_values_aggregates_numeric_points() -> None:
     assert provider._sum_time_series_values(response) == 11.0
 
 
-def test_geminiai_oauth_scopes_include_monitoring_bigquery_and_cloud_platform() -> None:
+def test_geminiai_service_account_scopes_include_monitoring_bigquery_and_cloud_platform() -> None:
     """
-    @brief Verify GeminiAI OAuth scopes include Monitoring, BigQuery read, and cloud-platform.
+    @brief Verify GeminiAI service-account scopes include Monitoring, BigQuery read, and cloud-platform.
     @return {None} Function return value.
-    @satisfies REQ-056
-    @satisfies TST-025
+    @satisfies REQ-264
+    @satisfies TST-115
     """
-    assert GEMINIAI_OAUTH_SCOPES == (
+    assert GEMINIAI_SERVICE_ACCOUNT_SCOPES == (
         "https://www.googleapis.com/auth/bigquery.readonly",
         "https://www.googleapis.com/auth/monitoring.read",
         "https://www.googleapis.com/auth/cloud-platform",
     )
 
 
-def test_geminiai_load_credentials_refresh_error_surfaces_google_reason(
-    monkeypatch,
+def test_geminiai_load_service_account_credentials_returns_none_for_missing_or_invalid_key(
     tmp_path: Path,
 ) -> None:
     """
-    @brief Verify GeminiAI refresh failures include Google error reason detail.
-    @details Creates refresh-capable authorized-user token JSON, forces
-    `google.oauth2.credentials.Credentials.refresh(...)` to raise a structured
-    `RefreshError`, and asserts raised `AuthenticationError` includes both
-    canonical remediation text and the upstream Google error reason payload.
-    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @brief Verify service-account credential loading tolerates absent or invalid keys.
+    @details Asserts `load_service_account_credentials` returns None when the key
+    file is missing and when the persisted document fails service-account validation,
+    so callers surface a deterministic not-configured state instead of crashing.
     @param tmp_path {Path} Temporary directory fixture.
     @return {None} Function return value.
-    @satisfies REQ-056
-    @satisfies REQ-060
+    @satisfies REQ-258
     """
-    token_path = tmp_path / "geminiai_oauth_token.json"
-    client_path = tmp_path / "geminiai_oauth_client.json"
-    token_path.write_text(
-        json.dumps(
-            {
-                "token": "ya29.expired-token",
-                "refresh_token": "1//refresh-token",
-                "token_uri": "https://oauth2.googleapis.com/token",
-                "client_id": "client-id.apps.googleusercontent.com",
-                "client_secret": "secret",
-                "scopes": list(GEMINIAI_OAUTH_SCOPES),
-                "expiry": "2000-01-01T00:00:00Z",
-            }
-        ),
+    missing_store = GeminiAICredentialStore(
+        service_account_path=tmp_path / "missing-service-account.json"
+    )
+    assert (
+        missing_store.load_service_account_credentials(
+            scopes=GEMINIAI_SERVICE_ACCOUNT_SCOPES
+        )
+        is None
+    )
+
+    invalid_path = tmp_path / "invalid-service-account.json"
+    invalid_path.write_text(
+        json.dumps({"type": "authorized_user", "refresh_token": "not-a-key"}),
         encoding="utf-8",
     )
-    store = GeminiAICredentialStore(client_config_path=client_path, token_path=token_path)
-
-    def _raise_refresh_error(self, request):  # pylint: disable=unused-argument
-        error = RefreshError("invalid_grant")
-        error.response = {  # pyright: ignore[reportAttributeAccessIssue]
-            "error": "invalid_grant",
-            "error_description": "Token has been expired or revoked.",
-        }
-        raise error
-
-    monkeypatch.setattr(Credentials, "refresh", _raise_refresh_error)
-
-    with pytest.raises(AuthenticationError) as exc_info:
-        store.load_credentials(scopes=GEMINIAI_OAUTH_SCOPES)
-
-    message = str(exc_info.value)
-    assert "GeminiAI OAuth token refresh failed." in message
-    assert "invalid_grant" in message
+    invalid_store = GeminiAICredentialStore(service_account_path=invalid_path)
+    assert (
+        invalid_store.load_service_account_credentials(
+            scopes=GEMINIAI_SERVICE_ACCOUNT_SCOPES
+        )
+        is None
+    )
 
 
 def test_geminiai_billing_query_uses_latest_invoice_month_with_fallback() -> None:

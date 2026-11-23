@@ -266,8 +266,8 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-051**: CLI `show` text output MUST render cost as `Cost: <currency_symbol><value>` where `<currency_symbol><value>` uses `metrics.currency_symbol`, is bold bright white, and MUST NOT use hardcoded `$`.
 - **REQ-053**: GNOME extension MUST NOT render aggregated total panel cost; panel and provider-card cost labels MUST use per-provider `metrics.currency_symbol` and display provider-local monetary values.
 - **REQ-054**: MUST support provider key `geminiai` across `aibar`, `aibar setup`, `aibar show`, `aibar show --json`, and GNOME extension payload pipelines.
-- **REQ-055**: `setup` MUST accept GeminiAI OAuth source choices `skip`, `file`, `paste`, and `login`; `file`/`paste` inputs MUST validate required fields and persist normalized client JSON under `~/.config/aibar/`.
-- **REQ-056**: `setup` and `login --provider geminiai` MUST execute OAuth installed-app authorization with scopes `https://www.googleapis.com/auth/bigquery.readonly`, `https://www.googleapis.com/auth/monitoring.read`, and `https://www.googleapis.com/auth/cloud-platform`, then persist refresh-capable authorized-user credentials.
+- **REQ-055**: `setup` MUST accept GeminiAI credential source choices `skip`, `file`, and `paste`; `file`/`paste` inputs MUST accept service-account key JSON and persist the normalized key document under `~/.config/aibar/`.
+- **REQ-056**: GeminiAI provider `fetch` MUST authenticate Google Cloud Monitoring and BigQuery requests using service-account credentials loaded from `~/.config/aibar/geminiai_service_account.json`.
 - **REQ-057**: GeminiAI provider `fetch` MUST query Cloud Monitoring using service constraint `resource.labels.service="generativelanguage.googleapis.com"` and MUST extract request/token metrics when Monitoring emits either `resource.type="api"` or `resource.type="consumed_api"` series, then map usage metrics (`request_count`, latency, errors, token usage) into `UsageMetrics`.
 - **REQ-058**: GeminiAI provider failures for HTTP `429`, Google quota exhaustion, or missing billing-export table MUST mark attempt status `FAIL`, preserve prior payload snapshots, and apply existing idle-time retry policy for rate-limited refreshes.
 - **REQ-059**: `setup` MUST include `geminiai` in `currency_symbols` prompts, and GeminiAI rendering MUST resolve `RuntimeConfig.currency_symbols.geminiai` with fallback `"$"` when missing.
@@ -279,7 +279,7 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-127**: GNOME extension MUST parse `enabled_providers` before provider extraction and MUST hide tabs, cards, and panel status labels for providers whose flag is `false`.
 - **REQ-062**: GNOME tab/card labels MUST render `GEMINIAI`; machine-readable payload keys and CLI provider arguments MUST remain lowercase `geminiai`; CLI display title for provider `geminiai` MUST render `GEMINIAI`.
 - **REQ-063**: Refresh scheduling MUST apply configured inter-provider call delay and provider-scoped idle-time lifecycle updates to GeminiAI fetches identically to existing providers, including `idle-time.json` updates after success and rate-limited failures.
-- **REQ-064**: GeminiAI billing fetch MUST read `<project_id>` from `~/.config/aibar/geminiai_oauth_client.json`, discover `<table_id>` by listing tables in dataset `RuntimeConfig.billing_data` (default `billing_data`), and fail with structured error when billing export table is unavailable.
+- **REQ-064**: GeminiAI billing fetch MUST read `<project_id>` from `~/.config/aibar/geminiai_service_account.json`, discover `<table_id>` by listing tables in dataset `RuntimeConfig.billing_data` (default `billing_data`), and fail with structured error when the billing export table is unavailable.
 - **REQ-065**: GeminiAI billing fetch MUST query `<billing_dataset>.gcp_billing_export_v1_<table_id>` using explicit column projection and aggregate the latest available invoice month (`MAX(invoice.month)`); when invoice month is unavailable, implementation MUST fallback to `usage_start_time >= TIMESTAMP_TRUNC(CURRENT_TIMESTAMP(), MONTH)`.
 - **REQ-066**: MUST guard every read/write of `~/.cache/aibar/cache.json` and `~/.cache/aibar/idle-time.json` with lock files under `~/.cache/aibar/`, polling every 250 milliseconds, and fail with explicit error after 5 seconds if lock acquisition remains blocked.
 - **REQ-067**: CLI `show` text mode MUST render ANSI provider-colored bordered panels ordered `agy`, `openrouter`, `copilot`, `codex`, `openai`, `geminiai`, `zai`, `deepseek`, keep one shared panel width, and render `Status` first on `OK`.
@@ -423,13 +423,12 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-250**: MUST document in DeepSeek `get_config_help` and `README.md` that the API key authorizes balance retrieval but exposes no aggregated per-key usage report.
 
 ### 3.8 GeminiAI Service Account Authentication
-- **REQ-257**: `setup` MUST detect a GeminiAI credential JSON carrying `type=service_account` from the `file` or `paste` OAuth sources, validate required fields, and persist it to `~/.config/aibar/geminiai_service_account.json`.
-- **REQ-258**: GeminiAI provider `fetch` MUST prefer service-account credentials loaded from `~/.config/aibar/geminiai_service_account.json` over user OAuth credentials whenever that file yields valid credentials.
-- **REQ-259**: GeminiAI provider `fetch` MUST fall back to persisted user OAuth credentials when the service-account key file is absent, unreadable, or invalid.
+- **REQ-257**: `setup` MUST accept a GeminiAI credential JSON carrying `type=service_account` from the `file` or `paste` sources, validate non-empty `project_id`, `private_key`, and `client_email` fields, and persist the document verbatim to `~/.config/aibar/geminiai_service_account.json`.
+- **REQ-258**: GeminiAI provider `fetch` MUST load Google API credentials exclusively from the service-account key file `~/.config/aibar/geminiai_service_account.json`.
 - **REQ-260**: GeminiAI project-id resolution MUST accept the `project_id` field of the persisted service-account key document.
-- **REQ-261**: `login --provider geminiai` MUST skip the interactive OAuth flow, print an informational message, and exit with status 0 when service-account credentials are configured.
-- **REQ-262**: The GeminiAI OAuth refresh-failure diagnostic MUST name the OAuth consent screen Testing publishing status as typical cause and production publishing or `aibar login --provider geminiai` as remedies.
-- **REQ-263**: GeminiAI `is_configured` MUST report the provider configured when the project id resolves and either service-account credentials or authorized-user OAuth credentials exist.
+- **REQ-261**: `login --provider geminiai` MUST print an informational message directing to `setup` service-account configuration and MUST exit with status 0 without executing any OAuth authorization flow.
+- **REQ-263**: GeminiAI `is_configured` MUST report the provider configured when the project id resolves and service-account credentials exist in `~/.config/aibar/geminiai_service_account.json`.
+- **REQ-264**: GeminiAI service-account credentials MUST use scopes `https://www.googleapis.com/auth/bigquery.readonly`, `https://www.googleapis.com/auth/monitoring.read`, and `https://www.googleapis.com/auth/cloud-platform`.
 
 ## 4. Test Requirements
 
@@ -460,8 +459,9 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-020**: MUST verify refresh and fallback logic do not read or write legacy per-provider snapshot files.
 - **TST-021**: Tests that mock `httpx.AsyncClient` transport and invoke provider `fetch` or `fetch_all_windows` execution path MUST restrict assertions to success/error state (`is_error`, `error` fields), result-dict window key presence, HTTP call count, and cache/filesystem side effects; MUST NOT assert specific numeric metric field values (`usage_percent`, `remaining`, `cost`) derived from the parsed HTTP response.
 - **TST-023**: MUST verify `currency_symbol` in `UsageMetrics` flows through provider fetch and cache serialization to CLI text output (`_print_result`) and GNOME extension cost labels using the symbol from metrics, not a hardcoded `$`.
-- **TST-024**: MUST verify `setup` accepts GeminiAI OAuth desktop-client credentials from both pasted JSON and file path input and persists normalized client-secret JSON in `~/.config/aibar/`.
-- **TST-025**: MUST verify GeminiAI OAuth authorization requests `bigquery.readonly`, `monitoring.read`, and `cloud-platform` scopes and persists refresh-capable authorized-user credentials for provider fetch execution.
+- **TST-024**: MUST verify `setup` accepts a GeminiAI service-account key JSON document from both pasted JSON and file path input, persists it verbatim to `~/.config/aibar/geminiai_service_account.json`, and derives `geminiai_project_id` from its `project_id` field.
+- **TST-115**: MUST verify GeminiAI service-account credentials request scopes `https://www.googleapis.com/auth/bigquery.readonly`, `https://www.googleapis.com/auth/monitoring.read`, and `https://www.googleapis.com/auth/cloud-platform`.
+- **TST-116**: MUST verify `login --provider geminiai` prints the service-account informational message and exits with status 0 without executing any OAuth authorization flow.
 - **TST-026**: MUST verify GeminiAI fetch queries Cloud Monitoring usage metrics with service constraint `resource.labels.service="generativelanguage.googleapis.com"` and `UTC month-start -> now` interval semantics, supports `api`/`consumed_api` metric series, and queries BigQuery billing data using explicit selected columns with latest invoice-month aggregation fallback to current-month `usage_start_time`.
 - **TST-027**: MUST verify GeminiAI HTTP `429`, quota-exhaustion, and missing billing-export-table failures preserve cached payload snapshots, mark status `FAIL`, and update only GeminiAI idle-time state according to rate-limit retry policy.
 - **TST-028**: MUST verify `setup` currency prompts exclude `geminiai` and GeminiAI rendering in CLI text and JSON payload includes latest-available billing-period monetary cost values when billing data exists.
@@ -543,6 +543,7 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-112**: MUST verify CLI and GNOME DeepSeek render `Balance`, `Topped up`, and `Granted` rows and never render `Spent`, `Cost`, or usage rows.
 - **TST-113**: MUST verify DeepSeek rose palette classes use `#FF375F` in `stylesheet.css` and ANSI `\033[38;5;204m` in the CLI provider color map.
 - **TST-114**: MUST verify `--upgrade` executes the `aibar gnome-install` argv resolved from `PATH` after a successful install, propagates its exit status, and skips it on install failure or non-Linux runtimes.
+- **TST-117**: MUST verify `setup` GeminiAI credential prompts accept only service-account key JSON, reject OAuth client-secret JSON documents with a validation error, and expose no `login` credential source choice.
 
 ## 5. Evidence
 

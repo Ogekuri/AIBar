@@ -71,7 +71,7 @@ def test_setup_prompts_runtime_config_before_credentials(
     `default-retry-after` twelfth, `gnome-refresh-interval` thirteenth,
     `billing_data` fourteenth, Copilot extra premium-request unit cost
     fifteenth, then per-provider currency symbols,
-    then GeminiAI OAuth source prompt, provider credential prompts, final
+    then GeminiAI service-account source prompt, provider credential prompts, final
     logging prompts, then writes all selected values to runtime config JSON.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
     @param tmp_path {Path} Temporary path fixture.
@@ -85,7 +85,7 @@ def test_setup_prompts_runtime_config_before_credentials(
     config_dir = _patch_config_paths(monkeypatch, tmp_path)
     prompts: list[str] = []
     # 8 provider toggles + 6 runtime values + Copilot overage
-    # + 7 currency symbols (agy excluded) + OAuth source + empty credentials + 2 logging modes
+    # + 7 currency symbols (agy excluded) + service-account source + empty credentials + 2 logging modes
     responses = iter(
         [
             "enable",
@@ -167,7 +167,7 @@ def test_setup_prompts_runtime_config_before_credentials(
     assert prompts[19] == "  geminiai currency symbol"
     assert prompts[20] == "  zai currency symbol"
     assert prompts[21] == "  deepseek currency symbol"
-    assert prompts[22] == "  geminiai oauth source"
+    assert prompts[22] == "  geminiai service-account source"
     assert prompts[23] == "  OPENROUTER_API_KEY"
     assert prompts[24] == "  OPENAI_ADMIN_KEY"
     assert prompts[25] == "  GITHUB_TOKEN"
@@ -211,30 +211,282 @@ def test_setup_prompts_runtime_config_before_credentials(
     assert "geminiai_billing_account" not in runtime_config
 
 
-def test_setup_accepts_geminiai_oauth_json_paste_and_persists_runtime_fields(
+def _build_synthetic_service_account_payload() -> dict[str, object]:
+    """
+    @brief Build a synthetic Google Cloud service-account key document.
+    @details Mirrors the standard Google Cloud console key-download field set
+    (`type`, `project_id`, `private_key_id`, `private_key`, `client_email`,
+    `client_id`, `auth_uri`, `token_uri`, `auth_provider_x509_cert_url`,
+    `client_x509_cert_url`, `universe_domain`) using synthetic placeholder values;
+    no real credential material is embedded.
+    @return {dict[str, object]} Synthetic service-account key payload.
+    """
+    return {
+        "type": "service_account",
+        "project_id": "gen-lang-client-0834428245",
+        "private_key_id": "synthetic-key-id",
+        "private_key": (
+            "-----BEGIN PRIVATE KEY-----\nMIIEsynthetic\n-----END PRIVATE KEY-----\n"
+        ),
+        "client_email": "synthetic@gen-lang-client-0834428245.iam.gserviceaccount.com",
+        "client_id": "100000000000000000000",
+        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+        "token_uri": "https://oauth2.googleapis.com/token",
+        "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+        "client_x509_cert_url": (
+            "https://www.googleapis.com/robot/v1/metadata/x509/synthetic%40gen-lang-client-0834428245.iam.gserviceaccount.com"
+        ),
+        "universe_domain": "googleapis.com",
+    }
+
+
+def test_setup_accepts_geminiai_service_account_json_paste_and_persists_runtime_fields(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
     """
-    @brief Verify setup persists GeminiAI OAuth client JSON and runtime identifiers.
-    @details Simulates paste-mode OAuth client input, skips browser authorization,
-    and asserts persisted client config plus `geminiai_project_id` runtime config field.
+    @brief Verify setup persists pasted GeminiAI service-account key JSON verbatim.
+    @details Simulates paste-mode service-account key input shaped like a Google
+    Cloud console key download using synthetic values, answers the project-id
+    prompt with its default, and asserts the persisted key document equals the
+    input payload plus the `geminiai_project_id` runtime field derived from the
+    key `project_id`.
     @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
     @param tmp_path {Path} Temporary path fixture.
     @return {None} Function return value.
     @satisfies REQ-055
     @satisfies REQ-056
+    @satisfies REQ-257
     @satisfies TST-024
     """
     config_dir = _patch_config_paths(monkeypatch, tmp_path)
     from aibar.providers import geminiai as geminiai_module
 
-    client_path = config_dir / "geminiai_oauth_client.json"
-    token_path = config_dir / "geminiai_oauth_token.json"
-    monkeypatch.setattr(geminiai_module, "GEMINIAI_OAUTH_CLIENT_PATH", client_path)
-    monkeypatch.setattr(geminiai_module, "GEMINIAI_OAUTH_TOKEN_PATH", token_path)
+    service_account_path = config_dir / "geminiai_service_account.json"
+    monkeypatch.setattr(
+        geminiai_module, "GEMINIAI_SERVICE_ACCOUNT_PATH", service_account_path
+    )
 
-    oauth_payload = json.dumps(
+    service_account_payload = _build_synthetic_service_account_payload()
+
+    responses = iter(
+        [
+            "enable",
+            "enable",
+            "enable",
+            "enable",
+            "enable",
+            "enable",
+            "enable",
+            "enable",
+            300,
+            1000,
+            5000,
+            3600,
+            60,
+            "billing_data",
+            0.04,
+            "$",
+            "$",
+            "$",
+            "$",
+            "$",
+            "$",
+            "$",
+            "paste",
+            json.dumps(service_account_payload),
+            ...,  # project-id prompt: accept the derived default
+            "",
+            "",
+            "",
+            "",
+            "",
+            "enable",
+            "enable",
+        ]
+    )
+
+    def _fake_prompt(
+        text: str,
+        default=None,
+        show_default: bool = True,
+        type=None,
+        **kwargs,
+    ):
+        """
+        @brief Return deterministic prompt responses for the GeminiAI paste flow.
+        @details The Ellipsis response marker resolves to the prompt default so the
+        derived project-id default supplied by setup is accepted verbatim.
+        @param text {str} Prompt label.
+        @param default {object | None} Prompt default value.
+        @param show_default {bool} Flag indicating default rendering behavior.
+        @param type {object | None} Optional click type.
+        @return {object} Predetermined prompt response value.
+        """
+        del text, show_default, type, kwargs
+        response = next(responses)
+        if response is ...:
+            return default
+        return response
+
+    monkeypatch.setattr("aibar.cli.click.prompt", _fake_prompt)
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["setup"])
+    assert result.exit_code == 0, result.output
+
+    assert service_account_path.exists()
+    key_doc = json.loads(service_account_path.read_text(encoding="utf-8"))
+    assert key_doc == service_account_payload
+
+    runtime_doc = json.loads((config_dir / "config.json").read_text(encoding="utf-8"))
+    assert runtime_doc["geminiai_project_id"] == "gen-lang-client-0834428245"
+    assert runtime_doc["billing_data"] == "billing_data"
+    assert runtime_doc["enabled_providers"] == {
+        "agy": True,
+        "openrouter": True,
+        "copilot": True,
+        "codex": True,
+        "openai": True,
+        "geminiai": True,
+        "zai": True,
+        "deepseek": True,
+    }
+    assert runtime_doc["log_enabled"] is True
+    assert runtime_doc["debug_enabled"] is True
+    assert "geminiai_billing_account" not in runtime_doc
+
+
+def test_setup_geminiai_service_account_file_source_persists_key_verbatim(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """
+    @brief Verify setup `file` source persists the service-account key document verbatim.
+    @details Writes a service-account key document with the full Google Cloud
+    console field set to a temporary key file, selects the setup source `file`,
+    and asserts every field (including optional fields such as `universe_domain`)
+    survives persistence unchanged.
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @param tmp_path {Path} Temporary path fixture.
+    @return {None} Function return value.
+    @satisfies REQ-257
+    @satisfies TST-024
+    """
+    config_dir = _patch_config_paths(monkeypatch, tmp_path)
+    from aibar.providers import geminiai as geminiai_module
+
+    service_account_path = config_dir / "geminiai_service_account.json"
+    monkeypatch.setattr(
+        geminiai_module, "GEMINIAI_SERVICE_ACCOUNT_PATH", service_account_path
+    )
+
+    key_source_path = tmp_path / "downloaded-gen-lang-client-key.json"
+    service_account_payload = _build_synthetic_service_account_payload()
+    key_source_path.write_text(json.dumps(service_account_payload), encoding="utf-8")
+
+    responses = iter(
+        [
+            "enable",
+            "enable",
+            "enable",
+            "enable",
+            "enable",
+            "enable",
+            "enable",
+            "enable",
+            300,
+            1000,
+            5000,
+            3600,
+            60,
+            "billing_data",
+            0.04,
+            "$",
+            "$",
+            "$",
+            "$",
+            "$",
+            "$",
+            "$",
+            "file",
+            str(key_source_path),
+            ...,  # project-id prompt: accept the derived default
+            "",
+            "",
+            "",
+            "",
+            "",
+            "enable",
+            "disable",
+        ]
+    )
+
+    def _fake_prompt(
+        text: str,
+        default=None,
+        show_default: bool = True,
+        type=None,
+        **kwargs,
+    ):
+        """
+        @brief Return deterministic prompt responses for the GeminiAI file flow.
+        @details The Ellipsis response marker resolves to the prompt default so the
+        derived project-id default supplied by setup is accepted verbatim.
+        @param text {str} Prompt label.
+        @param default {object | None} Prompt default value.
+        @param show_default {bool} Flag indicating default rendering behavior.
+        @param type {object | None} Optional click type.
+        @return {object} Predetermined prompt response value.
+        """
+        del text, show_default, type, kwargs
+        response = next(responses)
+        if response is ...:
+            return default
+        return response
+
+    monkeypatch.setattr("aibar.cli.click.prompt", _fake_prompt)
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["setup"])
+    assert result.exit_code == 0, result.output
+
+    assert service_account_path.exists()
+    persisted_doc = json.loads(service_account_path.read_text(encoding="utf-8"))
+    assert persisted_doc == service_account_payload
+    assert persisted_doc["universe_domain"] == "googleapis.com"
+    assert persisted_doc["type"] == "service_account"
+
+    runtime_doc = json.loads((config_dir / "config.json").read_text(encoding="utf-8"))
+    assert runtime_doc["geminiai_project_id"] == "gen-lang-client-0834428245"
+
+
+def test_setup_rejects_oauth_client_json_as_gemini_credential(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """
+    @brief Verify setup refuses OAuth client-secret JSON for GeminiAI credentials.
+    @details Simulates paste-mode input carrying an OAuth desktop-client document
+    (`installed` section) and asserts setup reports the service-account validation
+    failure, persists no service-account key file, and still completes with the
+    runtime configuration saved.
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @param tmp_path {Path} Temporary path fixture.
+    @return {None} Function return value.
+    @satisfies REQ-055
+    @satisfies REQ-257
+    @satisfies TST-117
+    """
+    config_dir = _patch_config_paths(monkeypatch, tmp_path)
+    from aibar.providers import geminiai as geminiai_module
+
+    service_account_path = config_dir / "geminiai_service_account.json"
+    monkeypatch.setattr(
+        geminiai_module, "GEMINIAI_SERVICE_ACCOUNT_PATH", service_account_path
+    )
+
+    oauth_client_payload = json.dumps(
         {
             "installed": {
                 "client_id": "example-client.apps.googleusercontent.com",
@@ -273,155 +525,7 @@ def test_setup_accepts_geminiai_oauth_json_paste_and_persists_runtime_fields(
             "$",
             "$",
             "paste",
-            oauth_payload,
-            "gen-lang-client-0834428245",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "enable",
-            "enable",
-        ]
-    )
-
-    def _fake_prompt(
-        text: str,
-        default=None,
-        show_default: bool = True,
-        type=None,
-        **kwargs,
-    ):
-        """
-        @brief Return deterministic prompt responses for GeminiAI setup flow.
-        @param text {str} Prompt label.
-        @param default {object | None} Prompt default value.
-        @param show_default {bool} Prompt default visibility flag.
-        @param type {object | None} Optional click type.
-        @return {object} Predetermined prompt response.
-        """
-        del text, default, show_default, type, kwargs
-        return next(responses)
-
-    monkeypatch.setattr("aibar.cli.click.prompt", _fake_prompt)
-    monkeypatch.setattr("aibar.cli.click.confirm", lambda *args, **kwargs: False)
-
-    runner = CliRunner()
-    result = runner.invoke(main, ["setup"])
-    assert result.exit_code == 0, result.output
-
-    assert client_path.exists()
-    client_doc = json.loads(client_path.read_text(encoding="utf-8"))
-    assert (
-        client_doc["installed"]["client_id"]
-        == "example-client.apps.googleusercontent.com"
-    )
-    assert client_doc["installed"]["project_id"] == "gen-lang-client-0834428245"
-    assert not token_path.exists()
-
-    runtime_doc = json.loads((config_dir / "config.json").read_text(encoding="utf-8"))
-    assert runtime_doc["geminiai_project_id"] == "gen-lang-client-0834428245"
-    assert runtime_doc["billing_data"] == "billing_data"
-    assert runtime_doc["enabled_providers"] == {
-        "agy": True,
-        "openrouter": True,
-        "copilot": True,
-        "codex": True,
-        "openai": True,
-        "geminiai": True,
-        "zai": True,
-        "deepseek": True,
-    }
-    assert runtime_doc["log_enabled"] is True
-    assert runtime_doc["debug_enabled"] is True
-    assert "geminiai_billing_account" not in runtime_doc
-
-
-def test_setup_geminiai_oauth_login_source_reauthorizes_with_current_scopes(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    """
-    @brief Verify setup `login` OAuth source re-runs GeminiAI authorization.
-    @details Creates persisted GeminiAI OAuth client config, selects setup source
-    `login`, and asserts `authorize_interactively` is called once with
-    `GEMINIAI_OAUTH_SCOPES`.
-    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
-    @param tmp_path {Path} Temporary path fixture.
-    @return {None} Function return value.
-    @satisfies REQ-055
-    @satisfies REQ-056
-    """
-    config_dir = _patch_config_paths(monkeypatch, tmp_path)
-    from aibar.providers import geminiai as geminiai_module
-
-    client_path = config_dir / "geminiai_oauth_client.json"
-    token_path = config_dir / "geminiai_oauth_token.json"
-    monkeypatch.setattr(geminiai_module, "GEMINIAI_OAUTH_CLIENT_PATH", client_path)
-    monkeypatch.setattr(geminiai_module, "GEMINIAI_OAUTH_TOKEN_PATH", token_path)
-
-    client_path.parent.mkdir(parents=True, exist_ok=True)
-    client_path.write_text(
-        json.dumps(
-            {
-                "installed": {
-                    "client_id": "example-client.apps.googleusercontent.com",
-                    "project_id": "gen-lang-client-0834428245",
-                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                    "token_uri": "https://oauth2.googleapis.com/token",
-                    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-                    "client_secret": "example-secret",
-                    "redirect_uris": ["http://localhost"],
-                }
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    recorded_scopes: list[tuple[str, ...]] = []
-
-    def _fake_authorize(self: object, scopes: tuple[str, ...] = ()) -> object:
-        """
-        @brief Capture scopes used by setup login-triggered OAuth authorization.
-        @param self {object} Credential store instance.
-        @param scopes {tuple[str, ...]} OAuth scopes passed by setup flow.
-        @return {object} Placeholder credentials object.
-        """
-        del self
-        recorded_scopes.append(tuple(scopes))
-        return object()
-
-    monkeypatch.setattr(
-        geminiai_module.GeminiAICredentialStore,
-        "authorize_interactively",
-        _fake_authorize,
-    )
-
-    responses = iter(
-        [
-            "enable",
-            "enable",
-            "enable",
-            "enable",
-            "enable",
-            "enable",
-            "enable",
-            "enable",
-            300,
-            1000,
-            5000,
-            3600,
-            60,
-            "billing_data",
-            0.04,
-            "$",
-            "$",
-            "$",
-            "$",
-            "$",
-            "$",
-            "$",
-            "login",
+            oauth_client_payload,
             "",
             "",
             "",
@@ -441,12 +545,12 @@ def test_setup_geminiai_oauth_login_source_reauthorizes_with_current_scopes(
         **kwargs,
     ):
         """
-        @brief Return deterministic prompt responses for setup login-source flow.
+        @brief Return deterministic prompt responses for the rejection flow.
         @param text {str} Prompt label.
         @param default {object | None} Prompt default value.
-        @param show_default {bool} Prompt default visibility flag.
+        @param show_default {bool} Flag indicating default rendering behavior.
         @param type {object | None} Optional click type.
-        @return {object} Predetermined prompt response.
+        @return {object} Predetermined prompt response value.
         """
         del text, default, show_default, type, kwargs
         return next(responses)
@@ -456,17 +560,10 @@ def test_setup_geminiai_oauth_login_source_reauthorizes_with_current_scopes(
     runner = CliRunner()
     result = runner.invoke(main, ["setup"])
     assert result.exit_code == 0, result.output
-    assert recorded_scopes == [geminiai_module.GEMINIAI_OAUTH_SCOPES]
+    assert "GeminiAI service-account setup failed" in result.output
+    assert not service_account_path.exists()
+
     runtime_doc = json.loads((config_dir / "config.json").read_text(encoding="utf-8"))
-    assert runtime_doc["enabled_providers"] == {
-        "agy": True,
-        "openrouter": True,
-        "copilot": True,
-        "codex": True,
-        "openai": True,
-        "geminiai": True,
-        "zai": True,
-        "deepseek": True,
-    }
+    assert runtime_doc["geminiai_project_id"] is None
     assert runtime_doc["log_enabled"] is False
     assert runtime_doc["debug_enabled"] is True

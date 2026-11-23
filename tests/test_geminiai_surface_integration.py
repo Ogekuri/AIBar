@@ -35,9 +35,9 @@ def test_cli_registers_geminiai_provider_and_login_paths() -> None:
     """
     source = CLI_PATH.read_text(encoding="utf-8")
     assert "ProviderName.GEMINIAI: GeminiAIProvider()," in source
-    assert "geminiai oauth source" in source
+    assert "geminiai service-account source" in source
     assert "billing_data" in source
-    assert 'click.Choice(["skip", "file", "paste", "login"])' in source
+    assert 'click.Choice(["skip", "file", "paste"])' in source
     assert "p != ProviderName.AGY" in source
     assert 'help="Provider to query (agy, openai, openrouter, copilot, codex, geminiai, zai, deepseek, all)"' in source
     assert 'help="Provider to login to (copilot, geminiai)"' in source
@@ -52,8 +52,9 @@ def test_config_includes_geminiai_runtime_surfaces() -> None:
     """
     config_source = CONFIG_PATH.read_text(encoding="utf-8")
 
-    assert 'ProviderName.GEMINIAI: "GEMINIAI_OAUTH_ACCESS_TOKEN"' in config_source
+    assert 'GEMINIAI_OAUTH_ACCESS_TOKEN' not in config_source
     assert '"name": "GeminiAI"' in config_source
+    assert '"description": "Google Gemini API usage via service account"' in config_source
     assert "geminiai_project_id: str | None = Field(default=None)" in config_source
     assert "billing_data: str = Field(default=DEFAULT_BILLING_DATASET, min_length=1)" in config_source
 
@@ -70,9 +71,9 @@ def test_extension_and_dependencies_include_geminiai_support() -> None:
     assert "geminiai: 'GEMINIAI'" in extension_source
     assert "google-api-python-client" in pyproject_source
     assert "google-cloud-bigquery" in pyproject_source
-    assert "google-auth-oauthlib" in pyproject_source
     assert "google-auth-httplib2" in pyproject_source
+    assert "google-auth-oauthlib" not in pyproject_source
     assert 'name = "google-api-python-client"' in uv_lock_source
     assert 'name = "google-cloud-bigquery"' in uv_lock_source
-    assert 'name = "google-auth-oauthlib"' in uv_lock_source
     assert 'name = "google-auth-httplib2"' in uv_lock_source
+    assert 'name = "google-auth-oauthlib"' not in uv_lock_source

@@ -1,7 +1,7 @@
 """
 @file
-@brief GeminiAI provider with Google OAuth, Monitoring, and BigQuery billing integration.
-@details Implements OAuth and service-account credential persistence, token refresh,
+@brief GeminiAI provider with Google service-account authentication, Cloud Monitoring, and BigQuery billing integration.
+@details Implements service-account key credential persistence and validation,
 usage retrieval from Cloud Monitoring and latest-available billing-period retrieval
 from BigQuery, then normalizes results into AIBar provider result contracts.
 """
@@ -14,16 +14,13 @@ import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from google.api_core.exceptions import GoogleAPICallError  # pyright: ignore[reportMissingImports]
 from google.auth.credentials import Credentials as AuthCredentials
-from google.auth.exceptions import GoogleAuthError, RefreshError
-from google.auth.transport.requests import Request
+from google.auth.exceptions import GoogleAuthError
 from google.cloud import bigquery  # pyright: ignore[reportAttributeAccessIssue]
-from google.oauth2.credentials import Credentials
 from google.oauth2.service_account import Credentials as ServiceAccountCredentials
-from google_auth_oauthlib.flow import InstalledAppFlow  # pyright: ignore[reportMissingImports]
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
@@ -37,16 +34,13 @@ from aibar.providers.base import (
     WindowPeriod,
 )
 
-GEMINIAI_OAUTH_SCOPES: tuple[str, ...] = (
+GEMINIAI_SERVICE_ACCOUNT_SCOPES: tuple[str, ...] = (
     "https://www.googleapis.com/auth/bigquery.readonly",
     "https://www.googleapis.com/auth/monitoring.read",
     "https://www.googleapis.com/auth/cloud-platform",
 )
-GEMINIAI_OAUTH_CLIENT_PATH = Path.home() / ".config" / "aibar" / "geminiai_oauth_client.json"
-GEMINIAI_OAUTH_TOKEN_PATH = Path.home() / ".config" / "aibar" / "geminiai_oauth_token.json"
 GEMINIAI_SERVICE_ACCOUNT_PATH = Path.home() / ".config" / "aibar" / "geminiai_service_account.json"
 GEMINIAI_PROJECT_ID_ENV_VAR = "GEMINIAI_PROJECT_ID"
-GEMINIAI_ACCESS_TOKEN_ENV_VAR = "GEMINIAI_OAUTH_ACCESS_TOKEN"
 DEFAULT_BILLING_DATASET_ID = "billing_data"
 BILLING_TABLE_PREFIX = "gcp_billing_export_v1_"
 
@@ -148,11 +142,11 @@ def _extract_google_api_status(error: GoogleAPICallError) -> int:
 
 def _is_scope_insufficient_error(error: Exception) -> bool:
     """
-    @brief Determine whether exception payload indicates OAuth scope insufficiency.
+    @brief Determine whether exception payload indicates authentication scope insufficiency.
     @details Matches Google API error reason `ACCESS_TOKEN_SCOPE_INSUFFICIENT` and
     equivalent human-readable messages.
     @param error {Exception} Exception to inspect.
-    @return {bool} True when the error indicates insufficient OAuth scopes.
+    @return {bool} True when the error indicates insufficient authentication scopes.
     """
     message = str(error).lower()
     if "access_token_scope_insufficient" in message:
@@ -170,33 +164,6 @@ def _is_scope_insufficient_error(error: Exception) -> bool:
     return False
 
 
-def _summarize_google_refresh_error(error: RefreshError) -> str:
-    """
-    @brief Build compact diagnostic string from Google OAuth refresh failure payload.
-    @details Extracts structured `response.error` and `response.error_description`
-    fields when available, then appends fallback exception message to preserve
-    actionable provider diagnostics for operators.
-    @param error {RefreshError} OAuth refresh exception emitted by google-auth.
-    @return {str} Stable diagnostic summary for user-facing authentication errors.
-    """
-    details: list[str] = []
-    response = getattr(error, "response", None)
-    if isinstance(response, dict):
-        error_code = response.get("error")
-        if isinstance(error_code, str) and error_code.strip():
-            details.append(error_code.strip())
-        error_description = response.get("error_description")
-        if isinstance(error_description, str) and error_description.strip():
-            details.append(error_description.strip())
-    fallback_message = str(error).strip()
-    if fallback_message:
-        details.append(fallback_message)
-    if not details:
-        return "unknown_refresh_error"
-    ordered_unique_details = list(dict.fromkeys(details))
-    return "; ".join(ordered_unique_details)
-
-
 @dataclass(frozen=True)
 class GeminiAIWindowRange:
     """
@@ -210,53 +177,28 @@ class GeminiAIWindowRange:
 
 class GeminiAICredentialStore:
     """
-    @brief OAuth credential persistence and validation helper for GeminiAI.
-    @details Manages client-secret JSON validation, token-file persistence, and
-    interactive InstalledAppFlow authorization.
+    @brief Service-account credential persistence and validation helper for GeminiAI.
+    @details Manages service-account key JSON validation, verbatim key-file
+    persistence, project-id extraction, and scoped Google credential construction.
     """
 
     def __init__(
         self,
-        client_config_path: Path | None = None,
-        token_path: Path | None = None,
         service_account_path: Path | None = None,
     ) -> None:
         """
-        @brief Initialize credential store with optional custom file paths.
-        @param client_config_path {Path | None} Optional OAuth client config path.
-        @param token_path {Path | None} Optional OAuth token path.
+        @brief Initialize credential store with optional custom file path.
         @param service_account_path {Path | None} Optional service-account key path.
         @return {None} Function return value.
         """
-        self.client_config_path = client_config_path or GEMINIAI_OAUTH_CLIENT_PATH
-        self.token_path = token_path or GEMINIAI_OAUTH_TOKEN_PATH
         self.service_account_path = service_account_path or GEMINIAI_SERVICE_ACCOUNT_PATH
 
     def _ensure_config_dir(self) -> None:
         """
-        @brief Create parent directories for OAuth files when missing.
+        @brief Create parent directories for the service-account key file when missing.
         @return {None} Function return value.
         """
-        self.client_config_path.parent.mkdir(parents=True, exist_ok=True)
-        self.token_path.parent.mkdir(parents=True, exist_ok=True)
-
-    def has_client_config(self) -> bool:
-        """
-        @brief Check whether GeminiAI client config JSON exists.
-        @return {bool} True when client config file exists.
-        """
-        return self.client_config_path.exists()
-
-    def has_authorized_credentials(self) -> bool:
-        """
-        @brief Check whether GeminiAI authorized token material exists.
-        @details Environment access-token override is treated as configured token
-        material.
-        @return {bool} True when token file or env token is available.
-        """
-        if os.environ.get(GEMINIAI_ACCESS_TOKEN_ENV_VAR):
-            return True
-        return self.token_path.exists()
+        self.service_account_path.parent.mkdir(parents=True, exist_ok=True)
 
     def has_service_account(self) -> bool:
         """
@@ -289,169 +231,6 @@ class GeminiAICredentialStore:
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"Service-account JSON missing required field: {field_name}")
         return payload
-
-    def validate_client_config(self, payload: dict[str, Any]) -> dict[str, Any]:
-        """
-        @brief Validate Google InstalledApp OAuth client-secret payload.
-        @details Enforces required `installed` section fields used by
-        `InstalledAppFlow.from_client_config`.
-        @param payload {dict[str, Any]} Decoded JSON payload to validate.
-        @return {dict[str, Any]} Normalized payload.
-        @throws {ValueError} When required fields are missing or malformed.
-        """
-        installed = payload.get("installed")
-        if not isinstance(installed, dict):
-            raise ValueError("OAuth JSON must contain top-level 'installed' object.")
-
-        required_fields = (
-            "client_id",
-            "client_secret",
-            "auth_uri",
-            "token_uri",
-            "redirect_uris",
-        )
-        for field_name in required_fields:
-            if field_name not in installed or not installed[field_name]:
-                raise ValueError(f"OAuth JSON missing required field: installed.{field_name}")
-
-        redirect_uris = installed.get("redirect_uris")
-        if not isinstance(redirect_uris, list) or not redirect_uris:
-            raise ValueError("OAuth JSON field installed.redirect_uris must be a non-empty list.")
-
-        return {"installed": installed}
-
-    def save_client_config(self, payload: dict[str, Any]) -> None:
-        """
-        @brief Persist validated OAuth client config JSON to disk.
-        @param payload {dict[str, Any]} Validated client payload.
-        @return {None} Function return value.
-        """
-        validated = self.validate_client_config(payload)
-        self._ensure_config_dir()
-        self.client_config_path.write_text(
-            json.dumps(validated, indent=2),
-            encoding="utf-8",
-        )
-
-    def load_client_config(self) -> dict[str, Any]:
-        """
-        @brief Load and validate persisted OAuth client config JSON.
-        @return {dict[str, Any]} Validated OAuth client payload.
-        @throws {FileNotFoundError} When client config file is missing.
-        @throws {ValueError} When payload is invalid JSON or fails validation.
-        """
-        if not self.client_config_path.exists():
-            raise FileNotFoundError(
-                "GeminiAI OAuth client config missing. Run 'aibar setup' and configure GeminiAI."
-            )
-        try:
-            decoded = json.loads(self.client_config_path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as exc:
-            raise ValueError("GeminiAI OAuth client config is not valid JSON.") from exc
-        if not isinstance(decoded, dict):
-            raise ValueError("GeminiAI OAuth client config must decode to a JSON object.")
-        return self.validate_client_config(decoded)
-
-    def extract_project_id(self, payload: dict[str, Any]) -> str | None:
-        """
-        @brief Extract project_id from validated OAuth payload.
-        @param payload {dict[str, Any]} Validated OAuth payload.
-        @return {str | None} Project identifier or None when absent.
-        """
-        installed = payload.get("installed")
-        if not isinstance(installed, dict):
-            return None
-        project_id = installed.get("project_id")
-        if isinstance(project_id, str) and project_id.strip():
-            return project_id.strip()
-        return None
-
-    def save_authorized_credentials(self, credentials: Credentials) -> None:
-        """
-        @brief Persist authorized-user OAuth credentials JSON.
-        @param credentials {Credentials} Google OAuth credentials object.
-        @return {None} Function return value.
-        """
-        self._ensure_config_dir()
-        serialized = cast(Any, credentials).to_json()
-        self.token_path.write_text(serialized, encoding="utf-8")
-
-    def authorize_interactively(
-        self,
-        scopes: tuple[str, ...] = GEMINIAI_OAUTH_SCOPES,
-    ) -> Credentials:
-        """
-        @brief Execute OAuth browser flow and persist refresh-capable credentials.
-        @details Uses InstalledAppFlow local-server flow (`http://localhost`) and
-        saves authorized-user token JSON to disk.
-        @param scopes {tuple[str, ...]} OAuth scopes requested during authorization.
-        @return {Credentials} Authorized credentials.
-        @throws {ValueError} When client config is invalid.
-        """
-        client_payload = self.load_client_config()
-        flow = InstalledAppFlow.from_client_config(client_payload, list(scopes))
-        credentials = cast(Credentials, flow.run_local_server(port=0))
-        self.save_authorized_credentials(credentials)
-        return credentials
-
-    def load_access_token(self) -> str | None:
-        """
-        @brief Load access token from env override or token file.
-        @return {str | None} Access token or None when unavailable.
-        """
-        if env_token := os.environ.get(GEMINIAI_ACCESS_TOKEN_ENV_VAR):
-            return env_token
-        if not self.token_path.exists():
-            return None
-        try:
-            decoded = json.loads(self.token_path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return None
-        token_value = decoded.get("token")
-        if isinstance(token_value, str) and token_value:
-            return token_value
-        return None
-
-    def load_credentials(
-        self,
-        scopes: tuple[str, ...] = GEMINIAI_OAUTH_SCOPES,
-    ) -> Credentials | None:
-        """
-        @brief Load OAuth credentials and refresh when token is expired.
-        @details Supports env-token fallback for non-refreshable runtime contexts.
-        @param scopes {tuple[str, ...]} OAuth scopes required by API calls.
-        @return {Credentials | None} Valid credentials or None when unavailable.
-        @throws {AuthenticationError} When persisted token refresh fails.
-        @satisfies REQ-262
-        """
-        if env_token := os.environ.get(GEMINIAI_ACCESS_TOKEN_ENV_VAR):
-            return Credentials(token=env_token, scopes=list(scopes))
-
-        if not self.token_path.exists():
-            return None
-
-        credentials = Credentials.from_authorized_user_file(str(self.token_path), list(scopes))
-        if credentials.valid:
-            return credentials
-
-        if credentials.expired and credentials.refresh_token:
-            try:
-                credentials.refresh(Request())
-            except RefreshError as exc:
-                refresh_reason = _summarize_google_refresh_error(exc)
-                raise AuthenticationError(
-                    "GeminiAI OAuth token refresh failed. "
-                    f"reason={refresh_reason}. "
-                    "Typical cause: Google revokes refresh tokens when the OAuth "
-                    "consent screen is in Testing publishing status. Remedies: publish "
-                    "the OAuth consent screen to production in Google Cloud Console, "
-                    "configure a service-account key, or re-authorize with "
-                    "'aibar login --provider geminiai'."
-                ) from exc
-            self.save_authorized_credentials(credentials)
-            return credentials
-
-        return None
 
     def save_service_account(self, payload: dict[str, Any]) -> None:
         """
@@ -489,17 +268,16 @@ class GeminiAICredentialStore:
 
     def load_service_account_credentials(
         self,
-        scopes: tuple[str, ...] = GEMINIAI_OAUTH_SCOPES,
+        scopes: tuple[str, ...] = GEMINIAI_SERVICE_ACCOUNT_SCOPES,
     ) -> AuthCredentials | None:
         """
         @brief Load service-account credentials scoped for Monitoring and BigQuery.
         @details Returns None when the key file is absent, unreadable, malformed,
-        or fails Google credential construction so callers can fall back to user
-        OAuth credentials (REQ-259).
-        @param scopes {tuple[str, ...]} OAuth scopes applied to the credentials.
+        or fails Google credential construction.
+        @param scopes {tuple[str, ...]} Scopes applied to the service-account credentials.
         @return {Credentials | None} Service-account credentials or None when unavailable.
         @satisfies REQ-258
-        @satisfies REQ-259
+        @satisfies REQ-264
         """
         if not self.service_account_path.exists():
             return None
@@ -574,30 +352,30 @@ class GeminiAIProvider(BaseProvider):
     def is_configured(self) -> bool:
         """
         @brief Check whether GeminiAI provider has required auth and project metadata.
-        @return {bool} True when project id and either service-account or OAuth
-        token material are available.
+        @details Reports configured only when the project id resolves and the
+        persisted service-account key document exists.
+        @return {bool} True when project id and service-account credentials are available.
         @satisfies REQ-263
         """
         project_id = self._resolve_project_id()
         if project_id is None:
             return False
-        return self._store.has_service_account() or self._store.has_authorized_credentials()
+        return self._store.has_service_account()
 
     def get_config_help(self) -> str:
         """
-        @brief Return setup guidance for GeminiAI OAuth configuration.
+        @brief Return setup guidance for GeminiAI service-account configuration.
         @return {str} Provider-specific setup instructions.
         """
-        scope_lines = "\n".join([f"   - {scope}" for scope in GEMINIAI_OAUTH_SCOPES])
+        scope_lines = "\n".join([f"   - {scope}" for scope in GEMINIAI_SERVICE_ACCOUNT_SCOPES])
         return f"""GeminiAI Provider Configuration:
 
 1. Run: aibar setup
-2. Configure GeminiAI OAuth client JSON (file or paste), or provide a Google
-   service-account key JSON (field `type=service_account`) through the same
-   `file`/`paste` sources; the service-account key is persisted to
-   ~/.config/aibar/geminiai_service_account.json and avoids the periodic OAuth
-   refresh-token expiry enforced for consent screens in Testing status.
-3. Authorize scopes:
+2. Provide a Google service-account key JSON (field `type=service_account`,
+   downloaded from the Google Cloud console) through the `file` or `paste`
+   credential source; the key document is validated and persisted verbatim to
+   ~/.config/aibar/geminiai_service_account.json.
+3. The credentials use scopes:
 {scope_lines}
 4. Ensure project id is configured via setup or {GEMINIAI_PROJECT_ID_ENV_VAR}.
 5. Ensure setup `billing_data` matches the BigQuery dataset containing billing export tables.
@@ -611,14 +389,14 @@ class GeminiAIProvider(BaseProvider):
         provider error payloads with retry-after metadata.
         @param window {WindowPeriod} Requested window period.
         @return {ProviderResult} Provider result payload.
-        @throws {AuthenticationError} When OAuth credentials are invalid.
+        @throws {AuthenticationError} When service-account credentials are invalid.
         """
         if not self.is_configured():
             return self._make_error_result(
                 window=window,
                 error=(
-                    "Not configured. Run 'aibar setup' and configure GeminiAI OAuth "
-                    "or service-account credentials and project id."
+                    "Not configured. Run 'aibar setup' and configure the GeminiAI "
+                    "service-account key JSON and project id."
                 ),
             )
 
@@ -633,19 +411,14 @@ class GeminiAIProvider(BaseProvider):
 
     def _load_fetch_credentials(self) -> AuthCredentials | None:
         """
-        @brief Resolve fetch credentials preferring service-account mode.
-        @details Service-account credentials remove the dependency on user OAuth
-        refresh tokens that Google revokes periodically for consent screens left
-        in Testing publishing status; user OAuth credentials remain the fallback.
-        @return {Credentials | None} Service-account or OAuth credentials, or None
-        when neither source yields credentials.
+        @brief Resolve fetch credentials from the persisted service-account key.
+        @details Service-account credentials are the single supported GeminiAI
+        authentication source; no user OAuth fallback exists.
+        @return {Credentials | None} Service-account credentials or None when unavailable.
         @satisfies REQ-258
-        @satisfies REQ-259
+        @satisfies REQ-264
         """
-        service_account_credentials = self._store.load_service_account_credentials()
-        if service_account_credentials is not None:
-            return service_account_credentials
-        return self._store.load_credentials()
+        return self._store.load_service_account_credentials()
 
     def _fetch_sync(self, window: WindowPeriod) -> ProviderResult:
         """
@@ -664,8 +437,8 @@ class GeminiAIProvider(BaseProvider):
         credentials = self._load_fetch_credentials()
         if credentials is None:
             raise AuthenticationError(
-                "GeminiAI credentials are missing. Run 'aibar setup' and authorize "
-                "GeminiAI or configure a service-account key."
+                "GeminiAI service-account credentials are missing. Run 'aibar setup' "
+                "and configure the GeminiAI service-account key JSON."
             )
 
         try:
@@ -781,7 +554,8 @@ class GeminiAIProvider(BaseProvider):
             status_code = _extract_http_status(exc)
             if status_code in {401, 403}:
                 raise AuthenticationError(
-                    "GeminiAI OAuth token is invalid or missing required Google API scopes."
+                    "GeminiAI service-account credentials are invalid or missing "
+                    "required Google API scopes."
                 ) from exc
             if status_code == 429:
                 retry_after_seconds = _extract_retry_after_seconds(exc)
@@ -801,7 +575,8 @@ class GeminiAIProvider(BaseProvider):
             status_code = _extract_google_api_status(exc)
             if status_code in {401, 403} or _is_scope_insufficient_error(exc):
                 raise AuthenticationError(
-                    "GeminiAI OAuth token is invalid or missing required Google API scopes."
+                    "GeminiAI service-account credentials are invalid or missing "
+                    "required Google API scopes."
                 ) from exc
             if status_code == 429:
                 return self._make_error_result(
@@ -815,16 +590,9 @@ class GeminiAIProvider(BaseProvider):
                     },
                 )
             raise ProviderError(f"API error: HTTP {status_code}") from exc
-        except RefreshError as exc:
-            refresh_reason = _summarize_google_refresh_error(exc)
+        except GoogleAuthError as exc:
             raise AuthenticationError(
-                "GeminiAI OAuth token refresh failed. "
-                f"reason={refresh_reason}. "
-                "Typical cause: Google revokes refresh tokens when the OAuth consent "
-                "screen is in Testing publishing status. Remedies: publish the OAuth "
-                "consent screen to production in Google Cloud Console, configure a "
-                "service-account key, or re-authorize with "
-                "'aibar login --provider geminiai'."
+                f"GeminiAI service-account authentication failed: {exc}"
             ) from exc
 
     def _build_window_range(self, window: WindowPeriod) -> GeminiAIWindowRange:
@@ -848,8 +616,8 @@ class GeminiAIProvider(BaseProvider):
 
     def _resolve_project_id(self) -> str | None:
         """
-        @brief Resolve project id from override, env, runtime config, client JSON,
-        or service-account key.
+        @brief Resolve project id from override, env, runtime config, or
+        service-account key.
         @return {str | None} Project id or None when unresolved.
         @satisfies REQ-260
         """
@@ -864,12 +632,6 @@ class GeminiAIProvider(BaseProvider):
         runtime_config = load_runtime_config()
         if runtime_config.geminiai_project_id:
             return runtime_config.geminiai_project_id
-
-        if self._store.has_client_config():
-            client_payload = self._store.load_client_config()
-            client_project_id = self._store.extract_project_id(client_payload)
-            if client_project_id:
-                return client_project_id
 
         return self._store.load_service_account_project_id()
 
@@ -893,7 +655,7 @@ class GeminiAIProvider(BaseProvider):
     def _build_monitoring_service(self, credentials: AuthCredentials) -> Any:
         """
         @brief Build Google Cloud Monitoring API client.
-        @param credentials {AuthCredentials} OAuth or service-account credentials.
+        @param credentials {AuthCredentials} Service-account credentials.
         @return {Any} Monitoring service client.
         """
         return build("monitoring", "v3", credentials=credentials, cache_discovery=False)
@@ -905,8 +667,8 @@ class GeminiAIProvider(BaseProvider):
     ) -> bigquery.Client:
         """
         @brief Build BigQuery client for GeminiAI billing export queries.
-        @param credentials {AuthCredentials} OAuth or service-account credentials
-        with BigQuery read scope.
+        @param credentials {AuthCredentials} Service-account credentials with
+        BigQuery read scope.
         @param project_id {str} Google Cloud project id.
         @return {bigquery.Client} BigQuery API client.
         @satisfies REQ-056

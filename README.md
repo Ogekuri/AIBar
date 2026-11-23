@@ -47,7 +47,7 @@ AIBar brings every supported AI provider quota and cost into one place, on the t
 - Text output and machine output (`show --json`) with stable top-level sections (`payload`, `status`, `idle_time`, `freshness`, `extension`, `enabled_providers`).
 - Per-run refresh override with `show --force` (bypasses idle-time gating for that execution).
 - Direct configuration inspection and mutation with canonical colon-separated paths: `--print [PATH]`, `--info [PATH]`, `--print-raw`, `--get PATH`, `--set PATH VALUE`, `--unset PATH`.
-- Interactive `setup` for provider enable/disable state, runtime throttling, Copilot overage pricing, provider currency symbols, provider API keys (including `DEEPSEEK_API_KEY`), GeminiAI OAuth/project settings, and logging flags.
+- Interactive `setup` for provider enable/disable state, runtime throttling, Copilot overage pricing, provider currency symbols, provider API keys (including `DEEPSEEK_API_KEY`), GeminiAI service-account/project settings, and logging flags.
 - DeepSeek account balance monitoring (`Balance`, `Topped up`, `Granted`) rendered without progress bars or fabricated usage counters.
 - Built-in lifecycle and observability flags: `--version|--ver`, `--upgrade`, `--upgrade --develop|--dev`, `--upgrade --force` (forced full re-install), `--uninstall`, `--enable-log`, `--disable-log`, `--enable-debug`, `--disable-debug`.
 - Startup release preflight that can emit update notices or fetch diagnostics before normal command output.
@@ -101,7 +101,7 @@ in the [User's Guide](#users-guide).
 | `openrouter` | `OPENROUTER_API_KEY` |
 | `copilot` | GitHub account for the device-flow login (`aibar login --provider copilot`) |
 | `codex` | Existing Codex login read from `~/.codex/auth.json` |
-| `geminiai` | Google Cloud project with Desktop OAuth 2.0 client, Cloud Monitoring API, BigQuery API, and a billing export dataset (details in the User's Guide) |
+| `geminiai` | Google Cloud project with a service-account key (JSON), Cloud Monitoring API, BigQuery API, and a billing export dataset (details in the User's Guide) |
 | `zai` | `ZAI_API_KEY` |
 | `deepseek` | `DEEPSEEK_API_KEY` (balance only; no aggregated per-key usage report) |
 
@@ -204,7 +204,7 @@ Credentials resolve in this order: environment variable, then
 | `openrouter` | `OPENROUTER_API_KEY` |
 | `copilot` | `aibar login --provider copilot` (saves token to `~/.config/aibar/copilot.json`) |
 | `codex` | Existing Codex login read from `~/.codex/auth.json` |
-| `geminiai` | Google OAuth configured during `aibar setup` or `aibar login --provider geminiai` |
+| `geminiai` | Google service-account key JSON configured during `aibar setup` (`file`/`paste`); `aibar login --provider geminiai` is informational only |
 | `zai` | `ZAI_API_KEY` |
 | `deepseek` | `DEEPSEEK_API_KEY` (account balance; no aggregated per-key usage report) |
 
@@ -236,7 +236,8 @@ User-editable `config.json` keys surfaced by setup:
 # Copilot GitHub device-flow login
 aibar login --provider copilot
 
-# GeminiAI Google OAuth browser login (requires the OAuth client configured in setup)
+# GeminiAI authenticates through the service-account key configured in setup;
+# this command only prints informational guidance (no browser authorization)
 aibar login --provider geminiai
 
 # Re-authenticate only providers currently in cached FAIL state
@@ -247,14 +248,15 @@ aibar login
 
 To enable GeminiAI features, configure Google Cloud before running `aibar setup`:
 
-1. Create **Desktop Client OAuth 2.0** credentials in the target Google Cloud project.
-2. In `aibar setup`, configure GeminiAI OAuth client JSON (`file` or `paste`) or re-authorize with `login`, then authorize requested scopes:
+1. Create a **service-account key** (JSON) in the target Google Cloud project and download the key file (for example `gen-lang-client-<id>-<hash>.json`).
+2. In `aibar setup`, provide the service-account key JSON through the GeminiAI credential source `file` (key file path) or `paste` (single-line JSON); setup validates `type=service_account` plus the `project_id`, `private_key`, and `client_email` fields and stores the key document verbatim in `~/.config/aibar/geminiai_service_account.json`.
+3. The service-account credentials use the scopes:
    - `https://www.googleapis.com/auth/bigquery.readonly`
    - `https://www.googleapis.com/auth/monitoring.read`
    - `https://www.googleapis.com/auth/cloud-platform`
-3. Configure the Gemini project id in setup (`geminiai project id`) or via `GEMINIAI_PROJECT_ID`.
-4. Set setup field `billing_data` to the BigQuery dataset containing billing export tables (`gcp_billing_export_v1_*`, default dataset name: `billing_data`).
-5. Ensure required Google APIs are enabled for the project used by OAuth credentials:
+4. Configure the Gemini project id in setup (`geminiai project id`) or via `GEMINIAI_PROJECT_ID`; setup derives it automatically from the key `project_id` field.
+5. Set setup field `billing_data` to the BigQuery dataset containing billing export tables (`gcp_billing_export_v1_*`, default dataset name: `billing_data`).
+6. Ensure required Google APIs are enabled for the service-account project:
    - Cloud Monitoring API
    - BigQuery API
 
@@ -482,8 +484,7 @@ scripts/pre-release-check.sh
 | `~/.config/aibar/env` | Provider credentials written by `aibar setup`; loaded by the CLI and the GNOME extension |
 | `~/.config/aibar/config.json` | Runtime settings persisted by `aibar setup` (schema above) |
 | `~/.config/aibar/copilot.json` | Copilot device-flow token |
-| `~/.config/aibar/geminiai_oauth_client.json` | GeminiAI OAuth desktop-client JSON |
-| `~/.config/aibar/geminiai_oauth_token.json` | GeminiAI authorized-user credentials |
+| `~/.config/aibar/geminiai_service_account.json` | GeminiAI service-account key JSON (stored verbatim by `aibar setup`) |
 | `~/.cache/aibar/cache.json` | Per-provider, per-window last-success payload snapshots and last-attempt status (`OK`/`FAIL`) |
 | `~/.cache/aibar/idle-time.json` | Provider refresh-gating timestamps (`Updated`/`Next`) |
 | `~/.cache/aibar/check_version_idle-time.json` | Startup update-check gate |

@@ -747,7 +747,6 @@ class Config:
         ProviderName.OPENROUTER: "OPENROUTER_API_KEY",
         ProviderName.COPILOT: "GITHUB_TOKEN",
         ProviderName.CODEX: "CODEX_ACCESS_TOKEN",
-        ProviderName.GEMINIAI: "GEMINIAI_OAUTH_ACCESS_TOKEN",
         ProviderName.ZAI: "ZAI_API_KEY",
         ProviderName.DEEPSEEK: "DEEPSEEK_API_KEY",
     }
@@ -786,9 +785,9 @@ class Config:
         },
         ProviderName.GEMINIAI: {
             "name": "GeminiAI",
-            "description": "Google Gemini API usage via OAuth",
+            "description": "Google Gemini API usage via service account",
             "official": True,
-            "note": "Uses Google Cloud Monitoring API",
+            "note": "Uses Google Cloud Monitoring API with a service-account key",
         },
         ProviderName.ZAI: {
             "name": "Z.ai",
@@ -837,12 +836,6 @@ class Config:
             store = CopilotCredentialStore()
             return store.load_token()
 
-        if provider == ProviderName.GEMINIAI:
-            from aibar.providers.geminiai import GeminiAICredentialStore
-
-            store = GeminiAICredentialStore()
-            return store.load_access_token()
-
         return None
 
     def is_provider_configured(self, provider: ProviderName) -> bool:
@@ -889,7 +882,10 @@ class Config:
         @return {dict[str, Any]} Function return value.
         """
         info = self.PROVIDER_INFO.get(provider, {})
-        env_var = self.ENV_VARS.get(provider) or "N/A (local agy CLI)"
+        if provider == ProviderName.AGY:
+            env_var = self.ENV_VARS.get(provider) or "N/A (local agy CLI)"
+        else:
+            env_var = self.ENV_VARS.get(provider) or "N/A (provider-local credentials)"
         configured = self.is_provider_configured(provider)
 
         return {

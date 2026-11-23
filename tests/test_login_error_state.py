@@ -297,3 +297,24 @@ def test_explicit_provider_login_dispatch_is_preserved(
     assert result_geminiai.exit_code == 0
     assert result_unsupported.exit_code != 0
     assert calls == ["copilot", "geminiai"]
+
+
+def test_login_provider_geminiai_prints_service_account_message_and_exits_zero(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """
+    @brief Verify `login --provider geminiai` is informational-only with exit status 0.
+    @details Runs the real GeminiAI login path (no flow monkeypatching) and asserts
+    the service-account informational guidance is printed, the exit status is 0,
+    and no OAuth authorization wording is produced.
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @param tmp_path {Path} Temporary path fixture.
+    @return {None} Function return value.
+    @satisfies REQ-261
+    @satisfies TST-116
+    """
+    _patch_config_paths(monkeypatch, tmp_path)
+    result = CliRunner().invoke(main, ["login", "--provider", "geminiai"])
+    assert result.exit_code == 0
+    assert "service-account key JSON" in result.output
+    assert "No interactive OAuth login is required." in result.output
