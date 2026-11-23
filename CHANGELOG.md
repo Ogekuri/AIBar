@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.61.1](https://github.com/Ogekuri/AIBar/compare/v0.61.0..v0.61.1) - 2026-11-23
+### 🚜  Changes
+- BREAKING CHANGE: remove OAuth auth, keep service-account JSON credentials [useReq] *(geminiai)*
+  Remove OAuth installed-app login/client-secret flow: REQ-259/REQ-262 removed, REQ-055/056/064/257/258/261/263 rewritten, REQ-264 added.; setup accepts Google service-account key JSON via file/paste, validates type/project_id/private_key/client_email, and persists the document verbatim to ~/.config/aibar/geminiai_service_account.json.; GeminiAI fetch authenticates only through service-account credentials; login --provider geminiai prints informational guidance and exits 0 (TST-024, TST-115, TST-116, TST-117).; Drop google-auth-oauthlib dependency and refresh uv.lock; update README, WORKFLOW, REFERENCES.; No key or credential material added to sources, tests, or any project component.
+
 ## [0.61.0](https://github.com/Ogekuri/AIBar/compare/v0.60.0..v0.61.0) - 2026-11-23
 ### ⛰️  Features
 - Update .galias.conf file.
@@ -1608,6 +1613,7 @@
 - \[0.59.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.59.0
 - \[0.60.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.60.0
 - \[0.61.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.61.0
+- \[0.61.1\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.61.1
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1670,3 +1676,4 @@
 [0.59.0]: https://github.com/Ogekuri/AIBar/compare/v0.58.0..v0.59.0
 [0.60.0]: https://github.com/Ogekuri/AIBar/compare/v0.59.0..v0.60.0
 [0.61.0]: https://github.com/Ogekuri/AIBar/compare/v0.60.0..v0.61.0
+[0.61.1]: https://github.com/Ogekuri/AIBar/compare/v0.61.0..v0.61.1
