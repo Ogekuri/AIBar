@@ -62,7 +62,7 @@ from aibar.cli import main
 
 ---
 
-# cli.py | Python | 5610L | 142 symbols | 30 imports | 236 comments
+# cli.py | Python | 5637L | 142 symbols | 30 imports | 236 comments
 > Path: `src/aibar/aibar/cli.py`
 - @brief Command-line interface for aibar.
 - @details Defines command parsing, provider dispatch, formatted output, setup helpers, login flows, and UI launch hooks.
@@ -1425,7 +1425,7 @@ line.
 
 ### fn `def setup() -> None` (L4719-4918)
 - @brief Execute setup.
-- @details Prompts dedicated provider-activation section first, then prompts `idle_delay_seconds`, `api_call_delay_milliseconds`, `api_call_timeout_milliseconds`, `default_retry_after_seconds`, `gnome_refresh_interval_seconds`, and `billing_data` in order, then prompts dedicated Copilot overage pricing field `copilot_extra_premium_request_cost` (USD/request), then prompts provider currency symbols including `geminiai` (choices: `$`, `£`, `€`, default `$`), then persists all values to `~/.config/aibar/config.json`. Final setup section configures logging flags (`log_enabled`, `debug_enabled`). GeminiAI OAuth source supports `skip`, `file`, `paste`, and `login` (re-authorization with current scopes). Also prompts for provider API keys and writes them to `~/.config/aibar/env`.
+- @details Prompts dedicated provider-activation section first, then prompts `idle_delay_seconds`, `api_call_delay_milliseconds`, `api_call_timeout_milliseconds`, `default_retry_after_seconds`, `gnome_refresh_interval_seconds`, and `billing_data` in order, then prompts dedicated Copilot overage pricing field `copilot_extra_premium_request_cost` (USD/request), then prompts provider currency symbols including `geminiai` (choices: `$`, `£`, `€`, default `$`), then persists all values to `~/.config/aibar/config.json`. Final setup section configures logging flags (`log_enabled`, `debug_enabled`). GeminiAI OAuth source supports `skip`, `file`, `paste`, and `login` (re-authorization with current scopes); a credential JSON carrying `type=service_account` provided via `file` or `paste` is detected and persisted as a service-account key. Also prompts for provider API keys and writes them to `~/.config/aibar/env`.
 - @return {None} Function return value.
 - @satisfies REQ-005
 - @satisfies REQ-049
@@ -1435,8 +1435,9 @@ line.
 - @satisfies REQ-055
 - @satisfies REQ-056
 - @satisfies REQ-059
+- @satisfies REQ-257
 
-### fn `def login(provider: str | None) -> None` (L5127-5155)
+### fn `def login(provider: str | None) -> None` (L5142-5170)
 - @brief Execute provider login dispatch.
 - @details With `--provider`, executes the single provider login flow and prints diagnostics with non-zero exit for unsupported provider values. Without `--provider`, delegates to `_login_error_state_providers(...)` so only login-capable providers whose cached last-attempt status is `FAIL` are re-authenticated (the former default `copilot` fallback is removed).
 - @param provider {str | None} Optional provider selector (`copilot`, `geminiai`); `None` selects cached error-state providers.
@@ -1447,19 +1448,20 @@ line.
 - @satisfies REQ-174
 - @satisfies REQ-175
 
-### fn `def _login_copilot() -> None` `priv` (L5156-5183)
+### fn `def _login_copilot() -> None` `priv` (L5171-5198)
 - @brief Execute login copilot.
 - @details Applies login copilot logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_geminiai() -> None` `priv` (L5184-5222)
+### fn `def _login_geminiai() -> None` `priv` (L5199-5249)
 - @brief Execute GeminiAI OAuth login flow.
-- @details Reuses persisted OAuth client configuration to launch browser-based authorization and persist refresh-capable Google credentials.
+- @details Reuses persisted OAuth client configuration to launch browser-based authorization and persist refresh-capable Google credentials. Skips the interactive flow with an informational message and exit status 0 when service-account credentials are configured.
 - @return {None} Function return value.
 - @satisfies REQ-055
 - @satisfies REQ-056
+- @satisfies REQ-261
 
-### fn `def _select_login_error_providers() -> list[ProviderName]` `priv` (L5229-5258)
+### fn `def _select_login_error_providers() -> list[ProviderName]` `priv` (L5256-5285)
 - @brief Select login-capable providers whose cached last-attempt status is FAIL.
 - @details Reads `~/.cache/aibar/cache.json` through the locked `load_cli_cache` reader, extracts the canonical `status` section via `_cache_status_section(...)`, and returns one registry-ordered entry per login-capable provider carrying at least one cached window status with `result == "FAIL"`. Providers whose cached window statuses are all `OK` or absent are skipped (REQ-173). Missing, corrupt, or empty cache documents yield an empty selection.
 - @return {list[ProviderName]} Registry-ordered login-capable providers in error state.
@@ -1467,7 +1469,7 @@ line.
 - @satisfies REQ-172
 - @satisfies REQ-173
 
-### fn `def _login_error_state_providers() -> None` `priv` (L5259-5304)
+### fn `def _login_error_state_providers() -> None` `priv` (L5286-5331)
 - @brief Re-authenticate login-capable providers currently in cached error state.
 - @details Selects cached `result=FAIL` login-capable providers via `_select_login_error_providers(...)`. An empty selection prints one informational message and returns with exit status 0 (REQ-174). Each selected provider executes its login flow sequentially in registry order (REQ-172); `SystemExit` raised by a failed flow and any flow exception are captured per provider so remaining providers still execute. When at least one flow fails, one `ClickException` forces a non-zero exit after all flows complete (REQ-175).
 - @return {None} Function return value.
@@ -1476,7 +1478,7 @@ line.
 - @satisfies REQ-174
 - @satisfies REQ-175
 
-### fn `def _resolve_extension_target_dir() -> Path` `priv` (L5305-5326)
+### fn `def _resolve_extension_target_dir() -> Path` `priv` (L5332-5353)
 - @brief Resolve the GNOME Shell extension installation target directory.
 - @details Returns `Path(AIBAR_EXT_TARGET_DIR)` when that environment override is set to a non-blank value, otherwise returns the module-level canonical target `~/.local/share/gnome-shell/extensions/aibar@aibar.panel` read at call time so per-test monkeypatching of `_EXT_TARGET_DIR` stays effective. The override lets isolated executions (unit-test suites, CI jobs) guarantee that no install/update/remove operation can mutate the developer's real extension directory (REQ-026, REQ-081).
 - @return {Path} Absolute extension target directory candidate.
@@ -1485,7 +1487,7 @@ line.
 - @satisfies REQ-026
 - @satisfies REQ-081
 
-### fn `def _validate_extension_metadata(metadata_path: Path) -> str | None` `priv` (L5327-5367)
+### fn `def _validate_extension_metadata(metadata_path: Path) -> str | None` `priv` (L5354-5394)
 - @brief Validate one GNOME Shell extension `metadata.json` document.
 - @details Decodes `metadata_path` as UTF-8 JSON and enforces the GNOME Shell load contract: the root node MUST be a JSON object, `uuid` MUST be a non-empty string, and `shell-version` MUST be a non-empty array of non-empty strings. Every failure mode (missing file, unreadable file, invalid JSON, contract violation) returns one deterministic diagnostic instead of raising, so `gnome_install` can abort before `os.makedirs`, `shutil.copy2`, `gnome-extensions disable`, or `gnome-extensions enable` execute. This prevents a source tree with placeholder metadata (`{}`) from overwriting a valid installed extension and making it unloadable (REQ-027, REQ-029).
 - @param metadata_path {Path} Candidate extension metadata file path.
@@ -1495,13 +1497,13 @@ line.
 - @satisfies REQ-027
 - @satisfies REQ-030
 
-### fn `def _resolve_extension_source_dir() -> Path` `priv` (L5368-5380)
+### fn `def _resolve_extension_source_dir() -> Path` `priv` (L5395-5407)
 - @brief Resolve GNOME extension source directory from within the `aibar` package.
 - @details Uses `Path(__file__).resolve().parent` to locate the `aibar` package directory, then appends `gnome-extension/<UUID>/`. Works in development (editable install), wheel-installed, and `uv tool install` layouts because the extension directory resides inside the `aibar` Python package subtree.
 - @return {Path} Absolute path to the extension source directory.
 - @satisfies REQ-025, REQ-083
 
-### fn `def gnome_install() -> None` (L5391-5527)
+### fn `def gnome_install() -> None` (L5418-5554)
 - @brief Install or update the AIBar GNOME Shell extension to the user's local extensions directory.
 - @details Resolves extension source from the installed package path, validates source directory contains `metadata.json` and is non-empty, validates the metadata document against the GNOME Shell load contract (`uuid`, `shell-version`) before any target mutation, then executes one of two flows: install flow (`target` absent) creates target and copies files before enabling extension; update flow (`target` present) disables extension, copies files, then enables extension. The target directory resolves through `_resolve_extension_target_dir`, so an `AIBAR_EXT_TARGET_DIR` override keeps isolated executions away from the real user extension directory. Update flow masks non-zero disable outcomes caused by missing extension and continues. Produces colored Click-styled terminal output for all status messages.
 - @return {None} Function return value.
@@ -1509,7 +1511,7 @@ line.
 - @see _validate_extension_metadata
 - @satisfies PRJ-008, REQ-025, REQ-026, REQ-027, REQ-028, REQ-029, REQ-030, REQ-032, REQ-099
 
-### fn `def gnome_uninstall() -> None` (L5537-5608)
+### fn `def gnome_uninstall() -> None` (L5564-5635)
 - @brief Remove the AIBar GNOME Shell extension from the user's local extensions directory.
 - @details Disables the extension via `gnome-extensions disable`, then removes the entire extension directory resolved by `_resolve_extension_target_dir` (canonical `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/`, overridable through `AIBAR_EXT_TARGET_DIR`). Exits with code 1 if the extension directory does not exist. Produces colored Click-styled terminal output for all status messages.
 - @return {None} Function return value.
@@ -1651,16 +1653,16 @@ line.
 |`doctor`|fn|pub|4646-4701|def doctor() -> None|
 |`env`|fn|pub|4706-4714|def env() -> None|
 |`setup`|fn|pub|4719-4918|def setup() -> None|
-|`login`|fn|pub|5127-5155|def login(provider: str | None) -> None|
-|`_login_copilot`|fn|priv|5156-5183|def _login_copilot() -> None|
-|`_login_geminiai`|fn|priv|5184-5222|def _login_geminiai() -> None|
-|`_select_login_error_providers`|fn|priv|5229-5258|def _select_login_error_providers() -> list[ProviderName]|
-|`_login_error_state_providers`|fn|priv|5259-5304|def _login_error_state_providers() -> None|
-|`_resolve_extension_target_dir`|fn|priv|5305-5326|def _resolve_extension_target_dir() -> Path|
-|`_validate_extension_metadata`|fn|priv|5327-5367|def _validate_extension_metadata(metadata_path: Path) -> ...|
-|`_resolve_extension_source_dir`|fn|priv|5368-5380|def _resolve_extension_source_dir() -> Path|
-|`gnome_install`|fn|pub|5391-5527|def gnome_install() -> None|
-|`gnome_uninstall`|fn|pub|5537-5608|def gnome_uninstall() -> None|
+|`login`|fn|pub|5142-5170|def login(provider: str | None) -> None|
+|`_login_copilot`|fn|priv|5171-5198|def _login_copilot() -> None|
+|`_login_geminiai`|fn|priv|5199-5249|def _login_geminiai() -> None|
+|`_select_login_error_providers`|fn|priv|5256-5285|def _select_login_error_providers() -> list[ProviderName]|
+|`_login_error_state_providers`|fn|priv|5286-5331|def _login_error_state_providers() -> None|
+|`_resolve_extension_target_dir`|fn|priv|5332-5353|def _resolve_extension_target_dir() -> Path|
+|`_validate_extension_metadata`|fn|priv|5354-5394|def _validate_extension_metadata(metadata_path: Path) -> ...|
+|`_resolve_extension_source_dir`|fn|priv|5395-5407|def _resolve_extension_source_dir() -> Path|
+|`gnome_install`|fn|pub|5418-5554|def gnome_install() -> None|
+|`gnome_uninstall`|fn|pub|5564-5635|def gnome_uninstall() -> None|
 
 
 ---
@@ -3734,12 +3736,12 @@ monetary value while leaving every usage counter unset.
 
 ---
 
-# geminiai.py | Python | 1045L | 48 symbols | 20 imports | 41 comments
+# geminiai.py | Python | 1182L | 55 symbols | 22 imports | 47 comments
 > Path: `src/aibar/aibar/providers/geminiai.py`
 - @brief GeminiAI provider with Google OAuth, Monitoring, and BigQuery billing integration.
-- @details Implements OAuth credential persistence, token refresh, usage retrieval from
-Cloud Monitoring and latest-available billing-period retrieval from BigQuery, then normalizes
-results into AIBar provider result contracts.
+- @details Implements OAuth and service-account credential persistence, token refresh,
+usage retrieval from Cloud Monitoring and latest-available billing-period retrieval
+from BigQuery, then normalizes results into AIBar provider result contracts.
 
 ## Imports
 ```
@@ -3752,10 +3754,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
 from google.api_core.exceptions import GoogleAPICallError  # pyright: ignore[reportMissingImports]
-from google.auth.exceptions import RefreshError
+from google.auth.credentials import Credentials as AuthCredentials
+from google.auth.exceptions import GoogleAuthError, RefreshError
 from google.auth.transport.requests import Request
 from google.cloud import bigquery  # pyright: ignore[reportAttributeAccessIssue]
 from google.oauth2.credentials import Credentials
+from google.oauth2.service_account import Credentials as ServiceAccountCredentials
 from google_auth_oauthlib.flow import InstalledAppFlow  # pyright: ignore[reportMissingImports]
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
@@ -3767,185 +3771,239 @@ from aibar.config import resolve_currency_symbol
 
 ## Definitions
 
-- var `GEMINIAI_OAUTH_CLIENT_PATH = Path.home() / ".config" / "aibar" / "geminiai_oauth_client.json"` (L43)
-- var `GEMINIAI_OAUTH_TOKEN_PATH = Path.home() / ".config" / "aibar" / "geminiai_oauth_token.json"` (L44)
-- var `GEMINIAI_PROJECT_ID_ENV_VAR = "GEMINIAI_PROJECT_ID"` (L45)
-- var `GEMINIAI_ACCESS_TOKEN_ENV_VAR = "GEMINIAI_OAUTH_ACCESS_TOKEN"` (L46)
-- var `DEFAULT_BILLING_DATASET_ID = "billing_data"` (L47)
-- var `BILLING_TABLE_PREFIX = "gcp_billing_export_v1_"` (L48)
-### fn `def _to_rfc3339_utc(value: datetime) -> str` `priv` (L51-62)
+- var `GEMINIAI_OAUTH_CLIENT_PATH = Path.home() / ".config" / "aibar" / "geminiai_oauth_client.json"` (L45)
+- var `GEMINIAI_OAUTH_TOKEN_PATH = Path.home() / ".config" / "aibar" / "geminiai_oauth_token.json"` (L46)
+- var `GEMINIAI_SERVICE_ACCOUNT_PATH = Path.home() / ".config" / "aibar" / "geminiai_service_account.json"` (L47)
+- var `GEMINIAI_PROJECT_ID_ENV_VAR = "GEMINIAI_PROJECT_ID"` (L48)
+- var `GEMINIAI_ACCESS_TOKEN_ENV_VAR = "GEMINIAI_OAUTH_ACCESS_TOKEN"` (L49)
+- var `DEFAULT_BILLING_DATASET_ID = "billing_data"` (L50)
+- var `BILLING_TABLE_PREFIX = "gcp_billing_export_v1_"` (L51)
+### fn `def _to_rfc3339_utc(value: datetime) -> str` `priv` (L54-65)
 - @brief Convert datetime to RFC3339 UTC string accepted by Google APIs.
 - @details Normalizes timezone awareness and strips microseconds to produce stable API query timestamps.
 - @param value {datetime} Input datetime value.
 - @return {str} RFC3339 UTC timestamp (e.g. `2026-03-08T11:00:00Z`).
 
-### fn `def _extract_http_status(error: HttpError) -> int` `priv` (L63-83)
+### fn `def _extract_http_status(error: HttpError) -> int` `priv` (L66-86)
 - @brief Extract integer HTTP status from Google API HttpError.
 - @details Returns `0` when status is unavailable to preserve deterministic error payload shape.
 - @param error {HttpError} Google API exception.
 - @return {int} HTTP status code or `0`.
 
-### fn `def _extract_retry_after_seconds(error: HttpError) -> float` `priv` (L84-107)
+### fn `def _extract_retry_after_seconds(error: HttpError) -> float` `priv` (L87-110)
 - @brief Extract retry-after seconds from HttpError response headers.
 - @details Reads `retry-after` case-insensitively and normalizes invalid values to `0.0`.
 - @param error {HttpError} Google API exception.
 - @return {float} Non-negative retry-after delay in seconds.
 
-### fn `def _has_retry_after_header(error: HttpError) -> bool` `priv` (L108-124)
+### fn `def _has_retry_after_header(error: HttpError) -> bool` `priv` (L111-127)
 - @brief Detect Retry-After header presence in Google HttpError response.
 - @details Evaluates case-insensitive `retry-after` header availability using `HttpError.resp.get(...)` access without parsing numeric values.
 - @param error {HttpError} Google API exception.
 - @return {bool} True when Retry-After header exists.
 
-### fn `def _extract_google_api_status(error: GoogleAPICallError) -> int` `priv` (L125-145)
+### fn `def _extract_google_api_status(error: GoogleAPICallError) -> int` `priv` (L128-148)
 - @brief Extract HTTP-like status code from Google API Core exceptions.
 - @details Normalizes exception `code` payloads to integer status values and returns `0` when status is unavailable.
 - @param error {GoogleAPICallError} Google API Core exception.
 - @return {int} Status code or `0`.
 
-### fn `def _is_scope_insufficient_error(error: Exception) -> bool` `priv` (L146-169)
+### fn `def _is_scope_insufficient_error(error: Exception) -> bool` `priv` (L149-172)
 - @brief Determine whether exception payload indicates OAuth scope insufficiency.
 - @details Matches Google API error reason `ACCESS_TOKEN_SCOPE_INSUFFICIENT` and equivalent human-readable messages.
 - @param error {Exception} Exception to inspect.
 - @return {bool} True when the error indicates insufficient OAuth scopes.
 
-### fn `def _summarize_google_refresh_error(error: RefreshError) -> str` `priv` (L170-196)
+### fn `def _summarize_google_refresh_error(error: RefreshError) -> str` `priv` (L173-199)
 - @brief Build compact diagnostic string from Google OAuth refresh failure payload.
 - @details Extracts structured `response.error` and `response.error_description` fields when available, then appends fallback exception message to preserve actionable provider diagnostics for operators.
 - @param error {RefreshError} OAuth refresh exception emitted by google-auth.
 - @return {str} Stable diagnostic summary for user-facing authentication errors.
 
-### class `class GeminiAIWindowRange` `@dataclass(frozen=True)` (L198-207)
+### class `class GeminiAIWindowRange` `@dataclass(frozen=True)` (L201-210)
 - @brief Immutable time-range descriptor for one GeminiAI fetch window.
 - @details Encodes start and end UTC timestamps used for Monitoring API queries.
 
-### class `class GeminiAICredentialStore` (L208-407)
+### class `class GeminiAICredentialStore` (L211-410)
 - @brief OAuth credential persistence and validation helper for GeminiAI.
 - @details Manages client-secret JSON validation, token-file persistence, and interactive InstalledAppFlow authorization.
-- fn `def __init__(` `priv` (L215-218)
+- fn `def __init__(` `priv` (L218-222)
   - @brief OAuth credential persistence and validation helper for GeminiAI.
   - @details Manages client-secret JSON validation, token-file persistence, and
 interactive InstalledAppFlow authorization.
-- fn `def _ensure_config_dir(self) -> None` `priv` (L229-236)
+- fn `def _ensure_config_dir(self) -> None` `priv` (L235-242)
   - @brief Initialize credential store with optional custom file paths.
   - @brief Create parent directories for OAuth files when missing.
   - @param client_config_path {Path | None} Optional OAuth client config path.
   - @param token_path {Path | None} Optional OAuth token path.
+  - @param service_account_path {Path | None} Optional service-account key path.
   - @return {None} Function return value.
   - @return {None} Function return value.
-- fn `def has_client_config(self) -> bool` (L237-243)
+- fn `def has_client_config(self) -> bool` (L243-249)
   - @brief Check whether GeminiAI client config JSON exists.
   - @return {bool} True when client config file exists.
-- fn `def has_authorized_credentials(self) -> bool` (L244-254)
+- fn `def has_authorized_credentials(self) -> bool` (L250-260)
   - @brief Check whether GeminiAI authorized token material exists.
   - @details Environment access-token override is treated as configured token material.
   - @return {bool} True when token file or env token is available.
-- fn `def validate_client_config(self, payload: dict[str, Any]) -> dict[str, Any]` (L255-284)
+- fn `def has_service_account(self) -> bool` (L261-269)
+  - @brief Check whether a persisted service-account key document exists.
+  - @return {bool} True when the service-account key file exists.
+  - @satisfies REQ-258
+  - @satisfies REQ-263
+- fn `def validate_service_account_payload(self, payload: dict[str, Any]) -> dict[str, Any]` (L270-292)
+  - @brief Validate a Google service-account key payload.
+  - @details Enforces the `type=service_account` marker and the non-empty `project_id`, `private_key`, and `client_email` fields required to build `google.oauth2.service_account.Credentials`.
+  - @param payload {dict[str, Any]} Decoded JSON payload to validate.
+  - @return {dict[str, Any]} Normalized payload.
+  - @throws {ValueError} When the payload is not a JSON object or required fields are missing or malformed.
+  - @satisfies REQ-257
+- fn `def validate_client_config(self, payload: dict[str, Any]) -> dict[str, Any]` (L293-322)
   - @brief Validate Google InstalledApp OAuth client-secret payload.
   - @details Enforces required `installed` section fields used by `InstalledAppFlow.from_client_config`.
   - @param payload {dict[str, Any]} Decoded JSON payload to validate.
   - @return {dict[str, Any]} Normalized payload.
   - @throws {ValueError} When required fields are missing or malformed.
-- fn `def save_client_config(self, payload: dict[str, Any]) -> None` (L285-297)
+- fn `def save_client_config(self, payload: dict[str, Any]) -> None` (L323-335)
   - @brief Persist validated OAuth client config JSON to disk.
   - @param payload {dict[str, Any]} Validated client payload.
   - @return {None} Function return value.
-- fn `def load_client_config(self) -> dict[str, Any]` (L298-316)
+- fn `def load_client_config(self) -> dict[str, Any]` (L336-354)
   - @brief Load and validate persisted OAuth client config JSON.
   - @return {dict[str, Any]} Validated OAuth client payload.
   - @throws {FileNotFoundError} When client config file is missing.
   - @throws {ValueError} When payload is invalid JSON or fails validation.
-- fn `def extract_project_id(self, payload: dict[str, Any]) -> str | None` (L317-330)
+- fn `def extract_project_id(self, payload: dict[str, Any]) -> str | None` (L355-368)
   - @brief Extract project_id from validated OAuth payload.
   - @param payload {dict[str, Any]} Validated OAuth payload.
   - @return {str | None} Project identifier or None when absent.
-- fn `def save_authorized_credentials(self, credentials: Credentials) -> None` (L331-340)
+- fn `def save_authorized_credentials(self, credentials: Credentials) -> None` (L369-378)
   - @brief Persist authorized-user OAuth credentials JSON.
   - @param credentials {Credentials} Google OAuth credentials object.
   - @return {None} Function return value.
-- fn `def authorize_interactively(` (L341-343)
-- fn `def load_access_token(self) -> str | None` (L359-376)
-  - @brief Execute OAuth browser flow and persist refresh-capable credentials.
-  - @brief Load access token from env override or token file.
-  - @details Uses InstalledAppFlow local-server flow (`http://localhost`) and
-saves authorized-user token JSON to disk.
-  - @param scopes {tuple[str, ...]} OAuth scopes requested during authorization.
-  - @return {Credentials} Authorized credentials.
-  - @return {str | None} Access token or None when unavailable.
-  - @throws {ValueError} When client config is invalid.
-- fn `def load_credentials(` (L377-379)
+- fn `def authorize_interactively(` (L379-381)
 
-### class `class GeminiAIProvider(BaseProvider)` : BaseProvider (L414-490)
+### fn `def load_access_token(self) -> str | None` (L397-414)
+- @brief Execute OAuth browser flow and persist refresh-capable credentials.
+- @brief Load access token from env override or token file.
+- @details Uses InstalledAppFlow local-server flow (`http://localhost`) and
+saves authorized-user token JSON to disk.
+- @param scopes {tuple[str, ...]} OAuth scopes requested during authorization.
+- @return {Credentials} Authorized credentials.
+- @return {str | None} Access token or None when unavailable.
+- @throws {ValueError} When client config is invalid.
+
+### fn `def load_credentials(` (L415-417)
+
+### fn `def save_service_account(self, payload: dict[str, Any]) -> None` (L456-470)
+- @brief Load OAuth credentials and refresh when token is expired.
+- @brief Persist validated service-account key JSON to disk.
+- @details Supports env-token fallback for non-refreshable runtime contexts.
+- @param scopes {tuple[str, ...]} OAuth scopes required by API calls.
+- @param payload {dict[str, Any]} Decoded service-account key payload.
+- @return {Credentials | None} Valid credentials or None when unavailable.
+- @return {None} Function return value.
+- @throws {AuthenticationError} When persisted token refresh fails.
+- @throws {ValueError} When the payload fails service-account validation.
+- @satisfies REQ-262
+- @satisfies REQ-257
+
+### fn `def load_service_account_project_id(self) -> str | None` (L471-489)
+- @brief Read the `project_id` field from the persisted service-account key.
+- @return {str | None} Project identifier or None when absent or unreadable.
+- @satisfies REQ-260
+
+### fn `def load_service_account_credentials(` (L490-492)
+
+### class `class GeminiAIProvider(BaseProvider)` : BaseProvider (L515-593)
+- @brief Load service-account credentials scoped for Monitoring and BigQuery.
 - @brief GeminiAI usage provider backed by Monitoring and BigQuery APIs.
+- @details Returns None when the key file is absent, unreadable, malformed,
+or fails Google credential construction so callers can fall back to user
+OAuth credentials (REQ-259).
 - @details Retrieves Generative Language API usage counters and status telemetry from Cloud Monitoring, retrieves latest-available billing-period costs from BigQuery export, then maps data into AIBar `ProviderResult` models.
-- var `SERVICE_FILTER = 'resource.labels.service="generativelanguage.googleapis.com"'` (L424)
+- @param scopes {tuple[str, ...]} OAuth scopes applied to the credentials.
+- @return {Credentials | None} Service-account credentials or None when unavailable.
+- @satisfies REQ-258
+- @satisfies REQ-259
+- var `SERVICE_FILTER = 'resource.labels.service="generativelanguage.googleapis.com"'` (L525)
   - @brief GeminiAI usage provider backed by Monitoring and BigQuery APIs.
   - @details Retrieves Generative Language API usage counters and status telemetry
 from Cloud Monitoring, retrieves latest-available billing-period costs from BigQuery export,
 then maps data into AIBar `ProviderResult` models.
-- var `REQUEST_COUNT_FILTER = REQUEST_COUNT_FILTERS[0]` (L434)
-- var `LATENCY_FILTER = (` (L450)
-- var `ERROR_FILTER = (` (L453)
-- fn `def __init__(` `priv` (L459-462)
-- fn `def is_configured(self) -> bool` (L473-482)
+- var `REQUEST_COUNT_FILTER = REQUEST_COUNT_FILTERS[0]` (L535)
+- var `LATENCY_FILTER = (` (L551)
+- var `ERROR_FILTER = (` (L554)
+- fn `def __init__(` `priv` (L560-563)
+- fn `def is_configured(self) -> bool` (L574-585)
   - @brief Initialize GeminiAI provider with optional overrides.
   - @brief Check whether GeminiAI provider has required auth and project metadata.
   - @param credential_store {GeminiAICredentialStore | None} Optional credential store.
   - @param project_id {str | None} Optional project id override.
   - @return {None} Function return value.
-  - @return {bool} True when project id and OAuth token material are available.
-- fn `def get_config_help(self) -> str` (L483-490)
+  - @return {bool} True when project id and either service-account or OAuth token material are available.
+  - @satisfies REQ-263
+- fn `def get_config_help(self) -> str` (L586-593)
   - @brief Return setup guidance for GeminiAI OAuth configuration.
   - @return {str} Provider-specific setup instructions.
 
-### fn `async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult` (L499-526)
+### fn `async def fetch(self, window: WindowPeriod = WindowPeriod.DAY_7) -> ProviderResult` (L606-633)
 - @brief Fetch GeminiAI monitoring usage metrics for one window.
 - @details Executes synchronous Google API calls in a worker thread and returns normalized provider metrics. HTTP 429 responses are normalized as rate-limit provider error payloads with retry-after metadata.
 - @param window {WindowPeriod} Requested window period.
 - @return {ProviderResult} Provider result payload.
 - @throws {AuthenticationError} When OAuth credentials are invalid.
 
-### fn `def _fetch_sync(self, window: WindowPeriod) -> ProviderResult` `priv` (L527-698)
+### fn `def _load_fetch_credentials(self) -> AuthCredentials | None` `priv` (L634-649)
+- @brief Resolve fetch credentials preferring service-account mode.
+- @details Service-account credentials remove the dependency on user OAuth refresh tokens that Google revokes periodically for consent screens left in Testing publishing status; user OAuth credentials remain the fallback.
+- @return {Credentials | None} Service-account or OAuth credentials, or None when neither source yields credentials.
+- @satisfies REQ-258
+- @satisfies REQ-259
+
+### fn `def _fetch_sync(self, window: WindowPeriod) -> ProviderResult` `priv` (L650-829)
 - @brief Execute blocking Google API retrieval flow for GeminiAI metrics.
 - @param window {WindowPeriod} Requested window period.
 - @return {ProviderResult} Normalized provider result.
 - @throws {AuthenticationError} When credentials are missing/invalid.
 - @throws {ProviderError} On non-auth API failures.
 
-### fn `def _build_window_range(self, window: WindowPeriod) -> GeminiAIWindowRange` `priv` (L699-717)
+### fn `def _build_window_range(self, window: WindowPeriod) -> GeminiAIWindowRange` `priv` (L830-848)
 - @brief Build current-month UTC interval used for Monitoring queries.
 - @details Uses `[UTC month start, current UTC time]` to align Monitoring usage aggregation with current-month GeminiAI billing semantics.
 - @param window {WindowPeriod} Requested window period (ignored by interval policy).
 - @return {GeminiAIWindowRange} Start/end UTC timestamps.
 - @satisfies REQ-098
 
-### fn `def _resolve_project_id(self) -> str | None` `priv` (L718-739)
-- @brief Resolve project id from override, env, runtime config, or client JSON.
+### fn `def _resolve_project_id(self) -> str | None` `priv` (L849-875)
+- @brief Resolve project id from override, env, runtime config, client JSON, or service-account key.
 - @return {str | None} Project id or None when unresolved.
+- @satisfies REQ-260
 
-### fn `def _resolve_billing_dataset(self) -> str` `priv` (L740-756)
+### fn `def _resolve_billing_dataset(self) -> str` `priv` (L876-892)
 - @brief Resolve billing dataset id from runtime configuration.
 - @details Uses `RuntimeConfig.billing_data` and falls back to `DEFAULT_BILLING_DATASET_ID` when configuration is empty.
 - @return {str} BigQuery billing dataset id.
 - @satisfies REQ-005
 - @satisfies REQ-064
 
-### fn `def _build_monitoring_service(self, credentials: Credentials) -> Any` `priv` (L757-764)
+### fn `def _build_monitoring_service(self, credentials: AuthCredentials) -> Any` `priv` (L893-900)
 - @brief Build Google Cloud Monitoring API client.
-- @param credentials {Credentials} OAuth credentials.
+- @param credentials {AuthCredentials} OAuth or service-account credentials.
 - @return {Any} Monitoring service client.
 
-### fn `def _build_bigquery_client(` `priv` (L765-768)
+### fn `def _build_bigquery_client(` `priv` (L901-904)
 
-### fn `def _discover_billing_table_id(` `priv` (L780-784)
+### fn `def _discover_billing_table_id(` `priv` (L917-921)
 - @brief Build BigQuery client for GeminiAI billing export queries.
-- @param credentials {Credentials} OAuth credentials with BigQuery read scope.
+- @param credentials {AuthCredentials} OAuth or service-account credentials
+with BigQuery read scope.
 - @param project_id {str} Google Cloud project id.
 - @return {bigquery.Client} BigQuery API client.
 - @satisfies REQ-056
 - @satisfies REQ-065
 
-### fn `def _query_current_month_billing_cost(` `priv` (L810-815)
+### fn `def _query_current_month_billing_cost(` `priv` (L947-952)
 - @brief Discover billing export table id in configured billing dataset.
 - @details Lists dataset tables and selects the first lexicographically sorted
 id that starts with `gcp_billing_export_v1_`.
@@ -3956,7 +4014,7 @@ id that starts with `gcp_billing_export_v1_`.
 - @throws {ProviderError} When billing export table is unavailable.
 - @satisfies REQ-064
 
-### fn `def _coerce_float(self, value: Any) -> float` `priv` (L891-910)
+### fn `def _coerce_float(self, value: Any) -> float` `priv` (L1028-1047)
 - @brief Query latest-available invoice-month billing costs grouped by service.
 - @brief Convert numeric BigQuery row field values to float.
 - @details Uses explicit projection and latest invoice-month selection
@@ -3973,9 +4031,9 @@ total net monthly cost.
 - @satisfies REQ-057
 - @satisfies REQ-065
 
-### fn `def _query_monitoring_metric(` `priv` (L911-918)
+### fn `def _query_monitoring_metric(` `priv` (L1048-1055)
 
-### fn `def _sum_time_series_values(self, response: dict[str, Any]) -> float | None` `priv` (L957-1009)
+### fn `def _sum_time_series_values(self, response: dict[str, Any]) -> float | None` `priv` (L1094-1146)
 - @brief Query Monitoring time-series metric and aggregate point values.
 - @brief Sum numeric point values in Monitoring `timeSeries` payload.
 - @details Returns None when metric is unavailable and `allow_missing=True`.
@@ -3990,59 +4048,66 @@ total net monthly cost.
 - @return {float | None} Aggregated numeric value or None when no points exist.
 - @throws {HttpError} For non-missing API errors.
 
-### fn `def _build_metrics(` `priv` (L1010-1015)
+### fn `def _build_metrics(` `priv` (L1147-1152)
 
 ## Symbol Index
 |Symbol|Kind|Vis|Lines|Sig|
 |---|---|---|---|---|
-|`GEMINIAI_OAUTH_CLIENT_PATH`|var|pub|43||
-|`GEMINIAI_OAUTH_TOKEN_PATH`|var|pub|44||
-|`GEMINIAI_PROJECT_ID_ENV_VAR`|var|pub|45||
-|`GEMINIAI_ACCESS_TOKEN_ENV_VAR`|var|pub|46||
-|`DEFAULT_BILLING_DATASET_ID`|var|pub|47||
-|`BILLING_TABLE_PREFIX`|var|pub|48||
-|`_to_rfc3339_utc`|fn|priv|51-62|def _to_rfc3339_utc(value: datetime) -> str|
-|`_extract_http_status`|fn|priv|63-83|def _extract_http_status(error: HttpError) -> int|
-|`_extract_retry_after_seconds`|fn|priv|84-107|def _extract_retry_after_seconds(error: HttpError) -> float|
-|`_has_retry_after_header`|fn|priv|108-124|def _has_retry_after_header(error: HttpError) -> bool|
-|`_extract_google_api_status`|fn|priv|125-145|def _extract_google_api_status(error: GoogleAPICallError)...|
-|`_is_scope_insufficient_error`|fn|priv|146-169|def _is_scope_insufficient_error(error: Exception) -> bool|
-|`_summarize_google_refresh_error`|fn|priv|170-196|def _summarize_google_refresh_error(error: RefreshError) ...|
-|`GeminiAIWindowRange`|class|pub|198-207|class GeminiAIWindowRange|
-|`GeminiAICredentialStore`|class|pub|208-407|class GeminiAICredentialStore|
-|`GeminiAICredentialStore.__init__`|fn|priv|215-218|def __init__(|
-|`GeminiAICredentialStore._ensure_config_dir`|fn|priv|229-236|def _ensure_config_dir(self) -> None|
-|`GeminiAICredentialStore.has_client_config`|fn|pub|237-243|def has_client_config(self) -> bool|
-|`GeminiAICredentialStore.has_authorized_credentials`|fn|pub|244-254|def has_authorized_credentials(self) -> bool|
-|`GeminiAICredentialStore.validate_client_config`|fn|pub|255-284|def validate_client_config(self, payload: dict[str, Any])...|
-|`GeminiAICredentialStore.save_client_config`|fn|pub|285-297|def save_client_config(self, payload: dict[str, Any]) -> ...|
-|`GeminiAICredentialStore.load_client_config`|fn|pub|298-316|def load_client_config(self) -> dict[str, Any]|
-|`GeminiAICredentialStore.extract_project_id`|fn|pub|317-330|def extract_project_id(self, payload: dict[str, Any]) -> ...|
-|`GeminiAICredentialStore.save_authorized_credentials`|fn|pub|331-340|def save_authorized_credentials(self, credentials: Creden...|
-|`GeminiAICredentialStore.authorize_interactively`|fn|pub|341-343|def authorize_interactively(|
-|`GeminiAICredentialStore.load_access_token`|fn|pub|359-376|def load_access_token(self) -> str | None|
-|`GeminiAICredentialStore.load_credentials`|fn|pub|377-379|def load_credentials(|
-|`GeminiAIProvider`|class|pub|414-490|class GeminiAIProvider(BaseProvider)|
-|`GeminiAIProvider.SERVICE_FILTER`|var|pub|424||
-|`GeminiAIProvider.REQUEST_COUNT_FILTER`|var|pub|434||
-|`GeminiAIProvider.LATENCY_FILTER`|var|pub|450||
-|`GeminiAIProvider.ERROR_FILTER`|var|pub|453||
-|`GeminiAIProvider.__init__`|fn|priv|459-462|def __init__(|
-|`GeminiAIProvider.is_configured`|fn|pub|473-482|def is_configured(self) -> bool|
-|`GeminiAIProvider.get_config_help`|fn|pub|483-490|def get_config_help(self) -> str|
-|`fetch`|fn|pub|499-526|async def fetch(self, window: WindowPeriod = WindowPeriod...|
-|`_fetch_sync`|fn|priv|527-698|def _fetch_sync(self, window: WindowPeriod) -> ProviderRe...|
-|`_build_window_range`|fn|priv|699-717|def _build_window_range(self, window: WindowPeriod) -> Ge...|
-|`_resolve_project_id`|fn|priv|718-739|def _resolve_project_id(self) -> str | None|
-|`_resolve_billing_dataset`|fn|priv|740-756|def _resolve_billing_dataset(self) -> str|
-|`_build_monitoring_service`|fn|priv|757-764|def _build_monitoring_service(self, credentials: Credenti...|
-|`_build_bigquery_client`|fn|priv|765-768|def _build_bigquery_client(|
-|`_discover_billing_table_id`|fn|priv|780-784|def _discover_billing_table_id(|
-|`_query_current_month_billing_cost`|fn|priv|810-815|def _query_current_month_billing_cost(|
-|`_coerce_float`|fn|priv|891-910|def _coerce_float(self, value: Any) -> float|
-|`_query_monitoring_metric`|fn|priv|911-918|def _query_monitoring_metric(|
-|`_sum_time_series_values`|fn|priv|957-1009|def _sum_time_series_values(self, response: dict[str, Any...|
-|`_build_metrics`|fn|priv|1010-1015|def _build_metrics(|
+|`GEMINIAI_OAUTH_CLIENT_PATH`|var|pub|45||
+|`GEMINIAI_OAUTH_TOKEN_PATH`|var|pub|46||
+|`GEMINIAI_SERVICE_ACCOUNT_PATH`|var|pub|47||
+|`GEMINIAI_PROJECT_ID_ENV_VAR`|var|pub|48||
+|`GEMINIAI_ACCESS_TOKEN_ENV_VAR`|var|pub|49||
+|`DEFAULT_BILLING_DATASET_ID`|var|pub|50||
+|`BILLING_TABLE_PREFIX`|var|pub|51||
+|`_to_rfc3339_utc`|fn|priv|54-65|def _to_rfc3339_utc(value: datetime) -> str|
+|`_extract_http_status`|fn|priv|66-86|def _extract_http_status(error: HttpError) -> int|
+|`_extract_retry_after_seconds`|fn|priv|87-110|def _extract_retry_after_seconds(error: HttpError) -> float|
+|`_has_retry_after_header`|fn|priv|111-127|def _has_retry_after_header(error: HttpError) -> bool|
+|`_extract_google_api_status`|fn|priv|128-148|def _extract_google_api_status(error: GoogleAPICallError)...|
+|`_is_scope_insufficient_error`|fn|priv|149-172|def _is_scope_insufficient_error(error: Exception) -> bool|
+|`_summarize_google_refresh_error`|fn|priv|173-199|def _summarize_google_refresh_error(error: RefreshError) ...|
+|`GeminiAIWindowRange`|class|pub|201-210|class GeminiAIWindowRange|
+|`GeminiAICredentialStore`|class|pub|211-410|class GeminiAICredentialStore|
+|`GeminiAICredentialStore.__init__`|fn|priv|218-222|def __init__(|
+|`GeminiAICredentialStore._ensure_config_dir`|fn|priv|235-242|def _ensure_config_dir(self) -> None|
+|`GeminiAICredentialStore.has_client_config`|fn|pub|243-249|def has_client_config(self) -> bool|
+|`GeminiAICredentialStore.has_authorized_credentials`|fn|pub|250-260|def has_authorized_credentials(self) -> bool|
+|`GeminiAICredentialStore.has_service_account`|fn|pub|261-269|def has_service_account(self) -> bool|
+|`GeminiAICredentialStore.validate_service_account_payload`|fn|pub|270-292|def validate_service_account_payload(self, payload: dict[...|
+|`GeminiAICredentialStore.validate_client_config`|fn|pub|293-322|def validate_client_config(self, payload: dict[str, Any])...|
+|`GeminiAICredentialStore.save_client_config`|fn|pub|323-335|def save_client_config(self, payload: dict[str, Any]) -> ...|
+|`GeminiAICredentialStore.load_client_config`|fn|pub|336-354|def load_client_config(self) -> dict[str, Any]|
+|`GeminiAICredentialStore.extract_project_id`|fn|pub|355-368|def extract_project_id(self, payload: dict[str, Any]) -> ...|
+|`GeminiAICredentialStore.save_authorized_credentials`|fn|pub|369-378|def save_authorized_credentials(self, credentials: Creden...|
+|`GeminiAICredentialStore.authorize_interactively`|fn|pub|379-381|def authorize_interactively(|
+|`load_access_token`|fn|pub|397-414|def load_access_token(self) -> str | None|
+|`load_credentials`|fn|pub|415-417|def load_credentials(|
+|`save_service_account`|fn|pub|456-470|def save_service_account(self, payload: dict[str, Any]) -...|
+|`load_service_account_project_id`|fn|pub|471-489|def load_service_account_project_id(self) -> str | None|
+|`load_service_account_credentials`|fn|pub|490-492|def load_service_account_credentials(|
+|`GeminiAIProvider`|class|pub|515-593|class GeminiAIProvider(BaseProvider)|
+|`GeminiAIProvider.SERVICE_FILTER`|var|pub|525||
+|`GeminiAIProvider.REQUEST_COUNT_FILTER`|var|pub|535||
+|`GeminiAIProvider.LATENCY_FILTER`|var|pub|551||
+|`GeminiAIProvider.ERROR_FILTER`|var|pub|554||
+|`GeminiAIProvider.__init__`|fn|priv|560-563|def __init__(|
+|`GeminiAIProvider.is_configured`|fn|pub|574-585|def is_configured(self) -> bool|
+|`GeminiAIProvider.get_config_help`|fn|pub|586-593|def get_config_help(self) -> str|
+|`fetch`|fn|pub|606-633|async def fetch(self, window: WindowPeriod = WindowPeriod...|
+|`_load_fetch_credentials`|fn|priv|634-649|def _load_fetch_credentials(self) -> AuthCredentials | None|
+|`_fetch_sync`|fn|priv|650-829|def _fetch_sync(self, window: WindowPeriod) -> ProviderRe...|
+|`_build_window_range`|fn|priv|830-848|def _build_window_range(self, window: WindowPeriod) -> Ge...|
+|`_resolve_project_id`|fn|priv|849-875|def _resolve_project_id(self) -> str | None|
+|`_resolve_billing_dataset`|fn|priv|876-892|def _resolve_billing_dataset(self) -> str|
+|`_build_monitoring_service`|fn|priv|893-900|def _build_monitoring_service(self, credentials: AuthCred...|
+|`_build_bigquery_client`|fn|priv|901-904|def _build_bigquery_client(|
+|`_discover_billing_table_id`|fn|priv|917-921|def _discover_billing_table_id(|
+|`_query_current_month_billing_cost`|fn|priv|947-952|def _query_current_month_billing_cost(|
+|`_coerce_float`|fn|priv|1028-1047|def _coerce_float(self, value: Any) -> float|
+|`_query_monitoring_metric`|fn|priv|1048-1055|def _query_monitoring_metric(|
+|`_sum_time_series_values`|fn|priv|1094-1146|def _sum_time_series_values(self, response: dict[str, Any...|
+|`_build_metrics`|fn|priv|1147-1152|def _build_metrics(|
 
 
 ---

@@ -4729,7 +4729,9 @@ def setup() -> None:
     (choices: `$`, `£`, `€`, default `$`), then persists all values to
     `~/.config/aibar/config.json`. Final setup section configures logging flags
     (`log_enabled`, `debug_enabled`). GeminiAI OAuth source supports `skip`,
-    `file`, `paste`, and `login` (re-authorization with current scopes). Also
+    `file`, `paste`, and `login` (re-authorization with current scopes); a
+    credential JSON carrying `type=service_account` provided via `file` or
+    `paste` is detected and persisted as a service-account key. Also
     prompts for provider API keys and writes them to `~/.config/aibar/env`.
     @return {None} Function return value.
     @satisfies REQ-005
@@ -4740,6 +4742,7 @@ def setup() -> None:
     @satisfies REQ-055
     @satisfies REQ-056
     @satisfies REQ-059
+    @satisfies REQ-257
     """
     from aibar.config import (
         ENV_FILE_PATH,
@@ -4873,7 +4876,8 @@ def setup() -> None:
     click.echo()
     click.echo(click.style("GeminiAI (Google Cloud OAuth)", bold=True))
     click.echo(
-        "  Configure OAuth desktop client JSON for Cloud Monitoring and BigQuery billing access."
+        "  Configure OAuth desktop client JSON or a Google service-account key"
+        " for Cloud Monitoring and BigQuery billing access."
     )
     click.echo(
         "  billing_data must be the dataset name created in Google BigQuery console."
@@ -4943,19 +4947,30 @@ def setup() -> None:
 
         if client_payload_raw is not None:
             try:
-                credential_store.save_client_config(client_payload_raw)
-                saved_payload = credential_store.load_client_config()
-                detected_project_id = credential_store.extract_project_id(saved_payload)
-                if detected_project_id is not None:
-                    geminiai_project_id = detected_project_id
-                click.echo("  -> OAuth client saved")
-                if click.confirm(
-                    "  Open browser and authorize GeminiAI now?", default=True
-                ):
-                    credential_store.authorize_interactively(
-                        scopes=GEMINIAI_OAUTH_SCOPES
+                if client_payload_raw.get("type") == "service_account":
+                    credential_store.save_service_account(client_payload_raw)
+                    detected_project_id = (
+                        credential_store.load_service_account_project_id()
                     )
-                    click.echo("  -> OAuth token saved")
+                    if detected_project_id is not None:
+                        geminiai_project_id = detected_project_id
+                    click.echo("  -> Service-account key saved")
+                else:
+                    credential_store.save_client_config(client_payload_raw)
+                    saved_payload = credential_store.load_client_config()
+                    detected_project_id = credential_store.extract_project_id(
+                        saved_payload
+                    )
+                    if detected_project_id is not None:
+                        geminiai_project_id = detected_project_id
+                    click.echo("  -> OAuth client saved")
+                    if click.confirm(
+                        "  Open browser and authorize GeminiAI now?", default=True
+                    ):
+                        credential_store.authorize_interactively(
+                            scopes=GEMINIAI_OAUTH_SCOPES
+                        )
+                        click.echo("  -> OAuth token saved")
             except (FileNotFoundError, ValueError, OSError, ProviderError) as exc:
                 click.echo(
                     click.style(f"  -> GeminiAI OAuth setup failed: {exc}", fg="red")
@@ -5185,10 +5200,13 @@ def _login_geminiai() -> None:
     """
     @brief Execute GeminiAI OAuth login flow.
     @details Reuses persisted OAuth client configuration to launch browser-based
-    authorization and persist refresh-capable Google credentials.
+    authorization and persist refresh-capable Google credentials. Skips the
+    interactive flow with an informational message and exit status 0 when
+    service-account credentials are configured.
     @return {None} Function return value.
     @satisfies REQ-055
     @satisfies REQ-056
+    @satisfies REQ-261
     """
     from aibar.providers.geminiai import GEMINIAI_OAUTH_SCOPES, GeminiAICredentialStore
 
@@ -5198,6 +5216,15 @@ def _login_geminiai() -> None:
     click.echo()
 
     credential_store = GeminiAICredentialStore()
+    if credential_store.has_service_account():
+        click.echo(
+            click.style(
+                " Service-account credentials are active;"
+                " interactive OAuth login is not required.",
+                fg="green",
+            )
+        )
+        return
     if not credential_store.has_client_config():
         click.echo(click.style(" GeminiAI OAuth client config not found.", fg="red"))
         click.echo("Run 'aibar setup' and configure GeminiAI OAuth first.")

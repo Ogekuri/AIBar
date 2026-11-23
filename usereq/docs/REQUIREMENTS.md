@@ -422,6 +422,15 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-249**: MUST exclude `deepseek` from GNOME progress-bar providers, API-counter providers, and panel percentage aggregation while listing it in provider ordering arrays.
 - **REQ-250**: MUST document in DeepSeek `get_config_help` and `README.md` that the API key authorizes balance retrieval but exposes no aggregated per-key usage report.
 
+### 3.8 GeminiAI Service Account Authentication
+- **REQ-257**: `setup` MUST detect a GeminiAI credential JSON carrying `type=service_account` from the `file` or `paste` OAuth sources, validate required fields, and persist it to `~/.config/aibar/geminiai_service_account.json`.
+- **REQ-258**: GeminiAI provider `fetch` MUST prefer service-account credentials loaded from `~/.config/aibar/geminiai_service_account.json` over user OAuth credentials whenever that file yields valid credentials.
+- **REQ-259**: GeminiAI provider `fetch` MUST fall back to persisted user OAuth credentials when the service-account key file is absent, unreadable, or invalid.
+- **REQ-260**: GeminiAI project-id resolution MUST accept the `project_id` field of the persisted service-account key document.
+- **REQ-261**: `login --provider geminiai` MUST skip the interactive OAuth flow, print an informational message, and exit with status 0 when service-account credentials are configured.
+- **REQ-262**: The GeminiAI OAuth refresh-failure diagnostic MUST name the OAuth consent screen Testing publishing status as typical cause and production publishing or `aibar login --provider geminiai` as remedies.
+- **REQ-263**: GeminiAI `is_configured` MUST report the provider configured when the project id resolves and either service-account credentials or authorized-user OAuth credentials exist.
+
 ## 4. Test Requirements
 
 Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HDT principles: deterministic, isolated, and behavior-focused.
