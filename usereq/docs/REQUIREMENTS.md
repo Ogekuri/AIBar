@@ -429,6 +429,8 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-261**: `login --provider geminiai` MUST print an informational message directing to `setup` service-account configuration and MUST exit with status 0 without executing any OAuth authorization flow.
 - **REQ-263**: GeminiAI `is_configured` MUST report the provider configured when the project id resolves and service-account credentials exist in `~/.config/aibar/geminiai_service_account.json`.
 - **REQ-264**: GeminiAI service-account credentials MUST use scopes `https://www.googleapis.com/auth/bigquery.readonly`, `https://www.googleapis.com/auth/monitoring.read`, and `https://www.googleapis.com/auth/cloud-platform`.
+- **REQ-265**: `setup` MUST expand a leading `~` or `~user` segment and `$HOME` variable references in the GeminiAI service-account key file path to the user home directory before reading the file.
+- **REQ-266**: On file read failure or JSON decode failure, `setup` MUST re-prompt the GeminiAI service-account key file path until the file reads and decodes successfully.
 
 ## 4. Test Requirements
 
@@ -544,6 +546,8 @@ Automated unit-test coverage is maintained under `tests/`; tests MUST satisfy HD
 - **TST-113**: MUST verify DeepSeek rose palette classes use `#FF375F` in `stylesheet.css` and ANSI `\033[38;5;204m` in the CLI provider color map.
 - **TST-114**: MUST verify `--upgrade` executes the `aibar gnome-install` argv resolved from `PATH` after a successful install, propagates its exit status, and skips it on install failure or non-Linux runtimes.
 - **TST-117**: MUST verify `setup` GeminiAI credential prompts accept only service-account key JSON, reject OAuth client-secret JSON documents with a validation error, and expose no `login` credential source choice.
+- **TST-118**: MUST verify `setup` resolves `~`-prefixed and `$HOME`-prefixed GeminiAI service-account key file paths against the user home directory before reading.
+- **TST-119**: MUST verify `setup` re-prompts the GeminiAI service-account key file path after a file read or JSON decode failure and completes persistence once a readable JSON document is provided.
 
 ## 5. Evidence
 

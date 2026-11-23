@@ -4712,6 +4712,19 @@ def env() -> None:
     click.echo(config.get_env_var_help())
 
 
+def _expand_user_home_path(raw_path: str) -> str:
+    """
+    @brief Expand home-directory references in one user-provided file path.
+    @details Resolves a leading `~` or `~user` segment through `os.path.expanduser`
+    and `$HOME`-style variable references through `os.path.expandvars`, returning
+    the resolved path text unchanged when no reference applies.
+    @param raw_path {str} Raw path text entered at the setup prompt.
+    @return {str} Path text with home-directory references resolved.
+    @satisfies REQ-265
+    """
+    return os.path.expandvars(os.path.expanduser(raw_path))
+
+
 @main.command(
     short_help="Run interactive setup.",
     help="Configure runtime settings, currency symbols, and provider credentials.",
@@ -4896,27 +4909,29 @@ def setup() -> None:
         service_account_payload_raw: dict[str, object] | None = None
         if service_account_source == "file":
             default_path = str(credential_store.service_account_path)
-            service_account_path_raw = click.prompt(
-                "  geminiai service-account key json path",
-                default=default_path,
-                show_default=True,
-            ).strip()
-            try:
-                service_account_payload_raw = json.loads(
-                    Path(service_account_path_raw).read_text(encoding="utf-8")
-                )
-            except OSError as exc:
-                click.echo(
-                    click.style(
-                        f"  -> Service-account file error: {exc}", fg="red"
+            while service_account_payload_raw is None:
+                service_account_path_raw = click.prompt(
+                    "  geminiai service-account key json path",
+                    default=default_path,
+                    show_default=True,
+                ).strip()
+                expanded_path = _expand_user_home_path(service_account_path_raw)
+                try:
+                    service_account_payload_raw = json.loads(
+                        Path(expanded_path).read_text(encoding="utf-8")
                     )
-                )
-            except ValueError as exc:
-                click.echo(
-                    click.style(
-                        f"  -> Service-account JSON decode error: {exc}", fg="red"
+                except OSError as exc:
+                    click.echo(
+                        click.style(
+                            f"  -> Service-account file error: {exc}", fg="red"
+                        )
                     )
-                )
+                except ValueError as exc:
+                    click.echo(
+                        click.style(
+                            f"  -> Service-account JSON decode error: {exc}", fg="red"
+                        )
+                    )
         else:
             pasted_json = click.prompt(
                 "  geminiai service-account key json (single-line)",

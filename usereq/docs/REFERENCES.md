@@ -62,7 +62,7 @@ from aibar.cli import main
 
 ---
 
-# cli.py | Python | 5585L | 142 symbols | 29 imports | 236 comments
+# cli.py | Python | 5600L | 143 symbols | 29 imports | 237 comments
 > Path: `src/aibar/aibar/cli.py`
 - @brief Command-line interface for aibar.
 - @details Defines command parsing, provider dispatch, formatted output, setup helpers, login flows, and UI launch hooks.
@@ -1422,7 +1422,14 @@ line.
 - @details Applies env logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def setup() -> None` (L4719-4918)
+### fn `def _expand_user_home_path(raw_path: str) -> str` `priv` (L4715-4727)
+- @brief Expand home-directory references in one user-provided file path.
+- @details Resolves a leading `~` or `~user` segment through `os.path.expanduser` and `$HOME`-style variable references through `os.path.expandvars`, returning the resolved path text unchanged when no reference applies.
+- @param raw_path {str} Raw path text entered at the setup prompt.
+- @return {str} Path text with home-directory references resolved.
+- @satisfies REQ-265
+
+### fn `def setup() -> None` (L4732-4931)
 - @brief Execute setup.
 - @details Prompts dedicated provider-activation section first, then prompts `idle_delay_seconds`, `api_call_delay_milliseconds`, `api_call_timeout_milliseconds`, `default_retry_after_seconds`, `gnome_refresh_interval_seconds`, and `billing_data` in order, then prompts dedicated Copilot overage pricing field `copilot_extra_premium_request_cost` (USD/request), then prompts provider currency symbols including `geminiai` (choices: `$`, `£`, `€`, default `$`), then persists all values to `~/.config/aibar/config.json`. Final setup section configures logging flags (`log_enabled`, `debug_enabled`). GeminiAI credential source supports `skip`, `file`, and `paste`; the source accepts a Google service-account key JSON (field `type=service_account`, validated on `project_id`, `private_key`, and `client_email`) and persists the document verbatim to `~/.config/aibar/geminiai_service_account.json`. Also prompts for provider API keys and writes them to `~/.config/aibar/env`.
 - @return {None} Function return value.
@@ -1436,7 +1443,7 @@ line.
 - @satisfies REQ-059
 - @satisfies REQ-257
 
-### fn `def login(provider: str | None) -> None` (L5116-5144)
+### fn `def login(provider: str | None) -> None` (L5131-5159)
 - @brief Execute provider login dispatch.
 - @details With `--provider`, executes the single provider login flow and prints diagnostics with non-zero exit for unsupported provider values. Without `--provider`, delegates to `_login_error_state_providers(...)` so only login-capable providers whose cached last-attempt status is `FAIL` are re-authenticated (the former default `copilot` fallback is removed).
 - @param provider {str | None} Optional provider selector (`copilot`, `geminiai`); `None` selects cached error-state providers.
@@ -1447,18 +1454,18 @@ line.
 - @satisfies REQ-174
 - @satisfies REQ-175
 
-### fn `def _login_copilot() -> None` `priv` (L5145-5172)
+### fn `def _login_copilot() -> None` `priv` (L5160-5187)
 - @brief Execute login copilot.
 - @details Applies login copilot logic for AIBar runtime behavior with explicit input/output contracts and deterministic side effects.
 - @return {None} Function return value.
 
-### fn `def _login_geminiai() -> None` `priv` (L5173-5197)
+### fn `def _login_geminiai() -> None` `priv` (L5188-5212)
 - @brief Print the GeminiAI service-account authentication guidance.
 - @details GeminiAI authenticates exclusively through the service-account key JSON persisted by `aibar setup`; no interactive OAuth authorization flow exists, so the command prints an informational message and returns with exit status 0.
 - @return {None} Function return value.
 - @satisfies REQ-261
 
-### fn `def _select_login_error_providers() -> list[ProviderName]` `priv` (L5204-5233)
+### fn `def _select_login_error_providers() -> list[ProviderName]` `priv` (L5219-5248)
 - @brief Select login-capable providers whose cached last-attempt status is FAIL.
 - @details Reads `~/.cache/aibar/cache.json` through the locked `load_cli_cache` reader, extracts the canonical `status` section via `_cache_status_section(...)`, and returns one registry-ordered entry per login-capable provider carrying at least one cached window status with `result == "FAIL"`. Providers whose cached window statuses are all `OK` or absent are skipped (REQ-173). Missing, corrupt, or empty cache documents yield an empty selection.
 - @return {list[ProviderName]} Registry-ordered login-capable providers in error state.
@@ -1466,7 +1473,7 @@ line.
 - @satisfies REQ-172
 - @satisfies REQ-173
 
-### fn `def _login_error_state_providers() -> None` `priv` (L5234-5279)
+### fn `def _login_error_state_providers() -> None` `priv` (L5249-5294)
 - @brief Re-authenticate login-capable providers currently in cached error state.
 - @details Selects cached `result=FAIL` login-capable providers via `_select_login_error_providers(...)`. An empty selection prints one informational message and returns with exit status 0 (REQ-174). Each selected provider executes its login flow sequentially in registry order (REQ-172); `SystemExit` raised by a failed flow and any flow exception are captured per provider so remaining providers still execute. When at least one flow fails, one `ClickException` forces a non-zero exit after all flows complete (REQ-175).
 - @return {None} Function return value.
@@ -1475,7 +1482,7 @@ line.
 - @satisfies REQ-174
 - @satisfies REQ-175
 
-### fn `def _resolve_extension_target_dir() -> Path` `priv` (L5280-5301)
+### fn `def _resolve_extension_target_dir() -> Path` `priv` (L5295-5316)
 - @brief Resolve the GNOME Shell extension installation target directory.
 - @details Returns `Path(AIBAR_EXT_TARGET_DIR)` when that environment override is set to a non-blank value, otherwise returns the module-level canonical target `~/.local/share/gnome-shell/extensions/aibar@aibar.panel` read at call time so per-test monkeypatching of `_EXT_TARGET_DIR` stays effective. The override lets isolated executions (unit-test suites, CI jobs) guarantee that no install/update/remove operation can mutate the developer's real extension directory (REQ-026, REQ-081).
 - @return {Path} Absolute extension target directory candidate.
@@ -1484,7 +1491,7 @@ line.
 - @satisfies REQ-026
 - @satisfies REQ-081
 
-### fn `def _validate_extension_metadata(metadata_path: Path) -> str | None` `priv` (L5302-5342)
+### fn `def _validate_extension_metadata(metadata_path: Path) -> str | None` `priv` (L5317-5357)
 - @brief Validate one GNOME Shell extension `metadata.json` document.
 - @details Decodes `metadata_path` as UTF-8 JSON and enforces the GNOME Shell load contract: the root node MUST be a JSON object, `uuid` MUST be a non-empty string, and `shell-version` MUST be a non-empty array of non-empty strings. Every failure mode (missing file, unreadable file, invalid JSON, contract violation) returns one deterministic diagnostic instead of raising, so `gnome_install` can abort before `os.makedirs`, `shutil.copy2`, `gnome-extensions disable`, or `gnome-extensions enable` execute. This prevents a source tree with placeholder metadata (`{}`) from overwriting a valid installed extension and making it unloadable (REQ-027, REQ-029).
 - @param metadata_path {Path} Candidate extension metadata file path.
@@ -1494,13 +1501,13 @@ line.
 - @satisfies REQ-027
 - @satisfies REQ-030
 
-### fn `def _resolve_extension_source_dir() -> Path` `priv` (L5343-5355)
+### fn `def _resolve_extension_source_dir() -> Path` `priv` (L5358-5370)
 - @brief Resolve GNOME extension source directory from within the `aibar` package.
 - @details Uses `Path(__file__).resolve().parent` to locate the `aibar` package directory, then appends `gnome-extension/<UUID>/`. Works in development (editable install), wheel-installed, and `uv tool install` layouts because the extension directory resides inside the `aibar` Python package subtree.
 - @return {Path} Absolute path to the extension source directory.
 - @satisfies REQ-025, REQ-083
 
-### fn `def gnome_install() -> None` (L5366-5502)
+### fn `def gnome_install() -> None` (L5381-5517)
 - @brief Install or update the AIBar GNOME Shell extension to the user's local extensions directory.
 - @details Resolves extension source from the installed package path, validates source directory contains `metadata.json` and is non-empty, validates the metadata document against the GNOME Shell load contract (`uuid`, `shell-version`) before any target mutation, then executes one of two flows: install flow (`target` absent) creates target and copies files before enabling extension; update flow (`target` present) disables extension, copies files, then enables extension. The target directory resolves through `_resolve_extension_target_dir`, so an `AIBAR_EXT_TARGET_DIR` override keeps isolated executions away from the real user extension directory. Update flow masks non-zero disable outcomes caused by missing extension and continues. Produces colored Click-styled terminal output for all status messages.
 - @return {None} Function return value.
@@ -1508,7 +1515,7 @@ line.
 - @see _validate_extension_metadata
 - @satisfies PRJ-008, REQ-025, REQ-026, REQ-027, REQ-028, REQ-029, REQ-030, REQ-032, REQ-099
 
-### fn `def gnome_uninstall() -> None` (L5512-5583)
+### fn `def gnome_uninstall() -> None` (L5527-5598)
 - @brief Remove the AIBar GNOME Shell extension from the user's local extensions directory.
 - @details Disables the extension via `gnome-extensions disable`, then removes the entire extension directory resolved by `_resolve_extension_target_dir` (canonical `~/.local/share/gnome-shell/extensions/aibar@aibar.panel/`, overridable through `AIBAR_EXT_TARGET_DIR`). Exits with code 1 if the extension directory does not exist. Produces colored Click-styled terminal output for all status messages.
 - @return {None} Function return value.
@@ -1649,17 +1656,18 @@ line.
 |`_progress_bar`|fn|priv|4617-4641|def _progress_bar(percent: float, provider_name: Provider...|
 |`doctor`|fn|pub|4646-4701|def doctor() -> None|
 |`env`|fn|pub|4706-4714|def env() -> None|
-|`setup`|fn|pub|4719-4918|def setup() -> None|
-|`login`|fn|pub|5116-5144|def login(provider: str | None) -> None|
-|`_login_copilot`|fn|priv|5145-5172|def _login_copilot() -> None|
-|`_login_geminiai`|fn|priv|5173-5197|def _login_geminiai() -> None|
-|`_select_login_error_providers`|fn|priv|5204-5233|def _select_login_error_providers() -> list[ProviderName]|
-|`_login_error_state_providers`|fn|priv|5234-5279|def _login_error_state_providers() -> None|
-|`_resolve_extension_target_dir`|fn|priv|5280-5301|def _resolve_extension_target_dir() -> Path|
-|`_validate_extension_metadata`|fn|priv|5302-5342|def _validate_extension_metadata(metadata_path: Path) -> ...|
-|`_resolve_extension_source_dir`|fn|priv|5343-5355|def _resolve_extension_source_dir() -> Path|
-|`gnome_install`|fn|pub|5366-5502|def gnome_install() -> None|
-|`gnome_uninstall`|fn|pub|5512-5583|def gnome_uninstall() -> None|
+|`_expand_user_home_path`|fn|priv|4715-4727|def _expand_user_home_path(raw_path: str) -> str|
+|`setup`|fn|pub|4732-4931|def setup() -> None|
+|`login`|fn|pub|5131-5159|def login(provider: str | None) -> None|
+|`_login_copilot`|fn|priv|5160-5187|def _login_copilot() -> None|
+|`_login_geminiai`|fn|priv|5188-5212|def _login_geminiai() -> None|
+|`_select_login_error_providers`|fn|priv|5219-5248|def _select_login_error_providers() -> list[ProviderName]|
+|`_login_error_state_providers`|fn|priv|5249-5294|def _login_error_state_providers() -> None|
+|`_resolve_extension_target_dir`|fn|priv|5295-5316|def _resolve_extension_target_dir() -> Path|
+|`_validate_extension_metadata`|fn|priv|5317-5357|def _validate_extension_metadata(metadata_path: Path) -> ...|
+|`_resolve_extension_source_dir`|fn|priv|5358-5370|def _resolve_extension_source_dir() -> Path|
+|`gnome_install`|fn|pub|5381-5517|def gnome_install() -> None|
+|`gnome_uninstall`|fn|pub|5527-5598|def gnome_uninstall() -> None|
 
 
 ---

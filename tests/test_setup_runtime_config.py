@@ -567,3 +567,220 @@ def test_setup_rejects_oauth_client_json_as_gemini_credential(
     assert runtime_doc["geminiai_project_id"] is None
     assert runtime_doc["log_enabled"] is False
     assert runtime_doc["debug_enabled"] is True
+
+
+def test_setup_resolves_home_references_in_service_account_key_path(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """
+    @brief Verify setup expands `~` and `$HOME` references in the key file path.
+    @details Patches `HOME` to the temporary directory, writes the synthetic
+    service-account key under `<tmp-home>/Desktop`, and answers the path prompt
+    with a `~`-prefixed path in one run and a `$HOME`-prefixed path in a second
+    run; asserts both runs read the key document and persist it verbatim.
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @param tmp_path {Path} Temporary path fixture.
+    @return {None} Function return value.
+    @satisfies REQ-265
+    @satisfies TST-118
+    """
+    config_dir = _patch_config_paths(monkeypatch, tmp_path)
+    from aibar.providers import geminiai as geminiai_module
+
+    service_account_path = config_dir / "geminiai_service_account.json"
+    monkeypatch.setattr(
+        geminiai_module, "GEMINIAI_SERVICE_ACCOUNT_PATH", service_account_path
+    )
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    key_relative_posix = "Desktop/gen-lang-client-0834428245-21e85e6435de.json"
+    key_source_path = tmp_path / key_relative_posix
+    key_source_path.parent.mkdir(parents=True, exist_ok=True)
+    service_account_payload = _build_synthetic_service_account_payload()
+    key_source_path.write_text(json.dumps(service_account_payload), encoding="utf-8")
+
+    for raw_path_input in (f"~/{key_relative_posix}", f"$HOME/{key_relative_posix}"):
+        service_account_path.unlink(missing_ok=True)
+        responses = iter(
+            [
+                "enable",
+                "enable",
+                "enable",
+                "enable",
+                "enable",
+                "enable",
+                "enable",
+                "enable",
+                300,
+                1000,
+                5000,
+                3600,
+                60,
+                "billing_data",
+                0.04,
+                "$",
+                "$",
+                "$",
+                "$",
+                "$",
+                "$",
+                "$",
+                "file",
+                raw_path_input,
+                ...,  # project-id prompt: accept the derived default
+                "",
+                "",
+                "",
+                "",
+                "",
+                "enable",
+                "disable",
+            ]
+        )
+
+        def _fake_prompt(
+            text: str,
+            default=None,
+            show_default: bool = True,
+            type=None,
+            **kwargs,
+        ):
+            """
+            @brief Return deterministic prompt responses for the home-path flow.
+            @details The Ellipsis response marker resolves to the prompt default so the
+            derived project-id default supplied by setup is accepted verbatim.
+            @param text {str} Prompt label.
+            @param default {object | None} Prompt default value.
+            @param show_default {bool} Flag indicating default rendering behavior.
+            @param type {object | None} Optional click type.
+            @return {object} Predetermined prompt response value.
+            """
+            del text, show_default, type, kwargs
+            response = next(responses)
+            if response is ...:
+                return default
+            return response
+
+        monkeypatch.setattr("aibar.cli.click.prompt", _fake_prompt)
+
+        runner = CliRunner()
+        result = runner.invoke(main, ["setup"])
+        assert result.exit_code == 0, result.output
+        assert "Service-account file error" not in result.output
+
+        assert service_account_path.exists()
+        persisted_doc = json.loads(service_account_path.read_text(encoding="utf-8"))
+        assert persisted_doc == service_account_payload
+
+        runtime_doc = json.loads(
+            (config_dir / "config.json").read_text(encoding="utf-8")
+        )
+        assert runtime_doc["geminiai_project_id"] == "gen-lang-client-0834428245"
+
+
+def test_setup_reprompts_service_account_key_path_after_read_or_decode_failure(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """
+    @brief Verify setup re-prompts the key path after read and decode failures.
+    @details Answers the path prompt first with a nonexistent path (read failure),
+    then with a non-JSON file (decode failure), and finally with a valid key file;
+    asserts both failure diagnostics are printed, the path prompt is presented
+    three times, and setup persists the key document and exits 0.
+    @param monkeypatch {_pytest.monkeypatch.MonkeyPatch} Pytest monkeypatch fixture.
+    @param tmp_path {Path} Temporary path fixture.
+    @return {None} Function return value.
+    @satisfies REQ-266
+    @satisfies TST-119
+    """
+    config_dir = _patch_config_paths(monkeypatch, tmp_path)
+    from aibar.providers import geminiai as geminiai_module
+
+    service_account_path = config_dir / "geminiai_service_account.json"
+    monkeypatch.setattr(
+        geminiai_module, "GEMINIAI_SERVICE_ACCOUNT_PATH", service_account_path
+    )
+
+    invalid_json_path = tmp_path / "not-json-gen-lang-client-key.json"
+    invalid_json_path.write_text("not-json{", encoding="utf-8")
+    key_source_path = tmp_path / "valid-gen-lang-client-key.json"
+    service_account_payload = _build_synthetic_service_account_payload()
+    key_source_path.write_text(json.dumps(service_account_payload), encoding="utf-8")
+
+    prompts: list[str] = []
+    responses = iter(
+        [
+            "enable",
+            "enable",
+            "enable",
+            "enable",
+            "enable",
+            "enable",
+            "enable",
+            "enable",
+            300,
+            1000,
+            5000,
+            3600,
+            60,
+            "billing_data",
+            0.04,
+            "$",
+            "$",
+            "$",
+            "$",
+            "$",
+            "$",
+            "$",
+            "file",
+            str(tmp_path / "missing-gen-lang-client-key.json"),
+            str(invalid_json_path),
+            str(key_source_path),
+            ...,  # project-id prompt: accept the derived default
+            "",
+            "",
+            "",
+            "",
+            "",
+            "enable",
+            "disable",
+        ]
+    )
+
+    def _fake_prompt(
+        text: str,
+        default=None,
+        show_default: bool = True,
+        type=None,
+        **kwargs,
+    ):
+        """
+        @brief Record prompt labels and return deterministic responses.
+        @details The Ellipsis response marker resolves to the prompt default so the
+        derived project-id default supplied by setup is accepted verbatim.
+        @param text {str} Prompt label appended to the shared recorder list.
+        @param default {object | None} Prompt default value.
+        @param show_default {bool} Flag indicating default rendering behavior.
+        @param type {object | None} Optional click type.
+        @return {object} Predetermined prompt response value.
+        """
+        prompts.append(text)
+        response = next(responses)
+        if response is ...:
+            return default
+        return response
+
+    monkeypatch.setattr("aibar.cli.click.prompt", _fake_prompt)
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["setup"])
+    assert result.exit_code == 0, result.output
+    assert "Service-account file error" in result.output
+    assert "Service-account JSON decode error" in result.output
+    assert prompts.count("  geminiai service-account key json path") == 3
+
+    assert service_account_path.exists()
+    persisted_doc = json.loads(service_account_path.read_text(encoding="utf-8"))
+    assert persisted_doc == service_account_payload
