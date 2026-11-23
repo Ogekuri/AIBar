@@ -1,11 +1,22 @@
 # Changelog
 
-## [0.60.2](https://github.com/Ogekuri/AIBar/compare/v0.60.0..v0.60.2) - 2026-11-13
+## [0.61.0](https://github.com/Ogekuri/AIBar/compare/v0.60.0..v0.61.0) - 2026-11-23
+### ⛰️  Features
+- Update .galias.conf file.
+
 ### 🐛  Bug Fixes
 - hide unpopulated DeepSeek card cost row [useReq] *(gnome-extension)*
   GNOME DeepSeek provider card no longer renders 'Costs:' when metrics.cost is null; Number(null) previously collapsed to 0 and printed an unpopulated value (REQ-246, REQ-252).; Cost row now requires a provider cost dimension plus a non-null finite metrics.cost; Copilot fallback overage behavior unchanged.; Add HDT Level 1 reproducer fixture tests/fixtures/deepseek-card-cost.cjs and pytest wrapper asserting the hidden cost row plus visible Balance/Topped up/Granted rows.; Update WORKFLOW.md and REFERENCES.md for the changed card projection contract.
 
 ### 🚜  Changes
+- add service-account auth mode and refresh diagnostics [useReq] *(geminiai)*
+  Add REQ-257..263: setup detects type=service_account GeminiAI key JSON
+  from file/paste sources and persists geminiai_service_account.json;
+  provider fetch prefers service-account credentials with OAuth fallback
+  and accepts the key project_id; login skips OAuth when the service
+  account is active; OAuth refresh failures now name the consent-screen
+  Testing publishing status cause and the production-publishing or
+  re-login remedies. Docs: REQUIREMENTS/WORKFLOW/REFERENCES updated.
 - run gnome-install of the newly installed version after successful --upgrade [useReq] *(cli)*
   Requirements: add REQ-254/REQ-255/REQ-256 and TST-114 for the post-upgrade GNOME extension sync.; Source: _handle_upgrade_option now executes _run_post_upgrade_gnome_install after a zero install exit status, spawning the aibar console script re-resolved from PATH with the gnome-install subcommand and propagating its exit status.; Docs: refresh WORKFLOW.md runtime model and regenerate REFERENCES.md.
 
@@ -1596,7 +1607,7 @@
 - \[0.58.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.58.0
 - \[0.59.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.59.0
 - \[0.60.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.60.0
-- \[0.60.2\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.60.2
+- \[0.61.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.61.0
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1658,4 +1669,4 @@
 [0.58.0]: https://github.com/Ogekuri/AIBar/compare/v0.57.0..v0.58.0
 [0.59.0]: https://github.com/Ogekuri/AIBar/compare/v0.58.0..v0.59.0
 [0.60.0]: https://github.com/Ogekuri/AIBar/compare/v0.59.0..v0.60.0
-[0.60.2]: https://github.com/Ogekuri/AIBar/compare/v0.60.0..v0.60.2
+[0.61.0]: https://github.com/Ogekuri/AIBar/compare/v0.60.0..v0.61.0
