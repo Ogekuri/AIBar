@@ -1,7 +1,14 @@
 # Changelog
 
-## [0.61.2](https://github.com/Ogekuri/AIBar/compare/v0.61.0..v0.61.2) - 2026-11-23
+## [0.61.3](https://github.com/Ogekuri/AIBar/compare/v0.61.0..v0.61.3) - 2026-11-27
+### 🐛  Bug Fixes
+- render show panels with rounded borders and double-line header separator [useReq] *(cli)*
+  Align _emit_provider_panel with REQ-267/REQ-268: rounded corners and double-line title/body separator for aibar show text-mode panels.; Add failing-first reproducer test for show panel border contract; update strictly related border assertions.; Update WORKFLOW.md renderer node and regenerate REFERENCES.md.
+- Update .gitignore file.
+
 ### 🚜  Changes
+- render tables with rounded borders and double-line header separator [useReq] *(config_cli)*
+  Add REQ-267/REQ-268 to usereq/docs/REQUIREMENTS.md: every generated table uses rounded corners and the double-line header separator.; Update format_config_table in src/aibar/aibar/config_cli.py to emit rounded top/bottom borders and the double-line header separator.; Realign table golden assertions and frame-character validators in tests to the new table contract.; Update WORKFLOW.md renderer nodes and regenerate REFERENCES.md.
 - expand ~ and $HOME in service-account key path and re-prompt on error [useReq] *(setup)*
   Add _expand_user_home_path helper: setup resolves leading ~/~user and $HOME references in the GeminiAI service-account key file path before reading (REQ-265).; Setup file branch now re-prompts the key path after file read or JSON decode failures until a readable JSON document is provided (REQ-266).; Add requirements TST-118/TST-119 with HDT tests covering ~/$HOME resolution and read/decode re-prompt recovery.; Refresh WORKFLOW call-trace and REFERENCES symbol inventory.
 - BREAKING CHANGE: remove OAuth auth, keep service-account JSON credentials [useReq] *(geminiai)*
@@ -1615,7 +1622,7 @@
 - \[0.59.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.59.0
 - \[0.60.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.60.0
 - \[0.61.0\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.61.0
-- \[0.61.2\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.61.2
+- \[0.61.3\]: https://github.com/Ogekuri/AIBar/releases/tag/v0.61.3
 
 [0.1.0]: https://github.com/Ogekuri/AIBar/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Ogekuri/AIBar/compare/v0.1.0..v0.2.0
@@ -1678,4 +1685,4 @@
 [0.59.0]: https://github.com/Ogekuri/AIBar/compare/v0.58.0..v0.59.0
 [0.60.0]: https://github.com/Ogekuri/AIBar/compare/v0.59.0..v0.60.0
 [0.61.0]: https://github.com/Ogekuri/AIBar/compare/v0.60.0..v0.61.0
-[0.61.2]: https://github.com/Ogekuri/AIBar/compare/v0.61.0..v0.61.2
+[0.61.3]: https://github.com/Ogekuri/AIBar/compare/v0.61.0..v0.61.3
