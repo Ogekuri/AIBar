@@ -13,7 +13,7 @@ from unittest.mock import MagicMock
 from click.testing import CliRunner
 
 from aibar.cli import RetrievalPipelineOutput, main
-from aibar.cli import _print_result
+from aibar.cli import _emit_provider_panel, _print_result
 from aibar.config import RuntimeConfig
 from aibar.providers.base import (
     ProviderName,
@@ -49,7 +49,7 @@ def _extract_panel_titles_and_bodies(output: str) -> list[tuple[str, list[str]]]
     index = 0
     while index < len(lines):
         line = lines[index]
-        if not (line.startswith("┌") and line.endswith("┐")):
+        if not (line.startswith("╭") and line.endswith("╮")):
             index += 1
             continue
         if index + 2 >= len(lines):
@@ -60,7 +60,7 @@ def _extract_panel_titles_and_bodies(output: str) -> list[tuple[str, list[str]]]
         index += 3
         while index < len(lines):
             row = lines[index]
-            if row.startswith("└") and row.endswith("┘"):
+            if row.startswith("╰") and row.endswith("╯"):
                 break
             if row.startswith("│") and row.endswith("│"):
                 body.append(row[2:-2])
@@ -250,7 +250,7 @@ def test_show_uses_one_shared_panel_width_for_all_rendered_providers(
         if line.strip()
     ]
     top_borders = [
-        line for line in visible_lines if line.startswith("┌") and line.endswith("┐")
+        line for line in visible_lines if line.startswith("╭") and line.endswith("╮")
     ]
     assert len(top_borders) == 2
     assert len({len(line) for line in top_borders}) == 1
@@ -262,6 +262,39 @@ def test_show_uses_one_shared_panel_width_for_all_rendered_providers(
     assert "█" not in openai_usage_row
     assert "░" not in openai_usage_row
     assert "▓" not in openai_usage_row
+
+
+def test_show_panels_render_rounded_borders_and_double_header_separator(capsys) -> None:
+    """
+    @brief Verify provider panels use rounded borders and a double-line header separator.
+    @details Reproduces the border-rule defect for `aibar show` text-mode panels:
+    the panel frame MUST use rounded corners `╭`/`╮`/`╰`/`╯` and the title/body
+    separator MUST be the double-line border `╞` + `═` fills + `╡` per REQ-267
+    and REQ-268; square single-line glyphs are forbidden.
+    @param capsys {_pytest.capture.CaptureFixture} Stdout/stderr capture fixture.
+    @return {None} Function return value.
+    @satisfies REQ-267
+    @satisfies REQ-268
+    @satisfies REQ-067
+    """
+    _emit_provider_panel(
+        ProviderName.AGY,
+        "Antigravity",
+        ["Status: OK", "Usage: 30d [██████████] 10.0%"],
+    )
+    output = capsys.readouterr().out
+    lines = [
+        _strip_ansi_sequences(line) for line in output.splitlines() if line.strip()
+    ]
+    assert lines, "Panel output MUST NOT be empty."
+    assert lines[0].startswith("╭") and lines[0].endswith("╮")
+    assert any(
+        line.startswith("╞") and line.endswith("╡") and set(line[1:-1]) == {"═"}
+        for line in lines
+    ), "Panel MUST separate title and body with the double-line separator."
+    assert lines[-1].startswith("╰") and lines[-1].endswith("╯")
+    for forbidden in ("┌", "├", "└"):
+        assert forbidden not in "".join(lines)
 
 
 def test_show_default_window_groups_dual_windows_into_one_panel_per_provider(

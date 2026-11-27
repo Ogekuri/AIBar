@@ -3758,13 +3758,18 @@ def _emit_provider_panel(
     @brief Render provider-colored ANSI bordered output panel with wrapped content lines.
     @details Creates fixed-width terminal panels aligned with GNOME extension
     card layout, preserving deterministic borders and line wrapping behavior.
-    Border and title color use provider-specific ANSI palette.
+    The panel frame follows the generated-table border contract: rounded
+    corners `╭`/`╮`/`╰`/`╯` and the title/body separator rendered as the
+    double-line border `╞` + `═` fills + `╡` (REQ-267, REQ-268). Border and
+    title color use provider-specific ANSI palette.
     @param provider_name {ProviderName} Provider enum key.
     @param title {str} Panel header text.
     @param body_lines {list[str]} Content lines rendered in panel body.
     @param content_width {int | None} Shared content width override for this panel.
     @return {None} Function return value.
     @satisfies REQ-067
+    @satisfies REQ-267
+    @satisfies REQ-268
     """
     color_code = _provider_panel_color_code(provider_name)
     wrap_width = _SHOW_PANEL_MAX_WIDTH - 4
@@ -3776,13 +3781,14 @@ def _emit_provider_panel(
             max(_SHOW_PANEL_MIN_WIDTH - 4, content_width), wrap_width
         )
     horizontal_border = "─" * (panel_content_width + 2)
-    click.echo(f"{color_code}┌{horizontal_border}┐{_ANSI_RESET}")
+    header_separator_border = "═" * (panel_content_width + 2)
+    click.echo(f"{color_code}╭{horizontal_border}╮{_ANSI_RESET}")
     click.echo(
         f"{color_code}│{_ANSI_RESET} "
         f"{color_code}{_ansi_ljust(title, panel_content_width)}{_ANSI_RESET} "
         f"{color_code}│{_ANSI_RESET}"
     )
-    click.echo(f"{color_code}├{horizontal_border}┤{_ANSI_RESET}")
+    click.echo(f"{color_code}╞{header_separator_border}╡{_ANSI_RESET}")
     for body_line in wrapped_lines:
         padded_line = (
             _ansi_rjust(body_line, panel_content_width)
@@ -3792,7 +3798,7 @@ def _emit_provider_panel(
         click.echo(
             f"{color_code}│{_ANSI_RESET} {padded_line} {color_code}│{_ANSI_RESET}"
         )
-    click.echo(f"{color_code}└{horizontal_border}┘{_ANSI_RESET}")
+    click.echo(f"{color_code}╰{horizontal_border}╯{_ANSI_RESET}")
     click.echo()
 
 

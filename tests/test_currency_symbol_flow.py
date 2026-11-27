@@ -242,8 +242,8 @@ class TestCliPrintResultUsesCurrencySymbol:
         _print_result(ProviderName.AGY, result)
         captured = capsys.readouterr()
 
-        assert "┌" in captured.out
-        assert "└" in captured.out
+        assert "╭" in captured.out
+        assert "╰" in captured.out
         assert "Usage:" in captured.out
         assert "█" in captured.out
         assert "Updated:" in captured.out
