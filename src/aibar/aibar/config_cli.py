@@ -542,17 +542,23 @@ def format_config_table(
     headers: Sequence[str], rows: Sequence[Sequence[str]]
 ) -> tuple[str, ...]:
     """
-    @brief Render one rectangular box-drawing table.
+    @brief Render one rectangular box-drawing table with rounded borders.
     @details Column widths are measured from the header and every escaped cell,
-    then shared by all border and row lines so `│`, `┬`, `┼`, and `┴`
-    characters align on one boundary set. Every line is a single logical line
-    that the tree renderer prefixes with the owner detail prefix.
+    then shared by all border and row lines so the rounded corners `╭`, `╮`,
+    `╰`, `╯`, the vertical `│`, the top/bottom junctions `┬`/`┴`, and the
+    double-line separator junction `╪` align on one boundary set. The header
+    row is separated from body rows by the double-line separator border
+    `╞` + `═` fills + `╪` junctions + `╡` (REQ-268); top and bottom borders
+    use `─` fills (REQ-267). Every line is a single logical line that the
+    tree renderer prefixes with the owner detail prefix.
     @param headers {Sequence[str]} Column header texts.
     @param rows {Sequence[Sequence[str]]} Escaped cell rows, one entry per column.
     @return {tuple[str, ...]} Table lines from top border to bottom border.
     @throws {ValueError} When a row does not match the header column count.
     @satisfies REQ-233
     @satisfies REQ-234
+    @satisfies REQ-267
+    @satisfies REQ-268
     """
     column_count = len(headers)
     for row in rows:
@@ -570,14 +576,14 @@ def format_config_table(
         )
         return f"{TREE_VERTICAL}{TREE_VERTICAL.join(padded)}{TREE_VERTICAL}"
 
-    def render_border(left: str, junction: str, right: str) -> str:
-        segments = ("─" * (width + 2) for width in widths)
+    def render_border(left: str, junction: str, right: str, fill: str = "─") -> str:
+        segments = (fill * (width + 2) for width in widths)
         return f"{left}{junction.join(segments)}{right}"
 
-    lines = [render_border("┌", "┬", "┐"), render_cells(tuple(headers))]
-    lines.append(render_border("├", "┼", "┤"))
+    lines = [render_border("╭", "┬", "╮"), render_cells(tuple(headers))]
+    lines.append(render_border("╞", "╪", "╡", fill="═"))
     lines.extend(render_cells(tuple(row)) for row in rows)
-    lines.append(render_border("└", "┴", "┘"))
+    lines.append(render_border("╰", "┴", "╯"))
     return tuple(lines)
 
 

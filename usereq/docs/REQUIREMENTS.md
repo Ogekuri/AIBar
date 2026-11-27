@@ -404,6 +404,8 @@ Performance note: explicit caching optimization uses persistent CLI cache (`~/.c
 - **REQ-236**: MUST abort at import time when the shared configuration schema field set diverges from `RuntimeConfig` model fields.
 - **REQ-237**: MUST list `--print`, `--info`, `--print-raw`, `--get`, `--set`, and `--unset` in `aibar --help` with complete canonical path examples.
 - **REQ-238**: MUST emit every configuration CLI identifier, description, help text, diagnostic, and rendered value in English.
+- **REQ-267**: MUST render every generated table with rounded corners `╭`, `╮`, `╰`, `╯`, `│` vertical borders, `─` fills, and `┬`/`┴` junctions on top/bottom borders.
+- **REQ-268**: MUST render every generated table header separator as `╞` left cap, `═` fills, `╪` column junctions, and `╡` right cap.
 
 ### 3.7 DeepSeek Provider
 - **REQ-239**: MUST implement provider `deepseek` that fetches `https://api.deepseek.com/user/balance` with `Authorization: Bearer <key>` and `Accept: application/json` headers.

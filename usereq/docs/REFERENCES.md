@@ -2046,7 +2046,7 @@ Invalid map entries are skipped.
 
 ---
 
-# config_cli.py | Python | 1562L | 71 symbols | 14 imports | 56 comments
+# config_cli.py | Python | 1568L | 71 symbols | 14 imports | 56 comments
 > Path: `src/aibar/aibar/config_cli.py`
 - @brief Schema-driven configuration CLI subsystem for aibar.
 - @details Defines the single canonical configuration schema, canonical path
@@ -2236,24 +2236,30 @@ prefix; `children` are real configuration nodes only.
 
 ### fn `def format_config_table(` (L541-542)
 
-### fn `def render_cells(cells: Sequence[str]) -> str` (L566-572)
-- @brief Render one rectangular box-drawing table.
+### fn `def render_cells(cells: Sequence[str]) -> str` (L572-578)
+- @brief Render one rectangular box-drawing table with rounded borders.
 - @details Column widths are measured from the header and every escaped cell,
-then shared by all border and row lines so `│`, `┬`, `┼`, and `┴`
-characters align on one boundary set. Every line is a single logical line
-that the tree renderer prefixes with the owner detail prefix.
+then shared by all border and row lines so the rounded corners `╭`, `╮`,
+`╰`, `╯`, the vertical `│`, the top/bottom junctions `┬`/`┴`, and the
+double-line separator junction `╪` align on one boundary set. The header
+row is separated from body rows by the double-line separator border
+`╞` + `═` fills + `╪` junctions + `╡` (REQ-268); top and bottom borders
+use `─` fills (REQ-267). Every line is a single logical line that the
+tree renderer prefixes with the owner detail prefix.
 - @param headers {Sequence[str]} Column header texts.
 - @param rows {Sequence[Sequence[str]]} Escaped cell rows, one entry per column.
 - @return {tuple[str, ...]} Table lines from top border to bottom border.
 - @throws {ValueError} When a row does not match the header column count.
 - @satisfies REQ-233
 - @satisfies REQ-234
+- @satisfies REQ-267
+- @satisfies REQ-268
 
-### fn `def render_border(left: str, junction: str, right: str) -> str` (L573-576)
+### fn `def render_border(left: str, junction: str, right: str, fill: str = "─") -> str` (L579-582)
 
-### fn `def validate_schema_value(` (L584-585)
+### fn `def validate_schema_value(` (L590-591)
 
-### fn `def _validate_scalar_value(` `priv` (L633-638)
+### fn `def _validate_scalar_value(` `priv` (L639-644)
 - @brief Validate one configuration value against its schema parameter.
 - @details Map values are validated as JSON objects with string keys and
 per-entry value domains; scalar values are validated by type, minimum,
@@ -2266,7 +2272,7 @@ non-empty, and selection-domain constraints.
 - @satisfies REQ-208
 - @satisfies REQ-212
 
-### fn `def validate_config_document(document: Any) -> None` (L707-740)
+### fn `def validate_config_document(document: Any) -> None` (L713-746)
 - @brief Validate one scalar value against a schema kind.
 - @brief Validate one complete configuration document against the schema.
 - @details Rejects non-object roots, fields absent from `RuntimeConfig`, and values violating declared constraints, then confirms the document against the `RuntimeConfig` model. Missing fields are accepted because defaults apply at load time.
@@ -2283,25 +2289,25 @@ non-empty, and selection-domain constraints.
 - @satisfies REQ-208
 - @satisfies REQ-209
 
-### fn `def configuration_file_path() -> Path` (L741-752)
+### fn `def configuration_file_path() -> Path` (L747-758)
 - @brief Resolve the global configuration file path.
 - @details Resolves the module-level `RUNTIME_CONFIG_PATH` at call time so the configuration CLI always targets `~/.config/aibar/config.json`; the application defines no project-local configuration layer.
 - @return {Path} Absolute global configuration file path.
 - @satisfies REQ-205
 
-### fn `def display_configuration_path(path: Path) -> str` (L753-766)
+### fn `def display_configuration_path(path: Path) -> str` (L759-772)
 - @brief Render one configuration path with a `~` home abbreviation.
 - @param path {Path} Absolute configuration path.
 - @return {str} Display path text.
 - @satisfies REQ-238
 
-### fn `def schema_default_document() -> dict[str, Any]` (L767-777)
+### fn `def schema_default_document() -> dict[str, Any]` (L773-783)
 - @brief Build the default configuration document from the schema.
 - @details Uses `RuntimeConfig` model defaults so bootstrap content matches the canonical schema exactly.
 - @return {dict[str, Any]} JSON-compatible default document.
 - @satisfies REQ-206
 
-### fn `def load_config_document(*, create_if_missing: bool) -> dict[str, Any]` (L778-820)
+### fn `def load_config_document(*, create_if_missing: bool) -> dict[str, Any]` (L784-826)
 - @brief Load and strictly validate the global configuration document.
 - @details Creates the configuration directory and file from schema defaults only when the file is absent and `create_if_missing` is true. Unparsable JSON, non-object roots, and schema-invalid documents raise instead of being rewritten.
 - @param create_if_missing {bool} Bootstrap the file when it is missing.
@@ -2311,7 +2317,7 @@ non-empty, and selection-domain constraints.
 - @satisfies REQ-207
 - @satisfies REQ-208
 
-### fn `def get_config_value(document: dict[str, Any], resolved: ResolvedConfigPath) -> Any` (L821-845)
+### fn `def get_config_value(document: dict[str, Any], resolved: ResolvedConfigPath) -> Any` (L827-851)
 - @brief Read one value addressed by a resolved canonical path.
 - @details Fields absent from the document resolve to schema defaults; a map key absent from the stored map is a path error.
 - @param document {dict[str, Any]} Validated configuration document.
@@ -2321,13 +2327,13 @@ non-empty, and selection-domain constraints.
 - @satisfies REQ-202
 - @satisfies REQ-209
 
-### fn `def _parse_json_text(raw_value: str) -> tuple[bool, Any]` `priv` (L846-858)
+### fn `def _parse_json_text(raw_value: str) -> tuple[bool, Any]` `priv` (L852-864)
 - @brief Attempt to decode one CLI value as JSON.
 - @param raw_value {str} Raw CLI argument text.
 - @return {tuple[bool, Any]} Pair `(is_json, decoded_value)`.
 - @satisfies REQ-210
 
-### fn `def parse_cli_value(resolved: ResolvedConfigPath, raw_value: str) -> Any` (L859-926)
+### fn `def parse_cli_value(resolved: ResolvedConfigPath, raw_value: str) -> Any` (L865-932)
 - @brief Parse one CLI value into the schema type of its target path.
 - @details JSON-parseable input must already match the target type. Non-JSON text is accepted as a literal string only for `String` and `Optional[String]` targets. Whole-map targets require one JSON object.
 - @param resolved {ResolvedConfigPath} Resolved canonical path.
@@ -2337,9 +2343,9 @@ non-empty, and selection-domain constraints.
 - @satisfies REQ-210
 - @satisfies REQ-211
 
-### fn `def set_config_value(` (L927-928)
+### fn `def set_config_value(` (L933-934)
 
-### fn `def unset_config_value(` (L956-957)
+### fn `def unset_config_value(` (L962-963)
 - @brief Apply one `--set` mutation to a copy of the configuration document.
 - @details Parses the CLI value into the schema type, replaces the addressed
 field or map entry, and validates the complete candidate document before it
@@ -2352,7 +2358,7 @@ is returned for persistence.
 - @satisfies REQ-208
 - @satisfies REQ-221
 
-### fn `def _persist_config_document(document: dict[str, Any]) -> None` `priv` (L991-1008)
+### fn `def _persist_config_document(document: dict[str, Any]) -> None` `priv` (L997-1014)
 - @brief Apply one `--unset` mutation to a copy of the configuration document.
 - @brief Persist one validated configuration document atomically.
 - @details Field resets remove the addressed field so schema defaults apply;
@@ -2370,9 +2376,9 @@ while missing map keys are rejected.
 - @satisfies REQ-212
 - @satisfies REQ-214
 
-### fn `def format_print_parameter(` (L1009-1010)
+### fn `def format_print_parameter(` (L1015-1016)
 
-### fn `def build_print_tree(` (L1069-1070)
+### fn `def build_print_tree(` (L1075-1076)
 - @brief Build one `--print` node for a configuration parameter.
 - @details Scalars render as JSON literals with a default/custom status suffix.
 Dynamic maps render an entry-count summary with a `Key | Value` table, or an
@@ -2384,7 +2390,7 @@ actionable empty-map hint without any table.
 - @satisfies REQ-229
 - @satisfies REQ-230
 
-### fn `def _selection_rows(spec: ConfigParamSpec) -> tuple[tuple[str, str, str], ...]` `priv` (L1113-1131)
+### fn `def _selection_rows(spec: ConfigParamSpec) -> tuple[tuple[str, str, str], ...]` `priv` (L1119-1137)
 - @brief Build the `--print` display tree for a whole document or one path.
 - @brief Build `Allowed Values` rows for one selection domain.
 - @details With no path the virtual root renders every schema parameter in
@@ -2400,9 +2406,9 @@ marker-free display root without invented ancestors.
 - @satisfies REQ-226
 - @satisfies REQ-232
 
-### fn `def format_selection_state_table(` (L1132-1133)
+### fn `def format_selection_state_table(` (L1138-1139)
 
-### fn `def build_info_parameter(spec: ConfigParamSpec) -> ConfigTreeNode` (L1155-1211)
+### fn `def build_info_parameter(spec: ConfigParamSpec) -> ConfigTreeNode` (L1161-1217)
 - @brief Render the `Sel | Value` table for one selection-typed value.
 - @brief Build one `--info` node documenting a configuration parameter.
 - @details Marks exactly one row with `[*]` for the active selection and every
@@ -2419,7 +2425,7 @@ formatter.
 - @satisfies REQ-232
 - @satisfies REQ-235
 
-### fn `def build_info_map_key(resolved: ResolvedConfigPath) -> ConfigTreeNode` (L1212-1259)
+### fn `def build_info_map_key(resolved: ResolvedConfigPath) -> ConfigTreeNode` (L1218-1265)
 - @brief Build one `--info` node documenting a dynamic map key.
 - @details Documents the resolved map-entry domain, its effective fallback, and the copyable `--set`/`--unset` commands for the concrete key.
 - @param resolved {ResolvedConfigPath} Resolved canonical map-entry path.
@@ -2427,7 +2433,7 @@ formatter.
 - @satisfies REQ-223
 - @satisfies REQ-231
 
-### fn `def build_info_tree(path_text: str | None = None) -> ConfigTreeNode` (L1260-1285)
+### fn `def build_info_tree(path_text: str | None = None) -> ConfigTreeNode` (L1266-1291)
 - @brief Build the `--info` display tree for the whole schema or one path.
 - @details Uses the same node model as `--print`; only the heading and detail formatters differ. A requested path becomes the marker-free display root.
 - @param path_text {str | None} Optional canonical path selector.
@@ -2436,7 +2442,7 @@ formatter.
 - @satisfies REQ-222
 - @satisfies REQ-223
 
-### fn `def render_config_tree(root: ConfigTreeNode) -> tuple[str, ...]` (L1286-1308)
+### fn `def render_config_tree(root: ConfigTreeNode) -> tuple[str, ...]` (L1292-1314)
 - @brief Render one configuration tree into deterministic output lines.
 - @details Implements the normative prefix algorithm: the display root has no marker, every real node has exactly one `├── ` or `└── ` marker preceded by one ancestor segment per ancestor with a later sibling, and every attached detail line uses the owner ancestor segments plus one own continuation segment. Table lines are details and never add a structural depth.
 - @param root {ConfigTreeNode} Display root node.
@@ -2446,9 +2452,9 @@ formatter.
 - @satisfies REQ-225
 - @satisfies REQ-226
 
-### fn `def _emit_config_node(` `priv` (L1309-1313)
+### fn `def _emit_config_node(` `priv` (L1315-1319)
 
-### fn `def _resolve_text_stream(stream: TextIO | None, *, error: bool) -> TextIO` `priv` (L1342-1354)
+### fn `def _resolve_text_stream(stream: TextIO | None, *, error: bool) -> TextIO` `priv` (L1348-1360)
 - @brief Emit one real configuration node and its subtree.
 - @brief Resolve one text output stream with late-bound defaults.
 - @param node {ConfigTreeNode} Node to emit.
@@ -2463,23 +2469,23 @@ formatter.
 - @satisfies REQ-225
 - @satisfies REQ-217
 
-### fn `def _write_lines(stream: TextIO, lines: Sequence[str]) -> None` `priv` (L1355-1367)
+### fn `def _write_lines(stream: TextIO, lines: Sequence[str]) -> None` `priv` (L1361-1373)
 - @brief Write complete output lines to one text stream.
 - @param stream {TextIO} Destination text stream.
 - @param lines {Sequence[str]} Lines without trailing newlines.
 - @return {None} Function return value.
 - @satisfies REQ-217
 
-### fn `def _write_diagnostic(stream: TextIO, message: str) -> None` `priv` (L1368-1379)
+### fn `def _write_diagnostic(stream: TextIO, message: str) -> None` `priv` (L1374-1385)
 - @brief Write one error diagnostic line to stderr.
 - @param stream {TextIO} Destination error stream.
 - @param message {str} Diagnostic text.
 - @return {None} Function return value.
 - @satisfies REQ-217
 
-### fn `def run_config_print(` (L1380-1384)
+### fn `def run_config_print(` (L1386-1390)
 
-### fn `def run_config_info(` (L1408-1412)
+### fn `def run_config_info(` (L1414-1418)
 - @brief Execute `--print` for the whole configuration or one path.
 - @param path_text {str | None} Optional canonical path selector.
 - @param stdout {TextIO | None} Optional stdout override.
@@ -2488,7 +2494,7 @@ formatter.
 - @satisfies REQ-217
 - @satisfies REQ-223
 
-### fn `def run_config_print_raw(` (L1435-1438)
+### fn `def run_config_print_raw(` (L1441-1444)
 - @brief Execute `--info` for the whole schema or one path.
 - @param path_text {str | None} Optional canonical path selector.
 - @param stdout {TextIO | None} Optional stdout override.
@@ -2497,7 +2503,7 @@ formatter.
 - @satisfies REQ-217
 - @satisfies REQ-222
 
-### fn `def run_config_get(` (L1477-1481)
+### fn `def run_config_get(` (L1483-1487)
 - @brief Execute `--print-raw` byte-preserving output.
 - @details Bootstraps a missing configuration file from schema defaults, then
 emits the selected file bytes exactly as stored without validation,
@@ -2508,7 +2514,7 @@ reformatting, headings, or appended text.
 - @satisfies REQ-216
 - @satisfies REQ-217
 
-### fn `def run_config_set(` (L1507-1511)
+### fn `def run_config_set(` (L1513-1517)
 - @brief Execute `--get` for one canonical path.
 - @details Emits exactly one JSON value plus one newline on stdout so the
 output can be piped into JSON tools.
@@ -2519,7 +2525,7 @@ output can be piped into JSON tools.
 - @satisfies REQ-215
 - @satisfies REQ-217
 
-### fn `def run_config_unset(` (L1535-1538)
+### fn `def run_config_unset(` (L1541-1544)
 - @brief Execute `--set` for one canonical path and value.
 - @param path_text {str} Canonical path text.
 - @param raw_value {str} Raw CLI value text.
@@ -2570,39 +2576,39 @@ output can be piped into JSON tools.
 |`format_unset_command`|fn|pub|511-520|def format_unset_command(path_text: str) -> str|
 |`display_width`|fn|pub|521-540|def display_width(text: str) -> int|
 |`format_config_table`|fn|pub|541-542|def format_config_table(|
-|`render_cells`|fn|pub|566-572|def render_cells(cells: Sequence[str]) -> str|
-|`render_border`|fn|pub|573-576|def render_border(left: str, junction: str, right: str) -...|
-|`validate_schema_value`|fn|pub|584-585|def validate_schema_value(|
-|`_validate_scalar_value`|fn|priv|633-638|def _validate_scalar_value(|
-|`validate_config_document`|fn|pub|707-740|def validate_config_document(document: Any) -> None|
-|`configuration_file_path`|fn|pub|741-752|def configuration_file_path() -> Path|
-|`display_configuration_path`|fn|pub|753-766|def display_configuration_path(path: Path) -> str|
-|`schema_default_document`|fn|pub|767-777|def schema_default_document() -> dict[str, Any]|
-|`load_config_document`|fn|pub|778-820|def load_config_document(*, create_if_missing: bool) -> d...|
-|`get_config_value`|fn|pub|821-845|def get_config_value(document: dict[str, Any], resolved: ...|
-|`_parse_json_text`|fn|priv|846-858|def _parse_json_text(raw_value: str) -> tuple[bool, Any]|
-|`parse_cli_value`|fn|pub|859-926|def parse_cli_value(resolved: ResolvedConfigPath, raw_val...|
-|`set_config_value`|fn|pub|927-928|def set_config_value(|
-|`unset_config_value`|fn|pub|956-957|def unset_config_value(|
-|`_persist_config_document`|fn|priv|991-1008|def _persist_config_document(document: dict[str, Any]) ->...|
-|`format_print_parameter`|fn|pub|1009-1010|def format_print_parameter(|
-|`build_print_tree`|fn|pub|1069-1070|def build_print_tree(|
-|`_selection_rows`|fn|priv|1113-1131|def _selection_rows(spec: ConfigParamSpec) -> tuple[tuple...|
-|`format_selection_state_table`|fn|pub|1132-1133|def format_selection_state_table(|
-|`build_info_parameter`|fn|pub|1155-1211|def build_info_parameter(spec: ConfigParamSpec) -> Config...|
-|`build_info_map_key`|fn|pub|1212-1259|def build_info_map_key(resolved: ResolvedConfigPath) -> C...|
-|`build_info_tree`|fn|pub|1260-1285|def build_info_tree(path_text: str | None = None) -> Conf...|
-|`render_config_tree`|fn|pub|1286-1308|def render_config_tree(root: ConfigTreeNode) -> tuple[str...|
-|`_emit_config_node`|fn|priv|1309-1313|def _emit_config_node(|
-|`_resolve_text_stream`|fn|priv|1342-1354|def _resolve_text_stream(stream: TextIO | None, *, error:...|
-|`_write_lines`|fn|priv|1355-1367|def _write_lines(stream: TextIO, lines: Sequence[str]) ->...|
-|`_write_diagnostic`|fn|priv|1368-1379|def _write_diagnostic(stream: TextIO, message: str) -> None|
-|`run_config_print`|fn|pub|1380-1384|def run_config_print(|
-|`run_config_info`|fn|pub|1408-1412|def run_config_info(|
-|`run_config_print_raw`|fn|pub|1435-1438|def run_config_print_raw(|
-|`run_config_get`|fn|pub|1477-1481|def run_config_get(|
-|`run_config_set`|fn|pub|1507-1511|def run_config_set(|
-|`run_config_unset`|fn|pub|1535-1538|def run_config_unset(|
+|`render_cells`|fn|pub|572-578|def render_cells(cells: Sequence[str]) -> str|
+|`render_border`|fn|pub|579-582|def render_border(left: str, junction: str, right: str, f...|
+|`validate_schema_value`|fn|pub|590-591|def validate_schema_value(|
+|`_validate_scalar_value`|fn|priv|639-644|def _validate_scalar_value(|
+|`validate_config_document`|fn|pub|713-746|def validate_config_document(document: Any) -> None|
+|`configuration_file_path`|fn|pub|747-758|def configuration_file_path() -> Path|
+|`display_configuration_path`|fn|pub|759-772|def display_configuration_path(path: Path) -> str|
+|`schema_default_document`|fn|pub|773-783|def schema_default_document() -> dict[str, Any]|
+|`load_config_document`|fn|pub|784-826|def load_config_document(*, create_if_missing: bool) -> d...|
+|`get_config_value`|fn|pub|827-851|def get_config_value(document: dict[str, Any], resolved: ...|
+|`_parse_json_text`|fn|priv|852-864|def _parse_json_text(raw_value: str) -> tuple[bool, Any]|
+|`parse_cli_value`|fn|pub|865-932|def parse_cli_value(resolved: ResolvedConfigPath, raw_val...|
+|`set_config_value`|fn|pub|933-934|def set_config_value(|
+|`unset_config_value`|fn|pub|962-963|def unset_config_value(|
+|`_persist_config_document`|fn|priv|997-1014|def _persist_config_document(document: dict[str, Any]) ->...|
+|`format_print_parameter`|fn|pub|1015-1016|def format_print_parameter(|
+|`build_print_tree`|fn|pub|1075-1076|def build_print_tree(|
+|`_selection_rows`|fn|priv|1119-1137|def _selection_rows(spec: ConfigParamSpec) -> tuple[tuple...|
+|`format_selection_state_table`|fn|pub|1138-1139|def format_selection_state_table(|
+|`build_info_parameter`|fn|pub|1161-1217|def build_info_parameter(spec: ConfigParamSpec) -> Config...|
+|`build_info_map_key`|fn|pub|1218-1265|def build_info_map_key(resolved: ResolvedConfigPath) -> C...|
+|`build_info_tree`|fn|pub|1266-1291|def build_info_tree(path_text: str | None = None) -> Conf...|
+|`render_config_tree`|fn|pub|1292-1314|def render_config_tree(root: ConfigTreeNode) -> tuple[str...|
+|`_emit_config_node`|fn|priv|1315-1319|def _emit_config_node(|
+|`_resolve_text_stream`|fn|priv|1348-1360|def _resolve_text_stream(stream: TextIO | None, *, error:...|
+|`_write_lines`|fn|priv|1361-1373|def _write_lines(stream: TextIO, lines: Sequence[str]) ->...|
+|`_write_diagnostic`|fn|priv|1374-1385|def _write_diagnostic(stream: TextIO, message: str) -> None|
+|`run_config_print`|fn|pub|1386-1390|def run_config_print(|
+|`run_config_info`|fn|pub|1414-1418|def run_config_info(|
+|`run_config_print_raw`|fn|pub|1441-1444|def run_config_print_raw(|
+|`run_config_get`|fn|pub|1483-1487|def run_config_get(|
+|`run_config_set`|fn|pub|1513-1517|def run_config_set(|
+|`run_config_unset`|fn|pub|1541-1544|def run_config_unset(|
 
 
 ---

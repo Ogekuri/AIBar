@@ -233,16 +233,18 @@ def test_selection_table_marks_exactly_one_active_row() -> None:
     @return {None} Function return value.
     @satisfies TST-090
     @satisfies TST-092
+    @satisfies REQ-267
+    @satisfies REQ-268
     """
     spec = CONFIG_PARAM_SPECS_BY_KEY["currency_symbols"]
     expected_lines = (
-        "┌─────┬───────┐",
+        "╭─────┬───────╮",
         "│ Sel │ Value │",
-        "├─────┼───────┤",
+        "╞═════╪═══════╡",
         '│ [*] │ "$"   │',
         '│ [ ] │ "£"   │',
         '│ [ ] │ "€"   │',
-        "└─────┴───────┘",
+        "╰─────┴───────╯",
     )
     lines = format_selection_state_table(spec, "$")
     assert lines == expected_lines
@@ -255,13 +257,15 @@ def test_object_table_columns_match_schema_fields() -> None:
     @return {None} Function return value.
     @satisfies TST-090
     @satisfies TST-092
+    @satisfies REQ-267
+    @satisfies REQ-268
     """
     expected_lines = (
-        "┌─────────┬───────┐",
+        "╭─────────┬───────╮",
         "│ Key     │ Value │",
-        "├─────────┼───────┤",
+        "╞═════════╪═══════╡",
         '│ "codex" │ false │',
-        "└─────────┴───────┘",
+        "╰─────────┴───────╯",
     )
     lines = format_config_table(("Key", "Value"), (('"codex"', "false"),))
     assert lines == expected_lines
@@ -272,15 +276,17 @@ def test_table_measures_wide_and_escaped_cells() -> None:
     @brief Verify display-width measurement for wide and escaped cell data.
     @return {None} Function return value.
     @satisfies TST-092
+    @satisfies REQ-267
+    @satisfies REQ-268
     """
     assert display_width("漢字") == 4
     assert display_width("a\\nb") == 4
     expected_lines = (
-        "┌─────────┬────────────────┐",
+        "╭─────────┬────────────────╮",
         "│ Pattern │ Value          │",
-        "├─────────┼────────────────┤",
+        "╞═════════╪════════════════╡",
         '│ "漢字"  │ "line1\\nline2" │',
-        "└─────────┴────────────────┘",
+        "╰─────────┴────────────────╯",
     )
     lines = format_config_table(("Pattern", "Value"), (('"漢字"', '"line1\\nline2"'),))
     assert lines == expected_lines
@@ -314,8 +320,8 @@ def test_populated_map_attaches_key_value_table() -> None:
     assert node.heading == (
         "enabled_providers = (2 entries | key target: enabled_providers:<Key>)"
     )
-    assert node.details[0] == "┌──────────┬───────┐"
-    assert node.details[-1] == "└──────────┴───────┘"
+    assert node.details[0] == "╭──────────┬───────╮"
+    assert node.details[-1] == "╰──────────┴───────╯"
 
 
 def test_requested_subtree_root_has_no_marker_and_four_space_details() -> None:
@@ -327,13 +333,13 @@ def test_requested_subtree_root_has_no_marker_and_four_space_details() -> None:
     document = {"currency_symbols": {"openai": "$"}}
     expected_output = (
         'currency_symbols:openai = "$"\n'
-        "    ┌─────┬───────┐\n"
+        "    ╭─────┬───────╮\n"
         "    │ Sel │ Value │\n"
-        "    ├─────┼───────┤\n"
+        "    ╞═════╪═══════╡\n"
         '    │ [*] │ "$"   │\n'
         '    │ [ ] │ "£"   │\n'
         '    │ [ ] │ "€"   │\n'
-        "    └─────┴───────┘\n"
+        "    ╰─────┴───────╯\n"
     )
     assert _render(build_print_tree(document, "currency_symbols:openai")) == (
         expected_output

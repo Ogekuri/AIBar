@@ -25,7 +25,7 @@ TREE_BRANCH = "├── "
 TREE_LAST = "└── "
 TREE_INDENT = "    "
 TREE_CONTINUE = "│   "
-TABLE_BORDER_CHARACTERS = frozenset("┌┬┐├┼┤└┴┘│")
+TABLE_BORDER_CHARACTERS = frozenset("╭╮╰╯┬┴│╞╡╪")
 
 
 def _patch_config_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
@@ -187,18 +187,18 @@ def _table_blocks(lines: list[str]) -> list[tuple[list[str], list[str]]]:
     current_content: list[str] = []
     for line in lines:
         segments, content = _split_segments(line)
-        if content.startswith("┌"):
+        if content.startswith("╭"):
             current_prefix = segments
             current_content = [content]
             continue
         if current_prefix is not None:
             current_content.append(content)
-            if content.startswith("└"):
+            if content.startswith("╰"):
                 blocks.append((current_prefix, current_content))
                 current_prefix = None
                 current_content = []
                 continue
-    assert current_prefix is None, "Table block MUST terminate with `└`."
+    assert current_prefix is None, "Table block MUST terminate with `╰`."
     return blocks
 
 
@@ -207,11 +207,15 @@ def _validate_tables(lines: list[str]) -> int:
     @brief Validate rectangular table layout and owner anchoring.
     @details Asserts every block shares one owner prefix, one display width, and
     one set of border-column positions, and that the prefix equals the owner
-    detail prefix derived from the surrounding tree.
+    detail prefix derived from the surrounding tree. Frame characters follow
+    the rounded-border table contract: `╭`/`╰` corners, `╞` header-separator
+    cap, and `│` row borders (REQ-267, REQ-268).
     @param lines {list[str]} Physical output lines.
     @return {int} Number of validated tables.
     @throws {AssertionError} When any table invariant is violated.
     @satisfies TST-092
+    @satisfies REQ-267
+    @satisfies REQ-268
     """
     blocks = _table_blocks(lines)
     node_positions = [
@@ -233,7 +237,7 @@ def _validate_tables(lines: list[str]) -> int:
         }
         assert len(column_sets) == 1, "Table separators MUST align in columns."
         assert all(
-            content.startswith(("┌", "├", "└", "│")) for content in content_lines
+            content.startswith(("╭", "╞", "╰", "│")) for content in content_lines
         ), "Table lines MUST start with a frame character."
         block_start = next(
             index
@@ -374,6 +378,8 @@ def test_full_print_anchors_map_table_to_owner_detail_prefix(
     @param tmp_path {Path} Temporary path fixture.
     @return {None} Function return value.
     @satisfies TST-092
+    @satisfies REQ-267
+    @satisfies REQ-268
     """
     config_dir = _patch_config_paths(monkeypatch, tmp_path)
     _seed_document(config_dir)
@@ -383,5 +389,5 @@ def test_full_print_anchors_map_table_to_owner_detail_prefix(
     table_lines = [line for line in output_lines if '│ "codex"' in line]
     assert len(table_lines) == 1
     assert table_lines[0].startswith("│   │ ")
-    assert "│   ┌──────────┬───────┐" in output_lines
-    assert "│   └──────────┴───────┘" in output_lines
+    assert "│   ╭──────────┬───────╮" in output_lines
+    assert "│   ╰──────────┴───────╯" in output_lines
